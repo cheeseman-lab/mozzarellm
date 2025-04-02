@@ -1,0 +1,6 @@
+set_id,name,genes,description
+GS001,Cell Cycle,CCNA2;CCNB1;CDC20;CDK1;CDKN3;CENPF;PLK1;TOP2A;UBE2C,Genes involved in cell cycle regulation
+GS002,Immune Response,CD3D;CD3E;CD2;CD8A;CCL5;CXCL10;GZMA;GZMB;IFNG;PRF1,Genes involved in immune response
+GS003,Neural Development,NEUROD1;NEUROG2;ASCL1;DLL1;HES1;HEY1;NOTCH1;SOX2;PAX6;NES,Genes involved in neural development
+GS004,Oxidative Phosphorylation,ATP5A1;ATP5B;COX4I1;COX5A;NDUFA2;NDUFB8;SDHA;SDHB;UQCRC1;UQCRC2,Genes involved in cellular energy production
+GS005,DNA Repair,BRCA1;BRCA2;ATM;ATR;RAD51;TP53;CHEK1;CHEK2;PARP1;XRCC5,Genes involved in DNA damage repair
