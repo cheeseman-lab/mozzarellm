@@ -53,130 +53,118 @@ def process_analysis(analysis_text):
 def process_cluster_analysis(analysis_text):
     """
     Process the cluster analysis output from an LLM into structured components.
+    Expects a JSON formatted response.
 
     Args:
-        analysis_text: Raw text response from LLM
+        analysis_text: Raw text response from LLM with JSON content
 
     Returns:
         result_dict: Dictionary with structured analysis
     """
-    # Initialize result dictionary
+    # Initialize default result dictionary
     result_dict = {
         "cluster_id": None,
-        "dominant_process": None,
-        "confidence": None,
-        "known_members": {},
-        "novel_members": {},
-        "summary_hypothesis": None,
+        "dominant_process": "Unknown",
+        "pathway_confidence": "Low",
+        "genes": [],
+        "summary": "",
         "raw_text": analysis_text,
     }
 
-    # Extract cluster ID
-    cluster_match = re.search(r"Cluster ID:?\s*(\w+)", analysis_text)
-    if cluster_match:
-        result_dict["cluster_id"] = cluster_match.group(1).strip()
+    try:
+        # Try to extract JSON from the text
+        # First, find JSON object in the text (in case there's other text around it)
+        json_start = analysis_text.find("{")
+        json_end = analysis_text.rfind("}") + 1
 
-    # Extract dominant process - updated regex to be more flexible
-    process_match = re.search(
-        r"Dominant Process Name:?\s*(.*?)(?:\n|$)", analysis_text, re.IGNORECASE
-    )
-    if process_match:
-        result_dict["dominant_process"] = process_match.group(1).strip()
+        if json_start >= 0 and json_end > json_start:
+            json_text = analysis_text[json_start:json_end]
+            # Parse the JSON
+            analysis_json = json.loads(json_text)
 
-    # Extract confidence level - updated to handle different formats
-    confidence_match = re.search(
-        r"LLM confidence:?\s*(High|Medium|Low)", analysis_text, re.IGNORECASE
-    )
-    if confidence_match:
-        result_dict["confidence"] = confidence_match.group(1).strip()
+            # Extract the structured data
+            result_dict.update(analysis_json)
 
-    # Improved regex for extracting known pathway members section
-    known_section_match = re.search(
-        r"Known pathway members:(.*?)(?:Potential novel members:|$)",
-        analysis_text,
-        re.DOTALL,
-    )
-    if known_section_match:
-        known_section = known_section_match.group(1).strip()
-        # Process each line in the known members section
-        for line in known_section.split("\n"):
-            line = line.strip()
-            if line.startswith("-"):
-                gene_info_match = re.match(r"-\s*([\w\d]+):\s*(.*)", line)
-                if gene_info_match:
-                    gene, description = gene_info_match.groups()
-                    result_dict["known_members"][gene.strip()] = description.strip()
+            # Ensure cluster_id is a string
+            if "cluster_id" in result_dict:
+                result_dict["cluster_id"] = str(result_dict["cluster_id"])
 
-    # Improved regex for potential novel members section
-    novel_section_match = re.search(
-        r"Potential novel members:(.*?)(?:Summary hypothesis:|$)",
-        analysis_text,
-        re.DOTALL,
-    )
-    if novel_section_match:
-        novel_section = novel_section_match.group(1).strip()
-        # Process each line in the novel members section
-        for line in novel_section.split("\n"):
-            line = line.strip()
-            if line.startswith("-"):
-                gene_info_match = re.match(r"-\s*([\w\d]+):\s*(.*)", line)
-                if gene_info_match:
-                    gene, evidence = gene_info_match.groups()
-                    result_dict["novel_members"][gene.strip()] = evidence.strip()
+            return result_dict
+        else:
+            logging.warning("No JSON object found in analysis text")
+            return result_dict
 
-    # Extract summary hypothesis with improved regex
-    summary_match = re.search(
-        r"Summary hypothesis:(.*?)(?:$)", analysis_text, re.DOTALL
-    )
-    if summary_match:
-        result_dict["summary_hypothesis"] = summary_match.group(1).strip()
-
-    # Special handling for functionally diverse clusters
-    if "Functionally diverse cluster" in analysis_text:
-        result_dict["dominant_process"] = "Functionally diverse cluster"
-        result_dict["confidence"] = "Low"
-
-    return result_dict
+    except json.JSONDecodeError as e:
+        logging.error(f"Failed to parse JSON from analysis: {e}")
+        logging.debug(f"Problematic text: {analysis_text}")
+        return result_dict
+    except Exception as e:
+        logging.error(f"Error processing cluster analysis: {e}")
+        return result_dict
 
 
 def process_batch_cluster_analysis(analysis_text):
     """
-    Process batch cluster analysis by splitting the response into individual cluster analyses.
+    Process batch cluster analysis by extracting results from a JSON array.
 
     Args:
-        analysis_text: Raw text response containing multiple cluster analyses
+        analysis_text: Raw text response containing a JSON array of cluster analyses
 
     Returns:
         clusters_dict: Dictionary mapping cluster IDs to their analysis results
     """
     clusters_dict = {}
 
-    # Split the text into individual cluster analyses using a more robust pattern
-    # This handles different ways the model might format multiple cluster outputs
-    cluster_blocks = re.split(r"\n+Cluster ID:", analysis_text)
+    try:
+        # Try to extract JSON array from the text
+        # First, find JSON array in the text (in case there's other text around it)
+        json_start = analysis_text.find("[")
+        json_end = analysis_text.rfind("]") + 1
 
-    # Process each cluster block
-    for i, block in enumerate(cluster_blocks):
-        if i == 0 and not block.strip().startswith("Cluster ID:"):
-            # If first block doesn't start with "Cluster ID:",
-            # it might be an intro or header - check if it contains a cluster ID
-            if "Cluster ID:" in block:
-                block = block[block.find("Cluster ID:") :]
-            else:
-                continue  # Skip this block if no cluster ID found
+        if json_start >= 0 and json_end > json_start:
+            json_text = analysis_text[json_start:json_end]
+            # Parse the JSON array
+            analysis_array = json.loads(json_text)
 
-        # Reconstruct the cluster ID prefix if needed (except for first block that already has it)
-        if i > 0 or not block.strip().startswith("Cluster ID:"):
-            block = "Cluster ID:" + block
+            # Process each cluster in the array
+            for cluster_analysis in analysis_array:
+                # Ensure each cluster has required fields
+                if "cluster_id" in cluster_analysis:
+                    cluster_id = str(cluster_analysis["cluster_id"])
+                    # Add raw text to each cluster
+                    cluster_analysis["raw_text"] = analysis_text
+                    clusters_dict[cluster_id] = cluster_analysis
 
-        # Process this individual cluster analysis
-        result = process_cluster_analysis(block)
-        cluster_id = result["cluster_id"]
+            return clusters_dict
 
-        if cluster_id:
-            clusters_dict[cluster_id] = result
+        # If no array found, try to find a single JSON object
+        json_start = analysis_text.find("{")
+        json_end = analysis_text.rfind("}") + 1
 
-    return clusters_dict
+        if json_start >= 0 and json_end > json_start:
+            json_text = analysis_text[json_start:json_end]
+            # Parse the JSON
+            analysis_json = json.loads(json_text)
+
+            # Check if this is a single cluster
+            if "cluster_id" in analysis_json:
+                cluster_id = str(analysis_json["cluster_id"])
+                # Add raw text
+                analysis_json["raw_text"] = analysis_text
+                clusters_dict[cluster_id] = analysis_json
+
+            return clusters_dict
+
+        logging.warning("No JSON array or object found in batch analysis text")
+        return clusters_dict
+
+    except json.JSONDecodeError as e:
+        logging.error(f"Failed to parse JSON from batch analysis: {e}")
+        logging.debug(f"Problematic text: {analysis_text}")
+        return clusters_dict
+    except Exception as e:
+        logging.error(f"Error processing batch cluster analysis: {e}")
+        return clusters_dict
 
 
 def save_progress(df, analysis_dict, out_file_base):
@@ -206,7 +194,7 @@ def save_cluster_analysis(clusters_dict, out_file_base, include_raw=True):
     Save cluster analysis results to JSON and summary CSV.
 
     Args:
-        clusters_dict: Dictionary with cluster analysis results
+        clusters_dict: Dictionary with cluster analysis results in JSON format
         out_file_base: Base filename for output files (without extension)
         include_raw: Whether to include raw text in JSON output
     """
@@ -218,7 +206,11 @@ def save_cluster_analysis(clusters_dict, out_file_base, include_raw=True):
     if os.path.exists(json_path):
         try:
             with open(json_path, "r") as f:
-                existing_clusters = json.load(f)
+                existing_data = json.load(f)
+                if "clusters" in existing_data:
+                    existing_clusters = existing_data["clusters"]
+                else:
+                    existing_clusters = existing_data
             logging.info(
                 f"Loaded {len(existing_clusters)} existing clusters from {json_path}"
             )
@@ -248,20 +240,47 @@ def save_cluster_analysis(clusters_dict, out_file_base, include_raw=True):
     with open(json_path, "w") as f:
         json.dump(output_data, f, indent=2)
 
-    # Create summary DataFrame with additional stats
+    # Create summary DataFrame with gene details
     summary_data = []
     for cluster_id, analysis in combined_clusters.items():
-        summary_row = {
+        # Basic cluster info
+        cluster_info = {
             "cluster_id": cluster_id,
             "dominant_process": analysis.get("dominant_process", "Unknown"),
-            "confidence": analysis.get("confidence", "Unknown"),
-            "known_members_count": len(analysis.get("known_members", {})),
-            "novel_members_count": len(analysis.get("novel_members", {})),
-            "known_members": "; ".join(analysis.get("known_members", {}).keys()),
-            "novel_members": "; ".join(analysis.get("novel_members", {}).keys()),
-            "summary_hypothesis": analysis.get("summary_hypothesis", "None provided"),
+            "pathway_confidence": analysis.get("pathway_confidence", "Unknown"),
+            "gene_count": len(analysis.get("genes", [])),
+            "summary": analysis.get("summary", "None provided"),
         }
-        summary_data.append(summary_row)
+
+        # Count genes by classification and priority
+        if "genes" in analysis and analysis["genes"]:
+            classifications = {
+                "ESTABLISHED": 0,
+                "CHARACTERIZED": 0,
+                "UNCHARACTERIZED": 0,
+            }
+            high_priority_genes = []
+
+            for gene_info in analysis["genes"]:
+                # Count by classification
+                classification = gene_info.get("classification", "Unknown")
+                if classification in classifications:
+                    classifications[classification] += 1
+
+                # Track high priority genes (priority >= 8)
+                priority = gene_info.get("follow_up_priority", 0)
+                if isinstance(priority, (int, float)) and priority >= 8:
+                    high_priority_genes.append(gene_info.get("gene", "Unknown"))
+
+            # Add classification counts to cluster info
+            for classification, count in classifications.items():
+                cluster_info[f"{classification.lower()}_count"] = count
+
+            # Add high priority genes
+            cluster_info["high_priority_genes"] = "; ".join(high_priority_genes)
+            cluster_info["high_priority_count"] = len(high_priority_genes)
+
+        summary_data.append(cluster_info)
 
     # Convert to DataFrame and save
     if summary_data:
