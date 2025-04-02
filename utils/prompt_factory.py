@@ -39,8 +39,7 @@ ANALYSIS: [your detailed explanation]
 
 def make_cluster_analysis_prompt(cluster_id, genes, gene_features=None):
     """
-    Create a prompt for gene cluster analysis with standardized JSON output.
-    Works for single cluster analysis.
+    Create a prompt for gene cluster analysis with concise JSON output focusing on novel genes.
 
     Args:
         cluster_id: Identifier for the cluster
@@ -53,56 +52,63 @@ def make_cluster_analysis_prompt(cluster_id, genes, gene_features=None):
     gene_list = ", ".join(genes)
 
     prompt = f"""
-Analyze gene cluster {cluster_id} to identify the dominant biological function and prioritize genes for follow-up:
+Analyze gene cluster {cluster_id} to identify the dominant biological function and prioritize truly UNCHARACTERIZED genes for follow-up:
 
 Genes: {gene_list}
 
 Follow these steps:
 1. Identify the dominant biological process, focusing on specific pathways rather than general terms
-2. Classify each gene as either:
-   - ESTABLISHED: Well-known member of the identified pathway with clear functional role
-   - CHARACTERIZED: Gene with known functions, but not primarily associated with this pathway
-   - UNCHARACTERIZED: Gene with minimal functional annotation or unclear biological role
+2. Classify genes into three categories using these strict definitions:
+   - ESTABLISHED: Well-known members of the identified pathway with clear functional roles in this pathway
+   - CHARACTERIZED: Genes with ANY published functional annotation, even if not associated with this pathway
+   - UNCHARACTERIZED: Only genes with minimal to no functional annotation in published literature
 
-3. Score each gene on a follow-up priority scale (1-10):
-   - 8-10: Highest priority - uncharacterized genes in well-defined pathways OR characterized genes 
-     with strong evidence for unexpected associations that challenge current paradigms
-   - 6-7: High priority - characterized genes with preliminary evidence for novel pathway associations
-     OR uncharacterized genes in less well-defined pathways
-   - 4-5: Medium priority - genes with emerging roles in this pathway requiring validation
-   - 2-3: Low priority - genes likely involved but with extensive existing literature
-   - 1: Not recommended for follow-up - well-established pathway components
+Apply these stringent criteria for UNCHARACTERIZED genes - a gene is only UNCHARACTERIZED if ALL of these are true:
+- Limited or no experimental validation of function in any pathway
+- Few or no publications specifically focused on this gene
+- Unknown molecular function or biological process
+- No characterized protein domains that clearly indicate function
+- Lacks established interaction partners that would suggest function
 
-Provide your analysis in this EXACT JSON format:
+3. For each truly UNCHARACTERIZED gene, assign a follow-up priority score (1-10):
+   - 8-10: Highest priority - completely novel gene with strong evidence for pathway involvement
+   - 6-7: High priority - very limited characterization with good evidence for pathway connection
+   - 4-5: Medium priority - some preliminary characterization but potential novel pathway role
+   - 1-3: Lower priority - more characterized than initially appeared or weak pathway evidence
+
+Provide a concise analysis in this exact JSON format:
 {{
   "cluster_id": "{cluster_id}",
   "dominant_process": "specific pathway name",
-  "pathway_confidence": "High (>70% of genes are established pathway members)/Medium (40-70% established)/Low (<40% established)",
-  "genes": [
+  "pathway_confidence": "High/Medium/Low",
+  "established_genes": ["GeneA", "GeneB"],
+  "characterized_genes": ["GeneC", "GeneD"],
+  "novel_genes": [
     {{
-      "gene": "GeneA",
-      "classification": "ESTABLISHED/CHARACTERIZED/UNCHARACTERIZED",
-      "follow_up_priority": 1-10,
-      "rationale": "one-sentence explanation of classification and priority score"
+      "gene": "GeneE",
+      "priority": 8,
+      "rationale": "one-sentence explanation for why this uncharacterized gene may be a novel pathway member"
     }}
   ],
-  "summary": "one-sentence hypothesis about unexpected gene-pathway associations"
+  "summary": "one-sentence hypothesis about the most promising novel genes"
 }}
 
-If no clear dominant function (>50% genes share a common pathway), return:
+For clusters with no clear dominant function, use:
 {{
   "cluster_id": "{cluster_id}",
   "dominant_process": "Functionally diverse cluster",
   "pathway_confidence": "Low",
-  "genes": []
+  "established_genes": [],
+  "characterized_genes": [],
+  "novel_genes": []
 }}
 
-Important requirements:
-- Output VALID JSON that can be parsed programmatically
-- Prioritize poorly characterized or uncharacterized genes with unclear functions
-- Give high scores to genes with known functions appearing in unexpected pathway contexts
-- Consider genes that might have context-specific roles under these experimental conditions
-- Be conservative in your scoring - experimental validation is expensive and time-consuming
+Important:
+- The entire response should be a single JSON array for the cluster
+- Be extremely strict about what qualifies as "UNCHARACTERIZED" - any gene with published functional studies should be classified as CHARACTERIZED
+- Only assign high priority (8-10) to genes that are truly uncharacterized AND have strong evidence for meaningful pathway association
+- When in doubt, classify a gene as CHARACTERIZED rather than UNCHARACTERIZED
+- Be conservative in scoring - experimental validation is expensive and time-consuming
 """
 
     if gene_features:
@@ -117,7 +123,7 @@ Important requirements:
 
 def make_batch_cluster_analysis_prompt(clusters, gene_features=None):
     """
-    Create a prompt for batch analysis of multiple gene clusters.
+    Create a prompt for batch analysis of multiple gene clusters with concise output.
 
     Args:
         clusters: Dictionary mapping cluster IDs to lists of genes
@@ -132,59 +138,63 @@ def make_batch_cluster_analysis_prompt(clusters, gene_features=None):
         clusters_text += f"Cluster {cluster_id}: {gene_list}\n\n"
 
     prompt = f"""
-Analyze the following gene clusters to identify dominant biological functions and prioritize genes for follow-up:
+Analyze the following gene clusters to identify dominant biological functions and prioritize UNCHARACTERIZED genes for follow-up:
 
 {clusters_text}
 
-For each cluster, follow these steps:
+Follow these steps:
 1. Identify the dominant biological process, focusing on specific pathways rather than general terms
-2. Classify each gene as either:
-   - ESTABLISHED: Well-known member of the identified pathway with clear functional role
-   - CHARACTERIZED: Gene with known functions, but not primarily associated with this pathway
-   - UNCHARACTERIZED: Gene with minimal functional annotation or unclear biological role
+2. Classify genes into three categories using these strict definitions:
+   - ESTABLISHED: Well-known members of the identified pathway with clear functional roles in this pathway
+   - CHARACTERIZED: Genes with ANY published functional annotation, even if not associated with this pathway
+   - UNCHARACTERIZED: Only genes with minimal to no functional annotation in published literature
 
-3. Score each gene on a follow-up priority scale (1-10):
-   - 8-10: Highest priority - uncharacterized genes in well-defined pathways OR characterized genes 
-     with strong evidence for unexpected associations that challenge current paradigms
-   - 6-7: High priority - characterized genes with preliminary evidence for novel pathway associations
-     OR uncharacterized genes in less well-defined pathways
-   - 4-5: Medium priority - genes with emerging roles in this pathway requiring validation
-   - 2-3: Low priority - genes likely involved but with extensive existing literature
-   - 1: Not recommended for follow-up - well-established pathway components
+Apply these stringent criteria for UNCHARACTERIZED genes - a gene is only UNCHARACTERIZED if ALL of these are true:
+- Limited or no experimental validation of function in any pathway
+- Few or no publications specifically focused on this gene
+- Unknown molecular function or biological process
+- No characterized protein domains that clearly indicate function
+- Lacks established interaction partners that would suggest function
 
-For each cluster, provide an analysis as part of a JSON array with this exact format:
-[
-  {{
-    "cluster_id": "cluster_number",
-    "dominant_process": "specific pathway name",
-    "pathway_confidence": "High (>70% of genes are established pathway members)/Medium (40-70% established)/Low (<40% established)",
-    "genes": [
-      {{
-        "gene": "GeneA",
-        "classification": "ESTABLISHED/CHARACTERIZED/UNCHARACTERIZED",
-        "follow_up_priority": 1-10,
-        "rationale": "one-sentence explanation of classification and priority score"
-      }}
-    ],
-    "summary": "one-sentence hypothesis about unexpected gene-pathway associations"
-  }}
-]
+3. For each truly UNCHARACTERIZED gene, assign a follow-up priority score (1-10):
+   - 8-10: Highest priority - completely novel gene with strong evidence for pathway involvement
+   - 6-7: High priority - very limited characterization with good evidence for pathway connection
+   - 4-5: Medium priority - some preliminary characterization but potential novel pathway role
+   - 1-3: Lower priority - more characterized than initially appeared or weak pathway evidence
 
-For clusters with no clear dominant function (>50% genes share a common pathway), use:
+Provide a concise analysis in this exact JSON format:
 {{
   "cluster_id": "cluster_number",
-  "dominant_process": "Functionally diverse cluster",
-  "pathway_confidence": "Low",
-  "genes": []
+  "dominant_process": "specific pathway name",
+  "pathway_confidence": "High/Medium/Low",
+  "established_genes": ["GeneA", "GeneB"],
+  "characterized_genes": ["GeneC", "GeneD"],
+  "novel_genes": [
+    {{
+      "gene": "GeneE",
+      "priority": 8,
+      "rationale": "one-sentence explanation for why this uncharacterized gene may be a novel pathway member"
+    }}
+  ],
+  "summary": "one-sentence hypothesis about the most promising novel genes"
 }}
 
-Important requirements:
-- Output VALID JSON that can be parsed programmatically
+For clusters with no clear dominant function, use:
+{{
+  "cluster_id": "{cluster_id}",
+  "dominant_process": "Functionally diverse cluster",
+  "pathway_confidence": "Low",
+  "established_genes": [],
+  "characterized_genes": [],
+  "novel_genes": []
+}}
+
+Important:
 - The entire response should be a single JSON array containing all cluster analyses
-- Prioritize poorly characterized or uncharacterized genes with unclear functions
-- Give high scores to genes with known functions appearing in unexpected pathway contexts
-- Consider genes that might have context-specific roles under these experimental conditions
-- Be conservative in your scoring - experimental validation is expensive and time-consuming
+- Be extremely strict about what qualifies as "UNCHARACTERIZED" - any gene with published functional studies should be classified as CHARACTERIZED
+- Only assign high priority (8-10) to genes that are truly uncharacterized AND have strong evidence for meaningful pathway association
+- When in doubt, classify a gene as CHARACTERIZED rather than UNCHARACTERIZED
+- Be conservative in scoring - experimental validation is expensive and time-consuming
 """
 
     if gene_features:

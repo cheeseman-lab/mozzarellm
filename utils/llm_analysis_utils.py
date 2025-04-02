@@ -191,7 +191,7 @@ def save_progress(df, analysis_dict, out_file_base):
 
 def save_cluster_analysis(clusters_dict, out_file_base, include_raw=True):
     """
-    Save cluster analysis results to JSON and summary CSV.
+    Save cluster analysis results to JSON and multiple CSV formats.
 
     Args:
         clusters_dict: Dictionary with cluster analysis results in JSON format
@@ -240,53 +240,209 @@ def save_cluster_analysis(clusters_dict, out_file_base, include_raw=True):
     with open(json_path, "w") as f:
         json.dump(output_data, f, indent=2)
 
-    # Create summary DataFrame with gene details
+    # Create summary DataFrame with focus on novel genes
     summary_data = []
     for cluster_id, analysis in combined_clusters.items():
-        # Basic cluster info
-        cluster_info = {
+        # Get basic cluster info
+        pathway_confidence = analysis.get("pathway_confidence", "Unknown")
+        dominant_process = analysis.get("dominant_process", "Unknown")
+
+        # Create base entry for this cluster
+        base_entry = {
             "cluster_id": cluster_id,
-            "dominant_process": analysis.get("dominant_process", "Unknown"),
-            "pathway_confidence": analysis.get("pathway_confidence", "Unknown"),
-            "gene_count": len(analysis.get("genes", [])),
+            "dominant_process": dominant_process,
+            "pathway_confidence": pathway_confidence,
+            "established_gene_count": len(analysis.get("established_genes", [])),
+            "characterized_gene_count": len(analysis.get("characterized_genes", [])),
+            "novel_gene_count": len(analysis.get("novel_genes", [])),
             "summary": analysis.get("summary", "None provided"),
+            "established_genes": ";".join(analysis.get("established_genes", [])),
+            "characterized_genes": ";".join(analysis.get("characterized_genes", [])),
         }
 
-        # Count genes by classification and priority
-        if "genes" in analysis and analysis["genes"]:
-            classifications = {
-                "ESTABLISHED": 0,
-                "CHARACTERIZED": 0,
-                "UNCHARACTERIZED": 0,
-            }
-            high_priority_genes = []
+        # If there are no novel genes, add just the base entry
+        if not analysis.get("novel_genes"):
+            summary_data.append(base_entry)
+            continue
 
-            for gene_info in analysis["genes"]:
-                # Count by classification
-                classification = gene_info.get("classification", "Unknown")
-                if classification in classifications:
-                    classifications[classification] += 1
+        # For clusters with novel genes, create expanded entries
+        # First entry contains all the base information
+        novel_genes_list = []
+        novel_gene_priorities = []
 
-                # Track high priority genes (priority >= 8)
-                priority = gene_info.get("follow_up_priority", 0)
-                if isinstance(priority, (int, float)) and priority >= 8:
-                    high_priority_genes.append(gene_info.get("gene", "Unknown"))
+        for novel_gene in analysis.get("novel_genes", []):
+            gene_name = novel_gene.get("gene", "Unknown")
+            priority = novel_gene.get("priority", 0)
+            rationale = novel_gene.get("rationale", "")
 
-            # Add classification counts to cluster info
-            for classification, count in classifications.items():
-                cluster_info[f"{classification.lower()}_count"] = count
+            novel_genes_list.append(f"{gene_name}:{priority}")
+            novel_gene_priorities.append(priority)
 
-            # Add high priority genes
-            cluster_info["high_priority_genes"] = "; ".join(high_priority_genes)
-            cluster_info["high_priority_count"] = len(high_priority_genes)
+            # Add individual novel gene entries for detailed view
+            gene_entry = base_entry.copy()
+            gene_entry["novel_gene"] = gene_name
+            gene_entry["priority"] = priority
+            gene_entry["rationale"] = rationale
 
-        summary_data.append(cluster_info)
+            summary_data.append(gene_entry)
+
+        # Update the base entry with novel gene info and add it
+        base_entry["novel_genes"] = ";".join(novel_genes_list)
+        base_entry["max_priority"] = (
+            max(novel_gene_priorities) if novel_gene_priorities else 0
+        )
+        base_entry["avg_priority"] = (
+            sum(novel_gene_priorities) / len(novel_gene_priorities)
+            if novel_gene_priorities
+            else 0
+        )
+
+        # Add base entry (will be duplicate of some info but useful for summary views)
+        summary_data.append(base_entry)
 
     # Convert to DataFrame and save
     if summary_data:
+        # Convert to DataFrame
         summary_df = pd.DataFrame(summary_data)
+
+        # Save complete detailed view
         csv_path = f"{out_file_base}_summary.csv"
         summary_df.to_csv(csv_path, index=False)
+
+        # Create and save a prioritized view focusing on novel genes
+        try:
+            # Extract rows with novel gene information
+            novel_gene_df = summary_df.dropna(subset=["novel_gene"]).copy()
+
+            # Sort by pathway confidence (High > Medium > Low) and priority score (descending)
+            confidence_order = {"High": 3, "Medium": 2, "Low": 1, "Unknown": 0}
+            novel_gene_df["confidence_score"] = novel_gene_df[
+                "pathway_confidence"
+            ].apply(
+                lambda x: confidence_order.get(
+                    x.split()[0] if isinstance(x, str) else "Unknown", 0
+                )
+            )
+
+            # Sort by confidence and priority
+            novel_gene_df = novel_gene_df.sort_values(
+                ["confidence_score", "priority"], ascending=[False, False]
+            )
+
+            # Select and reorder columns for prioritized view
+            prioritized_columns = [
+                "cluster_id",
+                "novel_gene",
+                "priority",
+                "rationale",
+                "dominant_process",
+                "pathway_confidence",
+                "summary",
+            ]
+            prioritized_df = novel_gene_df[prioritized_columns]
+
+            # Save prioritized view
+            prioritized_path = f"{out_file_base}_prioritized.csv"
+            prioritized_df.to_csv(prioritized_path, index=False)
+
+            logging.info(f"Saved prioritized novel genes to {prioritized_path}")
+        except Exception as e:
+            logging.warning(f"Failed to create prioritized view: {e}")
+
+        # Create and save cluster-level analysis table
+        try:
+            # Create a DataFrame with one row per cluster
+            cluster_data = []
+
+            for cluster_id, analysis in combined_clusters.items():
+                pathway_confidence = analysis.get("pathway_confidence", "Unknown")
+                dominant_process = analysis.get("dominant_process", "Unknown")
+
+                # Count genes by category
+                established_count = len(analysis.get("established_genes", []))
+                characterized_count = len(analysis.get("characterized_genes", []))
+                novel_count = len(analysis.get("novel_genes", []))
+                total_count = established_count + characterized_count + novel_count
+
+                # Calculate pathway confidence score
+                confidence_order = {"High": 3, "Medium": 2, "Low": 1, "Unknown": 0}
+                confidence_score = confidence_order.get(
+                    pathway_confidence.split()[0]
+                    if isinstance(pathway_confidence, str)
+                    else "Unknown",
+                    0,
+                )
+
+                # Get novel gene statistics
+                novel_genes = []
+                novel_gene_priorities = []
+                high_priority_genes = []
+
+                for novel_gene in analysis.get("novel_genes", []):
+                    gene_name = novel_gene.get("gene", "Unknown")
+                    priority = novel_gene.get("priority", 0)
+
+                    novel_genes.append(gene_name)
+                    novel_gene_priorities.append(priority)
+
+                    if priority >= 8:
+                        high_priority_genes.append(f"{gene_name}:{priority}")
+
+                # Calculate cluster priority score based on:
+                # 1. Pathway confidence (3 for High, 2 for Medium, 1 for Low)
+                # 2. Number of high-priority novel genes (priority >= 8)
+                # 3. Average priority of novel genes
+                max_priority = (
+                    max(novel_gene_priorities) if novel_gene_priorities else 0
+                )
+                avg_priority = (
+                    sum(novel_gene_priorities) / len(novel_gene_priorities)
+                    if novel_gene_priorities
+                    else 0
+                )
+                high_priority_count = len(high_priority_genes)
+
+                # Combined score formula: confidence_score * (1 + high_priority_count/10) * max_priority/10
+                # This weights clusters by confidence first, then by novel gene potential
+                cluster_priority_score = (
+                    confidence_score
+                    * (1 + high_priority_count / 10)
+                    * (max_priority / 10)
+                )
+
+                # Create cluster entry
+                cluster_entry = {
+                    "cluster_id": cluster_id,
+                    "dominant_process": dominant_process,
+                    "pathway_confidence": pathway_confidence,
+                    "established_count": established_count,
+                    "characterized_count": characterized_count,
+                    "novel_count": novel_count,
+                    "total_genes": total_count,
+                    "max_novel_priority": max_priority,
+                    "avg_novel_priority": round(avg_priority, 2),
+                    "high_priority_count": high_priority_count,
+                    "high_priority_genes": ";".join(high_priority_genes),
+                    "cluster_priority_score": round(cluster_priority_score, 2),
+                    "summary": analysis.get("summary", "None provided"),
+                }
+
+                cluster_data.append(cluster_entry)
+
+            # Convert to DataFrame and sort by cluster priority score
+            cluster_df = pd.DataFrame(cluster_data)
+            cluster_df = cluster_df.sort_values(
+                "cluster_priority_score", ascending=False
+            )
+
+            # Save cluster analysis
+            cluster_path = f"{out_file_base}_clusters_ranked.csv"
+            cluster_df.to_csv(cluster_path, index=False)
+
+            logging.info(f"Saved ranked cluster analysis to {cluster_path}")
+        except Exception as e:
+            logging.warning(f"Failed to create cluster analysis table: {e}")
+
         logging.info(
             f"Cluster analysis saved to {json_path} and {csv_path} with {len(combined_clusters)} total clusters"
         )
