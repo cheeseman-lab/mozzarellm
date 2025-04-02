@@ -1,16 +1,16 @@
 def make_user_prompt_with_score(genes, gene_features=None):
     """
     Create a prompt for gene set analysis with explicit score request
-    
+
     Args:
         genes: List of gene identifiers
         gene_features: Optional dict of additional gene features
-        
+
     Returns:
         prompt: Formatted prompt string
     """
     gene_list = ", ".join(genes)
-    
+
     prompt = f"""
 I have a set of genes and need to identify their shared biological function or pathway.
 
@@ -33,23 +33,24 @@ ANALYSIS: [your detailed explanation]
             if gene in genes:
                 feature_text += f"{gene}: {features}\n"
         prompt += feature_text
-    
+
     return prompt
+
 
 def make_cluster_analysis_prompt(cluster_id, genes, gene_features=None):
     """
     Create a prompt for gene cluster analysis with focus on pathway discovery.
-    
+
     Args:
         cluster_id: Identifier for the cluster
         genes: List of gene identifiers in the cluster
         gene_features: Optional dict of additional gene features
-        
+
     Returns:
         prompt: Formatted prompt string
     """
     gene_list = ", ".join(genes)
-    
+
     prompt = f"""
 Analyze the following gene cluster (Cluster {cluster_id}) to identify the dominant biological function and potential novel pathway members:
 
@@ -93,17 +94,18 @@ Important requirements:
             if gene in genes:
                 feature_text += f"{gene}: {features}\n"
         prompt += feature_text
-    
+
     return prompt
+
 
 def make_batch_cluster_prompt(clusters, gene_features=None):
     """
     Create a prompt for batch analysis of multiple gene clusters to identify high-priority genes for follow-up.
-    
+
     Args:
         clusters: Dictionary mapping cluster IDs to lists of genes
         gene_features: Optional dict of additional gene features
-        
+
     Returns:
         prompt: Formatted prompt string
     """
@@ -111,7 +113,7 @@ def make_batch_cluster_prompt(clusters, gene_features=None):
     for cluster_id, genes in clusters.items():
         gene_list = ", ".join(genes)
         clusters_text += f"Cluster {cluster_id}: {gene_list}\n"
-    
+
     prompt = f"""
 Analyze the following gene clusters to identify dominant biological functions and prioritize genes for follow-up:
 {clusters_text}
@@ -169,5 +171,5 @@ Important requirements:
         for gene, features in gene_features.items():
             feature_text += f"{gene}: {features}\n"
         prompt += feature_text
-    
+
     return prompt
