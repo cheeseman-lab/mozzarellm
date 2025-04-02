@@ -1,7 +1,7 @@
-import requests
+import os
 import logging
 import time
-import os
+from openai import OpenAI
 
 def perplexity_chat(context, prompt, model, temperature, max_tokens, log_file):
     """
@@ -10,13 +10,14 @@ def perplexity_chat(context, prompt, model, temperature, max_tokens, log_file):
     Args:
         context: System context for the model
         prompt: User prompt to send
-        model: Model to use (e.g., "deepseek-coder")
+        model: Model to use (e.g., "deepseek-coder", "llama-3-70b", "mistral-large")
         temperature: Temperature setting for generation
         max_tokens: Maximum tokens to generate
         log_file: File to log API calls
         
     Returns:
         analysis_text: The model's response
+        error_message: Error message if any
     """
     logger = logging.getLogger(log_file)
     
@@ -26,55 +27,45 @@ def perplexity_chat(context, prompt, model, temperature, max_tokens, log_file):
         logger.error("PERPLEXITY_API_KEY not found in environment variables")
         return None, "API key not found"
     
-    # Set up the API endpoint
-    url = "https://api.perplexity.ai/chat/completions"
+    # Initialize OpenAI client with Perplexity base URL
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.perplexity.ai"
+    )
     
-    # Set up headers
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    # Set up the request data
-    data = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": context},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens
-    }
+    # Set up messages
+    messages = [
+        {"role": "system", "content": context},
+        {"role": "user", "content": prompt}
+    ]
     
     # Make API call with retry logic
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            response = requests.post(url, headers=headers, json=data)
+            # Create chat completion
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
             
-            # Check if the request was successful
-            if response.status_code == 200:
-                response_json = response.json()
-                analysis_text = response_json['choices'][0]['message']['content']
-                
-                # Log successful API call
-                logger.info(f"Perplexity API call successful: model={model}")
-                
-                return analysis_text, None
-            else:
-                error_message = f"API returned status code {response.status_code}: {response.text}"
-                logger.error(error_message)
-                
-                if attempt < max_retries - 1:
-                    time.sleep(2 ** attempt)  # Exponential backoff
-                else:
-                    return None, error_message
-                
+            # Extract the response text
+            analysis_text = response.choices[0].message.content
+            
+            # Log successful API call
+            logger.info(f"Perplexity API call successful: model={model}")
+            
+            return analysis_text, None
+            
         except Exception as e:
-            logger.error(f"Attempt {attempt+1}/{max_retries} failed: {str(e)}")
+            error_message = f"Attempt {attempt+1}/{max_retries} failed: {str(e)}"
+            logger.error(error_message)
+            
             if attempt < max_retries - 1:
                 time.sleep(2 ** attempt)  # Exponential backoff
             else:
-                return None, str(e)
+                return None, error_message
     
     return None, "Maximum retries exceeded"
