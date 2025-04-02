@@ -37,6 +37,112 @@ def process_analysis(analysis_text):
     
     return function_name, confidence_score, detailed_analysis
 
+def process_cluster_analysis(analysis_text):
+    """
+    Process the cluster analysis output from an LLM into structured components.
+    
+    Args:
+        analysis_text: Raw text response from LLM
+        
+    Returns:
+        result_dict: Dictionary with structured analysis
+    """
+    # Initialize result dictionary
+    result_dict = {
+        "cluster_id": None,
+        "dominant_process": None,
+        "confidence": None,
+        "known_members": {},
+        "novel_members": {},
+        "summary_hypothesis": None,
+        "raw_text": analysis_text
+    }
+    
+    # Extract cluster ID
+    cluster_match = re.search(r"Cluster ID:?\s*(\w+)", analysis_text)
+    if cluster_match:
+        result_dict["cluster_id"] = cluster_match.group(1).strip()
+    
+    # Extract dominant process
+    process_match = re.search(r"Dominant Process Name:?\s*(.*?)(?:\n|$)", analysis_text)
+    if process_match:
+        result_dict["dominant_process"] = process_match.group(1).strip()
+    
+    # Extract confidence level
+    confidence_match = re.search(r"LLM confidence:?\s*(High|Medium|Low)", analysis_text)
+    if confidence_match:
+        result_dict["confidence"] = confidence_match.group(1).strip()
+    
+    # Extract known pathway members section
+    known_section_match = re.search(r"Known pathway members:(.*?)(?:Potential novel members:|$)", analysis_text, re.DOTALL)
+    if known_section_match:
+        known_section = known_section_match.group(1).strip()
+        # Process each line in the known members section
+        for line in known_section.split('\n'):
+            line = line.strip()
+            if line.startswith('-'):
+                gene_info_match = re.match(r'-\s*([\w\d]+):\s*(.*)', line)
+                if gene_info_match:
+                    gene, description = gene_info_match.groups()
+                    result_dict["known_members"][gene.strip()] = description.strip()
+    
+    # Extract potential novel members section
+    novel_section_match = re.search(r"Potential novel members:(.*?)(?:Summary hypothesis:|$)", analysis_text, re.DOTALL)
+    if novel_section_match:
+        novel_section = novel_section_match.group(1).strip()
+        # Process each line in the novel members section
+        for line in novel_section.split('\n'):
+            line = line.strip()
+            if line.startswith('-'):
+                gene_info_match = re.match(r'-\s*([\w\d]+):\s*(.*)', line)
+                if gene_info_match:
+                    gene, evidence = gene_info_match.groups()
+                    result_dict["novel_members"][gene.strip()] = evidence.strip()
+    
+    # Extract summary hypothesis
+    summary_match = re.search(r"Summary hypothesis:(.*?)(?:\n\n|$)", analysis_text, re.DOTALL)
+    if summary_match:
+        result_dict["summary_hypothesis"] = summary_match.group(1).strip()
+    
+    # Special handling for functionally diverse clusters
+    if "Functionally diverse cluster" in analysis_text:
+        result_dict["dominant_process"] = "Functionally diverse cluster"
+        result_dict["confidence"] = "Low"
+    
+    return result_dict
+
+def process_batch_cluster_analysis(analysis_text):
+    """
+    Process batch cluster analysis by splitting the response into individual cluster analyses.
+    
+    Args:
+        analysis_text: Raw text response containing multiple cluster analyses
+        
+    Returns:
+        clusters_dict: Dictionary mapping cluster IDs to their analysis results
+    """
+    clusters_dict = {}
+    
+    # Split the text into individual cluster analyses
+    cluster_blocks = re.split(r'\n\s*Cluster ID:', analysis_text)
+    
+    # Process each cluster block
+    for i, block in enumerate(cluster_blocks):
+        if i == 0 and not block.strip():
+            continue  # Skip empty first block if it exists
+            
+        # Reconstruct the cluster ID prefix if needed (except for first block which might be intro)
+        if i > 0:
+            block = "Cluster ID:" + block
+            
+        # Process this individual cluster analysis
+        result = process_cluster_analysis(block)
+        cluster_id = result["cluster_id"]
+        
+        if cluster_id:
+            clusters_dict[cluster_id] = result
+    
+    return clusters_dict
 
 def save_progress(df, analysis_dict, out_file_base):
     """
@@ -59,87 +165,40 @@ def save_progress(df, analysis_dict, out_file_base):
     # Log the save
     logging.info(f"Progress saved to {tsv_path} and {json_path}")
 
-
-def calculate_stats(df, score_column):
+def save_cluster_analysis(clusters_dict, out_file_base):
     """
-    Calculate statistics for a column of scores.
+    Save cluster analysis results to JSON and summary CSV.
     
     Args:
-        df: DataFrame containing scores
-        score_column: Column name for scores
-        
-    Returns:
-        stats: Dictionary of statistics
+        clusters_dict: Dictionary with cluster analysis results
+        out_file_base: Base filename for output files (without extension)
     """
-    # Filter out invalid scores
-    valid_scores = df[df[score_column] > 0][score_column]
+    # Save full results to JSON
+    json_path = f"{out_file_base}_clusters.json"
+    with open(json_path, 'w') as f:
+        json.dump(clusters_dict, f, indent=2)
     
-    stats = {
-        "count": len(valid_scores),
-        "mean": valid_scores.mean(),
-        "median": valid_scores.median(),
-        "min": valid_scores.min(),
-        "max": valid_scores.max(),
-        "high_confidence_count": len(df[df[score_column] > 0.85]),
-        "medium_confidence_count": len(df[(df[score_column] > 0.80) & (df[score_column] <= 0.85)]),
-        "low_confidence_count": len(df[(df[score_column] > 0) & (df[score_column] <= 0.80)]),
-        "unscored_count": len(df[df[score_column] <= 0])
-    }
+    # Create summary DataFrame
+    summary_data = []
+    for cluster_id, analysis in clusters_dict.items():
+        summary_row = {
+            'cluster_id': cluster_id,
+            'dominant_process': analysis['dominant_process'],
+            'confidence': analysis['confidence'],
+            'known_members_count': len(analysis['known_members']),
+            'novel_members_count': len(analysis['novel_members']),
+            'known_members': '; '.join(analysis['known_members'].keys()),
+            'novel_members': '; '.join(analysis['novel_members'].keys()),
+            'summary_hypothesis': analysis['summary_hypothesis']
+        }
+        summary_data.append(summary_row)
     
-    return stats
-
-
-def compare_models(df, model_columns, base_column=None):
-    """
-    Compare results between different models.
-    
-    Args:
-        df: DataFrame with analysis results
-        model_columns: List of columns to compare (prefix for score columns)
-        base_column: Optional base model for comparison
-        
-    Returns:
-        comparison: Dictionary with comparison statistics
-    """
-    comparison = {}
-    
-    # Calculate agreement between models
-    score_columns = [f"{col} Score" for col in model_columns if f"{col} Score" in df.columns]
-    name_columns = [f"{col} Name" for col in model_columns if f"{col} Name" in df.columns]
-    
-    # Prepare scores for comparison (rows with valid scores in all models)
-    valid_rows = df.dropna(subset=score_columns)
-    
-    # Calculate score correlations if we have at least 2 models and enough data
-    if len(score_columns) >= 2 and len(valid_rows) > 5:
-        score_correlation = valid_rows[score_columns].corr()
-        comparison["score_correlation"] = score_correlation.to_dict()
-    
-    # Calculate name agreement if we have at least 2 models
-    if len(name_columns) >= 2:
-        for i, col1 in enumerate(name_columns):
-            for col2 in name_columns[i+1:]:
-                # Calculate percentage of matching names
-                match_count = sum(df[col1] == df[col2])
-                total_count = sum((df[col1].notna()) & (df[col2].notna()))
-                
-                if total_count > 0:
-                    agreement = match_count / total_count
-                    comparison[f"name_agreement_{col1}_vs_{col2}"] = agreement
-    
-    # Compare with base model if specified
-    if base_column and f"{base_column} Name" in df.columns:
-        base_name_col = f"{base_column} Name"
-        for col in model_columns:
-            if col != base_column and f"{col} Name" in df.columns:
-                comparison_col = f"{col} Name"
-                
-                # Calculate agreement with base model
-                match_count = sum(df[base_name_col] == df[comparison_col])
-                total_count = sum((df[base_name_col].notna()) & (df[comparison_col].notna()))
-                
-                if total_count > 0:
-                    agreement = match_count / total_count
-                    comparison[f"{col}_agreement_with_{base_column}"] = agreement
-    
-    return comparison
+    # Convert to DataFrame and save
+    if summary_data:
+        summary_df = pd.DataFrame(summary_data)
+        csv_path = f"{out_file_base}_summary.csv"
+        summary_df.to_csv(csv_path, index=False)
+        logging.info(f"Cluster analysis saved to {json_path} and {csv_path}")
+    else:
+        logging.warning("No cluster data to save to summary CSV")
+        logging.info(f"Empty cluster analysis saved to {json_path}")
