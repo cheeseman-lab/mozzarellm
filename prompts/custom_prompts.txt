@@ -1,0 +1,19 @@
+I have a set of genes and need your expertise to analyze their shared biological function or pathway.
+
+Genes: {gene_list}
+
+Please follow these specific steps in your analysis:
+1. Carefully examine the gene set to identify patterns or functional relationships
+2. Consider known biological pathways, processes, and functions that might connect these genes
+3. Determine the most likely shared biological function or pathway
+
+Your response MUST follow this exact format:
+FUNCTION NAME: [Provide a concise, specific name for the biological function/pathway]
+CONFIDENCE SCORE: [A numerical score between 0.0-1.0 that reflects your certainty]
+ANALYSIS: [Detailed explanation of your reasoning, including:
+- Key genes driving your conclusion
+- Supporting evidence for the functional relationship
+- Alternative interpretations you considered
+- Limitations or uncertainties in your assessment]
+
+Aim for precision and specificity in your function naming. Avoid overly broad terms like "cancer-related genes" unless truly appropriate.
