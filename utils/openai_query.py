@@ -1,5 +1,5 @@
-import openai
-import json
+import os
+from openai import OpenAI
 import time
 import logging
 
@@ -24,6 +24,15 @@ def openai_chat(context, prompt, model, temperature, max_tokens, rate_per_token,
     """
     logger = logging.getLogger(log_file)
     
+    # Get API key from environment if not configured
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        logger.error("OPENAI_API_KEY not found in environment variables")
+        return None, None
+    
+    # Initialize the OpenAI client
+    client = OpenAI(api_key=api_key)
+    
     # Set up messages
     messages = [
         {"role": "system", "content": context},
@@ -43,7 +52,7 @@ def openai_chat(context, prompt, model, temperature, max_tokens, rate_per_token,
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            response = openai.chat.completions.create(
+            response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=temperature,
@@ -63,8 +72,12 @@ def openai_chat(context, prompt, model, temperature, max_tokens, rate_per_token,
             return analysis_text, fingerprint
             
         except Exception as e:
-            logger.error(f"Attempt {attempt+1}/{max_retries} failed: {str(e)}")
+            error_message = f"Attempt {attempt+1}/{max_retries} failed: {str(e)}"
+            logger.error(error_message)
+            
             if attempt < max_retries - 1:
                 time.sleep(2 ** attempt)  # Exponential backoff
+            else:
+                return None, f"API error: {str(e)}"
     
-    return None, None
+    return None, "Maximum retries exceeded"
