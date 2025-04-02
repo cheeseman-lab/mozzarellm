@@ -50,6 +50,7 @@ The script produces:
 
 ## Structure
 
+```
 mozzarellm/
 ├── main.py                      # Main script for running gene analysis
 ├── config.json                  # Configuration for models and settings
@@ -83,3 +84,4 @@ mozzarellm/
     ├── test_openai_query.py
     ├── test_anthropic_query.py
     └── test_analysis_utils.py
+```
