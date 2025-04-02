@@ -16,9 +16,9 @@ from utils.gemini_query import query_genai_model
 from utils.perplexity_query import perplexity_chat
 from utils.server_model_query import server_model_chat
 from utils.prompt_factory import (
-    make_user_prompt_with_score,
+    make_gene_analysis_prompt,
     make_cluster_analysis_prompt,
-    make_batch_cluster_prompt,
+    make_batch_cluster_analysis_prompt,
 )
 from utils.llm_analysis_utils import (
     process_analysis,
@@ -26,7 +26,6 @@ from utils.llm_analysis_utils import (
     process_batch_cluster_analysis,
     save_progress,
     save_cluster_analysis,
-    log_parsing_issues,
 )
 from utils.logging_utils import get_model_logger
 
@@ -307,7 +306,7 @@ def process_gene_set(df, config, args, logger, gene_features_dict=None):
 
         try:
             # Create prompt
-            prompt = make_user_prompt_with_score(genes, gene_features_dict)
+            prompt = make_gene_analysis_prompt(genes, gene_features_dict)
 
             # Query LLM
             analysis, error = query_llm(
@@ -494,7 +493,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None):
 
                 try:
                     # Create batch prompt
-                    prompt = make_batch_cluster_prompt(
+                    prompt = make_batch_cluster_analysis_prompt(
                         batch_clusters, gene_features_dict
                     )
 
@@ -680,38 +679,6 @@ def main():
 
         # Process gene sets
         process_gene_set(df, config, args, logger, gene_features_dict)
-
-        # Process contaminated gene sets if requested
-        if args.run_contaminated:
-            contaminated_columns = [
-                col for col in df.columns if col.endswith("contaminated_Genes")
-            ]
-
-            for col in contaminated_columns:
-                # Create a copy of args to modify the gene column
-                contaminated_args = argparse.Namespace(**vars(args))
-                contaminated_args.gene_column = col
-
-                # Create a custom prefix for contaminated sets
-                contam_prefix = "_".join(col.split("_")[0:2])
-                custom_column_prefix = f"{column_prefix}_{contam_prefix}"
-
-                print(f"Processing contaminated gene sets with column '{col}'")
-
-                # Initialize columns if needed
-                if args.initialize:
-                    df[f"{custom_column_prefix} Name"] = None
-                    df[f"{custom_column_prefix} Analysis"] = None
-                    df[f"{custom_column_prefix} Score"] = float("-inf")
-
-                print(
-                    f"Found {df[f'{custom_column_prefix} Analysis'].isna().sum()} contaminated gene sets to analyze"
-                )
-
-                # Process contaminated gene sets with modified args
-                process_gene_set(
-                    df, config, contaminated_args, logger, gene_features_dict
-                )
 
     print("Analysis completed successfully")
 
