@@ -4,7 +4,7 @@
     "TEMP": 0.0,
     "MAX_TOKENS": 2000,
     "RATE_PER_TOKEN": 0.00001,
-    "DOLLAR_LIMIT": 10.0,
+    "DOLLAR_LIMIT": 5.0,
     "LOG_NAME": "gene_analysis",
     "CUSTOM_PROMPT_FILE": "prompts/custom_prompt.txt",
     "API_SETTINGS": {

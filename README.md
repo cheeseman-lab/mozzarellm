@@ -18,13 +18,7 @@ This repository contains code to analyze gene sets using various LLM APIs (OpenA
     conda activate mozzarellm
    ```
 
-3. Install dependencies
-   ```bash
-   conda install -c conda-forge pandas numpy tqdm
-   pip install openai==1.6.1 anthropic==0.9.1 google-generativeai==0.3.2 python-dotenv==1.0.0 requests>=2.32.0
-   ```
-
-4. Copy `.env.example` to `.env` and add your API keys:
+3. Copy `.env.example` to `.env` and add your API keys:
    ```
    OPENAI_API_KEY=your_openai_key_here
    ANTHROPIC_API_KEY=your_anthropic_key_here
@@ -32,7 +26,7 @@ This repository contains code to analyze gene sets using various LLM APIs (OpenA
    PERPLEXITY_API_KEY=your_perplexity_key_here
    ```
 
-5. Modify `config.json` to set your preferred models and parameters
+4. Modify `config.json` to set your preferred models and parameters
 
 ## Usage
 
@@ -46,6 +40,8 @@ python main.py --config config.json \
                --end 5 \
                --initialize \
                --output_file results/analysis
+
+python main.py --config config.json --input data/sample_gene_sets.csv --input_sep "," --gene_column "genes" --gene_sep ";" --start 0 --end 5 --initialize --output_file results/analysis
 ```
 
 ### Arguments
