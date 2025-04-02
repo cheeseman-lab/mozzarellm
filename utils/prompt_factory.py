@@ -98,7 +98,7 @@ Important requirements:
 
 def make_batch_cluster_prompt(clusters, gene_features=None):
     """
-    Create a prompt for batch analysis of multiple gene clusters.
+    Create a prompt for batch analysis of multiple gene clusters to identify high-priority genes for follow-up.
     
     Args:
         clusters: Dictionary mapping cluster IDs to lists of genes
@@ -113,39 +113,57 @@ def make_batch_cluster_prompt(clusters, gene_features=None):
         clusters_text += f"Cluster {cluster_id}: {gene_list}\n"
     
     prompt = f"""
-Analyze the following gene clusters to identify dominant biological functions and potential novel pathway members:
-
+Analyze the following gene clusters to identify dominant biological functions and prioritize genes for follow-up:
 {clusters_text}
+For each cluster, determine if genes share a common biological function or pathway and follow these steps:
 
-For each cluster, determine if >50% of genes share a common biological function or pathway and follow these steps:
-1. If a dominant process is identified:
-   - Name the specific biological process (avoid general terms like "cell signaling")
-   - List genes that are established members of this process
-   - Identify genes not yet linked to this process but may be related
-   - Provide evidence for why each novel gene might participate in the process
+1. Identify the dominant biological process, focusing on specific pathways rather than general terms.
+2. Classify each gene as either:
+   - ESTABLISHED: Well-known member of the identified pathway with clear functional role
+   - CHARACTERIZED: Gene with known functions, but not primarily associated with this pathway
+   - UNCHARACTERIZED: Gene with minimal functional annotation or unclear biological role
 
-For each cluster, use this exact format:
+3. Score each gene on a follow-up priority scale (1-10):
+   - 8-10: Highest priority - uncharacterized genes in well-defined pathways OR characterized genes 
+     with strong evidence for unexpected associations that challenge current paradigms
+   - 6-7: High priority - characterized genes with preliminary evidence for novel pathway associations
+     OR uncharacterized genes in less well-defined pathways
+   - 4-5: Medium priority - genes with emerging roles in this pathway requiring validation
+   - 2-3: Low priority - genes likely involved but with extensive existing literature
+   - 1: Not recommended for follow-up - well-established pathway components
 
-Cluster ID: [number]
-Dominant Process Name: [specific biological process name]
-LLM confidence: (High/Medium/Low)
+For each cluster, provide this EXACT JSON format:
+{{
+  "cluster_id": "number",
+  "dominant_process": "specific pathway name",
+  "pathway_confidence": "High (>70% of genes are established pathway members)/Medium (40-70% established)/Low (<40% established)",
+  "genes": [
+    {{
+      "gene": "GeneA",
+      "classification": "ESTABLISHED/CHARACTERIZED/UNCHARACTERIZED",
+      "follow_up_priority": 1-10,
+      "rationale": "one-sentence explanation of classification and priority score"
+    }}
+  ],
+  "summary": "one-sentence hypothesis about unexpected gene-pathway associations"
+}}
 
-Known pathway members:
-- [Gene]: [Brief description of established role]
-
-Potential novel members:
-- [Gene]: [Specific evidence from protein domains, localization, expression patterns, or interactions]
-
-Summary hypothesis:
-[1-2 sentences proposing how the novel genes might contribute to the pathway]
+If no clear dominant function, return:
+{{
+  "cluster_id": "number",
+  "dominant_process": "Functionally diverse cluster",
+  "pathway_confidence": "Low",
+  "genes": []
+}}
 
 Important requirements:
-- If no clear dominant function (>50% genes), mark as "Functionally diverse cluster"
-- Assign confidence based on proportion of known pathway genes and strength of evidence for novel members
-- Explicitly state when a gene's potential role is purely speculative
-- When evidence is contradictory, acknowledge both supporting and opposing factors
+- Prioritize poorly characterized or uncharacterized genes with unclear functions
+- Give high scores to genes with known functions appearing in unexpected pathway contexts
+- Consider genes that might have context-specific roles under these experimental conditions
+- The goal is to identify previously unknown gene functions or associations
+- High scores indicate the most promising discoveries, and will require experimental validation
+- Experimental validation is expensive and time-consuming. Be conservative in your scoring.
 """
-
     if gene_features:
         feature_text = "\nAdditional gene information:\n"
         for gene, features in gene_features.items():
