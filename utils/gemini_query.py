@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from google import genai
 import logging
 import time
 import os
