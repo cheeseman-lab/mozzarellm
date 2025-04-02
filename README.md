@@ -1,121 +1,109 @@
 # mozzarellm
 
-# Gene Set Analysis with LLMs
+# Gene Set and Cluster Analysis with LLMs
 
-This repository contains code to analyze gene sets using various LLM APIs (OpenAI, Google Gemini, Anthropic Claude, and custom models).
+This repository contains code to analyze gene sets and gene clusters using various LLM APIs (OpenAI, Google Gemini, Anthropic Claude, and custom models).
 
 ## Installation
 
 1. Clone this repository
    ```bash
-   git clone https://github.com/yourusername/mozzarellm.git
-   cd mozzarellm
+   git clone https://github.com/yourusername/mozzarellm.git && cd mozzarellm
    ```
 
 2. Create and activate a conda environment
    ```bash
-    conda env create -f environment.yml
-    conda activate mozzarellm
+   conda env create -f environment.yml && conda activate mozzarellm
    ```
 
 3. Copy `.env.example` to `.env` and add your API keys:
-   ```
-   OPENAI_API_KEY=your_openai_key_here
-   ANTHROPIC_API_KEY=your_anthropic_key_here
-   GOOGLE_API_KEY=your_google_key_here
-   PERPLEXITY_API_KEY=your_perplexity_key_here
+   ```bash
+   cp .env.example .env && nano .env
    ```
 
 4. Modify `config.json` to set your preferred models and parameters
 
 ## Usage
 
-```bash
-python main.py --config config.json \
-               --input data/sample_gene_sets.csv \
-               --input_sep "," \
-               --set_index "set_id" \
-               --gene_column "genes" \
-               --gene_sep ";" \
-               --start 0 \
-               --end 5 \
-               --initialize \
-               --output_file results/analysis
+### Gene Set Analysis (Original)
 
-python main.py --config config.json --input data/sample_gene_sets.csv --input_sep "," --set_index "set_id" --gene_column "genes" --gene_sep ";" --start 0 --end 5 --initialize --output_file results/analysis
+Analyze individual gene sets to identify their biological function:
+
+```bash
+python main.py --config config.json --input data/sample_gene_sets.csv --input_sep "," --gene_column "genes" --gene_sep ";" --start 0 --end 5 --initialize --output_file results/gene_analysis
 ```
 
-### Arguments
+### Cluster Analysis (New)
 
+Analyze gene clusters to identify dominant pathways and novel pathway members:
+
+```bash
+python main.py --config cluster_config.json --mode cluster --input data/sample_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --start 0 --end 5 --output_file results/cluster_analysis
+```
+
+With gene features information:
+```bash
+python main.py --config cluster_config.json --mode cluster --input data/sample_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --gene_features data/gene_features.csv --start 0 --end 5 --output_file results/cluster_analysis
+```
+
+With batch processing (multiple clusters in one API call):
+```bash
+python main.py --config cluster_config.json --mode cluster --input data/sample_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --batch_size 3 --start 0 --end 5 --output_file results/cluster_analysis_batch
+
+python main.py --config cluster_config.json --mode cluster --input data/luke_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --batch_size 5 --output_file results/luke_cluster_analysis
+```
+
+### Data Preparation
+
+Convert gene-level data to cluster-level format:
+```bash
+python reshape_clusters.py --input your_gene_table.csv --output data/clusters.csv --sep "," --gene_col "gene_symbol" --cluster_col "cluster" --gene_sep ";" --additional_cols "cluster_group"
+
+python reshape_clusters.py --input data/df_phate_i.csv --output data/luke_clusters.csv --sep "," --gene_col "gene_symbol" --cluster_col "cluster" --gene_sep ";" --additional_cols "cluster_group"
+```
+
+Generate sample data:
+```bash
+bash create_sample_data.sh
+```
+
+## Arguments
+
+### Common Arguments
 - `--config`: Path to configuration JSON file
-- `--input`: Path to input CSV with gene sets
-- `--input_sep`: Separator for input CSV
+- `--input`: Path to input CSV with gene sets/clusters
+- `--input_sep`: Separator for input CSV (comma, tab, etc.)
 - `--gene_column`: Column name containing gene set
 - `--gene_sep`: Separator for genes within a set
 - `--start`: Start index for processing
 - `--end`: End index for processing
 - `--output_file`: Output file path (without extension)
+
+### Gene Set Analysis
 - `--initialize`: Initialize output columns if needed
 - `--run_contaminated`: Process contaminated gene sets
 
+### Cluster Analysis
+- `--mode cluster`: Activate cluster analysis mode
+- `--set_index`: Column name for cluster index
+- `--batch_size`: Number of clusters to analyze in one batch
+- `--gene_features`: Path to CSV with gene features
+
 ## Output
 
-The script produces:
+### Gene Set Analysis
 - A TSV file with gene set names, scores, and analyses
 - A JSON file with full LLM responses
-- A log file tracking all API calls and errors
 
-## Structure
+### Cluster Analysis
+- A JSON file with structured cluster analyses
+- A summary CSV with dominant pathway, confidence, and gene counts
+- An automatically generated log file
 
-```
-mozzarellm/
-├── main.py                      # Main script for running gene analysis
-├── config.json                  # Configuration for models and settings
-├── .env                         # Environment variables with API keys (not committed)
-├── .env.example                 # Template for .env file (committed)
-├── requirements.txt             # Python dependencies (legacy)
-├── .gitignore                   # Git ignore file
-├── README.md                    # Project documentation
-├── constant.py                  # Global constants
-├── data/                        # Directory for input data
-│   ├── .gitkeep                 # Keep directory in git even if empty
-│   └── sample_gene_sets.csv     # Sample input file
-├── prompts/                     # Prompt templates
-│   ├── .gitkeep
-│   └── custom_prompt.txt        # Custom prompt template
-├── results/                     # Output directory
-│   └── .gitkeep
-├── utils/                       # Utility modules
-│   ├── __init__.py
-│   ├── openai_query.py          # OpenAI API handler
-│   ├── anthropic_query.py       # Anthropic API handler
-│   ├── genai_query.py           # Google Gemini API handler
-│   ├── perplexity_query.py      # Perplexity API handler
-│   ├── server_model_query.py    # Custom server model handler
-│   ├── prompt_factory.py        # Functions to create prompts
-│   ├── llm_analysis_utils.py    # Processing LLM responses
-│   └── logging_utils.py         # Logging configuration
-└── tests/                       # Unit tests
-    ├── __init__.py
-    ├── test_prompt_factory.py
-    ├── test_openai_query.py
-    ├── test_anthropic_query.py
-    └── test_analysis_utils.py
-```
+## Configuration
 
-## Examples
+Two configuration files are provided:
+- `config.json`: Original gene set analysis configuration
+- `cluster_config.json`: New cluster analysis configuration
 
-Here's an example of analyzing the provided sample gene sets:
-
-```bash
-# Analyze all gene sets in the sample file
-python main.py --config config.json \
-               --input data/sample_gene_sets.csv \
-               --input_sep "," \
-               --gene_column "genes" \
-               --gene_sep ";" \
-               --start 0 \
-               --end 5 \
-               --initialize \
-               --output_file results/full_analysis
-```
+The cluster analysis configuration includes specialized context and higher token limits suitable for complex cluster analysis.

@@ -2,6 +2,7 @@ import json
 import re
 import pandas as pd
 import logging
+import os
 
 def process_analysis(analysis_text):
     """
@@ -173,14 +174,29 @@ def save_cluster_analysis(clusters_dict, out_file_base):
         clusters_dict: Dictionary with cluster analysis results
         out_file_base: Base filename for output files (without extension)
     """
-    # Save full results to JSON
+    # Set paths
     json_path = f"{out_file_base}_clusters.json"
+    
+    # Check if the JSON file already exists and load previous results
+    existing_clusters = {}
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, 'r') as f:
+                existing_clusters = json.load(f)
+            logging.info(f"Loaded {len(existing_clusters)} existing clusters from {json_path}")
+        except Exception as e:
+            logging.warning(f"Failed to load existing clusters file: {e}")
+    
+    # Merge existing clusters with new ones
+    combined_clusters = {**existing_clusters, **clusters_dict}
+    
+    # Save full results to JSON
     with open(json_path, 'w') as f:
-        json.dump(clusters_dict, f, indent=2)
+        json.dump(combined_clusters, f, indent=2)
     
     # Create summary DataFrame
     summary_data = []
-    for cluster_id, analysis in clusters_dict.items():
+    for cluster_id, analysis in combined_clusters.items():
         summary_row = {
             'cluster_id': cluster_id,
             'dominant_process': analysis['dominant_process'],
@@ -198,7 +214,7 @@ def save_cluster_analysis(clusters_dict, out_file_base):
         summary_df = pd.DataFrame(summary_data)
         csv_path = f"{out_file_base}_summary.csv"
         summary_df.to_csv(csv_path, index=False)
-        logging.info(f"Cluster analysis saved to {json_path} and {csv_path}")
+        logging.info(f"Cluster analysis saved to {json_path} and {csv_path} with {len(combined_clusters)} total clusters")
     else:
         logging.warning("No cluster data to save to summary CSV")
         logging.info(f"Empty cluster analysis saved to {json_path}")

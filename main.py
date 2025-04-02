@@ -44,8 +44,8 @@ parser.add_argument('--gene_column', type=str, required=True, help='Column name 
 parser.add_argument('--gene_sep', type=str, required=True, help='Separator for gene set')
 parser.add_argument('--batch_size', type=int, default=1, help='Number of clusters to analyze in one batch (cluster mode only)')
 parser.add_argument('--run_contaminated', action='store_true', help='Run the pipeline for contaminated gene sets')
-parser.add_argument('--start', type=int, required=True, help='Start index for gene set/cluster range')
-parser.add_argument('--end', type=int, required=True, help='End index for gene set/cluster range')
+parser.add_argument('--start', type=int, default=None, help='Start index for gene set/cluster range (default: 0)')
+parser.add_argument('--end', type=int, default=None, help='End index for gene set/cluster range (default: process all)')
 parser.add_argument('--gene_features', type=str, default=None, help='Path to csv with gene features if needed for prompt')
 parser.add_argument('--output_file', type=str, required=True, help='Path to output file (no extension)')
 
@@ -81,7 +81,10 @@ context = config['CONTEXT']
 model = config['MODEL']
 temperature = config['TEMP']
 max_tokens = config['MAX_TOKENS']
-LOG_FILE = config['LOG_NAME'] + f'_{ind_start}_{ind_end}.log'
+
+# Create log file name
+log_suffix = f"_{ind_start}_{ind_end}" if ind_start is not None and ind_end is not None else "_all"
+LOG_FILE = config['LOG_NAME'] + log_suffix + ".log"
 
 # Get rate from API settings if available
 if 'API_SETTINGS' in config:
@@ -389,6 +392,12 @@ if __name__ == "__main__":
     # Load the data
     raw_df = pd.read_csv(input_file, sep=input_sep, index_col=set_index)
     print(f"Loaded data with columns: {raw_df.columns}")
+
+    # Set start and end indices if not provided
+    ind_start = args.start if args.start is not None else 0
+    ind_end = args.end if args.end is not None else len(raw_df)
+
+    print(f"Processing rows from index {ind_start} to {ind_end-1}")
 
     # Only process the specified range of entries
     df = raw_df.iloc[ind_start:ind_end].copy()
