@@ -34,6 +34,7 @@ This repository contains code to analyze gene sets using various LLM APIs (OpenA
 python main.py --config config.json \
                --input data/sample_gene_sets.csv \
                --input_sep "," \
+               --set_index "set_id" \
                --gene_column "genes" \
                --gene_sep ";" \
                --start 0 \
@@ -41,7 +42,7 @@ python main.py --config config.json \
                --initialize \
                --output_file results/analysis
 
-python main.py --config config.json --input data/sample_gene_sets.csv --input_sep "," --gene_column "genes" --gene_sep ";" --start 0 --end 5 --initialize --output_file results/analysis
+python main.py --config config.json --input data/sample_gene_sets.csv --input_sep "," --set_index "set_id" --gene_column "genes" --gene_sep ";" --start 0 --end 5 --initialize --output_file results/analysis
 ```
 
 ### Arguments

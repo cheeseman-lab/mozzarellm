@@ -40,9 +40,11 @@ htmlcov/
 logs/
 
 # Results and data (optional, comment out if you want to track these)
-# results/*.json
-# results/*.tsv
-# data/*.csv
+results/*.json
+results/*.csv
+results/*.tsv
+data/*.csv
+data/*.tsv
 
 # IDE files
 .idea/
