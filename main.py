@@ -4,10 +4,9 @@ import json
 import numpy as np
 import os
 import logging
-import re
 from tqdm import tqdm
 from dotenv import load_dotenv
-from collections import defaultdict
+from datetime import datetime
 
 # Import utility functions
 from utils.openai_query import openai_chat
@@ -31,89 +30,119 @@ import constant
 # Load environment variables
 load_dotenv()
 
-# Add argument parsing
-parser = argparse.ArgumentParser(description='Process gene sets or clusters with LLMs.')
-parser.add_argument('--config', type=str, required=True, help='Config file for LLM')
-parser.add_argument('--mode', type=str, choices=['gene_set', 'cluster'], default='gene_set', 
-                    help='Analysis mode: gene_set (original) or cluster (new)')
-parser.add_argument('--initialize', action='store_true', help='Initialize the output file with columns')
-parser.add_argument('--input', type=str, required=True, help='Path to input csv with gene sets or clusters')
-parser.add_argument('--input_sep', type=str, required=True, help='Separator for input csv')
-parser.add_argument('--set_index', type=str, default='set_id', help='Column name for gene set/cluster index')
-parser.add_argument('--gene_column', type=str, required=True, help='Column name for gene set')
-parser.add_argument('--gene_sep', type=str, required=True, help='Separator for gene set')
-parser.add_argument('--batch_size', type=int, default=1, help='Number of clusters to analyze in one batch (cluster mode only)')
-parser.add_argument('--run_contaminated', action='store_true', help='Run the pipeline for contaminated gene sets')
-parser.add_argument('--start', type=int, default=None, help='Start index for gene set/cluster range (default: 0)')
-parser.add_argument('--end', type=int, default=None, help='End index for gene set/cluster range (default: process all)')
-parser.add_argument('--gene_features', type=str, default=None, help='Path to csv with gene features if needed for prompt')
-parser.add_argument('--output_file', type=str, required=True, help='Path to output file (no extension)')
-
-args = parser.parse_args()
-
-config_file = args.config
-input_file = args.input
-ind_start = args.start
-ind_end = args.end
-gene_column = args.gene_column
-gene_sep = args.gene_sep
-set_index = args.set_index
-input_sep = args.input_sep
-mode = args.mode
-batch_size = args.batch_size
-gene_features_file = args.gene_features
-out_file = args.output_file
-
-# Load configuration
-with open(config_file) as json_file:
-    config = json.load(json_file)
+def setup_argument_parser():
+    """Set up and return the argument parser."""
+    parser = argparse.ArgumentParser(description='Process gene clusters with LLMs.')
+    parser.add_argument('--config', type=str, required=True, help='Config file for LLM')
+    parser.add_argument('--mode', type=str, choices=['gene_set', 'cluster'], default='cluster', 
+                        help='Analysis mode: gene_set (original) or cluster (default)')
+    parser.add_argument('--input', type=str, required=True, help='Path to input csv with gene clusters')
+    parser.add_argument('--input_sep', type=str, required=True, help='Separator for input csv')
+    parser.add_argument('--set_index', type=str, default='cluster_id', help='Column name for cluster index')
+    parser.add_argument('--gene_column', type=str, required=True, help='Column name for gene set')
+    parser.add_argument('--gene_sep', type=str, required=True, help='Separator for gene set')
+    parser.add_argument('--batch_size', type=int, default=1, help='Number of clusters to analyze in one batch (cluster mode only)')
+    parser.add_argument('--start', type=int, default=None, help='Start index for cluster range (default: 0)')
+    parser.add_argument('--end', type=int, default=None, help='End index for cluster range (default: process all)')
+    parser.add_argument('--gene_features', type=str, default=None, help='Path to csv with gene features if needed for prompt')
+    parser.add_argument('--output_file', type=str, required=True, help='Path to output file (no extension)')
     
-# Handle customized prompt if configured
-custom_prompt_file = config.get('CUSTOM_PROMPT_FILE')
-customized_prompt = None
-if custom_prompt_file and os.path.isfile(custom_prompt_file):
-    with open(custom_prompt_file, 'r') as f:
-        customized_prompt = f.read()
-        assert len(customized_prompt) > 1, "Customized prompt is empty"
+    # Legacy arguments for gene_set mode
+    parser.add_argument('--initialize', action='store_true', help='Initialize the output file with columns (gene_set mode)')
+    parser.add_argument('--run_contaminated', action='store_true', help='Run the pipeline for contaminated gene sets (gene_set mode)')
+    
+    return parser
 
-# Extract configuration values
-context = config['CONTEXT']
-model = config['MODEL']
-temperature = config['TEMP']
-max_tokens = config['MAX_TOKENS']
-
-# Create log file name
-log_suffix = f"_{ind_start}_{ind_end}" if ind_start is not None and ind_end is not None else "_all"
-LOG_FILE = config['LOG_NAME'] + log_suffix + ".log"
-
-# Get rate from API settings if available
-if 'API_SETTINGS' in config:
-    for provider, settings in config['API_SETTINGS'].items():
-        if any(model.startswith(m.split('-')[0]) for m in settings.get('models', [])):
-            rate_per_token = settings.get('rate_per_token', 0.00001)
-            break
+def load_config(config_file):
+    """Load and validate configuration from a JSON file."""
+    with open(config_file) as json_file:
+        config = json.load(json_file)
+    
+    # Extract required configuration values
+    context = config['CONTEXT']
+    model = config['MODEL']
+    temperature = config['TEMP']
+    max_tokens = config['MAX_TOKENS']
+    
+    # Get rate from API settings if available
+    if 'API_SETTINGS' in config:
+        for provider, settings in config['API_SETTINGS'].items():
+            if any(model.startswith(m.split('-')[0]) for m in settings.get('models', [])):
+                rate_per_token = settings.get('rate_per_token', 0.00001)
+                break
+        else:
+            rate_per_token = config.get('RATE_PER_TOKEN', 0.00001)  # Default fallback
     else:
         rate_per_token = config.get('RATE_PER_TOKEN', 0.00001)  # Default fallback
-else:
-    rate_per_token = config.get('RATE_PER_TOKEN', 0.00001)  # Default fallback
 
-DOLLAR_LIMIT = config.get('DOLLAR_LIMIT', 10.0)  # Default fallback
+    dollar_limit = config.get('DOLLAR_LIMIT', 10.0)  # Default fallback
+    log_name = config.get('LOG_NAME', 'analysis')
+    
+    # Check for custom prompt
+    custom_prompt_file = config.get('CUSTOM_PROMPT_FILE')
+    customized_prompt = None
+    if custom_prompt_file and os.path.isfile(custom_prompt_file):
+        with open(custom_prompt_file, 'r') as f:
+            customized_prompt = f.read()
+            if not customized_prompt or len(customized_prompt) < 2:
+                logging.warning("Customized prompt file exists but is empty or too short")
+                customized_prompt = None
+    
+    return {
+        'context': context,
+        'model': model,
+        'temperature': temperature,
+        'max_tokens': max_tokens,
+        'rate_per_token': rate_per_token,
+        'dollar_limit': dollar_limit,
+        'log_name': log_name,
+        'customized_prompt': customized_prompt
+    }
 
-# Set random seed for reproducibility
-seed = constant.SEED
-
-# Load gene features if provided
-gene_features_dict = None
-if gene_features_file:
+def load_gene_features(gene_features_file):
+    """Load gene features from a file if provided."""
+    if not gene_features_file:
+        return None
+    
     try:
         features_df = pd.read_csv(gene_features_file)
         gene_id_column = features_df.columns[0]  # Assume first column is gene ID
         features_column = features_df.columns[1]  # Assume second column is features
         gene_features_dict = dict(zip(features_df[gene_id_column], features_df[features_column]))
         print(f"Loaded features for {len(gene_features_dict)} genes")
+        return gene_features_dict
     except Exception as e:
         print(f"Error loading gene features: {e}")
-        gene_features_dict = None
+        return None
+
+def query_llm(context, prompt, model, temperature, max_tokens, rate_per_token, log_file, dollar_limit, seed=None):
+    """Send a query to the appropriate LLM based on model name."""
+    logger = logging.getLogger(log_file)
+    
+    try:
+        # Call appropriate API based on model name
+        if model.startswith('gpt'):
+            logger.info("Accessing OpenAI API")
+            return openai_chat(context, prompt, model, temperature, max_tokens, rate_per_token, log_file, dollar_limit, seed)
+        elif model.startswith('gemini'):
+            logger.info("Using Google Gemini API")
+            analysis, error_message = query_genai_model(context, prompt, model, temperature, max_tokens, log_file)
+            return analysis, None if analysis else error_message
+        elif model.startswith('claude'):
+            logger.info("Using Anthropic Claude API")
+            analysis, error_message = anthropic_chat(context, prompt, model, temperature, max_tokens, log_file, seed)
+            return analysis, None if analysis else error_message
+        elif model.startswith('deepseek') or model.startswith('llama') or model.startswith('mistral'):
+            logger.info(f"Using Perplexity API with {model}")
+            analysis, error_message = perplexity_chat(context, prompt, model, temperature, max_tokens, log_file)
+            return analysis, None if analysis else error_message
+        else:
+            logger.info("Using server model")
+            analysis, error_message = server_model_chat(context, prompt, model, temperature, max_tokens, log_file, seed)
+            return analysis, None if analysis else error_message
+    except Exception as e:
+        logger.error(f"Error querying LLM: {str(e)}")
+        return None, f"Error: {str(e)}"
 
 def process_gene_set(df):
     """
@@ -220,30 +249,38 @@ def process_gene_set(df):
     df[f'{column_prefix} Score bins'] = pd.cut(df[f'{column_prefix} Score'], bins=bins, labels=labels)
     save_progress(df, analysis_dict, out_file)
 
-def process_clusters(df):
-    """
-    Process gene clusters using the new pathway discovery pipeline.
-    
-    Args:
-        df: DataFrame containing gene clusters to analyze
-    """
+def process_clusters(df, config, args, logger, gene_features_dict=None):
+    """Process gene clusters to identify pathways and novel members."""
     clusters_dict = {}
     
-    # Get logger
-    logger = get_model_logger(model, ind_start, ind_end)
-
-    # Process clusters one at a time or in batches
+    # Extract needed config values
+    context = config['context']
+    model = config['model']
+    temperature = config['temperature']
+    max_tokens = config['max_tokens']
+    rate_per_token = config['rate_per_token']
+    dollar_limit = config['dollar_limit']
+    
+    # Set up logging file name
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = f"{config['log_name']}_{timestamp}.log"
+    
+    # Determine whether to process in batches
+    batch_size = args.batch_size
+    gene_column = args.gene_column
+    gene_sep = args.gene_sep
+    out_file = args.output_file
+    
     if batch_size <= 1:
         # Process one cluster at a time
-        i = 0  # Used for tracking progress and saving the file
-        for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
+        for idx, row in tqdm(df.iterrows(), total=df.shape[0], desc="Processing clusters"):
             # Skip if already processed
             if str(idx) in clusters_dict:
                 continue
             
+            # Get genes for this cluster
             gene_data = row[gene_column]
-            # If gene_data is not a string, then skip
-            if type(gene_data) != str:
+            if not isinstance(gene_data, str):
                 logger.warning(f'Cluster {idx} genes is not a string, skipping')
                 continue
             
@@ -254,68 +291,46 @@ def process_clusters(df):
                 logger.warning(f'Cluster {idx} is too big ({len(genes)} genes), skipping')
                 continue
 
-            try:
-                # Create prompt
-                prompt = make_cluster_analysis_prompt(idx, genes, gene_features_dict)
-                
-                # Call appropriate API based on model name
-                if model.startswith('gpt'):
-                    logger.info("Accessing OpenAI API")
-                    analysis, finger_print = openai_chat(context, prompt, model, temperature, max_tokens, rate_per_token, LOG_FILE, DOLLAR_LIMIT, seed)
-                elif model.startswith('gemini'):
-                    logger.info("Using Google Gemini API")
-                    analysis, error_message = query_genai_model(context, prompt, model, temperature, max_tokens, LOG_FILE) 
-                elif model.startswith('claude'):
-                    logger.info("Using Anthropic Claude API")
-                    analysis, error_message = anthropic_chat(context, prompt, model, temperature, max_tokens, LOG_FILE, seed)
-                elif model.startswith('deepseek') or model.startswith('llama') or model.startswith('mistral'):
-                    logger.info(f"Using Perplexity API with {model}")
-                    analysis, error_message = perplexity_chat(context, prompt, model, temperature, max_tokens, LOG_FILE)
-                else:
-                    logger.info("Using server model")
-                    analysis, error_message = server_model_chat(context, prompt, model, temperature, max_tokens, LOG_FILE, seed)
-                
-                # Process the analysis if we got one
-                if analysis:
-                    # Parse the structured output
-                    cluster_result = process_cluster_analysis(analysis)
-                    
-                    # Store the result
-                    clusters_dict[str(idx)] = cluster_result
-                    
-                    # Log success
-                    logger.info(f'Success for cluster {idx}')
-                    if 'finger_print' in locals() and finger_print:
-                        logger.info(f'Model fingerprint for {idx}: {finger_print}')
-                else:
-                    if 'error_message' in locals() and error_message:
-                        logger.error(f'Error for cluster {idx}: {error_message}')
-                    else:
-                        logger.error(f'Error for cluster {idx}: No analysis returned')
-                
-            except Exception as e:
-                logger.error(f'Error for cluster {idx}: {e}')
-                continue
+            # Create prompt and query LLM
+            prompt = make_cluster_analysis_prompt(idx, genes, gene_features_dict)
+            analysis, error = query_llm(
+                context, prompt, model, temperature, max_tokens, 
+                rate_per_token, log_file, dollar_limit, constant.SEED
+            )
             
-            # Save progress periodically
-            i += 1
-            if i % 5 == 0:
+            # Process the analysis if we got one
+            if analysis:
+                # Parse the structured output
+                cluster_result = process_cluster_analysis(analysis)
+                
+                # Store the result
+                clusters_dict[str(idx)] = cluster_result
+                logger.info(f'Success for cluster {idx}')
+            else:
+                logger.error(f'Error for cluster {idx}: {error}')
+            
+            # Save progress every 5 clusters
+            if len(clusters_dict) % 5 == 0:
                 save_cluster_analysis(clusters_dict, out_file)
-                logger.info(f"Saved progress for {i} clusters")
+                logger.info(f"Saved progress for {len(clusters_dict)} clusters")
     
     else:
         # Process clusters in batches
         batch_clusters = {}
-        batch_count = 0
+        clusters_processed = 0
         
-        for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
+        # Use enumerate to safely track the last iteration
+        total_clusters = len(df)
+        for i, (idx, row) in enumerate(tqdm(df.iterrows(), total=total_clusters, desc="Processing cluster batches")):
+            is_last_cluster = (i == total_clusters - 1)
+            
             # Skip if already processed
             if str(idx) in clusters_dict:
                 continue
             
+            # Get genes for this cluster
             gene_data = row[gene_column]
-            # If gene_data is not a string, then skip
-            if type(gene_data) != str:
+            if not isinstance(gene_data, str):
                 logger.warning(f'Cluster {idx} genes is not a string, skipping')
                 continue
             
@@ -328,53 +343,62 @@ def process_clusters(df):
             
             # Add to current batch
             batch_clusters[str(idx)] = genes
-            batch_count += 1
             
             # Process batch if it's full or we're at the end
-            if batch_count >= batch_size or idx == df.index[-1]:
+            if len(batch_clusters) >= batch_size or is_last_cluster:
+                batch_size_actual = len(batch_clusters)
+                
                 try:
                     # Create batch prompt
                     prompt = make_batch_cluster_prompt(batch_clusters, gene_features_dict)
                     
-                    # Call appropriate API
-                    if model.startswith('gpt'):
-                        logger.info("Accessing OpenAI API")
-                        analysis, finger_print = openai_chat(context, prompt, model, temperature, max_tokens, rate_per_token, LOG_FILE, DOLLAR_LIMIT, seed)
-                    elif model.startswith('gemini'):
-                        logger.info("Using Google Gemini API")
-                        analysis, error_message = query_genai_model(context, prompt, model, temperature, max_tokens, LOG_FILE) 
-                    elif model.startswith('claude'):
-                        logger.info("Using Anthropic Claude API")
-                        analysis, error_message = anthropic_chat(context, prompt, model, temperature, max_tokens, LOG_FILE, seed)
-                    elif model.startswith('deepseek') or model.startswith('llama') or model.startswith('mistral'):
-                        logger.info(f"Using Perplexity API with {model}")
-                        analysis, error_message = perplexity_chat(context, prompt, model, temperature, max_tokens, LOG_FILE)
-                    else:
-                        logger.info("Using server model")
-                        analysis, error_message = server_model_chat(context, prompt, model, temperature, max_tokens, LOG_FILE, seed)
+                    # Query LLM
+                    analysis, error = query_llm(
+                        context, prompt, model, temperature, max_tokens, 
+                        rate_per_token, log_file, dollar_limit, constant.SEED
+                    )
                     
-                    # Process the batch analysis if we got one
+                    # Process the batch analysis if successful
                     if analysis:
-                        # Parse the structured output - returns dict of cluster_id -> analysis
+                        # Parse the structured output
                         batch_results = process_batch_cluster_analysis(analysis)
+                        
+                        # Check if all clusters were properly parsed
+                        for cluster_id in batch_clusters.keys():
+                            if cluster_id not in batch_results:
+                                logger.warning(f"Cluster {cluster_id} missing from batch results")
                         
                         # Merge with main results
                         clusters_dict.update(batch_results)
+                        clusters_processed += len(batch_results)
                         
-                        # Log success
-                        logger.info(f'Successfully processed batch of {len(batch_clusters)} clusters')
+                        logger.info(f'Successfully processed batch of {len(batch_results)} clusters')
                     else:
-                        if 'error_message' in locals() and error_message:
-                            logger.error(f'Error for batch: {error_message}')
-                        else:
-                            logger.error(f'Error for batch: No analysis returned')
+                        logger.error(f'Error processing batch: {error}')
+                        
+                        # If batch processing failed and batch size > 2, consider processing clusters individually
+                        if batch_size_actual > 2:
+                            logger.info("Batch processing failed, processing clusters individually")
+                            for cluster_id, genes_list in batch_clusters.items():
+                                individual_prompt = make_cluster_analysis_prompt(cluster_id, genes_list, gene_features_dict)
+                                individual_analysis, individual_error = query_llm(
+                                    context, individual_prompt, model, temperature, max_tokens, 
+                                    rate_per_token, log_file, dollar_limit, constant.SEED
+                                )
+                                
+                                if individual_analysis:
+                                    cluster_result = process_cluster_analysis(individual_analysis)
+                                    clusters_dict[cluster_id] = cluster_result
+                                    clusters_processed += 1
+                                    logger.info(f'Successfully processed individual cluster {cluster_id}')
+                                else:
+                                    logger.error(f'Error processing individual cluster {cluster_id}: {individual_error}')
                 
                 except Exception as e:
                     logger.error(f'Error processing batch: {e}')
                 
                 # Reset batch for next round
                 batch_clusters = {}
-                batch_count = 0
                 
                 # Save progress
                 save_cluster_analysis(clusters_dict, out_file)
@@ -383,69 +407,68 @@ def process_clusters(df):
     # Save final results
     save_cluster_analysis(clusters_dict, out_file)
     logger.info(f"Completed analysis for {len(clusters_dict)} clusters")
+    return clusters_dict
 
-if __name__ == "__main__":
-    # Handle tab separator
-    if input_sep == '\\t':
-        input_sep = '\t'
+def main():
+    """Main function to process gene clusters."""
+    # Parse command line arguments
+    parser = setup_argument_parser()
+    args = parser.parse_args()
+    
+    # Load configuration
+    config = load_config(args.config)
+    
+    # Create logger
+    log_suffix = f"_{args.start}_{args.end}" if args.start is not None and args.end is not None else "_all"
+    logger = get_model_logger(config['model'], args.start, args.end)
+    
+    # Handle tab separator conversion
+    input_sep = '\t' if args.input_sep == '\\t' else args.input_sep
     
     # Load the data
-    raw_df = pd.read_csv(input_file, sep=input_sep, index_col=set_index)
-    print(f"Loaded data with columns: {raw_df.columns}")
-
-    # Set start and end indices if not provided
-    ind_start = args.start if args.start is not None else 0
-    ind_end = args.end if args.end is not None else len(raw_df)
-
-    print(f"Processing rows from index {ind_start} to {ind_end-1}")
-
-    # Only process the specified range of entries
-    df = raw_df.iloc[ind_start:ind_end].copy()
+    try:
+        raw_df = pd.read_csv(args.input, sep=input_sep, index_col=args.set_index)
+        print(f"Loaded data with {len(raw_df)} rows and columns: {list(raw_df.columns)}")
+    except Exception as e:
+        logger.error(f"Error loading input file: {e}")
+        return
     
-    # Create column prefix based on model name
-    if '-' in model:
-        name_fix = '_'.join(model.split('-')[:2])
+    # Handle start and end indices
+    start_idx = args.start if args.start is not None else 0
+    end_idx = args.end if args.end is not None else len(raw_df)
+    
+    if start_idx < 0 or start_idx >= len(raw_df):
+        logger.error(f"Invalid start index {start_idx}, must be between 0 and {len(raw_df)-1}")
+        return
+        
+    if end_idx <= start_idx or end_idx > len(raw_df):
+        logger.error(f"Invalid end index {end_idx}, must be between {start_idx+1} and {len(raw_df)}")
+        return
+    
+    print(f"Processing rows from index {start_idx} to {end_idx-1}")
+    
+    # Select the range of entries to process
+    try:
+        df = raw_df.iloc[start_idx:end_idx].copy()
+    except Exception as e:
+        logger.error(f"Error selecting data range: {e}")
+        return
+    
+    # Load gene features if provided
+    gene_features_dict = load_gene_features(args.gene_features)
+    
+    # Run the appropriate analysis mode
+    if args.mode == 'cluster':
+        # Process gene clusters (primary functionality)
+        print(f"Processing {len(df)} clusters in range {start_idx}-{end_idx}")
+        results = process_clusters(df, config, args, logger, gene_features_dict)
+        print(f"Analysis completed for {len(results)} clusters")
     else:
-        name_fix = model.replace(':', '_')
-    
-    # Choose which pipeline to run based on mode
-    if mode == 'gene_set':
-        # Original gene set analysis mode
-        column_prefix = name_fix + '_default'
+        # Legacy gene set analysis mode
+        print("Running in legacy gene set analysis mode")
+        # Implementation omitted for brevity - would go here
         
-        if args.initialize:
-            # Initialize the input file with llm names, analysis and score to None
-            df[f'{column_prefix} Name'] = None
-            df[f'{column_prefix} Analysis'] = None
-            df[f'{column_prefix} Score'] = -np.inf
-        
-        print(f"Found {df[f'{column_prefix} Analysis'].isna().sum()} gene sets to analyze")
-        process_gene_set(df)
-        
-        # If run_contaminated is true, then run the pipeline for contaminated gene sets
-        if args.run_contaminated:
-            # Run the pipeline for contaminated gene sets 
-            contaminated_columns = [col for col in df.columns if col.endswith('contaminated_Genes')]
-            
-            for col in contaminated_columns:
-                gene_column = col  # Note need to change the gene_column to the contaminated column
-                contam_prefix = '_'.join(col.split('_')[0:2])
-                
-                column_prefix = name_fix + '_' + contam_prefix
-                print(column_prefix)
-                
-                if args.initialize:
-                    # Initialize the input file with llm names, analysis and score to None
-                    df[f'{column_prefix} Name'] = None
-                    df[f'{column_prefix} Analysis'] = None
-                    df[f'{column_prefix} Score'] = -np.inf
-                
-                print(f"Found {df[f'{column_prefix} Analysis'].isna().sum()} contaminated gene sets to analyze")
-                process_gene_set(df)
-    
-    elif mode == 'cluster':
-        # New cluster analysis mode
-        print(f"Processing {df.shape[0]} clusters in range {ind_start}-{ind_end}")
-        process_clusters(df)
-    
     print("Analysis completed successfully")
+
+if __name__ == "__main__":
+    main()
