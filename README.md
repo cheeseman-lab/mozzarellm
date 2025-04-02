@@ -2,29 +2,49 @@
 
 # Gene Set Analysis with LLMs
 
-This repository contains code to analyze gene sets using various LLM APIs (OpenAI, Google Gemini, and custom models).
+This repository contains code to analyze gene sets using various LLM APIs (OpenAI, Google Gemini, Anthropic Claude, and custom models).
 
-## Setup
+## Installation
 
 1. Clone this repository
-2. Install dependencies: `pip install -r requirements.txt`
-3. Copy `.env.example` to `.env` and add your API keys:
+   ```bash
+   git clone https://github.com/yourusername/mozzarellm.git
+   cd mozzarellm
+   ```
+
+2. Create and activate a conda environment
+   ```bash
+    conda env create -f environment.yml
+    conda activate mozzarellm
+   ```
+
+3. Install dependencies
+   ```bash
+   conda install -c conda-forge pandas numpy tqdm
+   pip install openai==1.6.1 anthropic==0.9.1 google-generativeai==0.3.2 python-dotenv==1.0.0 requests>=2.32.0
+   ```
+
+4. Copy `.env.example` to `.env` and add your API keys:
    ```
    OPENAI_API_KEY=your_openai_key_here
+   ANTHROPIC_API_KEY=your_anthropic_key_here
    GOOGLE_API_KEY=your_google_key_here
+   PERPLEXITY_API_KEY=your_perplexity_key_here
    ```
-4. Modify `config.json` to set your preferred models and parameters
+
+5. Modify `config.json` to set your preferred models and parameters
 
 ## Usage
 
 ```bash
 python main.py --config config.json \
-               --input data/genesets.csv \
+               --input data/sample_gene_sets.csv \
                --input_sep "," \
-               --gene_column "Genes" \
+               --gene_column "genes" \
                --gene_sep ";" \
                --start 0 \
-               --end 10 \
+               --end 5 \
+               --initialize \
                --output_file results/analysis
 ```
 
@@ -56,7 +76,7 @@ mozzarellm/
 ├── config.json                  # Configuration for models and settings
 ├── .env                         # Environment variables with API keys (not committed)
 ├── .env.example                 # Template for .env file (committed)
-├── requirements.txt             # Python dependencies
+├── requirements.txt             # Python dependencies (legacy)
 ├── .gitignore                   # Git ignore file
 ├── README.md                    # Project documentation
 ├── constant.py                  # Global constants
@@ -84,4 +104,21 @@ mozzarellm/
     ├── test_openai_query.py
     ├── test_anthropic_query.py
     └── test_analysis_utils.py
+```
+
+## Examples
+
+Here's an example of analyzing the provided sample gene sets:
+
+```bash
+# Analyze all gene sets in the sample file
+python main.py --config config.json \
+               --input data/sample_gene_sets.csv \
+               --input_sep "," \
+               --gene_column "genes" \
+               --gene_sep ";" \
+               --start 0 \
+               --end 5 \
+               --initialize \
+               --output_file results/full_analysis
 ```
