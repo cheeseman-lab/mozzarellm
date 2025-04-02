@@ -1,9 +1,0 @@
-pandas==2.0.3
-numpy==1.24.4
-openai==1.6.1
-tqdm>=4.66.3
-python-dotenv==1.0.0
-google-generativeai==0.3.2
-anthropic==0.9.1
-requests>=2.32.0
-logging==0.4.9.6
