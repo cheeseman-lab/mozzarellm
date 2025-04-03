@@ -97,12 +97,12 @@ python main.py --config cluster_config.json --mode cluster --input data/sample_c
 
 Example:
 ```bash
-python main.py --config cluster_config.json --mode cluster --input data/luke_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --batch_size 3 --output_file results/aconcagua_cell
+python main.py --config cluster_config.json --mode cluster --input data/luke_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --batch_size 2 --output_file results/aconcagua_cell
 ```
 
 ## Configuration
 
-Create a configuration JSON file (e.g., `cluster_config.json`):
+Create/modify a configuration JSON file (e.g., `cluster_config.json`):
 
 ```json
 {
@@ -184,14 +184,6 @@ python main.py --config config.json --input data/sample_gene_sets.csv --input_se
 
 This mode provides a simpler analysis focusing on identifying the most likely function of each gene set without the detailed categorization and prioritization of the cluster analysis mode.
 
-### Additional Gene Set Analysis Arguments
-- `--initialize`: Initialize output columns if needed
-- `--run_contaminated`: Process contaminated gene sets
-
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.

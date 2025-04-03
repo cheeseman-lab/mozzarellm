@@ -102,11 +102,6 @@ def setup_argument_parser():
         action="store_true",
         help="Initialize the output file with columns (gene_set mode)",
     )
-    parser.add_argument(
-        "--run_contaminated",
-        action="store_true",
-        help="Run the pipeline for contaminated gene sets (gene_set mode)",
-    )
 
     return parser
 
