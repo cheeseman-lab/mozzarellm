@@ -654,9 +654,16 @@ def main():
         # Process gene clusters
         print(f"Processing {len(df)} clusters in range {start_idx}-{end_idx}")
         results = process_clusters(df, config, args, logger, gene_features_dict)
+        
+        # Reset index to make cluster_id a column for merging
+        original_df = raw_df.reset_index()
+        
+        # Save the results with the original dataframe
+        save_cluster_analysis(results, args.output_file, original_df=original_df)
+        
         print(f"Analysis completed for {len(results)} clusters")
     else:
-        # Gene set analysis mode
+        # Gene set analysis mode remains unchanged
         print(f"Processing {len(df)} gene sets in range {start_idx}-{end_idx}")
 
         # Create column prefix for this model
@@ -681,7 +688,7 @@ def main():
         process_gene_set(df, config, args, logger, gene_features_dict)
 
     print("Analysis completed successfully")
-
+    
 
 if __name__ == "__main__":
     main()
