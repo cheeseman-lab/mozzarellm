@@ -1,4 +1,5 @@
 from google import genai
+from google.genai import types
 import logging
 import time
 import os
@@ -28,35 +29,27 @@ def query_genai_model(context, prompt, model, temperature, max_tokens, log_file)
         logger.error("GOOGLE_API_KEY not found in environment variables")
         return None, "API key not found"
 
-    # Configure the Gemini API with your API key
-    genai.configure(api_key=api_key)
-
-    # Create a client
-    client = genai.GenerationClient()
+    # Create a client with your API key
+    client = genai.Client(api_key=api_key)
 
     # Set up the generation config
-    generation_config = {
-        "temperature": temperature,
-        "max_output_tokens": max_tokens,
-        "top_p": 1,
-        "top_k": 32,
-    }
-
-    # Combine context and prompt
-    # For Gemini, we'll use system_instruction for the context and contents for the prompt
-    system_instruction = {"role": "system", "parts": [{"text": context}]}
-    contents = {"role": "user", "parts": [{"text": prompt}]}
+    config = types.GenerateContentConfig(
+        temperature=temperature,
+        max_output_tokens=max_tokens,
+        top_p=1,
+        top_k=32,
+        system_instruction=context
+    )
 
     # Make API call with retry logic
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # Generate content
-            response = client.generate_content(
+            # Generate content using the updated API structure
+            response = client.models.generate_content(
                 model=model,
-                contents=[contents],
-                system_instruction=system_instruction,
-                generation_config=generation_config,
+                contents=prompt,
+                config=config
             )
 
             # Extract the response text

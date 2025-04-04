@@ -1,0 +1,27 @@
+{
+    "MODEL": "r1-1776",
+    "CONTEXT": "You are an AI assistant specializing in genomics and systems biology with expertise in pathway analysis. Your task is to analyze gene clusters from optical pooled screening data to identify biological pathways and potential novel pathway members based on published literature and gaps in knowledge of gene function.",
+    "TEMP": 0.0,
+    "MAX_TOKENS": 4000,
+    "RATE_PER_TOKEN": 0.000015,
+    "DOLLAR_LIMIT": 10.0,
+    "LOG_NAME": "cluster_analysis",
+    "API_SETTINGS": {
+      "openai": {
+        "models": ["gpt-4o", "gpt-4.5", "gpt-3.5-turbo"],
+        "rate_per_token": 0.00001
+      },
+      "anthropic": {
+        "models": ["claude-3-7-sonnet-20250219", "claude-3.5-sonnet", "claude-3-opus-20240229"],
+        "rate_per_token": 0.000015
+      },
+      "perplexity": {
+        "models": ["r1-1776", "sonar-reasoning-pro"],
+        "rate_per_token": 0.000005
+      },
+      "gemini": {
+        "models": ["gemini-2.5-pro-exp-03-25", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
+        "rate_per_token": 0.000005
+      }
+    }
+  }
