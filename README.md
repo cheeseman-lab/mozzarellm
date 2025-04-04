@@ -70,11 +70,6 @@ Convert gene-level data to cluster-level format:
 python reshape_clusters.py --input your_gene_table.csv --output data/clusters.csv --sep "," --gene_col "gene_symbol" --cluster_col "cluster" --gene_sep ";" --additional_cols "cluster_group"
 ```
 
-Example:
-```bash
-python reshape_clusters.py --input data/df_phate_i.csv --output data/luke_clusters.csv --sep "," --gene_col "gene_symbol" --cluster_col "cluster" --gene_sep ";" --additional_cols "cluster_group"
-```
-
 ## Usage
 
 ### Cluster Analysis
@@ -93,11 +88,6 @@ python main.py --config cluster_config.json --mode cluster --input data/sample_c
 With batch processing (multiple clusters in one API call):
 ```bash
 python main.py --config cluster_config.json --mode cluster --input data/sample_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --batch_size 3 --start 0 --end 5 --output_file results/cluster_analysis_batch
-```
-
-Example:
-```bash
-python main.py --config cluster_config.json --mode cluster --input data/luke_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --batch_size 2 --output_file results/aconcagua_cell
 ```
 
 ## Configuration
