@@ -95,6 +95,12 @@ def setup_argument_parser():
         required=True,
         help="Path to output file (no extension)",
     )
+    parser.add_argument(
+        "--screen_info",
+        type=str,
+        default=None,
+        help="Path to file containing information about the OPS screen context"
+    )
 
     # Legacy arguments for gene_set mode
     parser.add_argument(
@@ -173,6 +179,20 @@ def load_gene_features(gene_features_file):
         return gene_features_dict
     except Exception as e:
         print(f"Error loading gene features: {e}")
+        return None
+
+def load_screen_info(screen_info_file):
+    """Load screen information from a file if provided."""
+    if not screen_info_file:
+        return None
+
+    try:
+        with open(screen_info_file, 'r') as f:
+            screen_info = f.read().strip()
+        print(f"Loaded screen information: {len(screen_info)} characters")
+        return screen_info
+    except Exception as e:
+        print(f"Error loading screen information: {e}")
         return None
 
 
@@ -372,7 +392,7 @@ def process_gene_set(df, config, args, logger, gene_features_dict=None):
     return analysis_dict
 
 
-def process_clusters(df, config, args, logger, gene_features_dict=None):
+def process_clusters(df, config, args, logger, gene_features_dict=None, screen_info=None):
     """Process gene clusters to identify pathways and novel members."""
     clusters_dict = {}
 
@@ -419,7 +439,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None):
                 continue
 
             # Create prompt and query LLM
-            prompt = make_cluster_analysis_prompt(idx, genes, gene_features_dict)
+            prompt = make_cluster_analysis_prompt(idx, genes, gene_features_dict, screen_info)
             analysis, error = query_llm(
                 context,
                 prompt,
@@ -487,9 +507,9 @@ def process_clusters(df, config, args, logger, gene_features_dict=None):
                 batch_size_actual = len(batch_clusters)
 
                 try:
-                    # Create batch prompt
+                    # Create batch prompt - now with screen_info
                     prompt = make_batch_cluster_analysis_prompt(
-                        batch_clusters, gene_features_dict
+                        batch_clusters, gene_features_dict, screen_info
                     )
 
                     # Query LLM
@@ -545,7 +565,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None):
                             )
                             for cluster_id, genes_list in batch_clusters.items():
                                 individual_prompt = make_cluster_analysis_prompt(
-                                    cluster_id, genes_list, gene_features_dict
+                                    cluster_id, genes_list, gene_features_dict, screen_info
                                 )
                                 individual_analysis, individual_error = query_llm(
                                     context,
@@ -643,12 +663,15 @@ def main():
 
     # Load gene features if provided
     gene_features_dict = load_gene_features(args.gene_features)
+    
+    # Load screen information if provided
+    screen_info = load_screen_info(args.screen_info)
 
     # Run the appropriate analysis mode
     if args.mode == "cluster":
         # Process gene clusters
         print(f"Processing {len(df)} clusters in range {start_idx}-{end_idx}")
-        results = process_clusters(df, config, args, logger, gene_features_dict)
+        results = process_clusters(df, config, args, logger, gene_features_dict, screen_info)
         
         # Reset index to make cluster_id a column for merging
         original_df = raw_df.reset_index()
@@ -658,7 +681,7 @@ def main():
         
         print(f"Analysis completed for {len(results)} clusters")
     else:
-        # Gene set analysis mode remains unchanged
+        # Gene set analysis mode (not modified to use screen_info since it's not needed for that mode)
         print(f"Processing {len(df)} gene sets in range {start_idx}-{end_idx}")
 
         # Create column prefix for this model
@@ -682,8 +705,7 @@ def main():
         # Process gene sets
         process_gene_set(df, config, args, logger, gene_features_dict)
 
-    print("Analysis completed successfully")
-    
+    print("Analysis completed successfully")    
 
 if __name__ == "__main__":
     main()

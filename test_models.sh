@@ -11,6 +11,9 @@ PROJECT_NAME="aconcagua_cell"
 
 echo "Starting genomics pathway analysis pipeline..."
 
+# Step 0: Create results directory if it doesn't exist
+mkdir -p ${RESULTS_DIR}
+
 # Step 1: Reshape clusters for analysis
 # echo "Preprocessing data: Converting raw data to cluster format..."
 # python reshape_clusters.py \
