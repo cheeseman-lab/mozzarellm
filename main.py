@@ -597,7 +597,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                                 )
 
                                 if individual_analysis:
-                                    cluster_result = process_cluster_analysis(
+                                    cluster_result = process_cluster_response(
                                         individual_analysis
                                     )
                                     clusters_dict[cluster_id] = cluster_result

@@ -1,3 +1,6 @@
+import logging
+
+
 def make_gene_analysis_prompt(genes, gene_features=None):
     """
     Create a prompt for gene set analysis with explicit score request
@@ -184,25 +187,39 @@ Provide analysis for each cluster in this exact JSON array format:
     else:
         raise ValueError(f"Unknown template type: {template_type}")
 
-def make_gene_analysis_prompt(genes, gene_features=None, template_path=None):
+
+def make_cluster_analysis_prompt(cluster_id, genes, gene_features=None, screen_info=None, template_path=None):
     """
-    Create a prompt for gene set analysis with a custom or default template.
-    
+    Create a prompt for gene cluster analysis with concise JSON output focusing on both
+    truly uncharacterized genes and characterized genes with potential novel pathway roles.
+
     Args:
-        genes: List of gene identifiers
+        cluster_id: Identifier for the cluster
+        genes: List of gene identifiers in the cluster
         gene_features: Optional dict of additional gene features
+        screen_info: Optional information about the OPS screen and biological context
         template_path: Path to custom template file
-        
+
     Returns:
         prompt: Formatted prompt string
     """
     gene_list = ", ".join(genes)
     
     # Load template (will fall back to default if needed)
-    template = load_prompt_template(template_path=template_path, template_type="gene_set")
+    template = load_prompt_template(template_path=template_path, template_type="cluster")
     
-    # Format the template with gene list
-    prompt = template.format(gene_list=gene_list)
+    # Format template with cluster_id and gene_list
+    prompt = template.format(cluster_id=cluster_id, gene_list=gene_list)
+    
+    # Add screen information if provided
+    if screen_info:
+        screen_context = f"""
+SCREEN INFORMATION:
+{screen_info}
+
+Use this information to better understand the biological context of the screen and inform your assessment of potential novel pathway roles.
+"""
+        prompt += screen_context
     
     # Add gene features if provided
     if gene_features:
@@ -210,6 +227,65 @@ def make_gene_analysis_prompt(genes, gene_features=None, template_path=None):
         for gene, features in gene_features.items():
             if gene in genes:
                 feature_text += f"{gene}: {features}\n"
-        prompt += feature_text
+        
+        feature_explanation = """
+IMPORTANT: The additional gene information provided above should be used to:
+1. Better determine if genes are truly UNCHARACTERIZED
+2. Evaluate potential pathway connections for CHARACTERIZED_OTHER_PATHWAY genes
+3. Identify ESTABLISHED genes for the dominant process
+"""
+        prompt += feature_text + feature_explanation
+    
+    return prompt
+
+def make_batch_cluster_analysis_prompt(clusters, gene_features=None, screen_info=None, template_path=None):
+    """
+    Create a prompt for batch analysis of multiple gene clusters with concise output,
+    distinguishing between uncharacterized genes and characterized genes with novel roles.
+
+    Args:
+        clusters: Dictionary mapping cluster IDs to lists of genes
+        gene_features: Optional dict of additional gene features
+        screen_info: Optional information about the OPS screen and biological context
+        template_path: Path to custom template file
+
+    Returns:
+        prompt: Formatted prompt string
+    """
+    # Create formatted clusters text
+    clusters_text = ""
+    for cluster_id, genes in clusters.items():
+        gene_list = ", ".join(genes)
+        clusters_text += f"Cluster {cluster_id}: {gene_list}\n\n"
+    
+    # Load template (will fall back to default if needed)
+    template = load_prompt_template(template_path=template_path, template_type="batch_cluster")
+    
+    # Format template with clusters_text
+    prompt = template.format(clusters_text=clusters_text)
+    
+    # Add screen information if provided
+    if screen_info:
+        screen_context = f"""
+SCREEN INFORMATION:
+{screen_info}
+
+Use this information to better understand the biological context of the screen and inform your assessment of potential novel pathway roles.
+"""
+        prompt += screen_context
+    
+    # Add gene features if provided
+    if gene_features:
+        feature_text = "\nAdditional gene information:\n"
+        for gene, features in gene_features.items():
+            feature_text += f"{gene}: {features}\n"
+        
+        feature_explanation = """
+IMPORTANT: The additional gene information provided above should be used to:
+1. Better determine if genes are truly UNCHARACTERIZED
+2. Evaluate potential pathway connections for CHARACTERIZED_OTHER_PATHWAY genes
+3. Identify ESTABLISHED genes for the dominant process
+"""
+        prompt += feature_text + feature_explanation
     
     return prompt

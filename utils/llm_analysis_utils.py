@@ -145,6 +145,7 @@ def process_cluster_response(analysis_text, is_batch=False):
         logging.error(f"Error processing cluster analysis: {e}")
         return default_structure if not is_batch else {}
 
+
 def _standardize_cluster_format(cluster_data, raw_text):
     """Helper function to standardize cluster data format"""
     # Start with default structure
