@@ -81,6 +81,7 @@ Follow these steps:
     else:
         raise ValueError(f"Unknown template type: {template_type}")
 
+
 def get_output_format_instructions(template_type):
     """Get standardized output format instructions for a template type"""
     if template_type == "gene_set":
@@ -94,7 +95,7 @@ ANALYSIS: [your detailed explanation]
         return """
 Provide a concise analysis in this exact JSON format:
 {
-  "cluster_id": cluster_id_value,
+  "cluster_id": "[numeric_id]",
   "dominant_process": "specific pathway name",
   "pathway_confidence": "High/Medium/Low",
   "established_genes": ["GeneA", "GeneB"],
@@ -120,7 +121,7 @@ Provide a concise analysis in this exact JSON format:
 Provide analysis for each cluster in this exact JSON array format:
 [
   {
-    "cluster_id": cluster_id_value,
+    "cluster_id": "[numeric_id1]",
     "dominant_process": "specific pathway name",
     "pathway_confidence": "High/Medium/Low",
     "established_genes": ["GeneA", "GeneB"],
@@ -141,14 +142,19 @@ Provide analysis for each cluster in this exact JSON array format:
     "summary": "key findings summary"
   },
   {
-    // Next cluster...
+    "cluster_id": "[numeric_id2]",
+    "dominant_process": "another pathway name",
+    "pathway_confidence": "High/Medium/Low",
+    "established_genes": ["GeneE", "GeneF"],
+    "uncharacterized_genes": [],
+    "novel_role_genes": [],
+    "summary": "another summary"
   }
 ]
 """
     else:
         raise ValueError(f"Unknown template type: {template_type}")
-
-
+    
 def make_cluster_analysis_prompt(cluster_id, genes, gene_features=None, screen_info=None, template_path=None):
     """
     Create a prompt for gene cluster analysis with concise JSON output focusing on both
