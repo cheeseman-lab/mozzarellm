@@ -1,3 +1,36 @@
 These gene clusters were derived from an optical pooled screening (OPS) approach in interphase HeLa cells.
 
-Genes grouped within a cluster tend to exhibit similar morphological phenotypes in this context, suggesting that they may participate in the same biological process or pathway. However, not all clusters will correspond to a defined or coherent biological pathway—this is expected and should be acknowledged. Clusters without clear biological relevance or pathway coherence should be excluded from detailed analysis.
+Genes grouped within a cluster tend to exhibit similar morphological phenotypes in this context, suggesting that they may participate in the same biological process or pathway. However, not all clusters will correspond to a defined or coherent biological pathway.
+
+When evaluating pathway confidence, apply these stringent criteria:
+
+HIGH CONFIDENCE:
+- Multiple well-established genes (≥3) with strong literature support in the same specific pathway
+- Clear functional relationship between genes that explains the observed phenotypic clustering
+- Genes represent different aspects or components of the same biological process
+- The pathway assignment explains >60% of genes in the cluster
+
+MEDIUM CONFIDENCE:
+- Some established genes (1-2) from a specific pathway, with additional supporting genes
+- Functional relationship is plausible but has some gaps or uncertainties
+- Some genes in the cluster have unclear relationship to the proposed pathway
+- The pathway assignment explains 40-60% of genes in the cluster
+
+LOW CONFIDENCE:
+- Few or no established pathway genes, but a plausible functional theme
+- Significant heterogeneity in gene functions within the cluster
+- The proposed pathway is very broad or general
+- The pathway assignment explains <40% of genes in the cluster
+
+CLUSTERS WITH NO COHERENT PATHWAY:
+- For clusters with no clear functional relationship among genes
+- Clusters where genes belong to many unrelated pathways
+- Clusters containing nontargeting control genes
+- Clusters where you cannot identify a dominant biological process
+
+For clusters with no coherent pathway, set:
+- "pathway_confidence": "Low"
+- "dominant_process": "No coherent biological pathway"
+- And explain the reasoning clearly in the "summary" field
+
+The goal is NOT to force-fit clusters into pathways, but to identify clusters where a clear biological signal emerges from the phenotypic grouping. Mark clusters without a coherent biological signature as indicated above rather than assigning biologically implausible pathways.

@@ -110,7 +110,7 @@ Provide a concise analysis in this exact JSON format:
 {{
   "cluster_id": "[numeric_id]",
   "dominant_process": "specific pathway name",
-  "pathway_confidence": "High/Medium/Low",
+  "pathway_confidence": "High/Medium/Low/No coherent pathway",
   "established_genes": ["GeneA", "GeneB"],
   "uncharacterized_genes": [
     {{
