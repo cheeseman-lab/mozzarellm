@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 from utils.openai_query import openai_chat
 from utils.anthropic_query import anthropic_chat
 from utils.gemini_query import query_genai_model
-from utils.perplexity_query import perplexity_chat
 from utils.server_model_query import server_model_chat
 from utils.prompt_factory import (
     make_gene_analysis_prompt,
@@ -22,8 +21,7 @@ from utils.prompt_factory import (
 )
 from utils.llm_analysis_utils import (
     process_analysis,
-    process_cluster_analysis,
-    process_batch_cluster_analysis,
+    process_cluster_response,
     save_progress,
     save_cluster_analysis,
 )
@@ -46,6 +44,18 @@ def setup_argument_parser():
         choices=["gene_set", "cluster"],
         default="cluster",
         help="Analysis mode: gene_set (original) or cluster (default)",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Override model specified in config file"
+    )
+    parser.add_argument(
+        "--custom_prompt",
+        type=str,
+        default=None,
+        help="Path to custom prompt template file"
     )
     parser.add_argument(
         "--input", type=str, required=True, help="Path to input csv with gene clusters"
@@ -112,55 +122,71 @@ def setup_argument_parser():
     return parser
 
 
-def load_config(config_file):
-    """Load and validate configuration from a JSON file."""
-    with open(config_file) as json_file:
-        config = json.load(json_file)
-
-    # Extract required configuration values
-    context = config["CONTEXT"]
-    model = config["MODEL"]
-    temperature = config["TEMP"]
-    max_tokens = config["MAX_TOKENS"]
-
-    # Get rate from API settings if available
-    if "API_SETTINGS" in config:
-        for provider, settings in config["API_SETTINGS"].items():
-            if any(
-                model.startswith(m.split("-")[0]) for m in settings.get("models", [])
-            ):
-                rate_per_token = settings.get("rate_per_token", 0.00001)
-                break
-        else:
-            rate_per_token = config.get("RATE_PER_TOKEN", 0.00001)  # Default fallback
-    else:
-        rate_per_token = config.get("RATE_PER_TOKEN", 0.00001)  # Default fallback
-
-    dollar_limit = config.get("DOLLAR_LIMIT", 10.0)  # Default fallback
-    log_name = config.get("LOG_NAME", "analysis")
-
-    # Check for custom prompt
-    custom_prompt_file = config.get("CUSTOM_PROMPT_FILE")
-    customized_prompt = None
-    if custom_prompt_file and os.path.isfile(custom_prompt_file):
-        with open(custom_prompt_file, "r") as f:
-            customized_prompt = f.read()
-            if not customized_prompt or len(customized_prompt) < 2:
-                logging.warning(
-                    "Customized prompt file exists but is empty or too short"
-                )
-                customized_prompt = None
-
-    return {
-        "context": context,
-        "model": model,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "rate_per_token": rate_per_token,
-        "dollar_limit": dollar_limit,
-        "log_name": log_name,
-        "customized_prompt": customized_prompt,
+def load_config(config_file=None, model_override=None):
+    """
+    Load configuration with optional model override.
+    
+    Args:
+        config_file: Path to config file (optional)
+        model_override: Model to use, overriding config (optional)
+        
+    Returns:
+        config: Configuration dictionary
+    """
+    # Default configuration
+    default_config = {
+        "MODEL": "",
+        "CONTEXT": "You are an AI assistant specializing in genomics and systems biology.",
+        "TEMP": 0.0,
+        "MAX_TOKENS": 4000,
+        "RATE_PER_TOKEN": 0.00001,
+        "DOLLAR_LIMIT": 10.0,
+        "LOG_NAME": "analysis",
+        "API_SETTINGS": {
+            "openai": {
+                "models": ["gpt-4o", "gpt-4.5", "gpt-3.5-turbo"],
+                "rate_per_token": 0.00001
+            },
+            "anthropic": {
+                "models": ["claude-3-7-sonnet-20250219", "claude-3.5-sonnet", "claude-3-opus-20240229"],
+                "rate_per_token": 0.000015
+            },
+            "gemini": {
+                "models": ["gemini-2.5-pro-exp-03-25", "gemini-2.0-flash"],
+                "rate_per_token": 0.000005
+            }
+        }
     }
+    
+    # If config file provided, load and merge with defaults
+    if config_file:
+        try:
+            with open(config_file) as json_file:
+                user_config = json.load(json_file)
+                # Update default config with user settings
+                for key, value in user_config.items():
+                    if isinstance(value, dict) and key in default_config and isinstance(default_config[key], dict):
+                        # Deep merge for nested dictionaries
+                        default_config[key].update(value)
+                    else:
+                        default_config[key] = value
+        except Exception as e:
+            logging.error(f"Error loading config file: {e}")
+    
+    # Override model if specified
+    if model_override:
+        default_config["MODEL"] = model_override
+    
+    # Determine rate_per_token based on model if not explicitly set
+    model = default_config["MODEL"]
+    if model and "API_SETTINGS" in default_config:
+        for provider, settings in default_config["API_SETTINGS"].items():
+            if any(model.startswith(m.split("-")[0]) for m in settings.get("models", [])):
+                rate_per_token = settings.get("rate_per_token", default_config.get("RATE_PER_TOKEN", 0.00001))
+                default_config["RATE_PER_TOKEN"] = rate_per_token
+                break
+    
+    return default_config
 
 
 def load_gene_features(gene_features_file):
@@ -180,6 +206,7 @@ def load_gene_features(gene_features_file):
     except Exception as e:
         print(f"Error loading gene features: {e}")
         return None
+
 
 def load_screen_info(screen_info_file):
     """Load screen information from a file if provided."""
@@ -235,16 +262,6 @@ def query_llm(
             logger.info("Using Anthropic Claude API")
             analysis, error_message = anthropic_chat(
                 context, prompt, model, temperature, max_tokens, log_file, seed
-            )
-            return analysis, None if analysis else error_message
-        elif (
-            model.startswith("deepseek")
-            or model.startswith("llama")
-            or model.startswith("mistral")
-        ):
-            logger.info(f"Using Perplexity API with {model}")
-            analysis, error_message = perplexity_chat(
-                context, prompt, model, temperature, max_tokens, log_file
             )
             return analysis, None if analysis else error_message
         else:
@@ -439,7 +456,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                 continue
 
             # Create prompt and query LLM
-            prompt = make_cluster_analysis_prompt(idx, genes, gene_features_dict, screen_info)
+            prompt = make_cluster_analysis_prompt(idx, genes, gene_features_dict, screen_info, template_path=args.custom_prompt)
             analysis, error = query_llm(
                 context,
                 prompt,
@@ -455,7 +472,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
             # Process the analysis if we got one
             if analysis:
                 # Parse the structured output
-                cluster_result = process_cluster_analysis(analysis)
+                cluster_result = process_cluster_response(analysis, is_batch=False)
 
                 # Store the result
                 clusters_dict[str(idx)] = cluster_result
@@ -509,7 +526,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                 try:
                     # Create batch prompt - now with screen_info
                     prompt = make_batch_cluster_analysis_prompt(
-                        batch_clusters, gene_features_dict, screen_info
+                        batch_clusters, gene_features_dict, screen_info, template_path=args.custom_prompt
                     )
 
                     # Query LLM
@@ -528,7 +545,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                     # Process the batch analysis if we got one
                     if analysis:
                         # Parse the structured output - returns dict of cluster_id -> analysis
-                        batch_results = process_batch_cluster_analysis(analysis)
+                        batch_results = process_cluster_response(analysis, is_batch=True)
 
                         # Check if parsing was successful
                         if batch_results and len(batch_results) > 0:
@@ -618,7 +635,7 @@ def main():
     args = parser.parse_args()
 
     # Load configuration
-    config = load_config(args.config)
+    config = load_config(args.config, args.model)
 
     # Create logger
     logger = get_model_logger(config["model"], args.start, args.end)

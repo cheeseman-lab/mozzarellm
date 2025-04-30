@@ -72,20 +72,21 @@ def save_progress(df, analysis_dict, out_file_base):
     logging.info(f"Progress saved to {tsv_path} and {json_path}")
 
 
-def process_cluster_analysis(analysis_text):
+def process_cluster_response(analysis_text, is_batch=False):
     """
-    Process the cluster analysis output from an LLM into structured components.
-    Expects a JSON formatted response with updated categories for characterized
-    and uncharacterized genes.
-
+    Unified function to process cluster analysis output from an LLM.
+    Handles both single cluster and batch responses.
+    
     Args:
-        analysis_text: Raw text response from LLM with JSON content
-
+        analysis_text: Raw text response from LLM
+        is_batch: Boolean indicating if this is a batch response
+        
     Returns:
-        result_dict: Dictionary with structured analysis
+        If is_batch: Dictionary mapping cluster IDs to their analysis results
+        If not is_batch: Dictionary with structured analysis for a single cluster
     """
-    # Initialize default result dictionary
-    result_dict = {
+    # Default structure for a single cluster
+    default_structure = {
         "cluster_id": None,
         "dominant_process": "Unknown",
         "pathway_confidence": "Low",
@@ -95,186 +96,111 @@ def process_cluster_analysis(analysis_text):
         "summary": "",
         "raw_text": analysis_text,
     }
-
+    
     try:
-        # Try to extract JSON from the text
-        # First, find JSON object in the text (in case there's other text around it)
-        json_start = analysis_text.find("{")
-        json_end = analysis_text.rfind("}") + 1
-
-        if json_start >= 0 and json_end > json_start:
-            json_text = analysis_text[json_start:json_end]
-            # Parse the JSON
-            analysis_json = json.loads(json_text)
-
-            # Extract the structured data
-            result_dict.update(analysis_json)
-
-            # Ensure cluster_id is a string
-            if "cluster_id" in result_dict:
-                result_dict["cluster_id"] = str(result_dict["cluster_id"])
-
-            return result_dict
+        # Find and extract JSON content
+        json_array_start = analysis_text.find("[")
+        json_object_start = analysis_text.find("{")
+        
+        if is_batch and json_array_start >= 0:
+            # Process batch response (JSON array)
+            json_array_end = analysis_text.rfind("]") + 1
+            json_text = analysis_text[json_array_start:json_array_end]
+            clusters = {}
+            
+            try:
+                analysis_array = json.loads(json_text)
+                # Process each cluster in the array
+                for cluster_analysis in analysis_array:
+                    processed_cluster = _standardize_cluster_format(cluster_analysis, analysis_text)
+                    if processed_cluster["cluster_id"]:
+                        clusters[processed_cluster["cluster_id"]] = processed_cluster
+                return clusters
+            except json.JSONDecodeError:
+                logging.error("Failed to parse JSON array from batch analysis")
+                return {}
+                
+        elif json_object_start >= 0:
+            # Process single cluster response (JSON object)
+            json_object_end = analysis_text.rfind("}") + 1
+            json_text = analysis_text[json_object_start:json_object_end]
+            
+            try:
+                analysis_json = json.loads(json_text)
+                if is_batch and "cluster_id" in analysis_json:
+                    # Single cluster in batch mode
+                    processed_cluster = _standardize_cluster_format(analysis_json, analysis_text)
+                    return {processed_cluster["cluster_id"]: processed_cluster}
+                else:
+                    # Standard single cluster mode
+                    return _standardize_cluster_format(analysis_json, analysis_text)
+            except json.JSONDecodeError:
+                logging.error("Failed to parse JSON object from analysis")
+                return default_structure if not is_batch else {}
         else:
-            logging.warning("No JSON object found in analysis text")
-            return result_dict
-
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to parse JSON from analysis: {e}")
-        logging.debug(f"Problematic text: {analysis_text}")
-        return result_dict
+            logging.warning("No JSON content found in analysis text")
+            return default_structure if not is_batch else {}
+            
     except Exception as e:
         logging.error(f"Error processing cluster analysis: {e}")
-        return result_dict
+        return default_structure if not is_batch else {}
 
-
-def process_batch_cluster_analysis(analysis_text):
-    """
-    Process batch cluster analysis by extracting results from a JSON array.
-
-    Args:
-        analysis_text: Raw text response containing a JSON array of cluster analyses
-
-    Returns:
-        clusters_dict: Dictionary mapping cluster IDs to their analysis results
-    """
-    clusters_dict = {}
-
-    try:
-        # Try to extract JSON array from the text
-        # First, find JSON array in the text (in case there's other text around it)
-        json_start = analysis_text.find("[")
-        json_end = analysis_text.rfind("]") + 1
-
-        if json_start >= 0 and json_end > json_start:
-            json_text = analysis_text[json_start:json_end]
-            # Parse the JSON array
-            analysis_array = json.loads(json_text)
-
-            # Process each cluster in the array
-            for cluster_analysis in analysis_array:
-                # Ensure each cluster has required fields
-                if "cluster_id" in cluster_analysis:
-                    # Process cluster_id to ensure it's an integer when possible
-                    cluster_id_raw = cluster_analysis["cluster_id"]
-                    
-                    # Handle cases like "Cluster 0", "Cluster 1", etc.
-                    if isinstance(cluster_id_raw, str) and "cluster" in cluster_id_raw.lower():
-                        # Extract numeric part from strings like "Cluster 0"
-                        digit_match = re.search(r'\d+', cluster_id_raw)
-                        if digit_match:
-                            cluster_id = digit_match.group(0)
-                        else:
-                            cluster_id = str(cluster_id_raw)
-                    else:
-                        # Keep as is for other formats
-                        cluster_id = str(cluster_id_raw)
-                    
-                    # Update the cluster_id in the analysis to be consistent
-                    cluster_analysis["cluster_id"] = cluster_id
-                    
-                    # Initialize default structure for new gene categories if missing
-                    if "uncharacterized_genes" not in cluster_analysis:
-                        cluster_analysis["uncharacterized_genes"] = []
-                    if "novel_role_genes" not in cluster_analysis:
-                        cluster_analysis["novel_role_genes"] = []
-                    
-                    # Handle backward compatibility with old format - convert "novel_genes" to "uncharacterized_genes"
-                    if "novel_genes" in cluster_analysis and not cluster_analysis.get("uncharacterized_genes"):
-                        cluster_analysis["uncharacterized_genes"] = cluster_analysis.pop("novel_genes")
-                    
-                    # Ensure "characterized_genes" is also converted properly
-                    if "characterized_genes" in cluster_analysis and not cluster_analysis.get("novel_role_genes"):
-                        # Move characterized genes to novel_role_genes (with default priority and rationale)
-                        characterized = cluster_analysis.pop("characterized_genes")
-                        if isinstance(characterized, list):
-                            # If it's just a list of strings, convert to proper structure
-                            if characterized and isinstance(characterized[0], str):
-                                cluster_analysis["novel_role_genes"] = [
-                                    {"gene": gene, "priority": 5, "rationale": "Characterized gene with potential novel pathway role"}
-                                    for gene in characterized
-                                ]
-                            else:
-                                # Already in proper format
-                                cluster_analysis["novel_role_genes"] = characterized
-                    
-                    # Add raw text to each cluster
-                    cluster_analysis["raw_text"] = analysis_text
-                    clusters_dict[cluster_id] = cluster_analysis
-
-            return clusters_dict
-
-        # If no array found, try to find a single JSON object
-        json_start = analysis_text.find("{")
-        json_end = analysis_text.rfind("}") + 1
-
-        if json_start >= 0 and json_end > json_start:
-            json_text = analysis_text[json_start:json_end]
-            # Parse the JSON
-            analysis_json = json.loads(json_text)
-
-            # Check if this is a single cluster
-            if "cluster_id" in analysis_json:
-                # Process cluster_id to ensure it's an integer when possible
-                cluster_id_raw = analysis_json["cluster_id"]
-                
-                # Handle cases like "Cluster 0", "Cluster 1", etc.
-                if isinstance(cluster_id_raw, str) and "cluster" in cluster_id_raw.lower():
-                    # Extract numeric part from strings like "Cluster 0"
-                    digit_match = re.search(r'\d+', cluster_id_raw)
-                    if digit_match:
-                        cluster_id = digit_match.group(0)
-                    else:
-                        cluster_id = str(cluster_id_raw)
-                else:
-                    # Keep as is for other formats
-                    cluster_id = str(cluster_id_raw)
-                
-                # Update the cluster_id in the analysis to be consistent
-                analysis_json["cluster_id"] = cluster_id
-                
-                # Initialize default structure for new gene categories if missing
-                if "uncharacterized_genes" not in analysis_json:
-                    analysis_json["uncharacterized_genes"] = []
-                if "novel_role_genes" not in analysis_json:
-                    analysis_json["novel_role_genes"] = []
-                
-                # Handle backward compatibility with old format - convert "novel_genes" to "uncharacterized_genes"
-                if "novel_genes" in analysis_json and not analysis_json.get("uncharacterized_genes"):
-                    analysis_json["uncharacterized_genes"] = analysis_json.pop("novel_genes")
-                
-                # Ensure "characterized_genes" is also converted properly
-                if "characterized_genes" in analysis_json and not analysis_json.get("novel_role_genes"):
-                    # Move characterized genes to novel_role_genes (with default priority and rationale)
-                    characterized = analysis_json.pop("characterized_genes")
-                    if isinstance(characterized, list):
-                        # If it's just a list of strings, convert to proper structure
-                        if characterized and isinstance(characterized[0], str):
-                            analysis_json["novel_role_genes"] = [
-                                {"gene": gene, "priority": 5, "rationale": "Characterized gene with potential novel pathway role"}
-                                for gene in characterized
-                            ]
-                        else:
-                            # Already in proper format
-                            analysis_json["novel_role_genes"] = characterized
-                
-                # Add raw text
-                analysis_json["raw_text"] = analysis_text
-                clusters_dict[cluster_id] = analysis_json
-
-            return clusters_dict
-
-        logging.warning("No JSON array or object found in batch analysis text")
-        return clusters_dict
-
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to parse JSON from batch analysis: {e}")
-        logging.debug(f"Problematic text: {analysis_text}")
-        return clusters_dict
-    except Exception as e:
-        logging.error(f"Error processing batch cluster analysis: {e}")
-        return clusters_dict
+def _standardize_cluster_format(cluster_data, raw_text):
+    """Helper function to standardize cluster data format"""
+    # Start with default structure
+    standardized = {
+        "cluster_id": None,
+        "dominant_process": "Unknown",
+        "pathway_confidence": "Low",
+        "established_genes": [],
+        "uncharacterized_genes": [],
+        "novel_role_genes": [],
+        "summary": "",
+        "raw_text": raw_text,
+    }
+    
+    # Update with provided data
+    standardized.update(cluster_data)
+    
+    # Process cluster_id to ensure it's a string
+    if "cluster_id" in cluster_data:
+        cluster_id_raw = cluster_data["cluster_id"]
         
+        # Handle cases like "Cluster 0"
+        if isinstance(cluster_id_raw, str) and "cluster" in cluster_id_raw.lower():
+            digit_match = re.search(r'\d+', cluster_id_raw)
+            if digit_match:
+                standardized["cluster_id"] = digit_match.group(0)
+            else:
+                standardized["cluster_id"] = str(cluster_id_raw)
+        else:
+            standardized["cluster_id"] = str(cluster_id_raw)
+    
+    # Handle legacy format conversions
+    if "novel_genes" in cluster_data and not standardized.get("uncharacterized_genes"):
+        standardized["uncharacterized_genes"] = cluster_data.pop("novel_genes")
+    
+    if "characterized_genes" in cluster_data and not standardized.get("novel_role_genes"):
+        characterized = cluster_data.pop("characterized_genes")
+        if isinstance(characterized, list):
+            if characterized and isinstance(characterized[0], str):
+                standardized["novel_role_genes"] = [
+                    {"gene": gene, "priority": 5, "rationale": "Characterized gene with potential novel pathway role"}
+                    for gene in characterized
+                ]
+            else:
+                standardized["novel_role_genes"] = characterized
+    
+    # Ensure gene categories are properly structured
+    for category in ["uncharacterized_genes", "novel_role_genes"]:
+        if standardized[category] and isinstance(standardized[category][0], str):
+            standardized[category] = [
+                {"gene": gene, "priority": 5, "rationale": f"Default rationale for {category}"}
+                for gene in standardized[category]
+            ]
+    
+    return standardized
+
 
 def save_cluster_analysis(clusters_dict, out_file_base, original_df=None, include_raw=True):
     """
