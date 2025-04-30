@@ -1,0 +1,3 @@
+These gene clusters were derived from an optical pooled screening (OPS) approach in interphase HeLa cells.
+
+Genes grouped within a cluster tend to exhibit similar morphological phenotypes in this context, suggesting that they may participate in the same biological process or pathway. However, not all clusters will correspond to a defined or coherent biological pathway—this is expected and should be acknowledged. Clusters without clear biological relevance or pathway coherence should be excluded from detailed analysis.
