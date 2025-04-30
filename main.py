@@ -15,7 +15,6 @@ from utils.anthropic_query import anthropic_chat
 from utils.gemini_query import query_genai_model
 from utils.server_model_query import server_model_chat
 from utils.prompt_factory import (
-    make_gene_analysis_prompt,
     make_cluster_analysis_prompt,
     make_batch_cluster_analysis_prompt,
 )
@@ -273,140 +272,6 @@ def query_llm(
     except Exception as e:
         logger.error(f"Error querying LLM: {str(e)}")
         return None, f"Error: {str(e)}"
-
-
-def process_gene_set(df, config, args, logger, gene_features_dict=None):
-    """
-    Process gene sets using the original pipeline.
-
-    Args:
-        df: DataFrame containing gene sets to analyze
-        config: Configuration dictionary
-        args: Command line arguments
-        logger: Logger instance
-        gene_features_dict: Optional dictionary with gene features
-
-    Returns:
-        analysis_dict: Dictionary containing analysis results
-    """
-    analysis_dict = {}
-
-    # Extract needed config values
-    context = config["context"]
-    model = config["model"]
-    temperature = config["temperature"]
-    max_tokens = config["max_tokens"]
-    rate_per_token = config["rate_per_token"]
-    dollar_limit = config["dollar_limit"]
-
-    # Set up paths and column names
-    gene_column = args.gene_column
-    gene_sep = args.gene_sep
-    out_file = args.output_file
-
-    # Create column prefix based on model name
-    if "-" in model:
-        column_prefix = "_".join(model.split("-")[:2])
-    else:
-        column_prefix = model.replace(":", "_")
-
-    # Set random seed for reproducibility
-    seed = constant.SEED
-
-    # Set up logging file name
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = f"{config['log_name']}_{timestamp}.log"
-
-    i = 0  # Used for tracking progress and saving the file
-    for idx, row in tqdm(df.iterrows(), total=df.shape[0], desc="Processing gene sets"):
-        # Only process None rows
-        if pd.notna(row.get(f"{column_prefix} Analysis")):
-            continue
-
-        gene_data = row[gene_column]
-        # If gene_data is not a string, then skip
-        if not isinstance(gene_data, str):
-            logger.warning(f"Gene set {idx} is not a string, skipping")
-            continue
-
-        genes = gene_data.split(gene_sep)
-
-        # Check if gene set is too large
-        if len(genes) > constant.MAX_GENES_PER_ANALYSIS:
-            logger.warning(f"Gene set {idx} is too big ({len(genes)} genes), skipping")
-            continue
-
-        try:
-            # Create prompt
-            prompt = make_gene_analysis_prompt(genes, gene_features_dict)
-
-            # Query LLM
-            analysis, error = query_llm(
-                context,
-                prompt,
-                model,
-                temperature,
-                max_tokens,
-                rate_per_token,
-                log_file,
-                dollar_limit,
-                seed,
-            )
-
-            # Process the analysis if we got one
-            if analysis:
-                # Extract function name, confidence score, and detailed analysis
-                llm_name, llm_score, llm_analysis = process_analysis(analysis)
-
-                # Clean up the score and return float
-                try:
-                    llm_score_value = float(re.sub("[^0-9.-]", "", llm_score))
-                except ValueError:
-                    llm_score_value = float(0)
-
-                # Update dataframe with results (using loc method correctly)
-                df.loc[idx, f"{column_prefix} Name"] = llm_name
-                df.loc[idx, f"{column_prefix} Analysis"] = llm_analysis
-                df.loc[idx, f"{column_prefix} Score"] = llm_score_value
-
-                # Save raw response
-                analysis_dict[f"{idx}_{column_prefix}"] = analysis
-
-                # Log success
-                logger.info(f"Success for {idx} {column_prefix}.")
-                if isinstance(error, str) and "fingerprint" in error:
-                    logger.info(f"Model fingerprint for {idx}: {error}")
-            else:
-                logger.error(f"Error for query gene set {idx}: {error}")
-
-        except Exception as e:
-            logger.error(f"Error for {idx}: {e}")
-            continue
-
-        # Save progress periodically
-        i += 1
-        if i % 10 == 0:
-            # Bin scores into confidence categories
-            bins = constant.SCORE_BIN_RANGES
-            labels = constant.SCORE_BIN_LABELS
-
-            df[f"{column_prefix} Score bins"] = pd.cut(
-                df[f"{column_prefix} Score"], bins=bins, labels=labels
-            )
-            save_progress(df, analysis_dict, out_file)
-            logger.info(f"Saved progress for {i} gene sets")
-
-    # Save the final file
-    # Bin scores into confidence categories
-    bins = constant.SCORE_BIN_RANGES
-    labels = constant.SCORE_BIN_LABELS
-
-    df[f"{column_prefix} Score bins"] = pd.cut(
-        df[f"{column_prefix} Score"], bins=bins, labels=labels
-    )
-    save_progress(df, analysis_dict, out_file)
-
-    return analysis_dict
 
 
 def process_clusters(df, config, args, logger, gene_features_dict=None, screen_info=None):
@@ -697,30 +562,6 @@ def main():
         save_cluster_analysis(results, args.output_file, original_df=original_df)
         
         print(f"Analysis completed for {len(results)} clusters")
-    else:
-        # Gene set analysis mode (not modified to use screen_info since it's not needed for that mode)
-        print(f"Processing {len(df)} gene sets in range {start_idx}-{end_idx}")
-
-        # Create column prefix for this model
-        if "-" in config["model"]:
-            column_prefix = "_".join(config["model"].split("-")[:2])
-        else:
-            column_prefix = config["model"].replace(":", "_")
-
-        # Initialize columns if needed
-        if args.initialize:
-            df[f"{column_prefix} Name"] = None
-            df[f"{column_prefix} Analysis"] = None
-            df[f"{column_prefix} Score"] = float("-inf")
-            print(f"Initialized output columns with prefix '{column_prefix}'")
-
-        # Check how many entries need processing
-        print(
-            f"Found {df[f'{column_prefix} Analysis'].isna().sum()} gene sets to analyze"
-        )
-
-        # Process gene sets
-        process_gene_set(df, config, args, logger, gene_features_dict)
 
     print("Analysis completed successfully")    
 
