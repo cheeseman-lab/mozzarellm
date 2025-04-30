@@ -1,6 +1,6 @@
-Analyze the following gene clusters to identify dominant biological pathways and classify genes:
+Analyze gene cluster {cluster_id} to identify the dominant biological pathway and classify genes:
 
-{clusters_text}
+Genes: {gene_list}
 
 For each cluster:
 1. Identify the dominant biological pathway, focusing on specific molecular mechanisms rather than general terms
