@@ -55,33 +55,45 @@ ANALYSIS: [your detailed explanation]
 """
     elif template_type == "cluster":
         return """
-CONTEXT: You are an AI assistant specializing in genomics and systems biology with expertise in pathway analysis. 
-
-Analyze gene cluster {cluster_id} to identify the dominant biological function and prioritize genes in TWO distinct categories:
+Analyze gene cluster {cluster_id} to identify the dominant biological pathway and classify genes:
 
 Genes: {gene_list}
 
 Follow these steps:
-1. Identify the dominant biological process, focusing on specific pathways rather than general terms
-2. Classify genes into ESTABLISHED pathway members and potential NOVEL pathway members
-3. For potential novel pathway members, assign a priority score (1-10) for follow-up investigation
+1. Identify the dominant biological pathway, focusing on specific molecular mechanisms rather than general terms
+2. Classify genes into THREE categories using these definitions:
+   - ESTABLISHED: Well-known members of the identified pathway with clear functional roles in this pathway
+   - UNCHARACTERIZED: Genes with minimal to no functional annotation in ANY published literature
+   - NOVEL_ROLE: Genes with published functional annotation in OTHER pathways that may have additional roles in the dominant pathway
+
+3. For both UNCHARACTERIZED and NOVEL_ROLE genes:
+   - Assign a priority score (1-10) for follow-up investigation
+   - Provide a rationale explaining why this gene merits investigation
+
+4. Provide a concise summary of the key findings
 """
     elif template_type == "batch_cluster":
         return """
-CONTEXT: You are an AI assistant specializing in genomics and systems biology with expertise in pathway analysis. 
-
-Analyze the following gene clusters to identify dominant biological functions and prioritize genes:
+Analyze the following gene clusters to identify dominant biological pathways and classify genes:
 
 {clusters_text}
 
-Follow these steps:
-1. Identify the dominant biological process for each cluster
-2. Classify genes into ESTABLISHED pathway members and potential NOVEL pathway members
-3. For potential novel pathway members, assign a priority score (1-10) for follow-up investigation
+For each cluster:
+1. Identify the dominant biological pathway, focusing on specific molecular mechanisms rather than general terms
+2. Classify genes into THREE categories using these definitions:
+   - ESTABLISHED: Well-known members of the identified pathway with clear functional roles in this pathway
+   - UNCHARACTERIZED: Genes with minimal to no functional annotation in ANY published literature
+   - NOVEL_ROLE: Genes with published functional annotation in OTHER pathways that may have additional roles in the dominant pathway
+
+3. For both UNCHARACTERIZED and NOVEL_ROLE genes:
+   - Assign a priority score (1-10) for follow-up investigation
+   - Provide a rationale explaining why this gene merits investigation
+
+4. Provide a concise summary of the key findings for each cluster
 """
     else:
         raise ValueError(f"Unknown template type: {template_type}")
-
+    
 
 def get_output_format_instructions(template_type):
     """Get standardized output format instructions for a template type"""
@@ -157,6 +169,7 @@ def make_cluster_analysis_prompt(
     """
     Create a prompt for gene cluster analysis with concise JSON output focusing on both
     truly uncharacterized genes and characterized genes with potential novel pathway roles.
+    Optimized version that only includes relevant gene features.
 
     Args:
         cluster_id: Identifier for the cluster
@@ -188,20 +201,28 @@ Use this information to better understand the biological context of the screen a
 """
         prompt += screen_context
 
-    # Add gene features if provided
+    # Add gene features if provided - only for genes in this cluster
     if gene_features:
         feature_text = "\nAdditional gene information:\n"
-        for gene, features in gene_features.items():
-            if gene in genes:
-                feature_text += f"{gene}: {features}\n"
+        relevant_feature_count = 0
+        
+        for gene in genes:
+            if gene in gene_features:
+                feature_text += f"{gene}: {gene_features[gene]}\n"
+                relevant_feature_count += 1
 
-        feature_explanation = """
+        # Only add the feature section if we found relevant features
+        if relevant_feature_count > 0:
+            feature_explanation = """
 IMPORTANT: The additional gene information provided above should be used to:
 1. Better determine if genes are truly UNCHARACTERIZED
 2. Evaluate potential pathway connections for CHARACTERIZED_OTHER_PATHWAY genes
 3. Identify ESTABLISHED genes for the dominant process
 """
-        prompt += feature_text + feature_explanation
+            prompt += feature_text + feature_explanation
+            print(f"Added {relevant_feature_count} gene feature descriptions to prompt")
+        else:
+            print("No relevant gene features found for this cluster")
 
     return prompt
 
@@ -212,20 +233,24 @@ def make_batch_cluster_analysis_prompt(
     """
     Create a prompt for batch analysis of multiple gene clusters with concise output,
     distinguishing between uncharacterized genes and characterized genes with novel roles.
+    Optimized to only include gene features for genes present in the current batch.
     """
-    # Create formatted clusters text
+    # Create formatted clusters text and collect genes present in this batch
     clusters_text = ""
+    batch_genes = set()  # Use a set for efficient lookups
+    
     for cluster_id, genes in clusters.items():
         gene_list = ", ".join(genes)
         clusters_text += f"Cluster {cluster_id}: {gene_list}\n\n"
+        # Add all genes from this cluster to our set
+        batch_genes.update(genes)
 
     # Load template (will fall back to default if needed)
     template = load_prompt_template(
         template_path=template_path, template_type="batch_cluster"
     )
 
-    # Format template with clusters_text only
-    # Use a dictionary with only the required placeholder
+    # Format template with clusters_text
     prompt_vars = {"clusters_text": clusters_text}
     try:
         prompt = template.format(**prompt_vars)
@@ -247,18 +272,28 @@ Use this information to better understand the biological context of the screen a
 """
         prompt += screen_context
 
-    # Add gene features if provided
+    # Add gene features if provided - OPTIMIZED to only include genes in this batch
     if gene_features:
         feature_text = "\nAdditional gene information:\n"
+        relevant_feature_count = 0
+        
+        # Only include features for genes in this batch
         for gene, features in gene_features.items():
-            feature_text += f"{gene}: {features}\n"
-
-        feature_explanation = """
+            if gene in batch_genes:
+                feature_text += f"{gene}: {features}\n"
+                relevant_feature_count += 1
+        
+        # Only add the feature section if we found relevant features
+        if relevant_feature_count > 0:
+            feature_explanation = """
 IMPORTANT: The additional gene information provided above should be used to:
 1. Better determine if genes are truly UNCHARACTERIZED
 2. Evaluate potential pathway connections for CHARACTERIZED_OTHER_PATHWAY genes
 3. Identify ESTABLISHED genes for the dominant process
 """
-        prompt += feature_text + feature_explanation
+            prompt += feature_text + feature_explanation
+            print(f"Added {relevant_feature_count} gene feature descriptions to prompt")
+        else:
+            print("No relevant gene features found for this batch")
 
     return prompt
