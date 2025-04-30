@@ -69,7 +69,7 @@ def openai_chat(
                 model=model,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_tokens,
                 seed=seed,
             )
 

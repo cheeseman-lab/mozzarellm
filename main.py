@@ -241,7 +241,7 @@ def query_llm(
 
     try:
         # Call appropriate API based on model name
-        if model.startswith("gpt"):
+        if model.startswith("gpt") or model.startswith("o4") or model.startswith("o3"):
             logger.info("Accessing OpenAI API")
             return openai_chat(
                 context,
