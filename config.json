@@ -15,10 +15,6 @@
       "models": ["claude-3-7-sonnet-20250219", "claude-3.5-sonnet", "claude-3-opus-20240229"],
       "rate_per_token": 0.000015
     },
-    "perplexity": {
-      "models": ["perplexity-r1", "deepseek-r1", "llama-3-70b", "mistral-saba"],
-      "rate_per_token": 0.000005
-    },
     "gemini": {
       "models": ["gemini-2.0-pro", "gemini-1.5-pro", "gemini-1.5-flash"],
       "rate_per_token": 0.000005

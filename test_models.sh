@@ -65,32 +65,6 @@ mkdir -p ${RESULTS_DIR}
 #   --batch_size 2 \
 #   --output_file ${RESULTS_DIR}/${PROJECT_NAME}_anthropic
 
-# Step 4: Run with DeepSeek-R1
-# echo "Running analysis with Perplexity DeepSeek-R1..."
-# python main.py \
-#   --config config_deepseek.json \
-#   --mode cluster \
-#   --input ${PROCESSED_FILE} \
-#   --input_sep "," \
-#   --set_index "cluster_id" \
-#   --gene_column "genes" \
-#   --gene_sep ";" \
-#   --batch_size 2 \
-#   --output_file ${RESULTS_DIR}/${PROJECT_NAME}_deepseek
-
-# # Step 5: Run with sonar
-# echo "Running analysis with sonar..."
-# python main.py \
-#   --config config_sonar.json \
-#   --mode cluster \
-#   --input ${PROCESSED_FILE} \
-#   --input_sep "," \
-#   --set_index "cluster_id" \
-#   --gene_column "genes" \
-#   --gene_sep ";" \
-#   --batch_size 2 \
-#   --output_file ${RESULTS_DIR}/${PROJECT_NAME}_sonar
-
 # Step 6: Run with Gemini
 echo "Running analysis with Gemini..."
 python main.py \

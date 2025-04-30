@@ -15,10 +15,6 @@
         "models": ["claude-3-7-sonnet-20250219", "claude-3.5-sonnet", "claude-3-opus-20240229"],
         "rate_per_token": 0.000015
       },
-      "perplexity": {
-        "models": ["r1-1776", "sonar-reasoning-pro"],
-        "rate_per_token": 0.000005
-      },
       "gemini": {
         "models": ["gemini-2.5-pro-exp-03-25", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
         "rate_per_token": 0.000005

@@ -9,10 +9,10 @@ SEED = 42
 SCORE_THRESHOLDS = {"high": 0.86, "medium": 0.81, "low": 0.0}
 
 # API rate limits (requests per minute)
-RATE_LIMITS = {"openai": 60, "anthropic": 50, "perplexity": 60, "gemini": 60}
+RATE_LIMITS = {"openai": 60, "anthropic": 50, "gemini": 60}
 
 # Token count estimates
-CHARS_PER_TOKEN = {"openai": 4, "anthropic": 4.5, "perplexity": 4, "gemini": 4}
+CHARS_PER_TOKEN = {"openai": 4, "anthropic": 4.5, "gemini": 4}
 
 # Max gene set sizes
 MAX_GENES_PER_ANALYSIS = 1000

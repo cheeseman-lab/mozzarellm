@@ -4,7 +4,6 @@ from unittest.mock import patch, MagicMock
 from dotenv import load_dotenv
 from utils.openai_query import openai_chat
 from utils.anthropic_query import anthropic_chat
-from utils.perplexity_query import perplexity_chat
 
 # Load environment variables for testing
 load_dotenv()
@@ -73,28 +72,6 @@ class TestAPICalls(unittest.TestCase):
         # Check results
         self.assertEqual(result, "Test Claude analysis")
         mock_client.messages.create.assert_called_once()
-
-    @patch("requests.post")
-    def test_perplexity_call(self, mock_post):
-        """Test Perplexity API call with mocked response"""
-        # Set up the mock
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "choices": [{"message": {"content": "Test DeepSeek analysis"}}]
-        }
-        mock_post.return_value = mock_resp
-
-        # Call the function
-        model = "deepseek-coder"
-        result, _ = perplexity_chat(
-            self.context, self.prompt, model, 0.0, 1000, self.test_log_file
-        )
-
-        # Check results
-        self.assertEqual(result, "Test DeepSeek analysis")
-        mock_post.assert_called_once()
-
 
 if __name__ == "__main__":
     unittest.main()

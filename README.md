@@ -10,7 +10,7 @@ This repository provides tools for analyzing gene clusters using Large Language 
 - **Gene Categorization**: Classifies genes within clusters as established, characterized, or novel
 - **Novel Gene Prioritization**: Assigns importance scores to novel genes based on their likelihood of involvement in the identified pathway
 - **Batch Processing**: Efficiently processes multiple gene clusters in a single run
-- **Flexible Model Support**: Compatible with various LLM providers including OpenAI (GPT models), Anthropic (Claude models), Google (Gemini models), and Perplexity API
+- **Flexible Model Support**: Compatible with various LLM providers including OpenAI (GPT models), Anthropic (Claude models), Google (Gemini models)
 
 ## Installation
 
@@ -113,7 +113,6 @@ To use different LLM providers, modify the `MODEL` field in your configuration f
 - OpenAI: `"MODEL": "gpt-4"` or `"MODEL": "gpt-3.5-turbo"`
 - Anthropic: `"MODEL": "claude-3-opus-20240229"`
 - Google: `"MODEL": "gemini-pro"`
-- Perplexity: `"MODEL": "mistral-7b-instruct"`
 
 ## Output Files
 
