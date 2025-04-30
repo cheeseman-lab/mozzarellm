@@ -15,11 +15,11 @@ mkdir -p ${RESULTS_DIR}
 echo "Starting genomics pathway analysis pipeline..."
 
 # Step 2: Run analysis with OpenAI GPT-4o
-echo "Running analysis with OpenAI o4-mini..."
+echo "Running analysis with OpenAI GPT-4o..."
 python main.py \
   --config config_openai.json \
   --mode cluster \
-  --model "o4-mini" \
+  --model "gpt-4o" \
   --custom_prompt "prompts/top_targets.txt" \
   --input ${PROCESSED_FILE} \
   --input_sep "," \

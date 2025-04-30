@@ -40,15 +40,15 @@ def reshape_to_clusters(
         genes = group[gene_col].tolist()
         genes_text = gene_sep.join(genes)
 
-        # Start with cluster ID and genes
-        cluster_info = {
-            "cluster_id": cluster,
-            "genes": genes_text,
-            "gene_count": len(genes),
-        }
-
-        # Add additional cluster-level metadata if specified
+        # Start with just cluster ID and genes if no additional columns requested
         if additional_cols:
+            cluster_info = {
+                "cluster_id": cluster,
+                "genes": genes_text,
+                "gene_count": len(genes),
+            }
+            
+            # Add additional cluster-level metadata if specified
             for col in additional_cols:
                 if col in df.columns:
                     # For columns like cluster_group that should be the same for all genes in a cluster
@@ -63,6 +63,12 @@ def reshape_to_clusters(
                             cluster_info[col] = most_common
                     else:
                         cluster_info[col] = None
+        else:
+            # If no additional columns requested, only include cluster_id and genes
+            cluster_info = {
+                "cluster_id": cluster,
+                "genes": genes_text,
+            }
 
         clusters[cluster] = cluster_info
 
