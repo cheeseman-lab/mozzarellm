@@ -38,7 +38,7 @@ def query_genai_model(context, prompt, model, temperature, max_tokens, log_file)
         max_output_tokens=max_tokens,
         top_p=1,
         top_k=32,
-        system_instruction=context
+        system_instruction=context,
     )
 
     # Make API call with retry logic
@@ -47,9 +47,7 @@ def query_genai_model(context, prompt, model, temperature, max_tokens, log_file)
         try:
             # Generate content using the updated API structure
             response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=config
+                model=model, contents=prompt, config=config
             )
 
             # Extract the response text

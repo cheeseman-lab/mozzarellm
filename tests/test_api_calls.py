@@ -73,5 +73,6 @@ class TestAPICalls(unittest.TestCase):
         self.assertEqual(result, "Test Claude analysis")
         mock_client.messages.create.assert_called_once()
 
+
 if __name__ == "__main__":
     unittest.main()
