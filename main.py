@@ -61,12 +61,6 @@ def setup_argument_parser():
         "--input_sep", type=str, required=True, help="Separator for input csv"
     )
     parser.add_argument(
-        "--set_index",
-        type=str,
-        default="cluster_id",
-        help="Column name for cluster index",
-    )
-    parser.add_argument(
         "--gene_column", type=str, required=True, help="Column name for gene set"
     )
     parser.add_argument(
@@ -107,13 +101,6 @@ def setup_argument_parser():
         type=str,
         default=None,
         help="Path to file containing information about the OPS screen context"
-    )
-
-    # Legacy arguments for gene_set mode
-    parser.add_argument(
-        "--initialize",
-        action="store_true",
-        help="Initialize the output file with columns (gene_set mode)",
     )
 
     return parser
@@ -479,7 +466,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                                 else:
                                     logger.error(
                                         f"Error processing individual cluster {cluster_id}: {individual_error}"
-                                    )
+                                        )
 
                 except Exception as e:
                     logger.error(f"Error processing batch: {e}")
@@ -516,7 +503,7 @@ def main():
 
     # Load the data
     try:
-        raw_df = pd.read_csv(args.input, sep=input_sep, index_col=args.set_index)
+        raw_df = pd.read_csv(args.input, sep=input_sep)
         print(
             f"Loaded data with {len(raw_df)} rows and columns: {list(raw_df.columns)}"
         )

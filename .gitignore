@@ -38,13 +38,11 @@ htmlcov/
 # Logs
 *.log
 logs/
+debug/
 
 # Results and data (optional, comment out if you want to track these)
-results/*.json
-results/*.csv
-results/*.tsv
-data/*.csv
-data/*.tsv
+results/
+data/HeLa_essentials/
 
 # IDE files
 .idea/

@@ -85,6 +85,14 @@ def process_cluster_response(analysis_text, is_batch=False):
         If is_batch: Dictionary mapping cluster IDs to their analysis results
         If not is_batch: Dictionary with structured analysis for a single cluster
     """
+    # Save the raw response for debugging in a debug subdirectory
+    debug_dir = "debug"
+    if not os.path.exists(debug_dir):
+        os.makedirs(debug_dir)
+    debug_filename = os.path.join(debug_dir, f"debug_response_{int(time.time())}.txt")
+    with open(debug_filename, "w") as f:
+        f.write(analysis_text)
+    
     # Default structure for a single cluster
     default_structure = {
         "cluster_id": None,
@@ -98,48 +106,121 @@ def process_cluster_response(analysis_text, is_batch=False):
     }
     
     try:
-        # Find and extract JSON content
-        json_array_start = analysis_text.find("[")
-        json_object_start = analysis_text.find("{")
+        # Clean up the text - remove any leading/trailing whitespace
+        cleaned_text = analysis_text.strip()
         
-        if is_batch and json_array_start >= 0:
-            # Process batch response (JSON array)
-            json_array_end = analysis_text.rfind("]") + 1
-            json_text = analysis_text[json_array_start:json_array_end]
-            clusters = {}
+        # Try to extract JSON using regex patterns for more reliable extraction
+        import re
+        
+        if is_batch:
+            # Look for a JSON array pattern
+            array_pattern = r'\[\s*\{.*\}\s*\]'
+            json_match = re.search(array_pattern, cleaned_text, re.DOTALL)
             
+            if json_match:
+                try:
+                    json_str = json_match.group(0)
+                    analysis_array = json.loads(json_str)
+                    
+                    # Process each cluster in the array
+                    clusters = {}
+                    for cluster_analysis in analysis_array:
+                        processed_cluster = _standardize_cluster_format(cluster_analysis, analysis_text)
+                        if processed_cluster["cluster_id"]:
+                            clusters[processed_cluster["cluster_id"]] = processed_cluster
+                    
+                    return clusters
+                except json.JSONDecodeError as e:
+                    logging.error(f"Failed to parse JSON array from regex match: {e}")
+            
+            # If regex fails, try another approach - look for properly formed JSON
+            start_idx = cleaned_text.find('[')
+            end_idx = cleaned_text.rfind(']')
+            
+            if start_idx >= 0 and end_idx > start_idx:
+                try:
+                    json_str = cleaned_text[start_idx:end_idx+1]
+                    analysis_array = json.loads(json_str)
+                    
+                    # Process each cluster in the array
+                    clusters = {}
+                    for cluster_analysis in analysis_array:
+                        processed_cluster = _standardize_cluster_format(cluster_analysis, analysis_text)
+                        if processed_cluster["cluster_id"]:
+                            clusters[processed_cluster["cluster_id"]] = processed_cluster
+                    
+                    return clusters
+                except json.JSONDecodeError as e:
+                    logging.error(f"Failed to parse JSON array using indices: {e}")
+            
+            # Last resort - try cleaning up the text and attempt parsing line by line
             try:
-                analysis_array = json.loads(json_text)
-                # Process each cluster in the array
-                for cluster_analysis in analysis_array:
-                    processed_cluster = _standardize_cluster_format(cluster_analysis, analysis_text)
-                    if processed_cluster["cluster_id"]:
-                        clusters[processed_cluster["cluster_id"]] = processed_cluster
-                return clusters
-            except json.JSONDecodeError:
-                logging.error("Failed to parse JSON array from batch analysis")
-                return {}
+                # Look for JSON-like structure and rebuild it
+                lines = cleaned_text.splitlines()
+                json_lines = []
+                in_json = False
                 
-        elif json_object_start >= 0:
-            # Process single cluster response (JSON object)
-            json_object_end = analysis_text.rfind("}") + 1
-            json_text = analysis_text[json_object_start:json_object_end]
+                for line in lines:
+                    line = line.strip()
+                    # Start collecting when we see an opening bracket
+                    if '[' in line and not in_json:
+                        in_json = True
+                        json_lines.append('[')
+                    # If we're in JSON collection mode, gather lines
+                    elif in_json:
+                        # End collection when we see a closing bracket
+                        if ']' in line:
+                            json_lines.append(']')
+                            break
+                        # Otherwise, add the line if it looks like JSON content
+                        elif '{' in line or '}' in line or ':' in line or ',' in line:
+                            json_lines.append(line)
+                
+                if json_lines:
+                    rebuilt_json = ' '.join(json_lines)
+                    analysis_array = json.loads(rebuilt_json)
+                    
+                    # Process each cluster in the array
+                    clusters = {}
+                    for cluster_analysis in analysis_array:
+                        processed_cluster = _standardize_cluster_format(cluster_analysis, analysis_text)
+                        if processed_cluster["cluster_id"]:
+                            clusters[processed_cluster["cluster_id"]] = processed_cluster
+                    
+                    return clusters
+            except Exception as e:
+                logging.error(f"Failed to rebuild and parse JSON: {e}")
             
-            try:
-                analysis_json = json.loads(json_text)
-                if is_batch and "cluster_id" in analysis_json:
-                    # Single cluster in batch mode
-                    processed_cluster = _standardize_cluster_format(analysis_json, analysis_text)
-                    return {processed_cluster["cluster_id"]: processed_cluster}
-                else:
-                    # Standard single cluster mode
-                    return _standardize_cluster_format(analysis_json, analysis_text)
-            except json.JSONDecodeError:
-                logging.error("Failed to parse JSON object from analysis")
-                return default_structure if not is_batch else {}
+            # If all batch processing attempts fail, return empty dict
+            return {}
+            
         else:
-            logging.warning("No JSON content found in analysis text")
-            return default_structure if not is_batch else {}
+            # Single cluster mode - look for a JSON object pattern
+            object_pattern = r'\{\s*"cluster_id".*\}'
+            json_match = re.search(object_pattern, cleaned_text, re.DOTALL)
+            
+            if json_match:
+                try:
+                    json_str = json_match.group(0)
+                    analysis_json = json.loads(json_str)
+                    return _standardize_cluster_format(analysis_json, analysis_text)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Failed to parse JSON object from regex match: {e}")
+            
+            # If regex fails, try another approach
+            start_idx = cleaned_text.find('{')
+            end_idx = cleaned_text.rfind('}')
+            
+            if start_idx >= 0 and end_idx > start_idx:
+                try:
+                    json_str = cleaned_text[start_idx:end_idx+1]
+                    analysis_json = json.loads(json_str)
+                    return _standardize_cluster_format(analysis_json, analysis_text)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Failed to parse JSON object using indices: {e}")
+            
+            # If all single cluster processing attempts fail, return default structure
+            return default_structure
             
     except Exception as e:
         logging.error(f"Error processing cluster analysis: {e}")
