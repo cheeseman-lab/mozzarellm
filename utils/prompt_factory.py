@@ -157,7 +157,8 @@ Provide analysis for each cluster in this exact JSON array format:
   }}
 ]
 
-CRITICAL: Your response MUST be a valid JSON array starting with '[' and ending with ']'. Do not include explanations outside the JSON.
+CRITICAL: Your response MUST classify *every gene* into one of the three categories and include all three categories in the output.
+Your response MUST be a valid JSON array starting with '[' and ending with ']'. Do not include explanations outside the JSON.
 """
     else:
         raise ValueError(f"Unknown template type: {template_type}")
