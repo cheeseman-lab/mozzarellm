@@ -4,14 +4,6 @@ import logging
 def load_prompt_template(template_path=None, template_string=None, template_type="cluster"):
     """
     Load a prompt template from a file or string.
-    
-    Args:
-        template_path: Path to template file
-        template_string: Template string
-        template_type: Type of template (cluster, gene_set, batch_cluster)
-        
-    Returns:
-        template: The loaded template string
     """
     if template_path:
         try:
@@ -28,11 +20,18 @@ def load_prompt_template(template_path=None, template_string=None, template_type
     
     # Ensure the template contains the required output format instructions
     output_format = get_output_format_instructions(template_type)
+    
+    # Fix the issue by escaping curly braces in the output format that aren't meant to be placeholders
+    output_format = output_format.replace("{", "{{").replace("}", "}}")
+    # But restore any actual placeholders
+    output_format = output_format.replace("{{clusters_text}}", "{clusters_text}")
+    
     if output_format not in template:
         # Append output format to template
         template += f"\n\n{output_format}"
         
     return template
+
 
 def get_default_template(template_type):
     """Get the default template for a given type"""
@@ -94,67 +93,62 @@ ANALYSIS: [your detailed explanation]
     elif template_type == "cluster":
         return """
 Provide a concise analysis in this exact JSON format:
-{
+{{
   "cluster_id": "[numeric_id]",
   "dominant_process": "specific pathway name",
   "pathway_confidence": "High/Medium/Low",
   "established_genes": ["GeneA", "GeneB"],
   "uncharacterized_genes": [
-    {
+    {{
       "gene": "GeneC",
       "priority": 8,
       "rationale": "explanation"
-    }
+    }}
   ],
   "novel_role_genes": [
-    {
+    {{
       "gene": "GeneD",
       "priority": 7,
       "rationale": "explanation"
-    }
+    }}
   ],
   "summary": "key findings summary"
-}
+}}
 """
     elif template_type == "batch_cluster":
         return """
 Provide analysis for each cluster in this exact JSON array format:
+
 [
-  {
-    "cluster_id": "[numeric_id1]",
+  {{
+    "cluster_id": "0",
     "dominant_process": "specific pathway name",
-    "pathway_confidence": "High/Medium/Low",
+    "pathway_confidence": "High",
     "established_genes": ["GeneA", "GeneB"],
     "uncharacterized_genes": [
-      {
+      {{
         "gene": "GeneC",
         "priority": 8,
         "rationale": "explanation"
-      }
+      }}
     ],
     "novel_role_genes": [
-      {
+      {{
         "gene": "GeneD",
         "priority": 7,
         "rationale": "explanation"
-      }
+      }}
     ],
     "summary": "key findings summary"
-  },
-  {
-    "cluster_id": "[numeric_id2]",
-    "dominant_process": "another pathway name",
-    "pathway_confidence": "High/Medium/Low",
-    "established_genes": ["GeneE", "GeneF"],
-    "uncharacterized_genes": [],
-    "novel_role_genes": [],
-    "summary": "another summary"
-  }
+  }}
 ]
+
+CRITICAL: Your response MUST be a valid JSON array starting with '[' and ending with ']'. Do not include explanations outside the JSON.
 """
     else:
         raise ValueError(f"Unknown template type: {template_type}")
-    
+
+
 def make_cluster_analysis_prompt(cluster_id, genes, gene_features=None, screen_info=None, template_path=None):
     """
     Create a prompt for gene cluster analysis with concise JSON output focusing on both
@@ -205,19 +199,11 @@ IMPORTANT: The additional gene information provided above should be used to:
     
     return prompt
 
+
 def make_batch_cluster_analysis_prompt(clusters, gene_features=None, screen_info=None, template_path=None):
     """
     Create a prompt for batch analysis of multiple gene clusters with concise output,
     distinguishing between uncharacterized genes and characterized genes with novel roles.
-
-    Args:
-        clusters: Dictionary mapping cluster IDs to lists of genes
-        gene_features: Optional dict of additional gene features
-        screen_info: Optional information about the OPS screen and biological context
-        template_path: Path to custom template file
-
-    Returns:
-        prompt: Formatted prompt string
     """
     # Create formatted clusters text
     clusters_text = ""
@@ -228,8 +214,16 @@ def make_batch_cluster_analysis_prompt(clusters, gene_features=None, screen_info
     # Load template (will fall back to default if needed)
     template = load_prompt_template(template_path=template_path, template_type="batch_cluster")
     
-    # Format template with clusters_text
-    prompt = template.format(clusters_text=clusters_text)
+    # Format template with clusters_text only
+    # Use a dictionary with only the required placeholder
+    prompt_vars = {"clusters_text": clusters_text}
+    try:
+        prompt = template.format(**prompt_vars)
+    except KeyError as e:
+        # Handle errors by escaping all braces and then restoring only our placeholder
+        escaped_template = template.replace("{", "{{").replace("}", "}}")
+        escaped_template = escaped_template.replace("{{clusters_text}}", "{clusters_text}")
+        prompt = escaped_template.format(**prompt_vars)
     
     # Add screen information if provided
     if screen_info:
