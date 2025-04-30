@@ -345,6 +345,10 @@ def process_clusters(
                 constant.SEED,
             )
 
+            print("Prompt", prompt)
+            print("Analysis", analysis)
+            print("Error", error)
+
             # Process the analysis if we got one
             if analysis:
                 # Parse the structured output
@@ -420,7 +424,9 @@ def process_clusters(
                         dollar_limit,
                         constant.SEED,
                     )
-
+                    print("Prompt", prompt)
+                    print("Analysis", analysis)
+                    print("Error", error)
                     # Process the batch analysis if we got one
                     if analysis:
                         # Parse the structured output - returns dict of cluster_id -> analysis

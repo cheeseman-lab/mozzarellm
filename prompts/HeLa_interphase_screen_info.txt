@@ -1,3 +1,9 @@
-These gene clusters were derived from an optical pooled screening (OPS) approach in interphase HeLa cells.
+SCREEN INFORMATION:
+These genes were clustered based on similar morphological phenotypes in HeLa cells, suggesting shared biological functions. Use these confidence criteria:
 
-Genes grouped within a cluster tend to exhibit similar morphological phenotypes in this context, suggesting that they may participate in the same biological process or pathway. However, not all clusters will correspond to a defined or coherent biological pathway—this is expected and should be acknowledged. Clusters without clear biological relevance or pathway coherence should be excluded from detailed analysis.
+HIGH: ≥3 established pathway genes; clear functional relationships; explains >60% of cluster
+MEDIUM: 1-2 established pathway genes; plausible but uncertain relationships; explains 40-60% 
+LOW: Few established genes; heterogeneous functions; explains <40%
+NO COHERENT PATHWAY: No clear relationships; genes from unrelated pathways; contains nontargeting controls
+
+Do not force-fit pathways. If no clear biological signal exists or nontargeting genes are present, explicitly mark as "No coherent biological pathway" with "Low" confidence.
