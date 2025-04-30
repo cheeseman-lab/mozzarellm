@@ -182,6 +182,14 @@ def load_config(config_file=None, model_override=None):
                 rate_per_token = settings.get("rate_per_token", default_config.get("RATE_PER_TOKEN", 0.00001))
                 default_config["RATE_PER_TOKEN"] = rate_per_token
                 break
+
+    default_config["context"] = default_config["CONTEXT"]
+    default_config["model"] = default_config["MODEL"]
+    default_config["temperature"] = default_config["TEMP"]
+    default_config["max_tokens"] = default_config["MAX_TOKENS"]
+    default_config["rate_per_token"] = default_config["RATE_PER_TOKEN"]
+    default_config["dollar_limit"] = default_config["DOLLAR_LIMIT"]
+    default_config["log_name"] = default_config["LOG_NAME"]
     
     return default_config
 
@@ -501,7 +509,7 @@ def main():
     config = load_config(args.config, args.model)
 
     # Create logger
-    logger = get_model_logger(config["model"], args.start, args.end)
+    logger = get_model_logger(args.model, args.start, args.end)
 
     # Handle tab separator conversion
     input_sep = "\t" if args.input_sep == "\\t" else args.input_sep
