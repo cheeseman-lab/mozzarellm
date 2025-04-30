@@ -1,9 +1,7 @@
 import argparse
 import pandas as pd
 import json
-import os
 import logging
-import re
 import time
 from datetime import datetime
 from tqdm import tqdm
@@ -46,13 +44,13 @@ def setup_argument_parser():
         "--model",
         type=str,
         default=None,
-        help="Override model specified in config file"
+        help="Override model specified in config file",
     )
     parser.add_argument(
         "--custom_prompt",
         type=str,
         default=None,
-        help="Path to custom prompt template file"
+        help="Path to custom prompt template file",
     )
     parser.add_argument(
         "--input", type=str, required=True, help="Path to input csv with gene clusters"
@@ -100,7 +98,7 @@ def setup_argument_parser():
         "--screen_info",
         type=str,
         default=None,
-        help="Path to file containing information about the OPS screen context"
+        help="Path to file containing information about the OPS screen context",
     )
 
     return parser
@@ -109,11 +107,11 @@ def setup_argument_parser():
 def load_config(config_file=None, model_override=None):
     """
     Load configuration with optional model override.
-    
+
     Args:
         config_file: Path to config file (optional)
         model_override: Model to use, overriding config (optional)
-        
+
     Returns:
         config: Configuration dictionary
     """
@@ -129,19 +127,23 @@ def load_config(config_file=None, model_override=None):
         "API_SETTINGS": {
             "openai": {
                 "models": ["gpt-4o", "gpt-4.5", "gpt-3.5-turbo"],
-                "rate_per_token": 0.00001
+                "rate_per_token": 0.00001,
             },
             "anthropic": {
-                "models": ["claude-3-7-sonnet-20250219", "claude-3.5-sonnet", "claude-3-opus-20240229"],
-                "rate_per_token": 0.000015
+                "models": [
+                    "claude-3-7-sonnet-20250219",
+                    "claude-3.5-sonnet",
+                    "claude-3-opus-20240229",
+                ],
+                "rate_per_token": 0.000015,
             },
             "gemini": {
                 "models": ["gemini-2.5-pro-exp-03-25", "gemini-2.0-flash"],
-                "rate_per_token": 0.000005
-            }
-        }
+                "rate_per_token": 0.000005,
+            },
+        },
     }
-    
+
     # If config file provided, load and merge with defaults
     if config_file:
         try:
@@ -149,24 +151,32 @@ def load_config(config_file=None, model_override=None):
                 user_config = json.load(json_file)
                 # Update default config with user settings
                 for key, value in user_config.items():
-                    if isinstance(value, dict) and key in default_config and isinstance(default_config[key], dict):
+                    if (
+                        isinstance(value, dict)
+                        and key in default_config
+                        and isinstance(default_config[key], dict)
+                    ):
                         # Deep merge for nested dictionaries
                         default_config[key].update(value)
                     else:
                         default_config[key] = value
         except Exception as e:
             logging.error(f"Error loading config file: {e}")
-    
+
     # Override model if specified
     if model_override:
         default_config["MODEL"] = model_override
-    
+
     # Determine rate_per_token based on model if not explicitly set
     model = default_config["MODEL"]
     if model and "API_SETTINGS" in default_config:
         for provider, settings in default_config["API_SETTINGS"].items():
-            if any(model.startswith(m.split("-")[0]) for m in settings.get("models", [])):
-                rate_per_token = settings.get("rate_per_token", default_config.get("RATE_PER_TOKEN", 0.00001))
+            if any(
+                model.startswith(m.split("-")[0]) for m in settings.get("models", [])
+            ):
+                rate_per_token = settings.get(
+                    "rate_per_token", default_config.get("RATE_PER_TOKEN", 0.00001)
+                )
                 default_config["RATE_PER_TOKEN"] = rate_per_token
                 break
 
@@ -177,7 +187,7 @@ def load_config(config_file=None, model_override=None):
     default_config["rate_per_token"] = default_config["RATE_PER_TOKEN"]
     default_config["dollar_limit"] = default_config["DOLLAR_LIMIT"]
     default_config["log_name"] = default_config["LOG_NAME"]
-    
+
     return default_config
 
 
@@ -206,7 +216,7 @@ def load_screen_info(screen_info_file):
         return None
 
     try:
-        with open(screen_info_file, 'r') as f:
+        with open(screen_info_file, "r") as f:
             screen_info = f.read().strip()
         print(f"Loaded screen information: {len(screen_info)} characters")
         return screen_info
@@ -267,7 +277,9 @@ def query_llm(
         return None, f"Error: {str(e)}"
 
 
-def process_clusters(df, config, args, logger, gene_features_dict=None, screen_info=None):
+def process_clusters(
+    df, config, args, logger, gene_features_dict=None, screen_info=None
+):
     """Process gene clusters to identify pathways and novel members."""
     clusters_dict = {}
 
@@ -314,7 +326,13 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                 continue
 
             # Create prompt and query LLM
-            prompt = make_cluster_analysis_prompt(idx, genes, gene_features_dict, screen_info, template_path=args.custom_prompt)
+            prompt = make_cluster_analysis_prompt(
+                idx,
+                genes,
+                gene_features_dict,
+                screen_info,
+                template_path=args.custom_prompt,
+            )
             analysis, error = query_llm(
                 context,
                 prompt,
@@ -384,7 +402,10 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                 try:
                     # Create batch prompt - now with screen_info
                     prompt = make_batch_cluster_analysis_prompt(
-                        batch_clusters, gene_features_dict, screen_info, template_path=args.custom_prompt
+                        batch_clusters,
+                        gene_features_dict,
+                        screen_info,
+                        template_path=args.custom_prompt,
                     )
 
                     # Query LLM
@@ -403,7 +424,9 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                     # Process the batch analysis if we got one
                     if analysis:
                         # Parse the structured output - returns dict of cluster_id -> analysis
-                        batch_results = process_cluster_response(analysis, is_batch=True)
+                        batch_results = process_cluster_response(
+                            analysis, is_batch=True
+                        )
 
                         # Check if parsing was successful
                         if batch_results and len(batch_results) > 0:
@@ -440,7 +463,10 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                             )
                             for cluster_id, genes_list in batch_clusters.items():
                                 individual_prompt = make_cluster_analysis_prompt(
-                                    cluster_id, genes_list, gene_features_dict, screen_info
+                                    cluster_id,
+                                    genes_list,
+                                    gene_features_dict,
+                                    screen_info,
                                 )
                                 individual_analysis, individual_error = query_llm(
                                     context,
@@ -466,7 +492,7 @@ def process_clusters(df, config, args, logger, gene_features_dict=None, screen_i
                                 else:
                                     logger.error(
                                         f"Error processing individual cluster {cluster_id}: {individual_error}"
-                                        )
+                                    )
 
                 except Exception as e:
                     logger.error(f"Error processing batch: {e}")
@@ -538,7 +564,7 @@ def main():
 
     # Load gene features if provided
     gene_features_dict = load_gene_features(args.gene_features)
-    
+
     # Load screen information if provided
     screen_info = load_screen_info(args.screen_info)
 
@@ -546,17 +572,20 @@ def main():
     if args.mode == "cluster":
         # Process gene clusters
         print(f"Processing {len(df)} clusters in range {start_idx}-{end_idx}")
-        results = process_clusters(df, config, args, logger, gene_features_dict, screen_info)
-        
+        results = process_clusters(
+            df, config, args, logger, gene_features_dict, screen_info
+        )
+
         # Reset index to make cluster_id a column for merging
         original_df = raw_df.reset_index()
-        
+
         # Save the results with the original dataframe
         save_cluster_analysis(results, args.output_file, original_df=original_df)
-        
+
         print(f"Analysis completed for {len(results)} clusters")
 
-    print("Analysis completed successfully")    
+    print("Analysis completed successfully")
+
 
 if __name__ == "__main__":
     main()

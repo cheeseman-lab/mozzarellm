@@ -1,13 +1,15 @@
 import logging
 
 
-def load_prompt_template(template_path=None, template_string=None, template_type="cluster"):
+def load_prompt_template(
+    template_path=None, template_string=None, template_type="cluster"
+):
     """
     Load a prompt template from a file or string.
     """
     if template_path:
         try:
-            with open(template_path, 'r') as f:
+            with open(template_path, "r") as f:
                 template = f.read()
         except Exception as e:
             logging.error(f"Failed to load template from {template_path}: {e}")
@@ -17,19 +19,19 @@ def load_prompt_template(template_path=None, template_string=None, template_type
         template = template_string
     else:
         template = get_default_template(template_type)
-    
+
     # Ensure the template contains the required output format instructions
     output_format = get_output_format_instructions(template_type)
-    
+
     # Fix the issue by escaping curly braces in the output format that aren't meant to be placeholders
     output_format = output_format.replace("{", "{{").replace("}", "}}")
     # But restore any actual placeholders
     output_format = output_format.replace("{{clusters_text}}", "{clusters_text}")
-    
+
     if output_format not in template:
         # Append output format to template
         template += f"\n\n{output_format}"
-        
+
     return template
 
 
@@ -149,7 +151,9 @@ CRITICAL: Your response MUST be a valid JSON array starting with '[' and ending 
         raise ValueError(f"Unknown template type: {template_type}")
 
 
-def make_cluster_analysis_prompt(cluster_id, genes, gene_features=None, screen_info=None, template_path=None):
+def make_cluster_analysis_prompt(
+    cluster_id, genes, gene_features=None, screen_info=None, template_path=None
+):
     """
     Create a prompt for gene cluster analysis with concise JSON output focusing on both
     truly uncharacterized genes and characterized genes with potential novel pathway roles.
@@ -165,13 +169,15 @@ def make_cluster_analysis_prompt(cluster_id, genes, gene_features=None, screen_i
         prompt: Formatted prompt string
     """
     gene_list = ", ".join(genes)
-    
+
     # Load template (will fall back to default if needed)
-    template = load_prompt_template(template_path=template_path, template_type="cluster")
-    
+    template = load_prompt_template(
+        template_path=template_path, template_type="cluster"
+    )
+
     # Format template with cluster_id and gene_list
     prompt = template.format(cluster_id=cluster_id, gene_list=gene_list)
-    
+
     # Add screen information if provided
     if screen_info:
         screen_context = f"""
@@ -181,14 +187,14 @@ SCREEN INFORMATION:
 Use this information to better understand the biological context of the screen and inform your assessment of potential novel pathway roles.
 """
         prompt += screen_context
-    
+
     # Add gene features if provided
     if gene_features:
         feature_text = "\nAdditional gene information:\n"
         for gene, features in gene_features.items():
             if gene in genes:
                 feature_text += f"{gene}: {features}\n"
-        
+
         feature_explanation = """
 IMPORTANT: The additional gene information provided above should be used to:
 1. Better determine if genes are truly UNCHARACTERIZED
@@ -196,11 +202,13 @@ IMPORTANT: The additional gene information provided above should be used to:
 3. Identify ESTABLISHED genes for the dominant process
 """
         prompt += feature_text + feature_explanation
-    
+
     return prompt
 
 
-def make_batch_cluster_analysis_prompt(clusters, gene_features=None, screen_info=None, template_path=None):
+def make_batch_cluster_analysis_prompt(
+    clusters, gene_features=None, screen_info=None, template_path=None
+):
     """
     Create a prompt for batch analysis of multiple gene clusters with concise output,
     distinguishing between uncharacterized genes and characterized genes with novel roles.
@@ -210,10 +218,12 @@ def make_batch_cluster_analysis_prompt(clusters, gene_features=None, screen_info
     for cluster_id, genes in clusters.items():
         gene_list = ", ".join(genes)
         clusters_text += f"Cluster {cluster_id}: {gene_list}\n\n"
-    
+
     # Load template (will fall back to default if needed)
-    template = load_prompt_template(template_path=template_path, template_type="batch_cluster")
-    
+    template = load_prompt_template(
+        template_path=template_path, template_type="batch_cluster"
+    )
+
     # Format template with clusters_text only
     # Use a dictionary with only the required placeholder
     prompt_vars = {"clusters_text": clusters_text}
@@ -222,9 +232,11 @@ def make_batch_cluster_analysis_prompt(clusters, gene_features=None, screen_info
     except KeyError as e:
         # Handle errors by escaping all braces and then restoring only our placeholder
         escaped_template = template.replace("{", "{{").replace("}", "}}")
-        escaped_template = escaped_template.replace("{{clusters_text}}", "{clusters_text}")
+        escaped_template = escaped_template.replace(
+            "{{clusters_text}}", "{clusters_text}"
+        )
         prompt = escaped_template.format(**prompt_vars)
-    
+
     # Add screen information if provided
     if screen_info:
         screen_context = f"""
@@ -234,13 +246,13 @@ SCREEN INFORMATION:
 Use this information to better understand the biological context of the screen and inform your assessment of potential novel pathway roles.
 """
         prompt += screen_context
-    
+
     # Add gene features if provided
     if gene_features:
         feature_text = "\nAdditional gene information:\n"
         for gene, features in gene_features.items():
             feature_text += f"{gene}: {features}\n"
-        
+
         feature_explanation = """
 IMPORTANT: The additional gene information provided above should be used to:
 1. Better determine if genes are truly UNCHARACTERIZED
@@ -248,5 +260,5 @@ IMPORTANT: The additional gene information provided above should be used to:
 3. Identify ESTABLISHED genes for the dominant process
 """
         prompt += feature_text + feature_explanation
-    
+
     return prompt
