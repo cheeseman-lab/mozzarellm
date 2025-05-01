@@ -734,7 +734,7 @@ def save_cluster_analysis(
                     cluster_df = cluster_df.sort_values("cluster_id_num").drop(
                         "cluster_id_num", axis=1
                     )
-                except:
+                except Exception:  # Specify the exception type
                     # Fall back to string sorting if numeric conversion fails
                     cluster_df = cluster_df.sort_values("cluster_id")
 
