@@ -4,27 +4,26 @@
 
 # Set up environment variables
 DATA_DIR="data"
-RESULTS_DIR="results/aconcagua_1"
-INPUT_FILE="${DATA_DIR}/HeLa_essentials/phate_leiden_clustering.csv"
-PROCESSED_FILE="${DATA_DIR}/aconcagua_interphase.csv"
+RESULTS_DIR="results/luke_benchmark_1"
+INPUT_FILE="${DATA_DIR}/HeLa_essentials/cell_2022_clustering.csv"
+PROCESSED_FILE="${DATA_DIR}/luke_interphase.csv"
 GENE_FEATURES="${DATA_DIR}/HeLa_essentials/essentials_uniprot.csv"
 PROJECT_NAME="sample_gene_sets"
 
 # Step 0: Create results directory if it doesn't exist
 mkdir -p ${RESULTS_DIR}
 
-# Step 1: Reshape clusters for analysis
-echo "Preprocessing data: Converting raw data to cluster format..."
-python reshape_clusters.py \
-  --input ${INPUT_FILE} \
-  --output ${PROCESSED_FILE} \
-  --sep "," \
-  --gene_col "gene_symbol_0" \
-  --cluster_col "cluster" \
-  --gene_sep ";" 
+# # Step 1: Reshape clusters for analysis
+# echo "Preprocessing data: Converting raw data to cluster format..."
+# python reshape_clusters.py \
+#   --input ${INPUT_FILE} \
+#   --output ${PROCESSED_FILE} \
+#   --sep "," \
+#   --gene_col "gene_symbol_0" \
+#   --cluster_col "cluster" \
+#   --gene_sep ";" 
 
-
-echo "Starting genomics pathway analysis pipeline..."
+# # echo "Starting genomics pathway analysis pipeline..."
 
 # Step 2: Run analysis with OpenAI GPT-4o
 echo "Running analysis with OpenAI GPT-4o..."
