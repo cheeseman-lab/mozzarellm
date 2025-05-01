@@ -74,6 +74,18 @@ def setup_argument_parser():
         default=None,
         help="Path to file containing information about the OPS screen context",
     )
+    parser.add_argument(
+        "--cluster_id_column",
+        type=str,
+        default="cluster_id",
+        help="Column name for cluster ID (default: cluster_id)",
+    )
+    parser.add_argument(
+        "--set_index",
+        type=str,
+        default=None,
+        help="Column to use as index (will be used as cluster_id)",
+    )
 
     # Add reshape options
     parser.add_argument(
@@ -167,6 +179,8 @@ def main():
             batch_size=args.batch_size,
             start_idx=args.start if args.start is not None else 0,
             end_idx=args.end,
+            cluster_id_column=args.cluster_id_column,  # Pass the cluster ID column
+            set_index=args.set_index,  # Pass the set_index parameter
         )
         print(f"Analysis completed for {len(results) if results else 0} clusters")
 
