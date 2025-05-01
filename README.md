@@ -21,10 +21,10 @@ Mozzarellm is a Python package that leverages Large Language Models to analyze g
 pip install mozzarellm
 
 # From GitHub
-pip install git+https://github.com/yourusername/mozzarellm.git
+pip install git+https://github.com/cheeseman-lab/mozzarellm.git
 
 # For development
-git clone https://github.com/yourusername/mozzarellm.git
+git clone https://github.com/cheeseman-lab/mozzarellm.git
 cd mozzarellm
 pip install -e .
 ```
