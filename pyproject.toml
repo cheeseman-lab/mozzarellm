@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mozzarellm"
+version = "0.1.0"
+authors = [
+    {name = "Matteo Di Bernardo", email = "mdiberna@whitehead.mit.edu"},
+]
+description = "Tools for analyzing gene clusters using Large Language Models (LLMs)"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pandas>=2.0.0",
+    "numpy>=2.0.0",
+    "tqdm>=4.65.0",
+    "openai>=1.70.0",
+    "python-dotenv>=1.0.0",
+    "google-genai>=1.9.0",
+    "anthropic>=0.49.0",
+    "requests>=2.31.0",
+]
+
+[
+project.optional-dependencies
+]
+dev = [
+    "pytest>=7.0.0",
+    "ipykernel>=6.0.0",
+]
+
+[
+project.urls
+]
+"Homepage" = "https://github.com/cheeseman-lab/mozzarellm"
+"Bug Tracker" = "https://github.com/cheeseman-lab/mozzarellm/issues"
+
+[
+tool.setuptools
+]
+packages = ["mozzarellm"]
+
+[
+tool.setuptools.package-data
+]
+mozzarellm = ["prompts/*.txt"]
