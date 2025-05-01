@@ -218,6 +218,7 @@ def process_clusters(
     end_idx=None,
     log_name=None,
     use_tqdm=True,
+    cluster_id_column="cluster_id"  # Add parameter for cluster ID column
 ):
     """
     Process gene clusters to identify pathways and novel members.
@@ -236,6 +237,7 @@ def process_clusters(
         end_idx: End index in DataFrame (default: all)
         log_name: Custom log name (default: from config)
         use_tqdm: Whether to use tqdm progress bar
+        cluster_id_column: Column name for cluster ID (default: "cluster_id")
 
     Returns:
         clusters_dict: Dictionary of cluster analysis results
@@ -278,17 +280,25 @@ def process_clusters(
     else:
         row_iterator = df.iterrows()
 
+    # Ensure cluster_id_column exists in the DataFrame
+    if cluster_id_column not in df.columns:
+        logger.warning(f"Cluster ID column '{cluster_id_column}' not found in DataFrame. Using index as cluster ID.")
+        df[cluster_id_column] = df.index.astype(str)
+
     if batch_size <= 1:
         # Process one cluster at a time
         for idx, row in row_iterator:
+            # Get actual cluster ID from the data
+            cluster_id = str(row[cluster_id_column])
+            
             # Skip if already processed
-            if str(idx) in clusters_dict:
+            if cluster_id in clusters_dict:
                 continue
 
             # Get genes for this cluster
             gene_data = row[gene_column]
             if not isinstance(gene_data, str):
-                logger.warning(f"Cluster {idx} genes is not a string, skipping")
+                logger.warning(f"Cluster {cluster_id} genes is not a string, skipping")
                 continue
 
             genes = gene_data.split(gene_sep)
@@ -296,13 +306,13 @@ def process_clusters(
             # Check if gene set is too large
             if len(genes) > constant.MAX_GENES_PER_ANALYSIS:
                 logger.warning(
-                    f"Cluster {idx} is too big ({len(genes)} genes), skipping"
+                    f"Cluster {cluster_id} is too big ({len(genes)} genes), skipping"
                 )
                 continue
 
             # Create prompt and query LLM
             prompt = make_cluster_analysis_prompt(
-                idx,
+                cluster_id,  # Use actual cluster_id from data
                 genes,
                 gene_features_dict,
                 screen_info,
@@ -325,12 +335,17 @@ def process_clusters(
             if analysis:
                 # Parse the structured output
                 cluster_result = process_cluster_response(analysis, is_batch=False)
+                
+                # Ensure the cluster_id in the result matches our actual cluster_id
+                if cluster_result.get("cluster_id") != cluster_id:
+                    logger.warning(f"Cluster ID mismatch. Expected {cluster_id}, got {cluster_result.get('cluster_id')}. Fixing.")
+                    cluster_result["cluster_id"] = cluster_id
 
                 # Store the result
-                clusters_dict[str(idx)] = cluster_result
-                logger.info(f"Success for cluster {idx}")
+                clusters_dict[cluster_id] = cluster_result
+                logger.info(f"Success for cluster {cluster_id}")
             else:
-                logger.error(f"Error for cluster {idx}: {error}")
+                logger.error(f"Error for cluster {cluster_id}: {error}")
 
             # Save progress periodically
             if len(clusters_dict) % 5 == 0:
@@ -343,15 +358,18 @@ def process_clusters(
 
         for i, (idx, row) in enumerate(row_iterator):
             is_last_cluster = i == len(df) - 1
+            
+            # Get actual cluster ID from the data
+            cluster_id = str(row[cluster_id_column])
 
             # Skip if already processed
-            if str(idx) in clusters_dict:
+            if cluster_id in clusters_dict:
                 continue
 
             # Get genes for this cluster
             gene_data = row[gene_column]
             if not isinstance(gene_data, str):
-                logger.warning(f"Cluster {idx} genes is not a string, skipping")
+                logger.warning(f"Cluster {cluster_id} genes is not a string, skipping")
                 continue
 
             genes = gene_data.split(gene_sep)
@@ -359,12 +377,12 @@ def process_clusters(
             # Check if gene set is too large
             if len(genes) > constant.MAX_GENES_PER_ANALYSIS:
                 logger.warning(
-                    f"Cluster {idx} is too big ({len(genes)} genes), skipping"
+                    f"Cluster {cluster_id} is too big ({len(genes)} genes), skipping"
                 )
                 continue
 
             # Add to current batch
-            batch_clusters[str(idx)] = genes
+            batch_clusters[cluster_id] = genes  # Use actual cluster_id from data
 
             # Process batch if it's full or we're at the end
             if len(batch_clusters) >= batch_size or is_last_cluster:
@@ -401,6 +419,26 @@ def process_clusters(
 
                         # Check if parsing was successful
                         if batch_results and len(batch_results) > 0:
+                            # Ensure cluster IDs match our actual cluster IDs
+                            for result_id, result in list(batch_results.items()):
+                                if result_id not in batch_clusters:
+                                    # Try to match based on sequence or find closest match
+                                    correct_id = None
+                                    for real_id in batch_clusters.keys():
+                                        if real_id not in batch_results:
+                                            correct_id = real_id
+                                            break
+                                    
+                                    if correct_id:
+                                        logger.warning(f"Cluster ID mismatch. Got {result_id}, using {correct_id} instead.")
+                                        batch_results[correct_id] = result
+                                        batch_results[correct_id]["cluster_id"] = correct_id
+                                        del batch_results[result_id]
+                                else:
+                                    # Ensure the result has the correct ID
+                                    if result.get("cluster_id") != result_id:
+                                        result["cluster_id"] = result_id
+
                             # Merge with main results
                             clusters_dict.update(batch_results)
 
@@ -460,6 +498,8 @@ def analyze_gene_clusters(
     start_idx=0,
     end_idx=None,
     log_name=None,
+    cluster_id_column="cluster_id",
+    set_index=None,  
 ):
     """
     High-level function to analyze gene clusters from a file.
@@ -479,6 +519,8 @@ def analyze_gene_clusters(
         start_idx: Start index for processing
         end_idx: End index for processing
         log_name: Custom log name
+        cluster_id_column: Column name for cluster ID (default: "cluster_id")
+        set_index: Column to set as index (optional)
 
     Returns:
         clusters_dict: Dictionary of cluster analysis results
@@ -494,6 +536,18 @@ def analyze_gene_clusters(
     try:
         df = pd.read_csv(input_file, sep=input_sep)
         print(f"Loaded data with {len(df)} rows and columns: {list(df.columns)}")
+        
+        # Set index from a column if specified
+        if set_index and set_index in df.columns:
+            print(f"Setting index from column: {set_index}")
+            df = df.set_index(set_index).reset_index()
+            cluster_id_column = "index"  # Use the index column as cluster_id
+            
+        # Ensure we have a cluster ID column
+        if cluster_id_column not in df.columns:
+            print(f"Warning: Cluster ID column '{cluster_id_column}' not found. Using DataFrame index.")
+            df[cluster_id_column] = df.index.astype(str)
+            
     except Exception as e:
         print(f"Error loading input file: {e}")
         return None
@@ -512,4 +566,5 @@ def analyze_gene_clusters(
         start_idx=start_idx,
         end_idx=end_idx,
         log_name=log_name,
+        cluster_id_column=cluster_id_column,
     )

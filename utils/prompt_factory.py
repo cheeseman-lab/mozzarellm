@@ -108,7 +108,7 @@ ANALYSIS: [your detailed explanation]
         return """
 Provide a concise analysis in this exact JSON format:
 {{
-  "cluster_id": "[numeric_id]",
+  "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id provided in the prompt
   "dominant_process": "specific pathway name",
   "pathway_confidence": "High/Medium/Low/No coherent pathway",
   "established_genes": ["GeneA", "GeneB"],
@@ -135,7 +135,7 @@ Provide analysis for each cluster in this exact JSON array format:
 
 [
   {{
-    "cluster_id": "[numeric_id]",
+    "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id as provided in the prompt for each cluster
     "dominant_process": "specific pathway name",
     "pathway_confidence": "High",
     "established_genes": ["GeneA", "GeneB"],
@@ -158,6 +158,7 @@ Provide analysis for each cluster in this exact JSON array format:
 ]
 
 CRITICAL: Your response MUST classify *every gene* into one of the three categories and include all three categories in the output.
+CRITICAL: You MUST maintain the exact cluster_id as provided in the prompt for each cluster in your response.
 Your response MUST be a valid JSON array starting with '[' and ending with ']'. Do not include explanations outside the JSON.
 """
     else:
@@ -189,8 +190,8 @@ def make_cluster_analysis_prompt(
         template_path=template_path, template_type="cluster"
     )
 
-    # Format template with cluster_id and gene_list
-    prompt = template.format(cluster_id=cluster_id, gene_list=gene_list)
+    # Format template with cluster_id and gene_list (ensure cluster_id is a string)
+    prompt = template.format(cluster_id=str(cluster_id), gene_list=gene_list)
 
     # Add screen information if provided
     if screen_info:
