@@ -4,9 +4,9 @@
 
 # Set up environment variables
 DATA_DIR="data"
-RESULTS_DIR="results/aconcagua_1"
-INPUT_FILE="${DATA_DIR}/HeLa_essentials/phate_leiden_clustering.csv"
-PROCESSED_FILE="${DATA_DIR}/aconcagua_interphase.csv"
+RESULTS_DIR="results/denali_1"
+INPUT_FILE="${DATA_DIR}/Denali/phate_leiden_clustering.csv"
+PROCESSED_FILE="${DATA_DIR}/denali_interphase.csv"
 GENE_FEATURES="${DATA_DIR}/HeLa_essentials/essentials_uniprot.csv"
 PROJECT_NAME="sample_gene_sets"
 

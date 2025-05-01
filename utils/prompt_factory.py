@@ -135,7 +135,7 @@ Provide analysis for each cluster in this exact JSON array format:
 
 [
   {{
-    "cluster_id": "0",
+    "cluster_id": "[numeric_id]",
     "dominant_process": "specific pathway name",
     "pathway_confidence": "High",
     "established_genes": ["GeneA", "GeneB"],
