@@ -218,7 +218,7 @@ def process_clusters(
     end_idx=None,
     log_name=None,
     use_tqdm=True,
-    cluster_id_column="cluster_id"  # Add parameter for cluster ID column
+    cluster_id_column="cluster_id",  # Add parameter for cluster ID column
 ):
     """
     Process gene clusters to identify pathways and novel members.
@@ -282,7 +282,9 @@ def process_clusters(
 
     # Ensure cluster_id_column exists in the DataFrame
     if cluster_id_column not in df.columns:
-        logger.warning(f"Cluster ID column '{cluster_id_column}' not found in DataFrame. Using index as cluster ID.")
+        logger.warning(
+            f"Cluster ID column '{cluster_id_column}' not found in DataFrame. Using index as cluster ID."
+        )
         df[cluster_id_column] = df.index.astype(str)
 
     if batch_size <= 1:
@@ -290,7 +292,7 @@ def process_clusters(
         for idx, row in row_iterator:
             # Get actual cluster ID from the data
             cluster_id = str(row[cluster_id_column])
-            
+
             # Skip if already processed
             if cluster_id in clusters_dict:
                 continue
@@ -335,10 +337,12 @@ def process_clusters(
             if analysis:
                 # Parse the structured output
                 cluster_result = process_cluster_response(analysis, is_batch=False)
-                
+
                 # Ensure the cluster_id in the result matches our actual cluster_id
                 if cluster_result.get("cluster_id") != cluster_id:
-                    logger.warning(f"Cluster ID mismatch. Expected {cluster_id}, got {cluster_result.get('cluster_id')}. Fixing.")
+                    logger.warning(
+                        f"Cluster ID mismatch. Expected {cluster_id}, got {cluster_result.get('cluster_id')}. Fixing."
+                    )
                     cluster_result["cluster_id"] = cluster_id
 
                 # Store the result
@@ -358,7 +362,7 @@ def process_clusters(
 
         for i, (idx, row) in enumerate(row_iterator):
             is_last_cluster = i == len(df) - 1
-            
+
             # Get actual cluster ID from the data
             cluster_id = str(row[cluster_id_column])
 
@@ -428,11 +432,15 @@ def process_clusters(
                                         if real_id not in batch_results:
                                             correct_id = real_id
                                             break
-                                    
+
                                     if correct_id:
-                                        logger.warning(f"Cluster ID mismatch. Got {result_id}, using {correct_id} instead.")
+                                        logger.warning(
+                                            f"Cluster ID mismatch. Got {result_id}, using {correct_id} instead."
+                                        )
                                         batch_results[correct_id] = result
-                                        batch_results[correct_id]["cluster_id"] = correct_id
+                                        batch_results[correct_id]["cluster_id"] = (
+                                            correct_id
+                                        )
                                         del batch_results[result_id]
                                 else:
                                     # Ensure the result has the correct ID
@@ -499,7 +507,7 @@ def analyze_gene_clusters(
     end_idx=None,
     log_name=None,
     cluster_id_column="cluster_id",
-    set_index=None,  
+    set_index=None,
 ):
     """
     High-level function to analyze gene clusters from a file.
@@ -536,18 +544,20 @@ def analyze_gene_clusters(
     try:
         df = pd.read_csv(input_file, sep=input_sep)
         print(f"Loaded data with {len(df)} rows and columns: {list(df.columns)}")
-        
+
         # Set index from a column if specified
         if set_index and set_index in df.columns:
             print(f"Setting index from column: {set_index}")
             df = df.set_index(set_index).reset_index()
             cluster_id_column = "index"  # Use the index column as cluster_id
-            
+
         # Ensure we have a cluster ID column
         if cluster_id_column not in df.columns:
-            print(f"Warning: Cluster ID column '{cluster_id_column}' not found. Using DataFrame index.")
+            print(
+                f"Warning: Cluster ID column '{cluster_id_column}' not found. Using DataFrame index."
+            )
             df[cluster_id_column] = df.index.astype(str)
-            
+
     except Exception as e:
         print(f"Error loading input file: {e}")
         return None
