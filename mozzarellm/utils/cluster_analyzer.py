@@ -390,8 +390,6 @@ def process_clusters(
 
             # Process batch if it's full or we're at the end
             if len(batch_clusters) >= batch_size or is_last_cluster:
-                batch_size_actual = len(batch_clusters)
-
                 try:
                     # Create batch prompt
                     prompt = make_batch_cluster_analysis_prompt(
