@@ -85,7 +85,7 @@ def openai_chat(
             return analysis_text, fingerprint
 
         except Exception as e:
-            error_message = f"Attempt {attempt+1}/{max_retries} failed: {str(e)}"
+            error_message = f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}"
             logger.error(error_message)
 
             if attempt < max_retries - 1:

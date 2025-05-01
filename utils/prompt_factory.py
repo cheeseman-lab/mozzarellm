@@ -93,7 +93,7 @@ For each cluster:
 """
     else:
         raise ValueError(f"Unknown template type: {template_type}")
-    
+
 
 def get_output_format_instructions(template_type):
     """Get standardized output format instructions for a template type"""
@@ -206,7 +206,7 @@ Use this information to better understand the biological context of the screen a
     if gene_features:
         feature_text = "\nAdditional gene information:\n"
         relevant_feature_count = 0
-        
+
         for gene in genes:
             if gene in gene_features:
                 feature_text += f"{gene}: {gene_features[gene]}\n"
@@ -239,7 +239,7 @@ def make_batch_cluster_analysis_prompt(
     # Create formatted clusters text and collect genes present in this batch
     clusters_text = ""
     batch_genes = set()  # Use a set for efficient lookups
-    
+
     for cluster_id, genes in clusters.items():
         gene_list = ", ".join(genes)
         clusters_text += f"Cluster {cluster_id}: {gene_list}\n\n"
@@ -255,7 +255,7 @@ def make_batch_cluster_analysis_prompt(
     prompt_vars = {"clusters_text": clusters_text}
     try:
         prompt = template.format(**prompt_vars)
-    except KeyError as e:
+    except KeyError:
         # Handle errors by escaping all braces and then restoring only our placeholder
         escaped_template = template.replace("{", "{{").replace("}", "}}")
         escaped_template = escaped_template.replace(
@@ -277,13 +277,13 @@ Use this information to better understand the biological context of the screen a
     if gene_features:
         feature_text = "\nAdditional gene information:\n"
         relevant_feature_count = 0
-        
+
         # Only include features for genes in this batch
         for gene, features in gene_features.items():
             if gene in batch_genes:
                 feature_text += f"{gene}: {features}\n"
                 relevant_feature_count += 1
-        
+
         # Only add the feature section if we found relevant features
         if relevant_feature_count > 0:
             feature_explanation = """

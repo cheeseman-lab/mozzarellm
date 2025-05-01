@@ -62,7 +62,7 @@ def anthropic_chat(
             return analysis_text, None
 
         except Exception as e:
-            error_message = f"Attempt {attempt+1}/{max_retries} failed: {str(e)}"
+            error_message = f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}"
             logger.error(error_message)
 
             if attempt < max_retries - 1:

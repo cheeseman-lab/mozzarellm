@@ -7,7 +7,6 @@ in different contexts (CLI, notebook, etc.)
 import pandas as pd
 import json
 import logging
-import time
 from datetime import datetime
 from tqdm import tqdm
 import os
@@ -25,7 +24,7 @@ from .llm_analysis_utils import (
     process_cluster_response,
     save_cluster_analysis,
 )
-from .logging_utils import get_model_logger, setup_logger
+from .logging_utils import setup_logger
 
 # Import constants
 import constant
@@ -206,13 +205,23 @@ def query_llm(
 
 
 def process_clusters(
-    df, config, gene_column, gene_sep, out_file, custom_prompt_path=None,
-    gene_features_path=None, screen_info_path=None, batch_size=1, 
-    start_idx=0, end_idx=None, log_name=None, use_tqdm=True
+    df,
+    config,
+    gene_column,
+    gene_sep,
+    out_file,
+    custom_prompt_path=None,
+    gene_features_path=None,
+    screen_info_path=None,
+    batch_size=1,
+    start_idx=0,
+    end_idx=None,
+    log_name=None,
+    use_tqdm=True,
 ):
     """
     Process gene clusters to identify pathways and novel members.
-    
+
     Args:
         df: DataFrame with clusters to analyze
         config: Configuration dictionary
@@ -227,7 +236,7 @@ def process_clusters(
         end_idx: End index in DataFrame (default: all)
         log_name: Custom log name (default: from config)
         use_tqdm: Whether to use tqdm progress bar
-        
+
     Returns:
         clusters_dict: Dictionary of cluster analysis results
     """
@@ -237,11 +246,11 @@ def process_clusters(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = f"{log_name}_{timestamp}.log"
     logger = setup_logger(log_file)
-    
+
     # Load gene features and screen info if paths provided
     gene_features_dict = load_gene_features(gene_features_path)
     screen_info = load_screen_info(screen_info_path)
-    
+
     # Extract config values
     context = config["context"]
     model = config["model"]
@@ -249,26 +258,26 @@ def process_clusters(
     max_tokens = config["max_tokens"]
     rate_per_token = config["rate_per_token"]
     dollar_limit = config["dollar_limit"]
-    
+
     # Apply range limits
     if end_idx is None:
         end_idx = len(df)
     df = df.iloc[start_idx:end_idx].copy()
-    
+
     logger.info(f"Processing {len(df)} clusters with model {model}")
-    
+
     # Dictionary to store results
     clusters_dict = {}
-    
+
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(out_file), exist_ok=True)
-    
+
     # Use tqdm for progress tracking if requested
     if use_tqdm:
         row_iterator = tqdm(df.iterrows(), total=len(df), desc="Processing clusters")
     else:
         row_iterator = df.iterrows()
-    
+
     if batch_size <= 1:
         # Process one cluster at a time
         for idx, row in row_iterator:
@@ -299,7 +308,7 @@ def process_clusters(
                 screen_info,
                 template_path=custom_prompt_path,
             )
-            
+
             analysis, error = query_llm(
                 context,
                 prompt,
@@ -327,11 +336,11 @@ def process_clusters(
             if len(clusters_dict) % 5 == 0:
                 save_cluster_analysis(clusters_dict, out_file)
                 logger.info(f"Saved progress for {len(clusters_dict)} clusters")
-    
+
     else:
         # Process clusters in batches
         batch_clusters = {}
-        
+
         for i, (idx, row) in enumerate(row_iterator):
             is_last_cluster = i == len(df) - 1
 
@@ -425,34 +434,36 @@ def process_clusters(
 
                 # Save progress
                 save_cluster_analysis(clusters_dict, out_file)
-                logger.info(f"Saved progress with {len(clusters_dict)} clusters processed so far")
+                logger.info(
+                    f"Saved progress with {len(clusters_dict)} clusters processed so far"
+                )
 
     # Save final results
     save_cluster_analysis(clusters_dict, out_file)
     logger.info(f"Completed analysis for {len(clusters_dict)} clusters")
-    
+
     return clusters_dict
 
 
 def analyze_gene_clusters(
-    input_file, 
-    output_file, 
-    config_path=None, 
-    model_name=None, 
-    custom_prompt_path=None, 
-    gene_features_path=None, 
-    screen_info_path=None, 
-    input_sep=",", 
-    gene_column="genes", 
-    gene_sep=";", 
-    batch_size=1, 
-    start_idx=0, 
+    input_file,
+    output_file,
+    config_path=None,
+    model_name=None,
+    custom_prompt_path=None,
+    gene_features_path=None,
+    screen_info_path=None,
+    input_sep=",",
+    gene_column="genes",
+    gene_sep=";",
+    batch_size=1,
+    start_idx=0,
     end_idx=None,
-    log_name=None
+    log_name=None,
 ):
     """
     High-level function to analyze gene clusters from a file.
-    
+
     Args:
         input_file: Path to input CSV/TSV with gene clusters
         output_file: Path to output file (without extension)
@@ -468,27 +479,25 @@ def analyze_gene_clusters(
         start_idx: Start index for processing
         end_idx: End index for processing
         log_name: Custom log name
-        
+
     Returns:
         clusters_dict: Dictionary of cluster analysis results
     """
     # Load configuration
     config = load_config(config_path, model_override=model_name)
-    
+
     # Handle tab separator conversion
     if input_sep == "\\t":
         input_sep = "\t"
-    
+
     # Load the data
     try:
         df = pd.read_csv(input_file, sep=input_sep)
-        print(
-            f"Loaded data with {len(df)} rows and columns: {list(df.columns)}"
-        )
+        print(f"Loaded data with {len(df)} rows and columns: {list(df.columns)}")
     except Exception as e:
         print(f"Error loading input file: {e}")
         return None
-    
+
     # Process clusters
     return process_clusters(
         df=df,
@@ -502,5 +511,5 @@ def analyze_gene_clusters(
         batch_size=batch_size,
         start_idx=start_idx,
         end_idx=end_idx,
-        log_name=log_name
+        log_name=log_name,
     )

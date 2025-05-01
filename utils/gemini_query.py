@@ -59,7 +59,7 @@ def query_genai_model(context, prompt, model, temperature, max_tokens, log_file)
             return analysis_text, None
 
         except Exception as e:
-            error_message = f"Attempt {attempt+1}/{max_retries} failed: {str(e)}"
+            error_message = f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}"
             logger.error(error_message)
 
             if attempt < max_retries - 1:
