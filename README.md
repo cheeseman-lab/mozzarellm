@@ -1,178 +1,183 @@
 # mozzarellm
 
+Analyze gene clusters using Large Language Models (LLMs) to identify biological pathways and prioritize novel genes.
+
 ## Overview
 
-This repository provides tools for analyzing gene clusters using Large Language Models (LLMs). It processes gene cluster data to identify potential biological pathways, categorize genes within those pathways, and prioritize novel gene candidates for further investigation. The primary focus is on helping researchers discover functional relationships between genes and identify promising candidates for experimental validation.
+Mozzarellm is a Python package that leverages Large Language Models to analyze gene clusters for pathway identification and novel gene discovery. It provides a streamlined way to process gene cluster data, classify genes by their pathway involvement, and prioritize candidates for experimental validation.
 
-## Key Features
+## Features
 
-- **Automated Pathway Analysis**: Identifies the dominant biological process or pathway represented by a gene cluster
-- **Gene Categorization**: Classifies genes within clusters as established, characterized, or novel
-- **Novel Gene Prioritization**: Assigns importance scores to novel genes based on their likelihood of involvement in the identified pathway
-- **Batch Processing**: Efficiently processes multiple gene clusters in a single run
-- **Flexible Model Support**: Compatible with various LLM providers including OpenAI (GPT models), Anthropic (Claude models), Google (Gemini models)
+- 🧬 **Pathway Identification**: Automatically identify the dominant biological process or pathway in gene clusters
+- 🔍 **Gene Classification**: Categorize genes as established pathway members, uncharacterized, or having novel potential roles
+- 🏆 **Prioritization**: Assign importance scores to novel gene candidates to guide experimental follow-up
+- 🚀 **Multi-Provider Support**: Use OpenAI (GPT-4/o), Anthropic (Claude), or Google (Gemini) models
+- 📊 **Structured Output**: Generate JSON and CSV files with detailed analysis at gene and cluster levels
 
 ## Installation
 
-1. Clone this repository
-   ```bash
-   git clone https://github.com/yourusername/mozzarellm.git && cd mozzarellm
-   ```
+```bash
+# From PyPI (once published)
+pip install mozzarellm
 
-2. Create and activate a conda environment
-   ```bash
-   conda env create -f environment.yml && conda activate mozzarellm
-   ```
+# From GitHub
+pip install git+https://github.com/yourusername/mozzarellm.git
 
-3. Copy `.env.example` to `.env` and add your API keys:
-   ```bash
-   cp .env.example .env && nano .env
-   ```
+# For development
+git clone https://github.com/yourusername/mozzarellm.git
+cd mozzarellm
+pip install -e .
+```
 
-4. Modify configuration files to set your preferred models and parameters
+Create a `.env` file with your API keys:
 
-## How It Works
+```
+OPENAI_API_KEY=your_openai_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+GOOGLE_API_KEY=your_google_key_here
+```
 
-The system works through the following process:
+## Quick Start
 
-1. **Data Input**: Takes a CSV/TSV file containing gene clusters, where each row represents a cluster with a list of gene symbols
-2. **LLM Analysis**: Sends each cluster to an LLM with specialized prompts designed to:
-   - Identify the dominant biological process or pathway
-   - Assess confidence in the pathway identification
-   - Categorize genes as established, characterized, or novel in relation to the pathway
-   - Rank novel genes based on their likelihood of involvement
-3. **Output Generation**: Produces structured outputs including:
-   - JSON files with the full analysis
-   - CSV files with gene-level and cluster-level analyses
-   - Summary statistics and prioritization scores
+### Basic Usage
 
-## Input Data Format
+```python
+import mozzarellm
+from dotenv import load_dotenv
 
-The primary input should be a CSV/TSV file containing gene clusters in the following format:
+# Load API keys
+load_dotenv()
 
-| cluster_id | genes | additional_columns... |
-|------------|-------|------------------------|
-| 0 | STAT5A;STAT5B;MLX;HNF1B;PCGF2;GATAD2A;... | ... |
-| 1 | ARF1;ATF4;B3GAT3;BATF2;BSCL2;... | ... |
+# Run analysis
+results = mozzarellm.analyze_gene_clusters(
+    input_file="data/clusters.csv",
+    output_file="results/analysis",
+    config_path="config/openai.json",
+    gene_column="genes",
+    gene_sep=";",
+    cluster_id_column="cluster_id"
+)
+```
+
+### Command Line
+
+```bash
+# Run analysis from command line
+python -m mozzarellm.main \
+  --config config_openai.json \
+  --mode cluster \
+  --input data/clusters.csv \
+  --input_sep "," \
+  --gene_column "genes" \
+  --gene_sep ";" \
+  --cluster_id_column "cluster_id" \
+  --output_file results/analysis
+```
+
+## Input Format
+
+Your input should be a CSV/TSV file with gene clusters:
+
+| cluster_id | genes                                    | other_columns |
+|------------|------------------------------------------|---------------|
+| 1          | BRCA1;TP53;PTEN;MLH1                     | ...           |
+| 2          | MYC;MAX;MYCN;E2F1;RB1                    | ...           |
 
 Required columns:
 - `cluster_id`: Unique identifier for each cluster
-- `genes`: Semicolon-separated list of gene symbols in the cluster
-
-Optional columns:
-- `cluster_group`: Grouping or category information (will be preserved in output)
-- Any additional columns will be preserved in the output
-
-### Data Preparation
-
-Convert gene-level data to cluster-level format:
-```bash
-python reshape_clusters.py --input your_gene_table.csv --output data/clusters.csv --sep "," --gene_col "gene_symbol" --cluster_col "cluster" --gene_sep ";" --additional_cols "cluster_group"
-```
-
-## Usage
-
-### Cluster Analysis
-
-Analyze gene clusters to identify dominant pathways and novel pathway members:
-
-```bash
-python main.py --config cluster_config.json --mode cluster --input data/sample_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --start 0 --end 5 --output_file results/cluster_analysis
-```
-
-With gene features information:
-```bash
-python main.py --config cluster_config.json --mode cluster --input data/sample_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --gene_features data/gene_features.csv --start 0 --end 5 --output_file results/cluster_analysis
-```
-
-With batch processing (multiple clusters in one API call):
-```bash
-python main.py --config cluster_config.json --mode cluster --input data/sample_clusters.csv --input_sep "," --set_index "cluster_id" --gene_column "genes" --gene_sep ";" --batch_size 3 --start 0 --end 5 --output_file results/cluster_analysis_batch
-```
+- `genes`: Semicolon-separated gene symbols
 
 ## Configuration
 
-Create/modify a configuration JSON file (e.g., `cluster_config.json`):
+Create a JSON configuration file:
 
 ```json
 {
-  "MODEL": "gpt-4",
-  "CONTEXT": "You are a highly skilled bioinformatician analyzing gene clusters.",
-  "TEMP": 0.1,
+  "MODEL": "gpt-4o",
+  "CONTEXT": "You are a bioinformatician analyzing gene clusters.",
+  "TEMP": 0.0,
   "MAX_TOKENS": 4000,
   "RATE_PER_TOKEN": 0.00001,
-  "DOLLAR_LIMIT": 50.0,
-  "LOG_NAME": "cluster_analysis"
+  "DOLLAR_LIMIT": 10.0
 }
 ```
 
-### Using Different LLM Providers
+Available models:
+- OpenAI: `gpt-4o`, `gpt-4.5`, `gpt-3.5-turbo`
+- Anthropic: `claude-3-7-sonnet-20250219`, `claude-3.5-sonnet`
+- Google: `gemini-2.0-pro`, `gemini-1.5-pro`
 
-To use different LLM providers, modify the `MODEL` field in your configuration file:
+## Python API
 
-- OpenAI: `"MODEL": "gpt-4"` or `"MODEL": "gpt-3.5-turbo"`
-- Anthropic: `"MODEL": "claude-3-opus-20240229"`
-- Google: `"MODEL": "gemini-pro"`
+### Analyze Gene Clusters
+
+```python
+from mozzarellm import analyze_gene_clusters
+
+results = analyze_gene_clusters(
+    input_file="data/clusters.csv",        # Input file path
+    output_file="results/analysis",        # Output path prefix
+    config_path="config.json",             # Configuration file
+    model_name="gpt-4o",                   # Override model in config
+    gene_column="genes",                   # Column with gene lists
+    gene_sep=";",                          # Separator for genes
+    cluster_id_column="cluster_id",        # Column with cluster IDs
+    batch_size=1,                          # Clusters per API call
+    gene_features_path="features.csv",     # Optional gene annotations
+    screen_info_path="screen_info.txt"     # Optional screen context
+)
+```
+
+### Reshape Gene-Level Data
+
+```python
+from mozzarellm import reshape_to_clusters
+
+clusters_df = reshape_to_clusters(
+    input_file="gene_level_data.csv",      # Gene-level input file
+    output_file="clusters.csv",            # Output file path
+    gene_col="gene_symbol",                # Gene ID column
+    cluster_col="cluster",                 # Cluster assignment column
+    gene_sep=";",                          # Separator for output genes
+    additional_cols=["condition", "score"] # Additional columns to keep
+)
+```
 
 ## Output Files
 
-The script generates three types of output files:
+The analysis produces three types of output files:
 
-1. **JSON output** (`output_file_clusters.json`): Contains the full raw analysis from the LLM for each cluster
+1. **JSON** (`analysis_clusters.json`): Complete analysis with raw LLM responses
+2. **Cluster CSV** (`analysis_clusters.csv`): One row per cluster with pathway assignments and statistics
+3. **Gene CSV** (`analysis_all_genes.csv`): One row per gene with detailed rationales and scores
 
-2. **Cluster-level CSV** (`output_file_clusters.csv`): Contains one row per cluster with the following columns:
-   - `cluster_id`: Unique identifier for the cluster
-   - `biological_process`: The identified dominant biological process or pathway
-   - `pathway_confidence_level`: Confidence in the pathway identification (High, Medium, Low)
-   - `cluster_importance_score`: Composite score reflecting the overall importance of the cluster
-   - `established_gene_count`: Number of established pathway members
-   - `characterized_gene_count`: Number of characterized genes
-   - `novel_gene_count`: Number of novel gene candidates
-   - `total_gene_count`: Total number of genes in the cluster
-   - `functional_summary`: Brief summary of the pathway function
-   - `highest_novel_gene_importance`: Highest importance score among novel genes
-   - `average_novel_gene_importance`: Average importance score of novel genes
-   - `high_importance_genes`: List of high importance genes (score ≥ 8)
-   - `high_importance_gene_count`: Number of high importance genes
-   - Plus any additional columns from the original input file
+## Integration
 
-3. **Gene-level CSV** (`output_file_novel_genes.csv`): Contains one row per novel gene with the following columns:
-   - `gene_name`: Gene symbol
-   - `gene_description`: Rationale for why this gene may be involved in the pathway
-   - `gene_importance_score`: Importance score (0-10)
-   - `cluster_id`: ID of the cluster this gene belongs to
-   - `biological_process`: The identified biological process
-   - `pathway_confidence_level`: Confidence in the pathway identification
-   - `cluster_importance_score`: Overall importance score of the cluster
-   - `functional_summary`: Brief summary of the pathway function
-   - Plus additional gene statistics and any columns from the original input file
+Mozzarellm can be integrated with other bioinformatics pipelines:
 
-## Arguments
+```python
+# Example integration with a pipeline
+from mozzarellm import analyze_gene_clusters
 
-### Cluster Analysis
-- `--config`: Path to configuration JSON file
-- `--mode cluster`: Activate cluster analysis mode
-- `--input`: Path to input CSV with gene clusters
-- `--input_sep`: Separator for input CSV (comma, tab, etc.)
-- `--set_index`: Column name for cluster index
-- `--gene_column`: Column name containing gene set
-- `--gene_sep`: Separator for genes within a set
-- `--batch_size`: Number of clusters to analyze in one batch
-- `--start`: Start index for processing
-- `--end`: End index for processing
-- `--gene_features`: Path to CSV with gene features
-- `--output_file`: Output file path (without extension)
-
-## Gene Set Analysis (Legacy Mode)
-
-In addition to the primary cluster analysis functionality, this repository also offers a legacy gene set analysis mode for analyzing individual gene sets without clustering information:
-
-```bash
-python main.py --config config.json --input data/sample_gene_sets.csv --input_sep "," --gene_column "genes" --gene_sep ";" --start 0 --end 5 --initialize --output_file results/gene_analysis
+def my_pipeline_step(data):
+    # Process clusters
+    results = analyze_gene_clusters(
+        input_df=data,
+        output_file="results/analysis",
+        config_path="config.json"
+    )
+    
+    # Continue pipeline
+    return process_results(results)
 ```
 
-This mode provides a simpler analysis focusing on identifying the most likely function of each gene set without the detailed categorization and prioritization of the cluster analysis mode.
+## Examples
+
+See the `examples/` directory for:
+- Jupyter notebooks
+- Batch processing scripts
+- Integration examples
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - See LICENSE file for details.
