@@ -27,7 +27,7 @@ from .llm_analysis_utils import (
 from .logging_utils import setup_logger
 
 # Import constants
-import constant
+from mozzarellm import constant
 
 
 def load_config(config_file=None, model_override=None):
