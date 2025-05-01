@@ -4,15 +4,15 @@ channels:
   - defaults
 dependencies:
   - python=3.11
-  - pandas
-  - numpy
-  - tqdm
-  - pip
-  - ipykernel
-  - pytest
+  - pandas>=2.0.0
+  - numpy>=2.0.0
+  - tqdm>=4.65.0
+  - pip>=23.0.0
+  - ipykernel>=6.0.0
+  - pytest>=7.0.0
   - pip:
-      - openai
-      - python-dotenv
-      - google-genai
-      - anthropic
-      - requests
+      - openai>=1.70.0
+      - python-dotenv>=1.0.0
+      - google-genai>=1.9.0
+      - anthropic>=0.49.0
+      - requests>=2.31.0

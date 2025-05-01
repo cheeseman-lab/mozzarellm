@@ -42,6 +42,7 @@ debug/
 
 # Results and data (optional, comment out if you want to track these)
 results/
+data/Denali/
 data/HeLa_essentials/
 data/*csv
 
