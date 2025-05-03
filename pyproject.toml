@@ -33,8 +33,9 @@ dependencies = [
 "Homepage" = "https://github.com/cheeseman-lab/mozzarellm"
 "Bug Tracker" = "https://github.com/cheeseman-lab/mozzarellm/issues"
 
-[tool.setuptools]
-packages = ["mozzarellm"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mozzarellm*"]
 
 [tool.setuptools.package-data]
 mozzarellm = ["prompts/*.txt", "configs/*.json"]
