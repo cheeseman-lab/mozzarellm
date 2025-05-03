@@ -23,3 +23,20 @@ __all__ = [
     "process_cluster_response",
     "save_cluster_analysis",
 ]
+
+import os
+import warnings
+
+_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+_CONFIG_DIR = os.path.join(_PACKAGE_DIR, "configs")
+_PROMPTS_DIR = os.path.join(_PACKAGE_DIR, "prompts")
+
+if not os.path.exists(_CONFIG_DIR) or len(os.listdir(_CONFIG_DIR)) == 0:
+    warnings.warn(
+        "Configuration files not found in package. Default configurations may not be available."
+    )
+
+if not os.path.exists(_PROMPTS_DIR) or len(os.listdir(_PROMPTS_DIR)) == 0:
+    warnings.warn(
+        "Prompt files not found in package. Default prompts may not be available."
+    )
