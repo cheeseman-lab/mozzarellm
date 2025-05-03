@@ -33,11 +33,9 @@ from mozzarellm import constant
 def load_config(config_file=None, model_override=None):
     """
     Load configuration with optional model override.
-
     Args:
-        config_file: Path to config file (optional)
+        config_file: Path or name of config file (optional)
         model_override: Model to use, overriding config (optional)
-
     Returns:
         config: Configuration dictionary
     """
@@ -70,29 +68,83 @@ def load_config(config_file=None, model_override=None):
         },
     }
 
-    # If config file provided, load and merge with defaults
+    # If config file provided, try to locate and load it
     if config_file:
-        try:
-            with open(config_file) as json_file:
-                user_config = json.load(json_file)
-                # Update default config with user settings
-                for key, value in user_config.items():
-                    if (
-                        isinstance(value, dict)
-                        and key in default_config
-                        and isinstance(default_config[key], dict)
-                    ):
-                        # Deep merge for nested dictionaries
-                        default_config[key].update(value)
-                    else:
-                        default_config[key] = value
-        except Exception as e:
-            logging.error(f"Error loading config file: {e}")
+        # First, try the direct path (if it's a full path)
+        config_path = None
+        if os.path.exists(config_file):
+            config_path = config_file
+        else:
+            # Try to find config in standard locations
+            possible_locations = [
+                # Check in configs/ subdirectory
+                os.path.join("configs", config_file),
+                # Check in mozzarellm/configs/ subdirectory
+                os.path.join("mozzarellm", "configs", config_file),
+            ]
 
+            # Try adding .json extension if not present
+            if not config_file.endswith(".json"):
+                possible_locations.extend(
+                    [
+                        os.path.join("configs", f"{config_file}.json"),
+                        os.path.join("mozzarellm", "configs", f"{config_file}.json"),
+                    ]
+                )
+
+            # Check all possible locations
+            for location in possible_locations:
+                if os.path.exists(location):
+                    config_path = location
+                    break
+
+            # If not found in file system, try to use importlib.resources
+            if not config_path:
+                try:
+                    import importlib.resources
+
+                    config_filename = (
+                        config_file
+                        if config_file.endswith(".json")
+                        else f"{config_file}.json"
+                    )
+                    config_path = str(
+                        importlib.resources.files("mozzarellm")
+                        / "configs"
+                        / config_filename
+                    )
+                    # Verify this path exists
+                    if not os.path.exists(config_path):
+                        config_path = None
+                except (ImportError, ModuleNotFoundError):
+                    config_path = None
+
+        # Load the config if we found it
+        if config_path:
+            try:
+                with open(config_path) as json_file:
+                    user_config = json.load(json_file)
+                    # Update default config with user settings
+                    for key, value in user_config.items():
+                        if (
+                            isinstance(value, dict)
+                            and key in default_config
+                            and isinstance(default_config[key], dict)
+                        ):
+                            # Deep merge for nested dictionaries
+                            default_config[key].update(value)
+                        else:
+                            default_config[key] = value
+                logging.info(f"Loaded configuration from {config_path}")
+            except Exception as e:
+                logging.error(f"Error loading config file from {config_path}: {e}")
+        else:
+            logging.warning(f"Could not find config file: {config_file}")
+
+    # Rest of the function remains the same
     # Override model if specified
     if model_override:
         default_config["MODEL"] = model_override
-
     # Determine rate_per_token based on model if not explicitly set
     model = default_config["MODEL"]
     if model and "API_SETTINGS" in default_config:
@@ -105,7 +157,6 @@ def load_config(config_file=None, model_override=None):
                 )
                 default_config["RATE_PER_TOKEN"] = rate_per_token
                 break
-
     # Add lowercase aliases for consistency
     default_config["context"] = default_config["CONTEXT"]
     default_config["model"] = default_config["MODEL"]
@@ -114,7 +165,6 @@ def load_config(config_file=None, model_override=None):
     default_config["rate_per_token"] = default_config["RATE_PER_TOKEN"]
     default_config["dollar_limit"] = default_config["DOLLAR_LIMIT"]
     default_config["log_name"] = default_config["LOG_NAME"]
-
     return default_config
 
 

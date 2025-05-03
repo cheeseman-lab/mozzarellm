@@ -1,4 +1,6 @@
 import logging
+import os
+from .config_utils import get_prompt_path
 
 
 def load_prompt_template(
@@ -8,31 +10,30 @@ def load_prompt_template(
     Load a prompt template from a file or string.
     """
     if template_path:
-        try:
-            with open(template_path, "r") as f:
-                template = f.read()
-        except Exception as e:
-            logging.error(f"Failed to load template from {template_path}: {e}")
-            # Fall back to default template
-            template = get_default_template(template_type)
-    elif template_string:
-        template = template_string
+        # First check if it's a direct path
+        if os.path.exists(template_path):
+            try:
+                with open(template_path, "r") as f:
+                    template = f.read()
+                return template
+            except Exception as e:
+                logging.error(f"Failed to load template from {template_path}: {e}")
+
+        # If not, try to find it using the prompt finder
+        found_path = get_prompt_path(template_path)
+        if found_path:
+            try:
+                with open(found_path, "r") as f:
+                    template = f.read()
+                return template
+            except Exception as e:
+                logging.error(f"Failed to load template from {found_path}: {e}")
+
+    # Fall back to template string or default
+    if template_string:
+        return template_string
     else:
-        template = get_default_template(template_type)
-
-    # Ensure the template contains the required output format instructions
-    output_format = get_output_format_instructions(template_type)
-
-    # Fix the issue by escaping curly braces in the output format that aren't meant to be placeholders
-    output_format = output_format.replace("{", "{{").replace("}", "}}")
-    # But restore any actual placeholders
-    output_format = output_format.replace("{{clusters_text}}", "{clusters_text}")
-
-    if output_format not in template:
-        # Append output format to template
-        template += f"\n\n{output_format}"
-
-    return template
+        return get_default_template(template_type)
 
 
 def get_default_template(template_type):

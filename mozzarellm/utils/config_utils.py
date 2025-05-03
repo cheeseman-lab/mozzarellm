@@ -1,51 +1,61 @@
+# mozzarellm/utils/config_utils.py
 import os
+import importlib.resources
+import logging
 
 
-def get_default_config_path(provider="openai"):
-    """Get path to default config file for the specified provider"""
-    filename = f"config_{provider}.json"
+def get_config_path(config_name=None, provider="openai"):
+    """Get path to a config file, automatically finding it in the package"""
+    if config_name:
+        filename = config_name
+    else:
+        filename = f"config_{provider}.json"
 
-    # Try current directory
-    if os.path.exists(filename):
-        return filename
+    # Try different locations
+    possible_locations = [
+        # Current directory
+        filename,
+        # configs subdirectory
+        os.path.join("configs", filename),
+        # mozzarellm/configs subdirectory
+        os.path.join("mozzarellm", "configs", filename),
+    ]
 
-    # Try configs directory in current directory
-    local_configs = os.path.join("configs", filename)
-    if os.path.exists(local_configs):
-        return local_configs
+    # Check all possible file locations
+    for location in possible_locations:
+        if os.path.exists(location):
+            return location
 
-    # Try installed package
+    # If not found in file system, try to get from package resources
     try:
-        import importlib.resources
-
+        # Try to find it in the package
         return str(importlib.resources.files("mozzarellm") / "configs" / filename)
-    except (ImportError, ModuleNotFoundError):
-        # Fallback to relative path from this file
-        this_dir = os.path.dirname(os.path.abspath(__file__))
-        package_dir = os.path.dirname(os.path.dirname(this_dir))
-        return os.path.join(package_dir, "configs", filename)
+    except (ImportError, ModuleNotFoundError) as e:
+        logging.warning(f"Could not find config file {filename}: {e}")
+        return None
 
 
-def get_default_prompt_path(prompt_name="top_targets.txt"):
-    """Get path to default prompt file"""
-    filename = f"{prompt_name}"
+def get_prompt_path(prompt_name="top_targets.txt"):
+    """Get path to a prompt file, automatically finding it in the package"""
+    # Try different locations
+    possible_locations = [
+        # Current directory
+        prompt_name,
+        # prompts subdirectory
+        os.path.join("prompts", prompt_name),
+        # mozzarellm/prompts subdirectory
+        os.path.join("mozzarellm", "prompts", prompt_name),
+    ]
 
-    # Try current directory
-    if os.path.exists(filename):
-        return filename
+    # Check all possible file locations
+    for location in possible_locations:
+        if os.path.exists(location):
+            return location
 
-    # Try prompts directory in current directory
-    local_prompts = os.path.join("prompts", filename)
-    if os.path.exists(local_prompts):
-        return local_prompts
-
-    # Try installed package
+    # If not found in file system, try to get from package resources
     try:
-        import importlib.resources
-
-        return str(importlib.resources.files("mozzarellm") / "prompts" / filename)
-    except (ImportError, ModuleNotFoundError):
-        # Fallback to relative path from this file
-        this_dir = os.path.dirname(os.path.abspath(__file__))
-        package_dir = os.path.dirname(os.path.dirname(this_dir))
-        return os.path.join(package_dir, "prompts", filename)
+        # Try to find it in the package
+        return str(importlib.resources.files("mozzarellm") / "prompts" / prompt_name)
+    except (ImportError, ModuleNotFoundError) as e:
+        logging.warning(f"Could not find prompt file {prompt_name}: {e}")
+        return None
