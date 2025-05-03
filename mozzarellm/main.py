@@ -1,6 +1,6 @@
 import argparse
-from utils.cluster_analyzer import analyze_gene_clusters
-from utils.cluster_utils import reshape_to_clusters, parse_additional_cols
+from cluster_analyzer import analyze_gene_clusters
+from cluster_utils import reshape_to_clusters, parse_additional_cols
 
 
 def setup_argument_parser():
