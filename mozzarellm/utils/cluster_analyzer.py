@@ -25,6 +25,7 @@ from .llm_analysis_utils import (
     save_cluster_analysis,
 )
 from .logging_utils import setup_logger
+from .config_utils import get_config_path, get_prompt_path
 
 # Import constants
 from mozzarellm import constant
@@ -70,54 +71,8 @@ def load_config(config_file=None, model_override=None):
 
     # If config file provided, try to locate and load it
     if config_file:
-        # First, try the direct path (if it's a full path)
-        config_path = None
-        if os.path.exists(config_file):
-            config_path = config_file
-        else:
-            # Try to find config in standard locations
-            possible_locations = [
-                # Check in configs/ subdirectory
-                os.path.join("configs", config_file),
-                # Check in mozzarellm/configs/ subdirectory
-                os.path.join("mozzarellm", "configs", config_file),
-            ]
-
-            # Try adding .json extension if not present
-            if not config_file.endswith(".json"):
-                possible_locations.extend(
-                    [
-                        os.path.join("configs", f"{config_file}.json"),
-                        os.path.join("mozzarellm", "configs", f"{config_file}.json"),
-                    ]
-                )
-
-            # Check all possible locations
-            for location in possible_locations:
-                if os.path.exists(location):
-                    config_path = location
-                    break
-
-            # If not found in file system, try to use importlib.resources
-            if not config_path:
-                try:
-                    import importlib.resources
-
-                    config_filename = (
-                        config_file
-                        if config_file.endswith(".json")
-                        else f"{config_file}.json"
-                    )
-                    config_path = str(
-                        importlib.resources.files("mozzarellm")
-                        / "configs"
-                        / config_filename
-                    )
-                    # Verify this path exists
-                    if not os.path.exists(config_path):
-                        config_path = None
-                except (ImportError, ModuleNotFoundError):
-                    config_path = None
+        # Get the config path using the utility function
+        config_path = get_config_path(config_file)
 
         # Load the config if we found it
         if config_path:
@@ -141,7 +96,6 @@ def load_config(config_file=None, model_override=None):
         else:
             logging.warning(f"Could not find config file: {config_file}")
 
-    # Rest of the function remains the same
     # Override model if specified
     if model_override:
         default_config["MODEL"] = model_override
@@ -193,10 +147,16 @@ def load_screen_info(screen_info_file):
         return None
 
     try:
-        with open(screen_info_file, "r") as f:
-            screen_info = f.read().strip()
-        print(f"Loaded screen information: {len(screen_info)} characters")
-        return screen_info
+        # Use the get_prompt_path utility to find the screen info file
+        screen_info_path = get_prompt_path(screen_info_file)
+        if screen_info_path:
+            with open(screen_info_path, "r") as f:
+                screen_info = f.read().strip()
+            print(f"Loaded screen information: {len(screen_info)} characters")
+            return screen_info
+        else:
+            print(f"Error: Screen info file {screen_info_file} not found")
+            return None
     except Exception as e:
         print(f"Error loading screen information: {e}")
         return None

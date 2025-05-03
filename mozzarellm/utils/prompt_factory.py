@@ -1,5 +1,4 @@
 import logging
-import os
 from .config_utils import get_prompt_path
 
 
@@ -9,31 +8,49 @@ def load_prompt_template(
     """
     Load a prompt template from a file or string.
     """
+    # First, find and load the template
     if template_path:
-        # First check if it's a direct path
-        if os.path.exists(template_path):
-            try:
-                with open(template_path, "r") as f:
-                    template = f.read()
-                return template
-            except Exception as e:
-                logging.error(f"Failed to load template from {template_path}: {e}")
+        print(f"Attempting to load template from: {template_path}")
 
-        # If not, try to find it using the prompt finder
-        found_path = get_prompt_path(template_path)
-        if found_path:
+        # Use the utility function to find the prompt template
+        resolved_path = get_prompt_path(template_path)
+        if resolved_path:
+            print(f"Template found at: {resolved_path}")
             try:
-                with open(found_path, "r") as f:
+                with open(resolved_path, "r") as f:
                     template = f.read()
-                return template
+                print(f"Successfully loaded template ({len(template)} characters)")
             except Exception as e:
-                logging.error(f"Failed to load template from {found_path}: {e}")
-
-    # Fall back to template string or default
-    if template_string:
-        return template_string
+                print(f"Failed to load template from {resolved_path}: {e}")
+                logging.error(f"Failed to load template from {resolved_path}: {e}")
+                # Fall back to default template
+                template = get_default_template(template_type)
+        else:
+            print(f"Could not find prompt template: {template_path}")
+            logging.warning(f"Could not find prompt template: {template_path}")
+            # Fall back to default template
+            template = get_default_template(template_type)
+    elif template_string:
+        print("Using provided template string")
+        template = template_string
     else:
-        return get_default_template(template_type)
+        print(f"Using default template for type: {template_type}")
+        template = get_default_template(template_type)
+
+    # Now add the output format instructions if needed
+    output_format = get_output_format_instructions(template_type)
+
+    # Fix the issue by escaping curly braces in the output format that aren't meant to be placeholders
+    output_format = output_format.replace("{", "{{").replace("}", "}}")
+    # But restore any actual placeholders
+    output_format = output_format.replace("{{clusters_text}}", "{clusters_text}")
+
+    if output_format not in template:
+        print("Appending output format instructions to template")
+        # Append output format to template
+        template += f"\n\n{output_format}"
+
+    return template
 
 
 def get_default_template(template_type):
