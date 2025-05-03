@@ -1,0 +1,15 @@
+{
+    "MODEL": "o4-mini",
+    "CONTEXT": "You are an AI assistant specializing in genomics and systems biology with expertise in pathway analysis. Your task is to analyze gene clusters to identify biological pathways and potential novel pathway members based on published literature and gaps in knowledge of gene function.",
+    "TEMP": 1.0,
+    "MAX_TOKENS": 4000,
+    "RATE_PER_TOKEN": 0.000015,
+    "DOLLAR_LIMIT": 10.0,
+    "LOG_NAME": "cluster_analysis",
+    "API_SETTINGS": {
+      "openai": {
+        "models": ["o4-mini", "gpt-4o", "gpt-4.5", "gpt-4o"],
+        "rate_per_token": 0.00001
+      }
+    }
+  }

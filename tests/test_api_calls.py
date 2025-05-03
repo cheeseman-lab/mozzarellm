@@ -2,8 +2,8 @@ import unittest
 import json
 from unittest.mock import patch, MagicMock
 from dotenv import load_dotenv
-from utils.openai_query import openai_chat
-from utils.anthropic_query import anthropic_chat
+from openai_query import openai_chat
+from anthropic_query import anthropic_chat
 
 # Load environment variables for testing
 load_dotenv()
