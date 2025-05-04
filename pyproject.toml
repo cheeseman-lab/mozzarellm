@@ -17,8 +17,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "pandas,
-    "numpy,
+    "pandas",
+    "numpy",
     "tqdm",
     "python-dotenv",
     "requests",
