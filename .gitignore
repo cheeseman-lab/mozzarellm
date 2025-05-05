@@ -45,6 +45,7 @@ results/
 data/Denali/
 data/HeLa_essentials/
 data/*csv
+data/benchmarks/
 
 # IDE files
 .idea/
