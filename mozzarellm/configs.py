@@ -13,24 +13,30 @@ DEFAULT_CONFIG = {
 
 # OpenAI configuration
 DEFAULT_OPENAI_CONFIG = DEFAULT_CONFIG.copy()
-DEFAULT_OPENAI_CONFIG.update({
-    "MODEL": "gpt-4o",
-    "RATE_PER_TOKEN": 0.00001,
-    "API_TYPE": "openai",
-})
+DEFAULT_OPENAI_CONFIG.update(
+    {
+        "MODEL": "gpt-4o",
+        "RATE_PER_TOKEN": 0.00001,
+        "API_TYPE": "openai",
+    }
+)
 
-# Anthropic configuration 
+# Anthropic configuration
 DEFAULT_ANTHROPIC_CONFIG = DEFAULT_CONFIG.copy()
-DEFAULT_ANTHROPIC_CONFIG.update({
-    "MODEL": "claude-3-7-sonnet-20250219",
-    "RATE_PER_TOKEN": 0.000015,
-    "API_TYPE": "anthropic",
-})
+DEFAULT_ANTHROPIC_CONFIG.update(
+    {
+        "MODEL": "claude-3-7-sonnet-20250219",
+        "RATE_PER_TOKEN": 0.000015,
+        "API_TYPE": "anthropic",
+    }
+)
 
 # Google configuration
 DEFAULT_GEMINI_CONFIG = DEFAULT_CONFIG.copy()
-DEFAULT_GEMINI_CONFIG.update({
-    "MODEL": "gemini-2.0-pro",
-    "RATE_PER_TOKEN": 0.000005,
-    "API_TYPE": "gemini",
-})
+DEFAULT_GEMINI_CONFIG.update(
+    {
+        "MODEL": "gemini-2.0-pro",
+        "RATE_PER_TOKEN": 0.000005,
+        "API_TYPE": "gemini",
+    }
+)
