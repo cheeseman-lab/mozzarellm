@@ -15,8 +15,6 @@ from .configs import (
 from .prompts import (
     DEFAULT_CLUSTER_PROMPT,
     DEFAULT_BATCH_PROMPT,
-    CLUSTER_OUTPUT_FORMAT,
-    HELA_SCREEN_INFO,
 )
 
 # Import key functions

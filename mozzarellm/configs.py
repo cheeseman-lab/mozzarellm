@@ -20,8 +20,8 @@ DEFAULT_OPENAI_CONFIG.update({
 })
 
 # OpenAI creative models config (o4-mini, o3-mini with higher temperature)
-DEFAULT_OPENAI_CREATIVE_CONFIG = DEFAULT_OPENAI_CONFIG.copy()
-DEFAULT_OPENAI_CREATIVE_CONFIG.update({
+DEFAULT_OPENAI_REASONING_CONFIG = DEFAULT_OPENAI_CONFIG.copy()
+DEFAULT_OPENAI_REASONING_CONFIG.update({
     "MODEL": "o4-mini",
     "TEMP": 1.0,
 })
@@ -42,5 +42,5 @@ DEFAULT_GEMINI_CONFIG.update({
     "API_TYPE": "gemini",
 })
 
-# List of creative OpenAI models that use higher temperature
-CREATIVE_OPENAI_MODELS = ["o4-mini", "o3-mini"]
+# List of reasoning OpenAI models that use higher temperature
+REASONING_OPENAI_MODELS = ["o4-mini", "o3-mini"]
