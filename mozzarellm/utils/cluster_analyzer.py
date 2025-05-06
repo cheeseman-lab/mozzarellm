@@ -386,9 +386,13 @@ def process_clusters(
             # Save progress periodically if saving is enabled
             if save_outputs and out_file and len(clusters_dict) % 5 == 0:
                 save_cluster_analysis(
-                    clusters_dict, out_file, include_raw=("json" in outputs_to_generate)
+                    clusters_dict, 
+                    out_file_base=out_file, 
+                    include_raw=("json" in outputs_to_generate),
+                    save_outputs=True  # Force saving for periodic checkpoints
                 )
                 logger.info(f"Saved progress for {len(clusters_dict)} clusters")
+
 
     else:
         # Process clusters in batches
@@ -515,25 +519,40 @@ def process_clusters(
                 if save_outputs and out_file:
                     save_cluster_analysis(
                         clusters_dict,
-                        out_file,
+                        out_file_base=out_file,
                         include_raw=("json" in outputs_to_generate),
+                        save_outputs=True  # Force saving for batch checkpoints
                     )
                     logger.info(
                         f"Saved progress with {len(clusters_dict)} clusters processed so far"
                     )
 
-    # Save final results if saving is enabled
-    if save_outputs and out_file:
-        save_cluster_analysis(
-            clusters_dict, out_file, include_raw=("json" in outputs_to_generate)
-        )
-        logger.info(f"Completed analysis for {len(clusters_dict)} clusters")
-    else:
-        logger.info(
-            f"Analysis completed without saving for {len(clusters_dict)} clusters"
-        )
+    # Process and optionally save final results
+    results = save_cluster_analysis(
+        clusters_dict, 
+        out_file_base=out_file, 
+        include_raw=("json" in outputs_to_generate),
+        save_outputs=save_outputs
+    )
 
-    return clusters_dict
+    # Log appropriate message
+    if save_outputs and out_file:
+        logger.info(f"Completed analysis for {len(clusters_dict)} clusters with data saved to disk")
+    else:
+        logger.info(f"Completed analysis for {len(clusters_dict)} clusters without saving to disk")
+
+    # Determine what to return based on outputs_to_generate
+    return_data = {"clusters_dict": clusters_dict}
+
+    # Add requested outputs to the return value
+    if "json" in outputs_to_generate:
+        return_data["json_data"] = results["json_data"]
+    if "clusters" in outputs_to_generate:
+        return_data["cluster_df"] = results["cluster_df"]
+    if "flagged_genes" in outputs_to_generate:
+        return_data["gene_df"] = results["gene_df"]
+
+    return return_data
 
 
 def query_llm(
