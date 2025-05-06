@@ -184,7 +184,11 @@ Your response MUST be a valid JSON array starting with '[' and ending with ']'. 
 
 
 def make_cluster_analysis_prompt(
-    cluster_id, genes, gene_features=None, screen_info=None, template_path=None
+    cluster_id, 
+    genes, 
+    gene_annotations_dict=None, 
+    screen_context=None, 
+    template_path=None
 ):
     """
     Create a prompt for gene cluster analysis with concise JSON output focusing on both
@@ -212,23 +216,22 @@ def make_cluster_analysis_prompt(
     prompt = template.format(cluster_id=str(cluster_id), gene_list=gene_list)
 
     # Add screen information if provided
-    if screen_info:
+    if screen_context:
         screen_context = f"""
 SCREEN INFORMATION:
-{screen_info}
+{screen_context}
 
-Use this information to better understand the biological context of the screen and inform your assessment of potential novel pathway roles.
 """
         prompt += screen_context
 
     # Add gene features if provided - only for genes in this cluster
-    if gene_features:
+    if gene_annotations_dict:
         feature_text = "\nAdditional gene information:\n"
         relevant_feature_count = 0
 
         for gene in genes:
-            if gene in gene_features:
-                feature_text += f"{gene}: {gene_features[gene]}\n"
+            if gene in gene_annotations_dict:
+                feature_text += f"{gene}: {gene_annotations_dict[gene]}\n"
                 relevant_feature_count += 1
 
         # Only add the feature section if we found relevant features
@@ -248,7 +251,11 @@ IMPORTANT: The additional gene information provided above should be used to:
 
 
 def make_batch_cluster_analysis_prompt(
-    clusters, gene_features=None, screen_info=None, template_path=None
+    clusters,
+    genes, 
+    gene_annotations_dict=None, 
+    screen_context=None, 
+    template_path=None
 ):
     """
     Create a prompt for batch analysis of multiple gene clusters with concise output,
@@ -283,22 +290,21 @@ def make_batch_cluster_analysis_prompt(
         prompt = escaped_template.format(**prompt_vars)
 
     # Add screen information if provided
-    if screen_info:
+    if screen_context:
         screen_context = f"""
 SCREEN INFORMATION:
-{screen_info}
+{screen_context}
 
-Use this information to better understand the biological context of the screen and inform your assessment of potential novel pathway roles.
 """
         prompt += screen_context
 
     # Add gene features if provided - OPTIMIZED to only include genes in this batch
-    if gene_features:
+    if gene_annotations_dict:
         feature_text = "\nAdditional gene information:\n"
         relevant_feature_count = 0
 
         # Only include features for genes in this batch
-        for gene, features in gene_features.items():
+        for gene, features in gene_annotations_dict.items():
             if gene in batch_genes:
                 feature_text += f"{gene}: {features}\n"
                 relevant_feature_count += 1
