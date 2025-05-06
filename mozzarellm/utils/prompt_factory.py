@@ -3,12 +3,12 @@ def load_prompt_template(
 ):
     """
     Load a prompt template from file, string, or constants.
-    
+
     Args:
         template_path: Path to a template file (optional)
         template_string: String containing the template (optional)
         template_type: Type of template to load ('cluster' or 'batch_cluster')
-        
+
     Returns:
         Template string to use for prompts
     """
@@ -137,7 +137,7 @@ def make_cluster_analysis_prompt(
     """
     Create a prompt for gene cluster analysis with concise JSON output focusing on both
     truly uncharacterized genes and characterized genes with potential novel pathway roles.
-    
+
     Args:
         cluster_id: Identifier for the cluster
         genes: List of gene identifiers in the cluster
@@ -155,7 +155,7 @@ def make_cluster_analysis_prompt(
     template = load_prompt_template(
         template_path=template_path,
         template_string=template_string,
-        template_type="cluster"
+        template_type="cluster",
     )
 
     # Format template with cluster_id and gene_list (ensure cluster_id is a string)
@@ -197,23 +197,23 @@ IMPORTANT: The additional gene information provided above should be used to:
 
 
 def make_batch_cluster_analysis_prompt(
-    clusters, 
-    gene_annotations_dict=None, 
-    screen_context=None, 
+    clusters,
+    gene_annotations_dict=None,
+    screen_context=None,
     template_path=None,
     template_string=None,
 ):
     """
     Create a prompt for batch analysis of multiple gene clusters with concise output,
     distinguishing between uncharacterized genes and characterized genes with novel roles.
-    
+
     Args:
         clusters: Dictionary mapping cluster IDs to lists of genes
         gene_annotations_dict: Dictionary mapping gene IDs to annotations (optional)
         screen_context: String with context about the experiment/screen (optional)
         template_path: Path to custom template file (optional)
         template_string: Custom template string (optional)
-        
+
     Returns:
         prompt: Formatted prompt string for batch analysis
     """
@@ -231,7 +231,7 @@ def make_batch_cluster_analysis_prompt(
     template = load_prompt_template(
         template_path=template_path,
         template_string=template_string,
-        template_type="batch_cluster"
+        template_type="batch_cluster",
     )
 
     # Format template with clusters_text
