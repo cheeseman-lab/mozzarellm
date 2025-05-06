@@ -53,7 +53,7 @@ def analyze_gene_clusters(
     cluster_analysis_prompt_path=None,
     cluster_analysis_prompt=None,
     gene_annotations_path=None,
-    gene_annotations_dict=None,
+    gene_annotations_df=None,
     batch_size=1,
     start_idx=0,
     end_idx=None,
@@ -104,9 +104,11 @@ def analyze_gene_clusters(
 
     # Gene information
     gene_annotations_path : str, optional
-        Path to a CSV file with gene annotations/features
-    gene_annotations_dict : dict, optional
-        Dictionary mapping gene IDs to their annotations
+        Path to a CSV file with gene annotations/features, with 
+        column 0 containing the gene, and column 1 containing the annotation/features
+    gene_annotations_df : pandas.Dataframe
+        Dataframe mapping gene IDs to their annotations/features, with 
+        column 0 containing the gene, and column 1 containing the annotation/features
 
     # Processing options
     batch_size : int, default=1
@@ -169,11 +171,27 @@ def analyze_gene_clusters(
 
     # Load gene annotations
     annotations = None
-    if gene_annotations_dict is not None:
-        annotations = gene_annotations_dict
+    if gene_annotations_df is not None:
+        # Process the dataframe to create the annotations dictionary
+        try:
+            # Get column names for gene ID and features
+            gene_id_column = gene_annotations_df.columns[0]  # First column is gene ID
+            features_column = gene_annotations_df.columns[1]  # Second column is features
+            
+            # Create dictionary mapping gene IDs to their annotations
+            annotations = dict(
+                zip(gene_annotations_df[gene_id_column], gene_annotations_df[features_column])
+            )
+            print(f"Created annotations dictionary with {len(annotations)} entries from DataFrame")
+        except Exception as e:
+            print(f"Error processing gene annotations DataFrame: {e}")
+            # Fall back to file-based loading if available
+            if gene_annotations_path is not None:
+                annotations = load_gene_annotations(gene_annotations_path)
+            
     elif gene_annotations_path is not None:
         annotations = load_gene_annotations(gene_annotations_path)
-
+        
     # Load screen context
     context = None
     if screen_context is not None:
@@ -542,35 +560,42 @@ def query_llm(
 def load_config(config_file=None, model_override=None):
     """
     Load configuration with optional model override.
-
     Args:
-        config_file: Path to custom config file (optional)
+        config_file: Path or name of config file (optional)
         model_override: Model to use, overriding config (optional)
-
     Returns:
         config: Configuration dictionary
     """
     from mozzarellm.configs import (
-        DEFAULT_CONFIG,
+        DEFAULT_CONFIG, 
         DEFAULT_OPENAI_CONFIG,
+        DEFAULT_OPENAI_REASONING_CONFIG,
         DEFAULT_ANTHROPIC_CONFIG,
         DEFAULT_GEMINI_CONFIG,
+        REASONING_OPENAI_MODELS
     )
-
-    # Start with appropriate default config based on model
+    
+    # Select the appropriate base config
     if model_override:
-        if any(model_override.startswith(prefix) for prefix in ["gpt", "o4", "o3"]):
+        # Check if this is a REASONING OpenAI model
+        if any(model_override.startswith(prefix) for prefix in REASONING_OPENAI_MODELS):
+            config = DEFAULT_OPENAI_REASONING_CONFIG.copy()
+        # Check for standard OpenAI models
+        elif any(model_override.startswith(prefix) for prefix in ["gpt", "o4", "o3"]):
             config = DEFAULT_OPENAI_CONFIG.copy()
+        # Check for Anthropic models
         elif model_override.startswith("claude"):
             config = DEFAULT_ANTHROPIC_CONFIG.copy()
+        # Check for Gemini models
         elif model_override.startswith("gemini"):
             config = DEFAULT_GEMINI_CONFIG.copy()
         else:
             config = DEFAULT_CONFIG.copy()
-
-        # Override the model
+        
+        # Set the specified model
         config["MODEL"] = model_override
     else:
+        # Start with default config if no model specified
         config = DEFAULT_CONFIG.copy()
 
     # Load custom config if provided
