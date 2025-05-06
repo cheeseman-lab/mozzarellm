@@ -362,25 +362,43 @@ def _standardize_cluster_format(cluster_data, raw_text):
 
 
 def save_cluster_analysis(
-    clusters_dict, out_file_base, original_df=None, include_raw=True
+    clusters_dict, out_file_base=None, original_df=None, include_raw=True, save_outputs=True
 ):
     """
-    Save cluster analysis results to JSON and multiple CSV formats,
-    with an option to merge with original data.
-    Updated to handle the new gene categories structure.
-
+    Process and optionally save cluster analysis results to JSON and multiple CSV formats.
+    Returns the processed DataFrames regardless of whether they're saved to disk.
+    
     Args:
         clusters_dict: Dictionary with cluster analysis results in JSON format
-        out_file_base: Base filename for output files (without extension)
+        out_file_base: Base filename for output files (without extension), required if save_outputs=True
         original_df: Optional original DataFrame with cluster_id and other original data
         include_raw: Whether to include raw text in JSON output
+        save_outputs: Whether to write results to disk (default: True)
+    
+    Returns:
+        dict: Dictionary containing the following keys:
+            - 'json_data': The complete JSON data structure
+            - 'gene_df': DataFrame with gene-level analysis
+            - 'cluster_df': DataFrame with cluster-level analysis
     """
-    # Set paths
-    json_path = f"{out_file_base}_clusters.json"
-
+    # Initialize return dictionary
+    results = {
+        'json_data': None,
+        'gene_df': None,
+        'cluster_df': None
+    }
+    
+    # Validate parameters
+    if save_outputs and not out_file_base:
+        logging.warning("Cannot save outputs without out_file_base parameter")
+        save_outputs = False
+    
+    # Set paths if saving
+    json_path = f"{out_file_base}_clusters.json" if out_file_base else None
+    
     # Check if the JSON file already exists and load previous results
     existing_clusters = {}
-    if os.path.exists(json_path):
+    if save_outputs and os.path.exists(json_path):
         try:
             with open(json_path, "r") as f:
                 existing_data = json.load(f)
@@ -388,36 +406,39 @@ def save_cluster_analysis(
                     existing_clusters = existing_data["clusters"]
                 else:
                     existing_clusters = existing_data
-            logging.info(
-                f"Loaded {len(existing_clusters)} existing clusters from {json_path}"
-            )
+            logging.info(f"Loaded {len(existing_clusters)} existing clusters from {json_path}")
         except Exception as e:
             logging.warning(f"Failed to load existing clusters file: {e}")
-
+    
     # Merge existing clusters with new ones
     combined_clusters = {**existing_clusters, **clusters_dict}
-
+    
     # Option to exclude raw text to save space
+    processed_clusters = combined_clusters.copy()
     if not include_raw:
-        for cluster_id in combined_clusters:
-            if "raw_text" in combined_clusters[cluster_id]:
-                combined_clusters[cluster_id].pop("raw_text", None)
-
+        for cluster_id in processed_clusters:
+            if "raw_text" in processed_clusters[cluster_id]:
+                processed_clusters[cluster_id].pop("raw_text", None)
+    
     # Add metadata
     output_data = {
         "metadata": {
             "timestamp": time.time(),
             "date": datetime.datetime.now().isoformat(),
-            "cluster_count": len(combined_clusters),
+            "cluster_count": len(processed_clusters),
         },
-        "clusters": combined_clusters,
+        "clusters": processed_clusters,
     }
-
-    # Save full results to JSON
-    with open(json_path, "w") as f:
-        json.dump(output_data, f, indent=2)
-
-    # Create gene-level and cluster-level tables
+    
+    # Store the JSON data in the results
+    results['json_data'] = output_data
+    
+    # Save full results to JSON if requested
+    if save_outputs and json_path:
+        with open(json_path, "w") as f:
+            json.dump(output_data, f, indent=2)
+    
+    # Process and create gene-level and cluster-level tables
     if combined_clusters:
         # Create gene-level tables - one for uncharacterized genes and one for novel role genes
         try:
@@ -593,12 +614,14 @@ def save_cluster_analysis(
                     ],
                     ascending=[True, False, False],
                 )
-
-                # Save combined gene table
-                gene_path = f"{out_file_base}_flagged_genes.csv"
-                gene_df.to_csv(gene_path, index=False)
-
-                logging.info(f"Saved combined gene analysis to {gene_path}")
+                # Store in results
+                results['gene_df'] = gene_df
+                
+                # Save if requested
+                if save_outputs and out_file_base:
+                    gene_path = f"{out_file_base}_flagged_genes.csv"
+                    gene_df.to_csv(gene_path, index=False)
+                    logging.info(f"Saved combined gene analysis to {gene_path}")
             else:
                 logging.warning("No gene data to save")
 
@@ -778,11 +801,15 @@ def save_cluster_analysis(
                     # Fall back to string sorting if numeric conversion fails
                     cluster_df = cluster_df.sort_values("cluster_id")
 
-                # Save cluster analysis
-                cluster_path = f"{out_file_base}_clusters.csv"
-                cluster_df.to_csv(cluster_path, index=False)
+                # Store in results
+                results['cluster_df'] = cluster_df
+                
+                # Save if requested
+                if save_outputs and out_file_base:
+                    cluster_path = f"{out_file_base}_clusters.csv"
+                    cluster_df.to_csv(cluster_path, index=False)
+                    logging.info(f"Saved cluster analysis to {cluster_path}")
 
-                logging.info(f"Saved cluster analysis to {cluster_path}")
             else:
                 logging.warning("No cluster data to save")
 
@@ -795,3 +822,5 @@ def save_cluster_analysis(
     else:
         logging.warning("No cluster data to save")
         logging.info(f"Empty cluster analysis saved to {json_path}")
+
+    return results
