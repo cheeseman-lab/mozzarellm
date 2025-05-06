@@ -29,6 +29,7 @@ from .logging_utils import setup_logger
 from mozzarellm.configs import (
     DEFAULT_CONFIG,
     DEFAULT_OPENAI_CONFIG,
+    DEFAULT_OPENAI_REASONING_CONFIG,
     DEFAULT_ANTHROPIC_CONFIG,
     DEFAULT_GEMINI_CONFIG,
 )
@@ -38,7 +39,6 @@ from mozzarellm import constant
 
 
 def analyze_gene_clusters(
-    # Input data options
     input_file=None,
     input_df=None,
     input_sep=",",
@@ -104,10 +104,10 @@ def analyze_gene_clusters(
 
     # Gene information
     gene_annotations_path : str, optional
-        Path to a CSV file with gene annotations/features, with 
+        Path to a CSV file with gene annotations/features, with
         column 0 containing the gene, and column 1 containing the annotation/features
     gene_annotations_df : pandas.Dataframe
-        Dataframe mapping gene IDs to their annotations/features, with 
+        Dataframe mapping gene IDs to their annotations/features, with
         column 0 containing the gene, and column 1 containing the annotation/features
 
     # Processing options
@@ -140,14 +140,19 @@ def analyze_gene_clusters(
 
     # Automatically select config based on model name if not provided
     if not config and model_name:
-        if any(model_name.startswith(prefix) for prefix in ["gpt", "o4", "o3"]):
+        if model_name.startswith("gpt"):
             config = DEFAULT_OPENAI_CONFIG
+        elif any(model_name.startswith(prefix) for prefix in ["o4", "o3"]):
+            config = DEFAULT_OPENAI_REASONING_CONFIG
         elif model_name.startswith("claude"):
             config = DEFAULT_ANTHROPIC_CONFIG
         elif model_name.startswith("gemini"):
             config = DEFAULT_GEMINI_CONFIG
         else:
             config = DEFAULT_CONFIG
+
+    # Reshape the config regardless of what it is
+    config = reshape_config(config)
 
     # Load data
     df = None
@@ -176,22 +181,29 @@ def analyze_gene_clusters(
         try:
             # Get column names for gene ID and features
             gene_id_column = gene_annotations_df.columns[0]  # First column is gene ID
-            features_column = gene_annotations_df.columns[1]  # Second column is features
-            
+            features_column = gene_annotations_df.columns[
+                1
+            ]  # Second column is features
+
             # Create dictionary mapping gene IDs to their annotations
             annotations = dict(
-                zip(gene_annotations_df[gene_id_column], gene_annotations_df[features_column])
+                zip(
+                    gene_annotations_df[gene_id_column],
+                    gene_annotations_df[features_column],
+                )
             )
-            print(f"Created annotations dictionary with {len(annotations)} entries from DataFrame")
+            print(
+                f"Created annotations dictionary with {len(annotations)} entries from DataFrame"
+            )
         except Exception as e:
             print(f"Error processing gene annotations DataFrame: {e}")
             # Fall back to file-based loading if available
             if gene_annotations_path is not None:
                 annotations = load_gene_annotations(gene_annotations_path)
-            
+
     elif gene_annotations_path is not None:
         annotations = load_gene_annotations(gene_annotations_path)
-        
+
     # Load screen context
     context = None
     if screen_context is not None:
@@ -242,27 +254,28 @@ def process_clusters(
 ):
     """
     Process gene clusters to identify pathways and novel members.
-
     Args:
         df: DataFrame with clusters to analyze
         config: Configuration dictionary
         gene_column: Column name containing gene symbols
         gene_sep: Separator for genes in the column
         out_file: Output file path (without extension)
-        custom_prompt_path: Path to custom prompt template (optional)
-        gene_features_path: Path to gene features file (optional)
-        screen_info_path: Path to screen info file (optional)
+        cluster_analysis_prompt_path: Path to custom prompt template (optional)
+        cluster_analysis_prompt: Custom prompt template string (optional)
+        gene_annotations_dict: Dictionary mapping gene IDs to annotations
+        screen_context: String with context about the experiment/screen
         batch_size: Number of clusters to analyze in one batch
         start_idx: Start index in DataFrame (default: 0)
         end_idx: End index in DataFrame (default: all)
         log_name: Custom log name (default: from config)
         use_tqdm: Whether to use tqdm progress bar
         cluster_id_column: Column name for cluster ID (default: "cluster_id")
+        save_outputs: Whether to save results to disk (default: True)
+        outputs_to_generate: List of output file types to generate (default: ["json", "clusters", "flagged_genes"])
 
     Returns:
         clusters_dict: Dictionary of cluster analysis results
     """
-
     # Set up logging
     if not log_name:
         log_name = config.get("log_name", "cluster_analysis")
@@ -288,8 +301,9 @@ def process_clusters(
     # Dictionary to store results
     clusters_dict = {}
 
-    # Create output directory if it doesn't exist
-    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    # Create output directory if needed and if saving outputs
+    if save_outputs and out_file:
+        os.makedirs(os.path.dirname(out_file), exist_ok=True)
 
     # Use tqdm for progress tracking if requested
     if use_tqdm:
@@ -336,6 +350,7 @@ def process_clusters(
                 gene_annotations_dict,
                 screen_context,
                 template_path=cluster_analysis_prompt_path,
+                template_string=cluster_analysis_prompt,  # Pass the string template if provided
             )
 
             analysis, error = query_llm(
@@ -368,9 +383,13 @@ def process_clusters(
             else:
                 logger.error(f"Error for cluster {cluster_id}: {error}")
 
-            # Save progress periodically
-            if len(clusters_dict) % 5 == 0:
-                save_cluster_analysis(clusters_dict, out_file)
+            # Save progress periodically if saving is enabled
+            if save_outputs and out_file and len(clusters_dict) % 5 == 0:
+                save_cluster_analysis(
+                    clusters_dict, 
+                    out_file, 
+                    include_raw=("json" in outputs_to_generate)
+                )
                 logger.info(f"Saved progress for {len(clusters_dict)} clusters")
 
     else:
@@ -408,11 +427,13 @@ def process_clusters(
             # Process batch if it's full or we're at the end
             if len(batch_clusters) >= batch_size or is_last_cluster:
                 try:
+                    # Use cluster_analysis_prompt if provided
                     prompt = make_batch_cluster_analysis_prompt(
                         batch_clusters,
                         gene_annotations_dict,
                         screen_context,
                         template_path=cluster_analysis_prompt_path,
+                        template_string=cluster_analysis_prompt,
                     )
 
                     # Query LLM
@@ -492,15 +513,27 @@ def process_clusters(
                 # Reset batch for next round
                 batch_clusters = {}
 
-                # Save progress
-                save_cluster_analysis(clusters_dict, out_file)
-                logger.info(
-                    f"Saved progress with {len(clusters_dict)} clusters processed so far"
-                )
+                # Save progress if saving is enabled
+                if save_outputs and out_file:
+                    save_cluster_analysis(
+                        clusters_dict, 
+                        out_file,
+                        include_raw=("json" in outputs_to_generate)
+                    )
+                    logger.info(
+                        f"Saved progress with {len(clusters_dict)} clusters processed so far"
+                    )
 
-    # Save final results
-    save_cluster_analysis(clusters_dict, out_file)
-    logger.info(f"Completed analysis for {len(clusters_dict)} clusters")
+    # Save final results if saving is enabled
+    if save_outputs and out_file:
+        save_cluster_analysis(
+            clusters_dict, 
+            out_file,
+            include_raw=("json" in outputs_to_generate)
+        )
+        logger.info(f"Completed analysis for {len(clusters_dict)} clusters")
+    else:
+        logger.info(f"Analysis completed without saving for {len(clusters_dict)} clusters")
 
     return clusters_dict
 
@@ -566,32 +599,19 @@ def load_config(config_file=None, model_override=None):
     Returns:
         config: Configuration dictionary
     """
-    from mozzarellm.configs import (
-        DEFAULT_CONFIG, 
-        DEFAULT_OPENAI_CONFIG,
-        DEFAULT_OPENAI_REASONING_CONFIG,
-        DEFAULT_ANTHROPIC_CONFIG,
-        DEFAULT_GEMINI_CONFIG,
-        REASONING_OPENAI_MODELS
-    )
-    
     # Select the appropriate base config
     if model_override:
-        # Check if this is a REASONING OpenAI model
-        if any(model_override.startswith(prefix) for prefix in REASONING_OPENAI_MODELS):
-            config = DEFAULT_OPENAI_REASONING_CONFIG.copy()
-        # Check for standard OpenAI models
-        elif any(model_override.startswith(prefix) for prefix in ["gpt", "o4", "o3"]):
-            config = DEFAULT_OPENAI_CONFIG.copy()
-        # Check for Anthropic models
+        if model_override.startswith("gpt"):
+            config = DEFAULT_OPENAI_CONFIG
+        elif any(model_override.startswith(prefix) for prefix in ["o4", "o3"]):
+            config = DEFAULT_OPENAI_REASONING_CONFIG
         elif model_override.startswith("claude"):
-            config = DEFAULT_ANTHROPIC_CONFIG.copy()
-        # Check for Gemini models
+            config = DEFAULT_ANTHROPIC_CONFIG
         elif model_override.startswith("gemini"):
-            config = DEFAULT_GEMINI_CONFIG.copy()
+            config = DEFAULT_GEMINI_CONFIG
         else:
-            config = DEFAULT_CONFIG.copy()
-        
+            config = DEFAULT_CONFIG
+
         # Set the specified model
         config["MODEL"] = model_override
     else:
@@ -624,6 +644,10 @@ def load_config(config_file=None, model_override=None):
         except Exception as e:
             logging.error(f"Error loading config file: {e}")
 
+    return config
+
+
+def reshape_config(config):
     # Add lowercase aliases for consistency
     config["context"] = config["CONTEXT"]
     config["model"] = config["MODEL"]

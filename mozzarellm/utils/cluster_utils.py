@@ -29,7 +29,7 @@ def reshape_to_clusters(
         DataFrame containing gene-level data (alternative to input_file)
     input_sep : str, default=","
         Separator used in the input file
-    
+
     # Data structure parameters
     gene_col : str, default="gene_symbol"
         Column name containing gene identifiers
@@ -39,7 +39,7 @@ def reshape_to_clusters(
         Separator to use between genes in the output file
     additional_cols : list, optional
         List of additional columns to include as cluster-level metadata
-    
+
     # Output options
     output_file : str, optional
         Path to save the output cluster-level file
@@ -47,11 +47,11 @@ def reshape_to_clusters(
         Path to save gene features data
     return_dataframes : bool, default=True
         Whether to return DataFrames even when output files are specified
-    
+
     # Feature extraction options
     uniprot_col : str, optional
         Column name containing UniProt data for feature extraction
-    
+
     # Misc options
     verbose : bool, default=True
         Whether to print progress messages
@@ -62,11 +62,11 @@ def reshape_to_clusters(
         (cluster_df, gene_features_df) : tuple of DataFrames
             - cluster_df: DataFrame with reshaped clusters
             - gene_features_df: DataFrame with gene features
-    
+
     Otherwise if return_dataframes is True or no output_file specified:
         cluster_df : pandas.DataFrame
             DataFrame with reshaped clusters
-    
+
     If output_file is specified and return_dataframes is False:
         None
 
@@ -75,7 +75,7 @@ def reshape_to_clusters(
     - Either input_file or input_df must be provided
     - The reshaped cluster DataFrame will always have "cluster_id" and "genes" columns
     - The "genes" column contains semicolon-separated gene lists for direct use in analyze_gene_clusters
-    """    
+    """
     # Handle input - either from file or DataFrame
     if input_df is not None:
         df = input_df
