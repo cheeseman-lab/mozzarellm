@@ -75,23 +75,23 @@ def save_progress(df, analysis_dict, out_file_base):
 def extract_json_from_markdown(text):
     """
     Extracts JSON from text that might be wrapped in markdown code blocks.
-    
+
     Args:
         text: Raw text that might contain JSON in markdown code blocks
-        
+
     Returns:
         Extracted JSON string or the original text if no code blocks found
     """
     import re
-    
+
     # Look for JSON in code blocks (with or without language specifier)
     code_block_pattern = r"```(?:json)?\s*([\s\S]*?)```"
     matches = re.findall(code_block_pattern, text)
-    
+
     if matches:
         # Return the largest code block (most likely to be the complete JSON)
         return max(matches, key=len).strip()
-    
+
     # If no code blocks found, return the original text
     return text
 
@@ -131,7 +131,7 @@ def process_cluster_response(analysis_text, is_batch=False):
 
     # First, extract JSON from markdown code blocks if present
     cleaned_text = extract_json_from_markdown(analysis_text)
-    
+
     try:
         # Try direct JSON parsing first
         try:
@@ -149,28 +149,34 @@ def process_cluster_response(analysis_text, is_batch=False):
                             cluster_analysis, analysis_text
                         )
                         if processed_cluster["cluster_id"]:
-                            clusters[processed_cluster["cluster_id"]] = processed_cluster
+                            clusters[processed_cluster["cluster_id"]] = (
+                                processed_cluster
+                            )
                     return clusters
-                
+
         except json.JSONDecodeError:
             # If direct parsing fails, try more robust methods
             logging.info("Direct JSON parsing failed, trying regex extraction...")
-            
+
             # Clean up common JSON formatting issues
-            cleaned_text = re.sub(r',(\s*[}\]])', r'\1', cleaned_text)  # Remove trailing commas
-            cleaned_text = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)', r'\1"\2"\3', cleaned_text)  # Quote unquoted keys
-            
+            cleaned_text = re.sub(
+                r",(\s*[}\]])", r"\1", cleaned_text
+            )  # Remove trailing commas
+            cleaned_text = re.sub(
+                r"([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)", r'\1"\2"\3', cleaned_text
+            )  # Quote unquoted keys
+
             # Try to extract JSON using regex patterns
             if is_batch:
                 # Look for a JSON array pattern
                 array_pattern = r"\[\s*\{.*\}\s*\]"
                 json_match = re.search(array_pattern, cleaned_text, re.DOTALL)
-                
+
                 if json_match:
                     try:
                         json_str = json_match.group(0)
                         analysis_array = json.loads(json_str)
-                        
+
                         # Process each cluster in the array
                         clusters = {}
                         for cluster_analysis in analysis_array:
@@ -178,16 +184,20 @@ def process_cluster_response(analysis_text, is_batch=False):
                                 cluster_analysis, analysis_text
                             )
                             if processed_cluster["cluster_id"]:
-                                clusters[processed_cluster["cluster_id"]] = processed_cluster
-                                
+                                clusters[processed_cluster["cluster_id"]] = (
+                                    processed_cluster
+                                )
+
                         return clusters
                     except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse JSON array from regex match: {e}")
-                
+                        logging.error(
+                            f"Failed to parse JSON array from regex match: {e}"
+                        )
+
                 # If regex fails, try another approach - look for properly formed JSON objects
                 object_pattern = r'\{\s*"cluster_id".*?\}'
                 json_matches = re.findall(object_pattern, cleaned_text, re.DOTALL)
-                
+
                 if json_matches:
                     clusters = {}
                     for json_str in json_matches:
@@ -197,30 +207,34 @@ def process_cluster_response(analysis_text, is_batch=False):
                                 cluster_analysis, analysis_text
                             )
                             if processed_cluster["cluster_id"]:
-                                clusters[processed_cluster["cluster_id"]] = processed_cluster
+                                clusters[processed_cluster["cluster_id"]] = (
+                                    processed_cluster
+                                )
                         except json.JSONDecodeError:
                             continue
-                    
+
                     if clusters:
                         return clusters
-            
+
             else:
                 # Single cluster mode - look for a JSON object pattern
                 object_pattern = r'\{\s*"cluster_id".*\}'
                 json_match = re.search(object_pattern, cleaned_text, re.DOTALL)
-                
+
                 if json_match:
                     try:
                         json_str = json_match.group(0)
                         analysis_json = json.loads(json_str)
                         return _standardize_cluster_format(analysis_json, analysis_text)
                     except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse JSON object from regex match: {e}")
-                
+                        logging.error(
+                            f"Failed to parse JSON object from regex match: {e}"
+                        )
+
                 # If regex fails, try another approach - find a complete JSON object
                 start_idx = cleaned_text.find("{")
                 end_idx = cleaned_text.rfind("}")
-                
+
                 if start_idx >= 0 and end_idx > start_idx:
                     try:
                         json_str = cleaned_text[start_idx : end_idx + 1]
@@ -228,43 +242,53 @@ def process_cluster_response(analysis_text, is_batch=False):
                         return _standardize_cluster_format(analysis_json, analysis_text)
                     except json.JSONDecodeError as e:
                         logging.error(f"Failed to parse JSON object using indices: {e}")
-        
+
         # Last resort - try a completely different approach for particularly problematic responses
-        logging.warning("All standard parsing methods failed, attempting final recovery approach")
-        
+        logging.warning(
+            "All standard parsing methods failed, attempting final recovery approach"
+        )
+
         # Find all key-value pairs using regex and reconstruct JSON
         if not is_batch:
             try:
                 reconstructed_json = {}
-                
+
                 # Extract cluster_id
-                cluster_id_match = re.search(r'"cluster_id"\s*:\s*"([^"]+)"', cleaned_text)
+                cluster_id_match = re.search(
+                    r'"cluster_id"\s*:\s*"([^"]+)"', cleaned_text
+                )
                 if cluster_id_match:
                     reconstructed_json["cluster_id"] = cluster_id_match.group(1)
-                
+
                 # Extract dominant_process
-                process_match = re.search(r'"dominant_process"\s*:\s*"([^"]+)"', cleaned_text)
+                process_match = re.search(
+                    r'"dominant_process"\s*:\s*"([^"]+)"', cleaned_text
+                )
                 if process_match:
                     reconstructed_json["dominant_process"] = process_match.group(1)
-                
+
                 # Extract pathway_confidence
-                confidence_match = re.search(r'"pathway_confidence"\s*:\s*"([^"]+)"', cleaned_text)
+                confidence_match = re.search(
+                    r'"pathway_confidence"\s*:\s*"([^"]+)"', cleaned_text
+                )
                 if confidence_match:
                     reconstructed_json["pathway_confidence"] = confidence_match.group(1)
-                
+
                 # Extract summary
                 summary_match = re.search(r'"summary"\s*:\s*"([^"]+)"', cleaned_text)
                 if summary_match:
                     reconstructed_json["summary"] = summary_match.group(1)
-                
+
                 if reconstructed_json.get("cluster_id"):
-                    return _standardize_cluster_format(reconstructed_json, analysis_text)
+                    return _standardize_cluster_format(
+                        reconstructed_json, analysis_text
+                    )
             except Exception as e:
                 logging.error(f"Final recovery approach failed: {e}")
-                
+
         # If all approaches fail, return the default
         return default_structure if not is_batch else {}
-                
+
     except Exception as e:
         logging.error(f"Error processing cluster analysis: {e}")
         return default_structure if not is_batch else {}
@@ -338,25 +362,43 @@ def _standardize_cluster_format(cluster_data, raw_text):
 
 
 def save_cluster_analysis(
-    clusters_dict, out_file_base, original_df=None, include_raw=True
+    clusters_dict, out_file_base=None, original_df=None, include_raw=True, save_outputs=True
 ):
     """
-    Save cluster analysis results to JSON and multiple CSV formats,
-    with an option to merge with original data.
-    Updated to handle the new gene categories structure.
-
+    Process and optionally save cluster analysis results to JSON and multiple CSV formats.
+    Returns the processed DataFrames regardless of whether they're saved to disk.
+    
     Args:
         clusters_dict: Dictionary with cluster analysis results in JSON format
-        out_file_base: Base filename for output files (without extension)
+        out_file_base: Base filename for output files (without extension), required if save_outputs=True
         original_df: Optional original DataFrame with cluster_id and other original data
         include_raw: Whether to include raw text in JSON output
+        save_outputs: Whether to write results to disk (default: True)
+    
+    Returns:
+        dict: Dictionary containing the following keys:
+            - 'json_data': The complete JSON data structure
+            - 'gene_df': DataFrame with gene-level analysis
+            - 'cluster_df': DataFrame with cluster-level analysis
     """
-    # Set paths
-    json_path = f"{out_file_base}_clusters.json"
-
+    # Initialize return dictionary
+    results = {
+        'json_data': None,
+        'gene_df': None,
+        'cluster_df': None
+    }
+    
+    # Validate parameters
+    if save_outputs and not out_file_base:
+        logging.warning("Cannot save outputs without out_file_base parameter")
+        save_outputs = False
+    
+    # Set paths if saving
+    json_path = f"{out_file_base}_clusters.json" if out_file_base else None
+    
     # Check if the JSON file already exists and load previous results
     existing_clusters = {}
-    if os.path.exists(json_path):
+    if save_outputs and os.path.exists(json_path):
         try:
             with open(json_path, "r") as f:
                 existing_data = json.load(f)
@@ -364,36 +406,39 @@ def save_cluster_analysis(
                     existing_clusters = existing_data["clusters"]
                 else:
                     existing_clusters = existing_data
-            logging.info(
-                f"Loaded {len(existing_clusters)} existing clusters from {json_path}"
-            )
+            logging.info(f"Loaded {len(existing_clusters)} existing clusters from {json_path}")
         except Exception as e:
             logging.warning(f"Failed to load existing clusters file: {e}")
-
+    
     # Merge existing clusters with new ones
     combined_clusters = {**existing_clusters, **clusters_dict}
-
+    
     # Option to exclude raw text to save space
+    processed_clusters = combined_clusters.copy()
     if not include_raw:
-        for cluster_id in combined_clusters:
-            if "raw_text" in combined_clusters[cluster_id]:
-                combined_clusters[cluster_id].pop("raw_text", None)
-
+        for cluster_id in processed_clusters:
+            if "raw_text" in processed_clusters[cluster_id]:
+                processed_clusters[cluster_id].pop("raw_text", None)
+    
     # Add metadata
     output_data = {
         "metadata": {
             "timestamp": time.time(),
             "date": datetime.datetime.now().isoformat(),
-            "cluster_count": len(combined_clusters),
+            "cluster_count": len(processed_clusters),
         },
-        "clusters": combined_clusters,
+        "clusters": processed_clusters,
     }
-
-    # Save full results to JSON
-    with open(json_path, "w") as f:
-        json.dump(output_data, f, indent=2)
-
-    # Create gene-level and cluster-level tables
+    
+    # Store the JSON data in the results
+    results['json_data'] = output_data
+    
+    # Save full results to JSON if requested
+    if save_outputs and json_path:
+        with open(json_path, "w") as f:
+            json.dump(output_data, f, indent=2)
+    
+    # Process and create gene-level and cluster-level tables
     if combined_clusters:
         # Create gene-level tables - one for uncharacterized genes and one for novel role genes
         try:
@@ -569,27 +614,14 @@ def save_cluster_analysis(
                     ],
                     ascending=[True, False, False],
                 )
-
-                # Save combined gene table
-                gene_path = f"{out_file_base}_all_genes.csv"
-                gene_df.to_csv(gene_path, index=False)
-
-                # Also save separate tables for each gene category
-                if uncharacterized_gene_data:
-                    unchar_df = gene_df[gene_df["gene_category"] == "uncharacterized"]
-                    unchar_path = f"{out_file_base}_uncharacterized_genes.csv"
-                    unchar_df.to_csv(unchar_path, index=False)
-                    logging.info(
-                        f"Saved uncharacterized gene analysis to {unchar_path}"
-                    )
-
-                if novel_role_gene_data:
-                    novel_role_df = gene_df[gene_df["gene_category"] == "novel_role"]
-                    novel_role_path = f"{out_file_base}_novel_role_genes.csv"
-                    novel_role_df.to_csv(novel_role_path, index=False)
-                    logging.info(f"Saved novel role gene analysis to {novel_role_path}")
-
-                logging.info(f"Saved combined gene analysis to {gene_path}")
+                # Store in results
+                results['gene_df'] = gene_df
+                
+                # Save if requested
+                if save_outputs and out_file_base:
+                    gene_path = f"{out_file_base}_flagged_genes.csv"
+                    gene_df.to_csv(gene_path, index=False)
+                    logging.info(f"Saved combined gene analysis to {gene_path}")
             else:
                 logging.warning("No gene data to save")
 
@@ -769,11 +801,15 @@ def save_cluster_analysis(
                     # Fall back to string sorting if numeric conversion fails
                     cluster_df = cluster_df.sort_values("cluster_id")
 
-                # Save cluster analysis
-                cluster_path = f"{out_file_base}_clusters.csv"
-                cluster_df.to_csv(cluster_path, index=False)
+                # Store in results
+                results['cluster_df'] = cluster_df
+                
+                # Save if requested
+                if save_outputs and out_file_base:
+                    cluster_path = f"{out_file_base}_clusters.csv"
+                    cluster_df.to_csv(cluster_path, index=False)
+                    logging.info(f"Saved cluster analysis to {cluster_path}")
 
-                logging.info(f"Saved cluster analysis to {cluster_path}")
             else:
                 logging.warning("No cluster data to save")
 
@@ -786,3 +822,5 @@ def save_cluster_analysis(
     else:
         logging.warning("No cluster data to save")
         logging.info(f"Empty cluster analysis saved to {json_path}")
+
+    return results

@@ -35,6 +35,3 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["mozzarellm*"]
-
-[tool.setuptools.package-data]
-mozzarellm = ["prompts/*.txt", "configs/*.json"]
