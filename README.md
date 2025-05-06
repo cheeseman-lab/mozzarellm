@@ -30,7 +30,6 @@ pip install -e .
 ```
 
 Create a `.env` file with your API keys:
-
 ```
 OPENAI_API_KEY=your_openai_key_here
 ANTHROPIC_API_KEY=your_anthropic_key_here
@@ -39,73 +38,94 @@ GOOGLE_API_KEY=your_google_key_here
 
 ## Quick Start
 
-### Basic Usage
-
-```python
-import mozzarellm
-from dotenv import load_dotenv
-
-# Load API keys
-load_dotenv()
-
-# Run analysis
-results = mozzarellm.analyze_gene_clusters(
-    input_file="data/clusters.csv",
-    output_file="results/analysis",
-    config_path="config/openai.json",
-    gene_column="genes",
-    gene_sep=";",
-    cluster_id_column="cluster_id"
-)
-```
-
-### Command Line
+The easiest way to get started is to run the example notebook:
 
 ```bash
-# Run analysis from command line
-python -m mozzarellm.main \
-  --config config_openai.json \
-  --mode cluster \
-  --input data/clusters.csv \
-  --input_sep "," \
-  --gene_column "genes" \
-  --gene_sep ";" \
-  --cluster_id_column "cluster_id" \
-  --output_file results/analysis
+# Navigate to the examples directory
+cd examples
+
+# Launch Jupyter notebook
+jupyter notebook example_notebook.ipynb
 ```
+
+### Basic Python Usage
+
+```python
+import os
+import pandas as pd
+from mozzarellm import analyze_gene_clusters, reshape_to_clusters
+from mozzarellm.prompts import ROBUST_SCREEN_CONTEXT, ROBUST_CLUSTER_PROMPT
+from mozzarellm.configs import DEFAULT_OPENAI_REASONING_CONFIG
+
+# Load sample data
+sample_data = pd.read_csv("sample_data.csv")
+
+# Process data into cluster format
+cluster_df, gene_features = reshape_to_clusters(
+    input_df=sample_data, 
+    uniprot_col="uniprot_function", 
+    verbose=True
+)
+
+# Run analysis
+results = analyze_gene_clusters(
+    # Input data
+    input_df=cluster_df,
+    # Model configuration
+    model_name="o4-mini",  # or other supported models
+    config_dict=DEFAULT_OPENAI_REASONING_CONFIG,
+    # Analysis context and prompts
+    screen_context=ROBUST_SCREEN_CONTEXT,
+    cluster_analysis_prompt=ROBUST_CLUSTER_PROMPT,
+    # Gene annotations
+    gene_annotations_df=gene_features,
+    # Options
+    batch_size=1,
+    save_outputs=True,  # Set to False to avoid writing files
+    outputs_to_generate=["json", "clusters", "flagged_genes"]
+)
+
+# Explore results
+print(results.keys())
+cluster_analysis = results["cluster_df"]
+gene_analysis = results["gene_df"]
+```
+
+### Command Line (deprecated)
+
+Command line usage is currently deprecated as we migrate to a more flexible API-first approach.
 
 ## Input Format
 
 Your input should be a CSV/TSV file with gene clusters:
 
-| cluster_id | genes                                    | other_columns |
-|------------|------------------------------------------|---------------|
-| 1          | BRCA1;TP53;PTEN;MLH1                     | ...           |
-| 2          | MYC;MAX;MYCN;E2F1;RB1                    | ...           |
+| cluster_id | genes                    | uniprot_function                           |
+|------------|--------------------------|-------------------------------------------|
+| 1          | BRCA1;TP53;PTEN;MLH1     | DNA repair; tumor suppressor; metabolism   |
+| 2          | MYC;MAX;MYCN;E2F1;RB1    | transcription factors; cell cycle control  |
 
 Required columns:
-- `cluster_id`: Unique identifier for each cluster
-- `genes`: Semicolon-separated gene symbols
+- A column with cluster identifiers (default: `cluster_id`)
+- A column with gene symbols (default: `genes`)
+- Optionally, a column with UniProt function descriptions (helps with analysis)
 
 ## Configuration
 
-Create a JSON configuration file:
+Mozzarellm comes with default configurations for supported LLM providers:
 
-```json
-{
-  "MODEL": "gpt-4o",
-  "CONTEXT": "You are a bioinformatician analyzing gene clusters.",
-  "TEMP": 0.0,
-  "MAX_TOKENS": 4000,
-  "RATE_PER_TOKEN": 0.00001,
-  "DOLLAR_LIMIT": 10.0
-}
+```python
+from mozzarellm.configs import (
+    DEFAULT_OPENAI_REASONING_CONFIG,  # For OpenAI models with reasoning
+    DEFAULT_OPENAI_CONFIG,            # For standard OpenAI models
+    DEFAULT_ANTHROPIC_CONFIG,         # For Anthropic Claude models
+    DEFAULT_GEMINI_CONFIG             # For Google Gemini models
+)
 ```
 
-Available models:
-- OpenAI: `gpt-4o`, `gpt-4.5`, `gpt-3.5-turbo`
-- Anthropic: `claude-3-7-sonnet-20250219`, `claude-3.5-sonnet`
-- Google: `gemini-2.0-pro`, `gemini-1.5-pro`
+Available models include:
+- OpenAI: `o4-mini`, `o3-mini`, `gpt-4.1`, `gpt-4o`
+- Anthropic: `claude-3-7-sonnet-20250219`, `claude-3-5-haiku-20241022`
+- Google: `gemini-2.5-pro-preview-03-25`, `gemini-2.5-flash-preview-04-17`
 
 ## Python API
 
@@ -113,70 +133,65 @@ Available models:
 
 ```python
 from mozzarellm import analyze_gene_clusters
+from mozzarellm.configs import DEFAULT_OPENAI_REASONING_CONFIG
 
 results = analyze_gene_clusters(
-    input_file="data/clusters.csv",        # Input file path
-    output_file="results/analysis",        # Output path prefix
-    config_path="config.json",             # Configuration file
-    model_name="gpt-4o",                   # Override model in config
-    gene_column="genes",                   # Column with gene lists
-    gene_sep=";",                          # Separator for genes
-    cluster_id_column="cluster_id",        # Column with cluster IDs
-    batch_size=1,                          # Clusters per API call
-    gene_features_path="features.csv",     # Optional gene annotations
-    screen_info_path="screen_info.txt"     # Optional screen context
+    # Input options
+    input_df=cluster_df,               # DataFrame with cluster data
+    # Model configuration
+    model_name="o4-mini",              # Model to use
+    config_dict=DEFAULT_OPENAI_REASONING_CONFIG,  # Configuration
+    # Analysis context 
+    screen_context=SCREEN_CONTEXT,     # Context about the experiment
+    cluster_analysis_prompt=PROMPT,    # Custom analysis prompt
+    # Gene annotations
+    gene_annotations_df=gene_features, # Gene annotations DataFrame
+    # Processing options
+    batch_size=1,                      # Clusters per API call
+    # Output options
+    output_file="results/analysis",    # Output path prefix (optional)
+    save_outputs=True,                 # Whether to write files
+    outputs_to_generate=["json", "clusters", "flagged_genes"]  # Output types
 )
 ```
 
-### Reshape Gene-Level Data
+### Process Gene-Level Data
 
 ```python
 from mozzarellm import reshape_to_clusters
 
-clusters_df = reshape_to_clusters(
-    input_file="gene_level_data.csv",      # Gene-level input file
-    output_file="clusters.csv",            # Output file path
-    gene_col="gene_symbol",                # Gene ID column
-    cluster_col="cluster",                 # Cluster assignment column
-    gene_sep=";",                          # Separator for output genes
-    additional_cols=["condition", "score"] # Additional columns to keep
+cluster_df, gene_features = reshape_to_clusters(
+    input_df=gene_level_data,          # Gene-level input DataFrame
+    gene_col="gene_symbol",            # Gene ID column
+    cluster_col="cluster",             # Cluster assignment column
+    uniprot_col="uniprot_function",    # Column with gene annotations
+    verbose=True                       # Show processing information
 )
 ```
 
-## Output Files
+## Output Structure
 
-The analysis produces three types of output files:
+When `save_outputs=True`, the analysis produces three types of output files:
+1. **JSON** (`*_clusters.json`): Complete analysis with raw LLM responses
+2. **Cluster CSV** (`*_clusters.csv`): One row per cluster with pathway assignments and statistics
+3. **Gene CSV** (`*_flagged_genes.csv`): One row per gene with detailed rationales and scores
 
-1. **JSON** (`analysis_clusters.json`): Complete analysis with raw LLM responses
-2. **Cluster CSV** (`analysis_clusters.csv`): One row per cluster with pathway assignments and statistics
-3. **Gene CSV** (`analysis_all_genes.csv`): One row per gene with detailed rationales and scores
-
-## Integration
-
-Mozzarellm can be integrated with other bioinformatics pipelines:
-
+When `save_outputs=False`, the same data is returned in a dictionary:
 ```python
-# Example integration with a pipeline
-from mozzarellm import analyze_gene_clusters
-
-def my_pipeline_step(data):
-    # Process clusters
-    results = analyze_gene_clusters(
-        input_df=data,
-        output_file="results/analysis",
-        config_path="config.json"
-    )
-    
-    # Continue pipeline
-    return process_results(results)
+{
+    'clusters_dict': {...},    # Raw analysis results
+    'json_data': {...},        # Processed JSON with metadata
+    'cluster_df': pandas.DataFrame(...),  # Cluster-level analysis
+    'gene_df': pandas.DataFrame(...)      # Gene-level analysis
+}
 ```
 
 ## Examples
 
-See the `examples/` directory for:
-- Jupyter notebooks
-- Batch processing scripts
-- Integration examples
+See the `examples/example_notebook.ipynb` file for a complete walkthrough of:
+- Loading and processing gene data
+- Running analysis with different models
+- Exploring and visualizing results
 
 ## License
 
