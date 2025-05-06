@@ -75,23 +75,23 @@ def save_progress(df, analysis_dict, out_file_base):
 def extract_json_from_markdown(text):
     """
     Extracts JSON from text that might be wrapped in markdown code blocks.
-    
+
     Args:
         text: Raw text that might contain JSON in markdown code blocks
-        
+
     Returns:
         Extracted JSON string or the original text if no code blocks found
     """
     import re
-    
+
     # Look for JSON in code blocks (with or without language specifier)
     code_block_pattern = r"```(?:json)?\s*([\s\S]*?)```"
     matches = re.findall(code_block_pattern, text)
-    
+
     if matches:
         # Return the largest code block (most likely to be the complete JSON)
         return max(matches, key=len).strip()
-    
+
     # If no code blocks found, return the original text
     return text
 
@@ -131,7 +131,7 @@ def process_cluster_response(analysis_text, is_batch=False):
 
     # First, extract JSON from markdown code blocks if present
     cleaned_text = extract_json_from_markdown(analysis_text)
-    
+
     try:
         # Try direct JSON parsing first
         try:
@@ -149,28 +149,34 @@ def process_cluster_response(analysis_text, is_batch=False):
                             cluster_analysis, analysis_text
                         )
                         if processed_cluster["cluster_id"]:
-                            clusters[processed_cluster["cluster_id"]] = processed_cluster
+                            clusters[processed_cluster["cluster_id"]] = (
+                                processed_cluster
+                            )
                     return clusters
-                
+
         except json.JSONDecodeError:
             # If direct parsing fails, try more robust methods
             logging.info("Direct JSON parsing failed, trying regex extraction...")
-            
+
             # Clean up common JSON formatting issues
-            cleaned_text = re.sub(r',(\s*[}\]])', r'\1', cleaned_text)  # Remove trailing commas
-            cleaned_text = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)', r'\1"\2"\3', cleaned_text)  # Quote unquoted keys
-            
+            cleaned_text = re.sub(
+                r",(\s*[}\]])", r"\1", cleaned_text
+            )  # Remove trailing commas
+            cleaned_text = re.sub(
+                r"([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)", r'\1"\2"\3', cleaned_text
+            )  # Quote unquoted keys
+
             # Try to extract JSON using regex patterns
             if is_batch:
                 # Look for a JSON array pattern
                 array_pattern = r"\[\s*\{.*\}\s*\]"
                 json_match = re.search(array_pattern, cleaned_text, re.DOTALL)
-                
+
                 if json_match:
                     try:
                         json_str = json_match.group(0)
                         analysis_array = json.loads(json_str)
-                        
+
                         # Process each cluster in the array
                         clusters = {}
                         for cluster_analysis in analysis_array:
@@ -178,16 +184,20 @@ def process_cluster_response(analysis_text, is_batch=False):
                                 cluster_analysis, analysis_text
                             )
                             if processed_cluster["cluster_id"]:
-                                clusters[processed_cluster["cluster_id"]] = processed_cluster
-                                
+                                clusters[processed_cluster["cluster_id"]] = (
+                                    processed_cluster
+                                )
+
                         return clusters
                     except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse JSON array from regex match: {e}")
-                
+                        logging.error(
+                            f"Failed to parse JSON array from regex match: {e}"
+                        )
+
                 # If regex fails, try another approach - look for properly formed JSON objects
                 object_pattern = r'\{\s*"cluster_id".*?\}'
                 json_matches = re.findall(object_pattern, cleaned_text, re.DOTALL)
-                
+
                 if json_matches:
                     clusters = {}
                     for json_str in json_matches:
@@ -197,30 +207,34 @@ def process_cluster_response(analysis_text, is_batch=False):
                                 cluster_analysis, analysis_text
                             )
                             if processed_cluster["cluster_id"]:
-                                clusters[processed_cluster["cluster_id"]] = processed_cluster
+                                clusters[processed_cluster["cluster_id"]] = (
+                                    processed_cluster
+                                )
                         except json.JSONDecodeError:
                             continue
-                    
+
                     if clusters:
                         return clusters
-            
+
             else:
                 # Single cluster mode - look for a JSON object pattern
                 object_pattern = r'\{\s*"cluster_id".*\}'
                 json_match = re.search(object_pattern, cleaned_text, re.DOTALL)
-                
+
                 if json_match:
                     try:
                         json_str = json_match.group(0)
                         analysis_json = json.loads(json_str)
                         return _standardize_cluster_format(analysis_json, analysis_text)
                     except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse JSON object from regex match: {e}")
-                
+                        logging.error(
+                            f"Failed to parse JSON object from regex match: {e}"
+                        )
+
                 # If regex fails, try another approach - find a complete JSON object
                 start_idx = cleaned_text.find("{")
                 end_idx = cleaned_text.rfind("}")
-                
+
                 if start_idx >= 0 and end_idx > start_idx:
                     try:
                         json_str = cleaned_text[start_idx : end_idx + 1]
@@ -228,43 +242,53 @@ def process_cluster_response(analysis_text, is_batch=False):
                         return _standardize_cluster_format(analysis_json, analysis_text)
                     except json.JSONDecodeError as e:
                         logging.error(f"Failed to parse JSON object using indices: {e}")
-        
+
         # Last resort - try a completely different approach for particularly problematic responses
-        logging.warning("All standard parsing methods failed, attempting final recovery approach")
-        
+        logging.warning(
+            "All standard parsing methods failed, attempting final recovery approach"
+        )
+
         # Find all key-value pairs using regex and reconstruct JSON
         if not is_batch:
             try:
                 reconstructed_json = {}
-                
+
                 # Extract cluster_id
-                cluster_id_match = re.search(r'"cluster_id"\s*:\s*"([^"]+)"', cleaned_text)
+                cluster_id_match = re.search(
+                    r'"cluster_id"\s*:\s*"([^"]+)"', cleaned_text
+                )
                 if cluster_id_match:
                     reconstructed_json["cluster_id"] = cluster_id_match.group(1)
-                
+
                 # Extract dominant_process
-                process_match = re.search(r'"dominant_process"\s*:\s*"([^"]+)"', cleaned_text)
+                process_match = re.search(
+                    r'"dominant_process"\s*:\s*"([^"]+)"', cleaned_text
+                )
                 if process_match:
                     reconstructed_json["dominant_process"] = process_match.group(1)
-                
+
                 # Extract pathway_confidence
-                confidence_match = re.search(r'"pathway_confidence"\s*:\s*"([^"]+)"', cleaned_text)
+                confidence_match = re.search(
+                    r'"pathway_confidence"\s*:\s*"([^"]+)"', cleaned_text
+                )
                 if confidence_match:
                     reconstructed_json["pathway_confidence"] = confidence_match.group(1)
-                
+
                 # Extract summary
                 summary_match = re.search(r'"summary"\s*:\s*"([^"]+)"', cleaned_text)
                 if summary_match:
                     reconstructed_json["summary"] = summary_match.group(1)
-                
+
                 if reconstructed_json.get("cluster_id"):
-                    return _standardize_cluster_format(reconstructed_json, analysis_text)
+                    return _standardize_cluster_format(
+                        reconstructed_json, analysis_text
+                    )
             except Exception as e:
                 logging.error(f"Final recovery approach failed: {e}")
-                
+
         # If all approaches fail, return the default
         return default_structure if not is_batch else {}
-                
+
     except Exception as e:
         logging.error(f"Error processing cluster analysis: {e}")
         return default_structure if not is_batch else {}
