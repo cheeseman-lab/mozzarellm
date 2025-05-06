@@ -31,6 +31,170 @@ from .config_utils import get_config_path, get_prompt_path
 from mozzarellm import constant
 
 
+def analyze_gene_clusters(
+    # Input data options
+    input_file=None,
+    input_df=None,
+    input_sep=",",
+    gene_column="genes",
+    gene_sep=";",
+    cluster_id_column="cluster_id",
+    model_name=None,
+    config_path=None,
+    config_dict=None,
+    screen_context_path=None,
+    screen_context=None,
+    cluster_analysis_prompt_path=None,
+    cluster_analysis_prompt=None,
+    gene_annotations_path=None,
+    gene_annotations_dict=None,
+    batch_size=1,
+    start_idx=0,
+    end_idx=None,
+    output_file=None,
+    save_outputs=True,
+    outputs_to_generate=["json", "clusters", "flagged_genes"],
+):
+    """
+    Analyze gene clusters to identify biological pathways and potential novel gene functions.
+    
+    Parameters:
+    -----------
+    # Input data options
+    input_file : str, optional
+        Path to a CSV/TSV file containing gene clusters
+    input_df : pandas.DataFrame, optional
+        DataFrame containing gene clusters (alternative to input_file)
+    input_sep : str, default=","
+        Separator used in the input file
+        
+    # Data structure parameters
+    gene_column : str, default="genes"
+        Column name containing semicolon-separated gene lists
+    gene_sep : str, default=";"
+        Separator used between genes in the gene column
+    cluster_id_column : str, default="cluster_id"
+        Column name containing cluster identifiers
+        
+    # Model and configuration
+    model_name : str, optional
+        LLM to use for analysis (e.g., "gpt-4o", "claude-3-7-sonnet-20250219")
+    config_path : str, optional
+        Path to a JSON configuration file
+    config_dict : dict, optional
+        Configuration dictionary (alternative to config_path)
+        
+    # Analysis context
+    screen_context_path : str, optional
+        Path to a file containing information about the experiment/screen
+    screen_context : str, optional
+        String containing information about the experiment/screen
+        
+    # Prompts
+    cluster_analysis_prompt_path : str, optional
+        Path to a custom prompt template for pathway identification
+    cluster_analysis_prompt : str, optional
+        Custom prompt string for pathway identification
+        
+    # Gene information
+    gene_annotations_path : str, optional
+        Path to a CSV file with gene annotations/features
+    gene_annotations_dict : dict, optional
+        Dictionary mapping gene IDs to their annotations
+        
+    # Processing options
+    batch_size : int, default=1
+        Number of clusters to analyze in each API call
+    start_idx : int, default=0
+        Starting index in the input data
+    end_idx : int, optional
+        Ending index in the input data
+        
+    # Output options
+    output_file : str, optional
+        Base path for output files (without extension)
+    save_outputs : bool, default=True
+        Whether to save results to disk
+    outputs_to_generate : list, default=["json", "clusters", "flagged_genes"]
+        Which output files to generate
+    
+    Returns:
+    --------
+    dict
+        Dictionary containing analysis results and generated DataFrames
+    """
+    # Load configuration
+    config = None
+    if config_dict:
+        config = config_dict
+    else:
+        config = load_config(config_path, model_override=model_name)
+    
+    # Automatically select config based on model name if not provided
+    if not config and model_name:
+        if any(model_name.startswith(prefix) for prefix in ["gpt", "o4", "o3"]):
+            config = DEFAULT_OPENAI_CONFIG
+        elif model_name.startswith("claude"):
+            config = DEFAULT_ANTHROPIC_CONFIG
+        elif model_name.startswith("gemini"):
+            config = DEFAULT_GEMINI_CONFIG
+        else:
+            config = DEFAULT_CONFIG
+    
+    # Load data
+    df = None
+    if input_df is not None:
+        df = input_df
+    elif input_file is not None:
+        if input_sep == "\\t":
+            input_sep = "\t"
+        df = pd.read_csv(input_file, sep=input_sep)
+    else:
+        raise ValueError("Either input_file or input_df must be provided")
+    
+    print(f"Loaded data with {len(df)} rows and columns: {list(df.columns)}")
+    
+    # Ensure we have a cluster ID column
+    if cluster_id_column not in df.columns:
+        print(f"Warning: Cluster ID column '{cluster_id_column}' not found. Using DataFrame index.")
+        df[cluster_id_column] = df.index.astype(str)
+    
+    # Load gene annotations
+    annotations = None
+    if gene_annotations_dict is not None:
+        annotations = gene_annotations_dict
+    elif gene_annotations_path is not None:
+        annotations = load_gene_annotations(gene_annotations_path)
+    
+    # Load screen context
+    context = None
+    if screen_context is not None:
+        context = screen_context
+    elif screen_context_path is not None:
+        context = load_screen_context(screen_context_path)
+    
+    # Process clusters
+    results = process_clusters(
+        df=df,
+        config=config,
+        gene_column=gene_column,
+        gene_sep=gene_sep,
+        out_file=output_file if save_outputs else None,
+        cluster_analysis_prompt_path=cluster_analysis_prompt_path,
+        cluster_analysis_prompt=cluster_analysis_prompt,
+        gene_annotations_dict=annotations,
+        screen_context=context,
+        batch_size=batch_size,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        cluster_id_column=cluster_id_column,
+        save_outputs=save_outputs,
+        outputs_to_generate=outputs_to_generate,
+    )
+    
+    return results
+
+
 def load_config(config_file=None, model_override=None):
     """
     Load configuration with optional model override.
@@ -220,15 +384,18 @@ def process_clusters(
     gene_column,
     gene_sep,
     out_file,
-    custom_prompt_path=None,
-    gene_features_path=None,
-    screen_info_path=None,
+    cluster_analysis_prompt_path=None,
+    cluster_analysis_prompt=None,
+    gene_annotations_dict=None,
+    screen_context=None,
     batch_size=1,
     start_idx=0,
     end_idx=None,
     log_name=None,
     use_tqdm=True,
-    cluster_id_column="cluster_id",  # Add parameter for cluster ID column
+    cluster_id_column="cluster_id",
+    save_outputs=True,
+    outputs_to_generate=["json", "clusters", "flagged_genes"],
 ):
     """
     Process gene clusters to identify pathways and novel members.
@@ -252,16 +419,13 @@ def process_clusters(
     Returns:
         clusters_dict: Dictionary of cluster analysis results
     """
+
     # Set up logging
     if not log_name:
         log_name = config.get("log_name", "cluster_analysis")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = f"{log_name}_{timestamp}.log"
     logger = setup_logger(log_file)
-
-    # Load gene features and screen info if paths provided
-    gene_features_dict = load_gene_features(gene_features_path)
-    screen_info = load_screen_info(screen_info_path)
 
     # Extract config values
     context = config["context"]
@@ -324,11 +488,11 @@ def process_clusters(
 
             # Create prompt and query LLM
             prompt = make_cluster_analysis_prompt(
-                cluster_id,  # Use actual cluster_id from data
+                cluster_id,
                 genes,
-                gene_features_dict,
-                screen_info,
-                template_path=custom_prompt_path,
+                gene_annotations_dict,  
+                screen_context,         
+                template_path=cluster_analysis_prompt_path,
             )
 
             analysis, error = query_llm(
@@ -401,12 +565,12 @@ def process_clusters(
             # Process batch if it's full or we're at the end
             if len(batch_clusters) >= batch_size or is_last_cluster:
                 try:
-                    # Create batch prompt
                     prompt = make_batch_cluster_analysis_prompt(
-                        batch_clusters,
-                        gene_features_dict,
-                        screen_info,
-                        template_path=custom_prompt_path,
+                        cluster_id,
+                        genes,
+                        gene_annotations_dict, 
+                        screen_context,        
+                        template_path=cluster_analysis_prompt_path,  
                     )
 
                     # Query LLM
@@ -497,92 +661,3 @@ def process_clusters(
     logger.info(f"Completed analysis for {len(clusters_dict)} clusters")
 
     return clusters_dict
-
-
-def analyze_gene_clusters(
-    input_file,
-    output_file,
-    config_path=None,
-    model_name=None,
-    custom_prompt_path=None,
-    gene_features_path=None,
-    screen_info_path=None,
-    input_sep=",",
-    gene_column="genes",
-    gene_sep=";",
-    batch_size=1,
-    start_idx=0,
-    end_idx=None,
-    log_name=None,
-    cluster_id_column="cluster_id",
-    set_index=None,
-):
-    """
-    High-level function to analyze gene clusters from a file.
-
-    Args:
-        input_file: Path to input CSV/TSV with gene clusters
-        output_file: Path to output file (without extension)
-        config_path: Path to configuration JSON file
-        model_name: Override model specified in config
-        custom_prompt_path: Path to custom prompt template
-        gene_features_path: Path to gene features CSV
-        screen_info_path: Path to screen info text file
-        input_sep: Separator for input CSV (default: comma)
-        gene_column: Column name containing gene symbols
-        gene_sep: Separator for genes within a set
-        batch_size: Number of clusters to analyze in one batch
-        start_idx: Start index for processing
-        end_idx: End index for processing
-        log_name: Custom log name
-        cluster_id_column: Column name for cluster ID (default: "cluster_id")
-        set_index: Column to set as index (optional)
-
-    Returns:
-        clusters_dict: Dictionary of cluster analysis results
-    """
-    # Load configuration
-    config = load_config(config_path, model_override=model_name)
-
-    # Handle tab separator conversion
-    if input_sep == "\\t":
-        input_sep = "\t"
-
-    # Load the data
-    try:
-        df = pd.read_csv(input_file, sep=input_sep)
-        print(f"Loaded data with {len(df)} rows and columns: {list(df.columns)}")
-
-        # Set index from a column if specified
-        if set_index and set_index in df.columns:
-            print(f"Setting index from column: {set_index}")
-            df = df.set_index(set_index).reset_index()
-            cluster_id_column = "index"  # Use the index column as cluster_id
-
-        # Ensure we have a cluster ID column
-        if cluster_id_column not in df.columns:
-            print(
-                f"Warning: Cluster ID column '{cluster_id_column}' not found. Using DataFrame index."
-            )
-            df[cluster_id_column] = df.index.astype(str)
-
-    except Exception as e:
-        print(f"Error loading input file: {e}")
-        return None
-
-    # Process clusters
-    return process_clusters(
-        df=df,
-        config=config,
-        gene_column=gene_column,
-        gene_sep=gene_sep,
-        out_file=output_file,
-        custom_prompt_path=custom_prompt_path,
-        gene_features_path=gene_features_path,
-        screen_info_path=screen_info_path,
-        batch_size=batch_size,
-        start_idx=start_idx,
-        end_idx=end_idx,
-        log_name=log_name,
-        cluster_id_column=cluster_id_column,
-    )
