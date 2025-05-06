@@ -1,5 +1,3 @@
-# mozzarellm/configs.py
-
 # Base configuration with shared settings
 DEFAULT_CONFIG = {
     "MODEL": "",
