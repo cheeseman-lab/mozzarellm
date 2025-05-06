@@ -57,14 +57,7 @@ def get_default_template(template_type):
 
 def get_output_format_instructions(template_type):
     """Get standardized output format instructions for a template type"""
-    if template_type == "gene_set":
-        return """
-Format your response as:
-FUNCTION NAME: [your concise function name]
-CONFIDENCE SCORE: [0.0-1.0 numerical score]
-ANALYSIS: [your detailed explanation]
-"""
-    elif template_type == "cluster":
+    if template_type == "cluster":
         return """
 Provide a concise analysis in this exact JSON format:
 {{
