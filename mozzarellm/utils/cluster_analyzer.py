@@ -5,7 +5,6 @@ in different contexts (CLI, notebook, etc.)
 """
 
 import pandas as pd
-import json
 import logging
 from datetime import datetime
 from tqdm import tqdm
@@ -25,193 +24,213 @@ from .llm_analysis_utils import (
     save_cluster_analysis,
 )
 from .logging_utils import setup_logger
-from .config_utils import get_config_path, get_prompt_path
+
+# Import configuration and prompt constants
+from mozzarellm.configs import (
+    DEFAULT_CONFIG,
+    DEFAULT_OPENAI_CONFIG,
+    DEFAULT_OPENAI_REASONING_CONFIG,
+    DEFAULT_ANTHROPIC_CONFIG,
+    DEFAULT_GEMINI_CONFIG,
+)
 
 # Import constants
 from mozzarellm import constant
 
 
-def load_config(config_file=None, model_override=None):
-    """
-    Load configuration with optional model override.
-    Args:
-        config_file: Path or name of config file (optional)
-        model_override: Model to use, overriding config (optional)
-    Returns:
-        config: Configuration dictionary
-    """
-    # Default configuration
-    default_config = {
-        "MODEL": "",
-        "CONTEXT": "You are an AI assistant specializing in genomics and systems biology.",
-        "TEMP": 0.0,
-        "MAX_TOKENS": 4000,
-        "RATE_PER_TOKEN": 0.00001,
-        "DOLLAR_LIMIT": 10.0,
-        "LOG_NAME": "analysis",
-        "API_SETTINGS": {
-            "openai": {
-                "models": ["gpt-4o", "gpt-4.5", "gpt-3.5-turbo"],
-                "rate_per_token": 0.00001,
-            },
-            "anthropic": {
-                "models": [
-                    "claude-3-7-sonnet-20250219",
-                    "claude-3.5-sonnet",
-                    "claude-3-opus-20240229",
-                ],
-                "rate_per_token": 0.000015,
-            },
-            "gemini": {
-                "models": ["gemini-2.5-pro-exp-03-25", "gemini-2.0-flash"],
-                "rate_per_token": 0.000005,
-            },
-        },
-    }
-
-    # If config file provided, try to locate and load it
-    if config_file:
-        # Get the config path using the utility function
-        config_path = get_config_path(config_file)
-
-        # Load the config if we found it
-        if config_path:
-            try:
-                with open(config_path) as json_file:
-                    user_config = json.load(json_file)
-                    # Update default config with user settings
-                    for key, value in user_config.items():
-                        if (
-                            isinstance(value, dict)
-                            and key in default_config
-                            and isinstance(default_config[key], dict)
-                        ):
-                            # Deep merge for nested dictionaries
-                            default_config[key].update(value)
-                        else:
-                            default_config[key] = value
-                logging.info(f"Loaded configuration from {config_path}")
-            except Exception as e:
-                logging.error(f"Error loading config file from {config_path}: {e}")
-        else:
-            logging.warning(f"Could not find config file: {config_file}")
-
-    # Override model if specified
-    if model_override:
-        default_config["MODEL"] = model_override
-    # Determine rate_per_token based on model if not explicitly set
-    model = default_config["MODEL"]
-    if model and "API_SETTINGS" in default_config:
-        for provider, settings in default_config["API_SETTINGS"].items():
-            if any(
-                model.startswith(m.split("-")[0]) for m in settings.get("models", [])
-            ):
-                rate_per_token = settings.get(
-                    "rate_per_token", default_config.get("RATE_PER_TOKEN", 0.00001)
-                )
-                default_config["RATE_PER_TOKEN"] = rate_per_token
-                break
-    # Add lowercase aliases for consistency
-    default_config["context"] = default_config["CONTEXT"]
-    default_config["model"] = default_config["MODEL"]
-    default_config["temperature"] = default_config["TEMP"]
-    default_config["max_tokens"] = default_config["MAX_TOKENS"]
-    default_config["rate_per_token"] = default_config["RATE_PER_TOKEN"]
-    default_config["dollar_limit"] = default_config["DOLLAR_LIMIT"]
-    default_config["log_name"] = default_config["LOG_NAME"]
-    return default_config
-
-
-def load_gene_features(gene_features_file):
-    """Load gene features from a file if provided."""
-    if not gene_features_file:
-        return None
-
-    try:
-        features_df = pd.read_csv(gene_features_file)
-        gene_id_column = features_df.columns[0]  # Assume first column is gene ID
-        features_column = features_df.columns[1]  # Assume second column is features
-        gene_features_dict = dict(
-            zip(features_df[gene_id_column], features_df[features_column])
-        )
-        print(f"Loaded features for {len(gene_features_dict)} genes")
-        return gene_features_dict
-    except Exception as e:
-        print(f"Error loading gene features: {e}")
-        return None
-
-
-def load_screen_info(screen_info_file):
-    """Load screen information from a file if provided."""
-    if not screen_info_file:
-        return None
-
-    try:
-        # Use the get_prompt_path utility to find the screen info file
-        screen_info_path = get_prompt_path(screen_info_file)
-        if screen_info_path:
-            with open(screen_info_path, "r") as f:
-                screen_info = f.read().strip()
-            print(f"Loaded screen information: {len(screen_info)} characters")
-            return screen_info
-        else:
-            print(f"Error: Screen info file {screen_info_file} not found")
-            return None
-    except Exception as e:
-        print(f"Error loading screen information: {e}")
-        return None
-
-
-def query_llm(
-    context,
-    prompt,
-    model,
-    temperature,
-    max_tokens,
-    rate_per_token,
-    log_file,
-    dollar_limit,
-    seed=None,
+def analyze_gene_clusters(
+    input_file=None,
+    input_df=None,
+    input_sep=",",
+    gene_column="genes",
+    gene_sep=";",
+    cluster_id_column="cluster_id",
+    model_name=None,
+    config_path=None,
+    config_dict=None,
+    screen_context_path=None,
+    screen_context=None,
+    cluster_analysis_prompt_path=None,
+    cluster_analysis_prompt=None,
+    gene_annotations_path=None,
+    gene_annotations_df=None,
+    batch_size=1,
+    start_idx=0,
+    end_idx=None,
+    output_file=None,
+    save_outputs=True,
+    outputs_to_generate=["json", "clusters", "flagged_genes"],
 ):
-    """Send a query to the appropriate LLM based on model name."""
-    logger = logging.getLogger(log_file)
+    """
+    Analyze gene clusters to identify biological pathways and potential novel gene functions.
 
-    try:
-        # Call appropriate API based on model name
-        if model.startswith("gpt") or model.startswith("o4") or model.startswith("o3"):
-            logger.info("Accessing OpenAI API")
-            return openai_chat(
-                context,
-                prompt,
-                model,
-                temperature,
-                max_tokens,
-                rate_per_token,
-                log_file,
-                dollar_limit,
-                seed,
-            )
-        elif model.startswith("gemini"):
-            logger.info("Using Google Gemini API")
-            analysis, error_message = query_genai_model(
-                context, prompt, model, temperature, max_tokens, log_file
-            )
-            return analysis, None if analysis else error_message
-        elif model.startswith("claude"):
-            logger.info("Using Anthropic Claude API")
-            analysis, error_message = anthropic_chat(
-                context, prompt, model, temperature, max_tokens, log_file, seed
-            )
-            return analysis, None if analysis else error_message
+    Parameters:
+    -----------
+    # Input data options
+    input_file : str, optional
+        Path to a CSV/TSV file containing gene clusters
+    input_df : pandas.DataFrame, optional
+        DataFrame containing gene clusters (alternative to input_file)
+    input_sep : str, default=","
+        Separator used in the input file
+
+    # Data structure parameters
+    gene_column : str, default="genes"
+        Column name containing semicolon-separated gene lists
+    gene_sep : str, default=";"
+        Separator used between genes in the gene column
+    cluster_id_column : str, default="cluster_id"
+        Column name containing cluster identifiers
+
+    # Model and configuration
+    model_name : str, optional
+        LLM to use for analysis (e.g., "gpt-4o", "claude-3-7-sonnet-20250219")
+    config_path : str, optional
+        Path to a JSON configuration file
+    config_dict : dict, optional
+        Configuration dictionary (alternative to config_path)
+
+    # Analysis context
+    screen_context_path : str, optional
+        Path to a file containing information about the experiment/screen
+    screen_context : str, optional
+        String containing information about the experiment/screen
+
+    # Prompts
+    cluster_analysis_prompt_path : str, optional
+        Path to a custom prompt template for pathway identification
+    cluster_analysis_prompt : str, optional
+        Custom prompt string for pathway identification
+
+    # Gene information
+    gene_annotations_path : str, optional
+        Path to a CSV file with gene annotations/features, with
+        column 0 containing the gene, and column 1 containing the annotation/features
+    gene_annotations_df : pandas.Dataframe
+        Dataframe mapping gene IDs to their annotations/features, with
+        column 0 containing the gene, and column 1 containing the annotation/features
+
+    # Processing options
+    batch_size : int, default=1
+        Number of clusters to analyze in each API call
+    start_idx : int, default=0
+        Starting index in the input data
+    end_idx : int, optional
+        Ending index in the input data
+
+    # Output options
+    output_file : str, optional
+        Base path for output files (without extension)
+    save_outputs : bool, default=True
+        Whether to save results to disk
+    outputs_to_generate : list, default=["json", "clusters", "flagged_genes"]
+        Which output files to generate
+
+    Returns:
+    --------
+    dict
+        Dictionary containing analysis results and generated DataFrames
+    """
+    # Load configuration
+    config = None
+    if config_dict:
+        config = config_dict
+    else:
+        config = load_config(config_path, model_override=model_name)
+
+    # Automatically select config based on model name if not provided
+    if not config and model_name:
+        if model_name.startswith("gpt"):
+            config = DEFAULT_OPENAI_CONFIG
+        elif any(model_name.startswith(prefix) for prefix in ["o4", "o3"]):
+            config = DEFAULT_OPENAI_REASONING_CONFIG
+        elif model_name.startswith("claude"):
+            config = DEFAULT_ANTHROPIC_CONFIG
+        elif model_name.startswith("gemini"):
+            config = DEFAULT_GEMINI_CONFIG
         else:
-            logger.info("Using server model")
-            analysis, error_message = server_model_chat(
-                context, prompt, model, temperature, max_tokens, log_file, seed
+            config = DEFAULT_CONFIG
+
+    # Reshape the config regardless of what it is
+    config = reshape_config(config)
+
+    # Load data
+    df = None
+    if input_df is not None:
+        df = input_df
+    elif input_file is not None:
+        if input_sep == "\\t":
+            input_sep = "\t"
+        df = pd.read_csv(input_file, sep=input_sep)
+    else:
+        raise ValueError("Either input_file or input_df must be provided")
+
+    print(f"Loaded data with {len(df)} rows and columns: {list(df.columns)}")
+
+    # Ensure we have a cluster ID column
+    if cluster_id_column not in df.columns:
+        print(
+            f"Warning: Cluster ID column '{cluster_id_column}' not found. Using DataFrame index."
+        )
+        df[cluster_id_column] = df.index.astype(str)
+
+    # Load gene annotations
+    annotations = None
+    if gene_annotations_df is not None:
+        # Process the dataframe to create the annotations dictionary
+        try:
+            # Get column names for gene ID and features
+            gene_id_column = gene_annotations_df.columns[0]  # First column is gene ID
+            features_column = gene_annotations_df.columns[
+                1
+            ]  # Second column is features
+
+            # Create dictionary mapping gene IDs to their annotations
+            annotations = dict(
+                zip(
+                    gene_annotations_df[gene_id_column],
+                    gene_annotations_df[features_column],
+                )
             )
-            return analysis, None if analysis else error_message
-    except Exception as e:
-        logger.error(f"Error querying LLM: {str(e)}")
-        return None, f"Error: {str(e)}"
+            print(
+                f"Created annotations dictionary with {len(annotations)} entries from DataFrame"
+            )
+        except Exception as e:
+            print(f"Error processing gene annotations DataFrame: {e}")
+            # Fall back to file-based loading if available
+            if gene_annotations_path is not None:
+                annotations = load_gene_annotations(gene_annotations_path)
+
+    elif gene_annotations_path is not None:
+        annotations = load_gene_annotations(gene_annotations_path)
+
+    # Load screen context
+    context = None
+    if screen_context is not None:
+        context = screen_context
+    elif screen_context_path is not None:
+        context = load_screen_context(screen_context_path)
+
+    # Process clusters
+    results = process_clusters(
+        df=df,
+        config=config,
+        gene_column=gene_column,
+        gene_sep=gene_sep,
+        out_file=output_file if save_outputs else None,
+        cluster_analysis_prompt_path=cluster_analysis_prompt_path,
+        cluster_analysis_prompt=cluster_analysis_prompt,
+        gene_annotations_dict=annotations,
+        screen_context=context,
+        batch_size=batch_size,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        cluster_id_column=cluster_id_column,
+        save_outputs=save_outputs,
+        outputs_to_generate=outputs_to_generate,
+    )
+
+    return results
 
 
 def process_clusters(
@@ -220,34 +239,39 @@ def process_clusters(
     gene_column,
     gene_sep,
     out_file,
-    custom_prompt_path=None,
-    gene_features_path=None,
-    screen_info_path=None,
+    cluster_analysis_prompt_path=None,
+    cluster_analysis_prompt=None,
+    gene_annotations_dict=None,
+    screen_context=None,
     batch_size=1,
     start_idx=0,
     end_idx=None,
     log_name=None,
     use_tqdm=True,
-    cluster_id_column="cluster_id",  # Add parameter for cluster ID column
+    cluster_id_column="cluster_id",
+    save_outputs=True,
+    outputs_to_generate=["json", "clusters", "flagged_genes"],
 ):
     """
     Process gene clusters to identify pathways and novel members.
-
     Args:
         df: DataFrame with clusters to analyze
         config: Configuration dictionary
         gene_column: Column name containing gene symbols
         gene_sep: Separator for genes in the column
         out_file: Output file path (without extension)
-        custom_prompt_path: Path to custom prompt template (optional)
-        gene_features_path: Path to gene features file (optional)
-        screen_info_path: Path to screen info file (optional)
+        cluster_analysis_prompt_path: Path to custom prompt template (optional)
+        cluster_analysis_prompt: Custom prompt template string (optional)
+        gene_annotations_dict: Dictionary mapping gene IDs to annotations
+        screen_context: String with context about the experiment/screen
         batch_size: Number of clusters to analyze in one batch
         start_idx: Start index in DataFrame (default: 0)
         end_idx: End index in DataFrame (default: all)
         log_name: Custom log name (default: from config)
         use_tqdm: Whether to use tqdm progress bar
         cluster_id_column: Column name for cluster ID (default: "cluster_id")
+        save_outputs: Whether to save results to disk (default: True)
+        outputs_to_generate: List of output file types to generate (default: ["json", "clusters", "flagged_genes"])
 
     Returns:
         clusters_dict: Dictionary of cluster analysis results
@@ -258,10 +282,6 @@ def process_clusters(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = f"{log_name}_{timestamp}.log"
     logger = setup_logger(log_file)
-
-    # Load gene features and screen info if paths provided
-    gene_features_dict = load_gene_features(gene_features_path)
-    screen_info = load_screen_info(screen_info_path)
 
     # Extract config values
     context = config["context"]
@@ -281,8 +301,9 @@ def process_clusters(
     # Dictionary to store results
     clusters_dict = {}
 
-    # Create output directory if it doesn't exist
-    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    # Create output directory if needed and if saving outputs
+    if save_outputs and out_file:
+        os.makedirs(os.path.dirname(out_file), exist_ok=True)
 
     # Use tqdm for progress tracking if requested
     if use_tqdm:
@@ -324,11 +345,12 @@ def process_clusters(
 
             # Create prompt and query LLM
             prompt = make_cluster_analysis_prompt(
-                cluster_id,  # Use actual cluster_id from data
+                cluster_id,
                 genes,
-                gene_features_dict,
-                screen_info,
-                template_path=custom_prompt_path,
+                gene_annotations_dict,
+                screen_context,
+                template_path=cluster_analysis_prompt_path,
+                template_string=cluster_analysis_prompt,  # Pass the string template if provided
             )
 
             analysis, error = query_llm(
@@ -361,10 +383,16 @@ def process_clusters(
             else:
                 logger.error(f"Error for cluster {cluster_id}: {error}")
 
-            # Save progress periodically
-            if len(clusters_dict) % 5 == 0:
-                save_cluster_analysis(clusters_dict, out_file)
+            # Save progress periodically if saving is enabled
+            if save_outputs and out_file and len(clusters_dict) % 5 == 0:
+                save_cluster_analysis(
+                    clusters_dict, 
+                    out_file_base=out_file, 
+                    include_raw=("json" in outputs_to_generate),
+                    save_outputs=True  # Force saving for periodic checkpoints
+                )
                 logger.info(f"Saved progress for {len(clusters_dict)} clusters")
+
 
     else:
         # Process clusters in batches
@@ -401,12 +429,13 @@ def process_clusters(
             # Process batch if it's full or we're at the end
             if len(batch_clusters) >= batch_size or is_last_cluster:
                 try:
-                    # Create batch prompt
+                    # Use cluster_analysis_prompt if provided
                     prompt = make_batch_cluster_analysis_prompt(
                         batch_clusters,
-                        gene_features_dict,
-                        screen_info,
-                        template_path=custom_prompt_path,
+                        gene_annotations_dict,
+                        screen_context,
+                        template_path=cluster_analysis_prompt_path,
+                        template_string=cluster_analysis_prompt,
                     )
 
                     # Query LLM
@@ -486,103 +515,228 @@ def process_clusters(
                 # Reset batch for next round
                 batch_clusters = {}
 
-                # Save progress
-                save_cluster_analysis(clusters_dict, out_file)
-                logger.info(
-                    f"Saved progress with {len(clusters_dict)} clusters processed so far"
-                )
+                # Save progress if saving is enabled
+                if save_outputs and out_file:
+                    save_cluster_analysis(
+                        clusters_dict,
+                        out_file_base=out_file,
+                        include_raw=("json" in outputs_to_generate),
+                        save_outputs=True  # Force saving for batch checkpoints
+                    )
+                    logger.info(
+                        f"Saved progress with {len(clusters_dict)} clusters processed so far"
+                    )
 
-    # Save final results
-    save_cluster_analysis(clusters_dict, out_file)
-    logger.info(f"Completed analysis for {len(clusters_dict)} clusters")
+    # Process and optionally save final results
+    results = save_cluster_analysis(
+        clusters_dict, 
+        out_file_base=out_file, 
+        include_raw=("json" in outputs_to_generate),
+        save_outputs=save_outputs
+    )
 
-    return clusters_dict
+    # Log appropriate message
+    if save_outputs and out_file:
+        logger.info(f"Completed analysis for {len(clusters_dict)} clusters with data saved to disk")
+    else:
+        logger.info(f"Completed analysis for {len(clusters_dict)} clusters without saving to disk")
+
+    # Determine what to return based on outputs_to_generate
+    return_data = {"clusters_dict": clusters_dict}
+
+    # Add requested outputs to the return value
+    if "json" in outputs_to_generate:
+        return_data["json_data"] = results["json_data"]
+    if "clusters" in outputs_to_generate:
+        return_data["cluster_df"] = results["cluster_df"]
+    if "flagged_genes" in outputs_to_generate:
+        return_data["gene_df"] = results["gene_df"]
+
+    return return_data
 
 
-def analyze_gene_clusters(
-    input_file,
-    output_file,
-    config_path=None,
-    model_name=None,
-    custom_prompt_path=None,
-    gene_features_path=None,
-    screen_info_path=None,
-    input_sep=",",
-    gene_column="genes",
-    gene_sep=";",
-    batch_size=1,
-    start_idx=0,
-    end_idx=None,
-    log_name=None,
-    cluster_id_column="cluster_id",
-    set_index=None,
+def query_llm(
+    context,
+    prompt,
+    model,
+    temperature,
+    max_tokens,
+    rate_per_token,
+    log_file,
+    dollar_limit,
+    seed=None,
 ):
+    """Send a query to the appropriate LLM based on model name."""
+    logger = logging.getLogger(log_file)
+
+    try:
+        # Call appropriate API based on model name
+        if model.startswith("gpt") or model.startswith("o4") or model.startswith("o3"):
+            logger.info("Accessing OpenAI API")
+            return openai_chat(
+                context,
+                prompt,
+                model,
+                temperature,
+                max_tokens,
+                rate_per_token,
+                log_file,
+                dollar_limit,
+                seed,
+            )
+        elif model.startswith("gemini"):
+            logger.info("Using Google Gemini API")
+            analysis, error_message = query_genai_model(
+                context, prompt, model, temperature, max_tokens, log_file
+            )
+            return analysis, None if analysis else error_message
+        elif model.startswith("claude"):
+            logger.info("Using Anthropic Claude API")
+            analysis, error_message = anthropic_chat(
+                context, prompt, model, temperature, max_tokens, log_file, seed
+            )
+            return analysis, None if analysis else error_message
+        else:
+            logger.info("Using server model")
+            analysis, error_message = server_model_chat(
+                context, prompt, model, temperature, max_tokens, log_file, seed
+            )
+            return analysis, None if analysis else error_message
+    except Exception as e:
+        logger.error(f"Error querying LLM: {str(e)}")
+        return None, f"Error: {str(e)}"
+
+
+def load_config(config_file=None, model_override=None):
     """
-    High-level function to analyze gene clusters from a file.
+    Load configuration with optional model override.
+    Args:
+        config_file: Path or name of config file (optional)
+        model_override: Model to use, overriding config (optional)
+    Returns:
+        config: Configuration dictionary
+    """
+    # Select the appropriate base config
+    if model_override:
+        if model_override.startswith("gpt"):
+            config = DEFAULT_OPENAI_CONFIG
+        elif any(model_override.startswith(prefix) for prefix in ["o4", "o3"]):
+            config = DEFAULT_OPENAI_REASONING_CONFIG
+        elif model_override.startswith("claude"):
+            config = DEFAULT_ANTHROPIC_CONFIG
+        elif model_override.startswith("gemini"):
+            config = DEFAULT_GEMINI_CONFIG
+        else:
+            config = DEFAULT_CONFIG
+
+        # Set the specified model
+        config["MODEL"] = model_override
+    else:
+        # Start with default config if no model specified
+        config = DEFAULT_CONFIG.copy()
+
+    # Load custom config if provided
+    if config_file:
+        try:
+            import json
+            import os
+
+            if os.path.exists(config_file):
+                with open(config_file) as f:
+                    custom_config = json.load(f)
+                    # Update config with custom settings
+                    for key, value in custom_config.items():
+                        if (
+                            isinstance(value, dict)
+                            and key in config
+                            and isinstance(config[key], dict)
+                        ):
+                            # Deep merge for nested dictionaries
+                            config[key].update(value)
+                        else:
+                            config[key] = value
+                logging.info(f"Loaded configuration from {config_file}")
+            else:
+                logging.warning(f"Config file not found: {config_file}")
+        except Exception as e:
+            logging.error(f"Error loading config file: {e}")
+
+    return config
+
+
+def reshape_config(config):
+    # Add lowercase aliases for consistency
+    config["context"] = config["CONTEXT"]
+    config["model"] = config["MODEL"]
+    config["temperature"] = config["TEMP"]
+    config["max_tokens"] = config["MAX_TOKENS"]
+    config["rate_per_token"] = config["RATE_PER_TOKEN"]
+    config["dollar_limit"] = config["DOLLAR_LIMIT"]
+    config["log_name"] = config["LOG_NAME"]
+
+    return config
+
+
+def load_screen_context(context_path):
+    """
+    Load screen context from a file.
 
     Args:
-        input_file: Path to input CSV/TSV with gene clusters
-        output_file: Path to output file (without extension)
-        config_path: Path to configuration JSON file
-        model_name: Override model specified in config
-        custom_prompt_path: Path to custom prompt template
-        gene_features_path: Path to gene features CSV
-        screen_info_path: Path to screen info text file
-        input_sep: Separator for input CSV (default: comma)
-        gene_column: Column name containing gene symbols
-        gene_sep: Separator for genes within a set
-        batch_size: Number of clusters to analyze in one batch
-        start_idx: Start index for processing
-        end_idx: End index for processing
-        log_name: Custom log name
-        cluster_id_column: Column name for cluster ID (default: "cluster_id")
-        set_index: Column to set as index (optional)
+        context_path: Path to a file containing screen context information
 
     Returns:
-        clusters_dict: Dictionary of cluster analysis results
+        String containing the screen context or None if file not found
     """
-    # Load configuration
-    config = load_config(config_path, model_override=model_name)
+    import os
 
-    # Handle tab separator conversion
-    if input_sep == "\\t":
-        input_sep = "\t"
-
-    # Load the data
-    try:
-        df = pd.read_csv(input_file, sep=input_sep)
-        print(f"Loaded data with {len(df)} rows and columns: {list(df.columns)}")
-
-        # Set index from a column if specified
-        if set_index and set_index in df.columns:
-            print(f"Setting index from column: {set_index}")
-            df = df.set_index(set_index).reset_index()
-            cluster_id_column = "index"  # Use the index column as cluster_id
-
-        # Ensure we have a cluster ID column
-        if cluster_id_column not in df.columns:
-            print(
-                f"Warning: Cluster ID column '{cluster_id_column}' not found. Using DataFrame index."
-            )
-            df[cluster_id_column] = df.index.astype(str)
-
-    except Exception as e:
-        print(f"Error loading input file: {e}")
+    if not context_path:
         return None
 
-    # Process clusters
-    return process_clusters(
-        df=df,
-        config=config,
-        gene_column=gene_column,
-        gene_sep=gene_sep,
-        out_file=output_file,
-        custom_prompt_path=custom_prompt_path,
-        gene_features_path=gene_features_path,
-        screen_info_path=screen_info_path,
-        batch_size=batch_size,
-        start_idx=start_idx,
-        end_idx=end_idx,
-        log_name=log_name,
-        cluster_id_column=cluster_id_column,
-    )
+    try:
+        if os.path.exists(context_path):
+            with open(context_path, "r") as f:
+                screen_context = f.read().strip()
+            print(f"Loaded screen context: {len(screen_context)} characters")
+            return screen_context
+        else:
+            print(f"Screen context file not found: {context_path}")
+            return None
+    except Exception as e:
+        print(f"Error loading screen context: {e}")
+        return None
+
+
+def load_gene_annotations(annotations_path):
+    """
+    Load gene annotations from a file.
+
+    Args:
+        annotations_path: Path to a CSV file with gene annotations
+
+    Returns:
+        Dictionary mapping gene IDs to their annotations or None if file not found
+    """
+    import os
+    import pandas as pd
+
+    if not annotations_path:
+        return None
+
+    try:
+        if os.path.exists(annotations_path):
+            annotations_df = pd.read_csv(annotations_path)
+            gene_id_column = annotations_df.columns[0]  # Assume first column is gene ID
+            features_column = annotations_df.columns[
+                1
+            ]  # Assume second column is features
+            gene_annotations_dict = dict(
+                zip(annotations_df[gene_id_column], annotations_df[features_column])
+            )
+            print(f"Loaded annotations for {len(gene_annotations_dict)} genes")
+            return gene_annotations_dict
+        else:
+            print(f"Gene annotations file not found: {annotations_path}")
+            return None
+    except Exception as e:
+        print(f"Error loading gene annotations: {e}")
+        return None
