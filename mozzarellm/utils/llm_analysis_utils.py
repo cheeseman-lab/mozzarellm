@@ -595,23 +595,8 @@ def save_cluster_analysis(
                 )
 
                 # Save combined gene table
-                gene_path = f"{out_file_base}_all_genes.csv"
+                gene_path = f"{out_file_base}_flagged_genes.csv"
                 gene_df.to_csv(gene_path, index=False)
-
-                # Also save separate tables for each gene category
-                if uncharacterized_gene_data:
-                    unchar_df = gene_df[gene_df["gene_category"] == "uncharacterized"]
-                    unchar_path = f"{out_file_base}_uncharacterized_genes.csv"
-                    unchar_df.to_csv(unchar_path, index=False)
-                    logging.info(
-                        f"Saved uncharacterized gene analysis to {unchar_path}"
-                    )
-
-                if novel_role_gene_data:
-                    novel_role_df = gene_df[gene_df["gene_category"] == "novel_role"]
-                    novel_role_path = f"{out_file_base}_novel_role_genes.csv"
-                    novel_role_df.to_csv(novel_role_path, index=False)
-                    logging.info(f"Saved novel role gene analysis to {novel_role_path}")
 
                 logging.info(f"Saved combined gene analysis to {gene_path}")
             else:

@@ -3,6 +3,14 @@ def load_prompt_template(
 ):
     """
     Load a prompt template from file, string, or constants.
+    
+    Args:
+        template_path: Path to a template file (optional)
+        template_string: String containing the template (optional)
+        template_type: Type of template to load ('cluster' or 'batch_cluster')
+        
+    Returns:
+        Template string to use for prompts
     """
     import os
 
@@ -124,18 +132,19 @@ def make_cluster_analysis_prompt(
     gene_annotations_dict=None,
     screen_context=None,
     template_path=None,
+    template_string=None,
 ):
     """
     Create a prompt for gene cluster analysis with concise JSON output focusing on both
     truly uncharacterized genes and characterized genes with potential novel pathway roles.
-    Optimized version that only includes relevant gene features.
-
+    
     Args:
         cluster_id: Identifier for the cluster
         genes: List of gene identifiers in the cluster
-        gene_features: Optional dict of additional gene features
-        screen_info: Optional information about the OPS screen and biological context
-        template_path: Path to custom template file
+        gene_annotations_dict: Optional dict of additional gene features
+        screen_context: Optional information about the experiment/screen
+        template_path: Path to custom template file (optional)
+        template_string: Custom template string (optional)
 
     Returns:
         prompt: Formatted prompt string
@@ -144,7 +153,9 @@ def make_cluster_analysis_prompt(
 
     # Load template (will fall back to default if needed)
     template = load_prompt_template(
-        template_path=template_path, template_type="cluster"
+        template_path=template_path,
+        template_string=template_string,
+        template_type="cluster"
     )
 
     # Format template with cluster_id and gene_list (ensure cluster_id is a string)
@@ -186,12 +197,25 @@ IMPORTANT: The additional gene information provided above should be used to:
 
 
 def make_batch_cluster_analysis_prompt(
-    clusters, gene_annotations_dict=None, screen_context=None, template_path=None
+    clusters, 
+    gene_annotations_dict=None, 
+    screen_context=None, 
+    template_path=None,
+    template_string=None,
 ):
     """
     Create a prompt for batch analysis of multiple gene clusters with concise output,
     distinguishing between uncharacterized genes and characterized genes with novel roles.
-    Optimized to only include gene features for genes present in the current batch.
+    
+    Args:
+        clusters: Dictionary mapping cluster IDs to lists of genes
+        gene_annotations_dict: Dictionary mapping gene IDs to annotations (optional)
+        screen_context: String with context about the experiment/screen (optional)
+        template_path: Path to custom template file (optional)
+        template_string: Custom template string (optional)
+        
+    Returns:
+        prompt: Formatted prompt string for batch analysis
     """
     # Create formatted clusters text and collect genes present in this batch
     clusters_text = ""
@@ -205,7 +229,9 @@ def make_batch_cluster_analysis_prompt(
 
     # Load template (will fall back to default if needed)
     template = load_prompt_template(
-        template_path=template_path, template_type="batch_cluster"
+        template_path=template_path,
+        template_string=template_string,
+        template_type="batch_cluster"
     )
 
     # Format template with clusters_text
