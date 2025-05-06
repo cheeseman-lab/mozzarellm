@@ -386,9 +386,7 @@ def process_clusters(
             # Save progress periodically if saving is enabled
             if save_outputs and out_file and len(clusters_dict) % 5 == 0:
                 save_cluster_analysis(
-                    clusters_dict, 
-                    out_file, 
-                    include_raw=("json" in outputs_to_generate)
+                    clusters_dict, out_file, include_raw=("json" in outputs_to_generate)
                 )
                 logger.info(f"Saved progress for {len(clusters_dict)} clusters")
 
@@ -516,9 +514,9 @@ def process_clusters(
                 # Save progress if saving is enabled
                 if save_outputs and out_file:
                     save_cluster_analysis(
-                        clusters_dict, 
+                        clusters_dict,
                         out_file,
-                        include_raw=("json" in outputs_to_generate)
+                        include_raw=("json" in outputs_to_generate),
                     )
                     logger.info(
                         f"Saved progress with {len(clusters_dict)} clusters processed so far"
@@ -527,13 +525,13 @@ def process_clusters(
     # Save final results if saving is enabled
     if save_outputs and out_file:
         save_cluster_analysis(
-            clusters_dict, 
-            out_file,
-            include_raw=("json" in outputs_to_generate)
+            clusters_dict, out_file, include_raw=("json" in outputs_to_generate)
         )
         logger.info(f"Completed analysis for {len(clusters_dict)} clusters")
     else:
-        logger.info(f"Analysis completed without saving for {len(clusters_dict)} clusters")
+        logger.info(
+            f"Analysis completed without saving for {len(clusters_dict)} clusters"
+        )
 
     return clusters_dict
 
