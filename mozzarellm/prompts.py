@@ -133,3 +133,49 @@ IMPORTANT CONSIDERATIONS:
 - For any gene with substantial literature, it should NOT be classified as UNCHARACTERIZED
 - The goal is not to speculate but to flag only the most promising candidates for follow-up
 """
+
+ENHANCED_COT_INSTRUCTIONS = """
+STEP 1 - PATHWAY HYPOTHESIS (2-3 candidates):
+- Review retrieved evidence [cite snippet numbers] and gene annotations
+- List 2-3 candidate pathways with supporting genes
+- Note which evidence snippets support each hypothesis
+
+STEP 2 - PATHWAY SELECTION:
+- Select dominant pathway based on:
+  * Number of established genes with direct roles
+  * Coherence of functional relationships
+  * Quality of supporting evidence (prioritize high-relevance snippets)
+- Assign confidence level (High/Medium/Low/None) using strict criteria from screen context
+
+STEP 3 - GENE CLASSIFICATION (cite evidence):
+For each gene, determine ONE category:
+- ESTABLISHED: Well-documented role in selected pathway [cite evidence]
+- UNCHARACTERIZED: Minimal functional annotation anywhere [note lack of evidence]
+- NOVEL_ROLE: Known in other pathways but plausible new role here [cite supporting evidence]
+
+STEP 4 - PRIORITIZATION (scores 1-10):
+- For UNCHARACTERIZED genes: Score based on the following criteria:
+  * Score 8-10: Gene absent from all retrieved evidence but fits pathway mechanistically
+  * Score 4-7: Gene mentioned in 1-2 snippets with indirect pathway connection
+  * Score 1-3: Gene well-documented in pathway across multiple evidence sources
+- For NOVEL_ROLE genes: Score based on surprise/impact of proposed new role relative to known functions
+- Cite specific evidence snippets that inform each priority score
+
+STEP 5 - VERIFICATION:
+- Check for contradictions between evidence snippets
+- Verify all genes are classified (no omissions)
+- Adjust confidence if evidence is weak or contradictory
+- Note any gaps in evidence that limit conclusions
+
+STEP 6 - FINAL JSON OUTPUT:
+- Compile structured JSON with all required fields
+- Ensure cluster_id matches input exactly
+- Include concise summary highlighting key findings and evidence quality
+"""
+
+CONCISE_COT_INSTRUCTIONS = """
+1) Identify 2-3 candidate pathways citing key genes and evidence snippets [numbers].
+2) Classify each gene as ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE with 1-line rationale.
+3) Assign priority scores (1-10) based on novelty and impact; cite supporting evidence.
+4) Note contradictions or gaps in evidence; adjust confidence accordingly.
+"""

@@ -24,6 +24,7 @@ from .llm_analysis_utils import (
     save_cluster_analysis,
 )
 from .logging_utils import setup_logger
+from .retrieval import retrieve_context
 
 # Import configuration and prompt constants
 from mozzarellm.configs import (
@@ -60,6 +61,11 @@ def analyze_gene_clusters(
     output_file=None,
     save_outputs=True,
     outputs_to_generate=["json", "clusters", "flagged_genes"],
+    # RAG / CoT options
+    use_retrieval=False,
+    knowledge_dir=None,
+    retriever_k=10,
+    cot_instructions=None,
 ):
     """
     Analyze gene clusters to identify biological pathways and potential novel gene functions.
@@ -228,6 +234,10 @@ def analyze_gene_clusters(
         cluster_id_column=cluster_id_column,
         save_outputs=save_outputs,
         outputs_to_generate=outputs_to_generate,
+        use_retrieval=use_retrieval,
+        knowledge_dir=knowledge_dir,
+        retriever_k=retriever_k,
+        cot_instructions=cot_instructions,
     )
 
     return results
@@ -251,6 +261,10 @@ def process_clusters(
     cluster_id_column="cluster_id",
     save_outputs=True,
     outputs_to_generate=["json", "clusters", "flagged_genes"],
+    use_retrieval=False,
+    knowledge_dir=None,
+    retriever_k=10,
+    cot_instructions=None,
 ):
     """
     Process gene clusters to identify pathways and novel members.
@@ -343,6 +357,17 @@ def process_clusters(
                 )
                 continue
 
+            # Optional retrieval for this cluster
+            retrieved_ctx = None
+            if use_retrieval:
+                retrieved_ctx = retrieve_context(
+                    cluster_genes=genes,
+                    gene_annotations=gene_annotations_dict,
+                    screen_context=screen_context,
+                    knowledge_dir=knowledge_dir,
+                    k=retriever_k,
+                )
+
             # Create prompt and query LLM
             prompt = make_cluster_analysis_prompt(
                 cluster_id,
@@ -351,6 +376,8 @@ def process_clusters(
                 screen_context,
                 template_path=cluster_analysis_prompt_path,
                 template_string=cluster_analysis_prompt,  # Pass the string template if provided
+                retrieved_context=retrieved_ctx,
+                cot_instructions=cot_instructions,
             )
 
             analysis, error = query_llm(
@@ -430,12 +457,28 @@ def process_clusters(
             if len(batch_clusters) >= batch_size or is_last_cluster:
                 try:
                     # Use cluster_analysis_prompt if provided
+                    # Optional retrieval at batch level (aggregate genes)
+                    retrieved_ctx = None
+                    if use_retrieval:
+                        all_genes = []
+                        for _cid, gene_list in batch_clusters.items():
+                            all_genes.extend(gene_list)
+                        retrieved_ctx = retrieve_context(
+                            cluster_genes=all_genes,
+                            gene_annotations=gene_annotations_dict,
+                            screen_context=screen_context,
+                            knowledge_dir=knowledge_dir,
+                            k=retriever_k,
+                        )
+
                     prompt = make_batch_cluster_analysis_prompt(
                         batch_clusters,
                         gene_annotations_dict,
                         screen_context,
                         template_path=cluster_analysis_prompt_path,
                         template_string=cluster_analysis_prompt,
+                        retrieved_context=retrieved_ctx,
+                        cot_instructions=cot_instructions,
                     )
 
                     # Query LLM
