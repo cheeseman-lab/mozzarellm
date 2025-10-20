@@ -15,6 +15,8 @@ from .configs import (
 from .prompts import (
     DEFAULT_CLUSTER_PROMPT,
     DEFAULT_BATCH_PROMPT,
+    ENHANCED_COT_INSTRUCTIONS,
+    CONCISE_COT_INSTRUCTIONS,
 )
 
 # Import key functions
@@ -45,8 +47,8 @@ __all__ = [
     # Prompt constants
     "DEFAULT_CLUSTER_PROMPT",
     "DEFAULT_BATCH_PROMPT",
-    "CLUSTER_OUTPUT_FORMAT",
-    "HELA_SCREEN_INFO",
+    "ENHANCED_COT_INSTRUCTIONS",
+    "CONCISE_COT_INSTRUCTIONS",
     # Utility functions
     "make_cluster_analysis_prompt",
     "make_batch_cluster_analysis_prompt",

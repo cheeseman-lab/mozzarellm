@@ -133,6 +133,8 @@ def make_cluster_analysis_prompt(
     screen_context=None,
     template_path=None,
     template_string=None,
+    retrieved_context=None,
+    cot_instructions=None,
 ):
     """
     Create a prompt for gene cluster analysis with concise JSON output focusing on both
@@ -170,6 +172,45 @@ SCREEN INFORMATION:
 """
         prompt += screen_context
 
+    # Add retrieved evidence snippets if provided
+    if retrieved_context and isinstance(retrieved_context, dict):
+        snippets = retrieved_context.get("snippets", [])
+        if snippets:
+            evidence_text = "\nRETRIEVED EVIDENCE (ranked by relevance; cite by [number] in your reasoning):\n"
+            for i, sn in enumerate(snippets, 1):
+                txt = sn.get("text", "").strip()
+                src = sn.get("source", "")
+                meta = sn.get("meta", {})
+                relevance = sn.get("relevance_score", 0)
+                
+                # Format source tag based on source type
+                if src == "annotations":
+                    src_tag = f"Gene:{meta.get('gene', '')}"
+                elif src == "knowledge_file":
+                    src_tag = f"File:{meta.get('path', '')} (score:{meta.get('score', 0)})"
+                else:
+                    src_tag = "Screen Context"
+                
+                evidence_text += f"[{i}] {src_tag} [relevance:{relevance}]: {txt}\n"
+            
+            # Add retrieval metadata summary
+            ret_meta = retrieved_context.get("retrieval_metadata", {})
+            if ret_meta:
+                evidence_text += f"\nRetrieval Summary: {ret_meta.get('annotations_found', 0)} gene annotations, "
+                evidence_text += f"{ret_meta.get('knowledge_snippets_found', 0)} knowledge snippets from {ret_meta.get('total_retrieved', 0)} total sources.\n"
+                
+                # Note genes without annotations
+                genes_no_annot = ret_meta.get("genes_without_annotations", [])
+                if genes_no_annot:
+                    evidence_text += f"\nNOTE: The following genes lack direct functional annotations in the provided data: {', '.join(genes_no_annot)}\n"
+                    evidence_text += "These genes should be carefully evaluated based on pathway context and knowledge base evidence.\n"
+            
+            prompt += evidence_text
+
+    # Add concise, structured CoT guidance if provided
+    if cot_instructions and isinstance(cot_instructions, str):
+        prompt += f"\nREASONING STEPS (keep to brief bullet points; no long prose):\n{cot_instructions}\n"
+
     # Add gene features if provided - only for genes in this cluster
     if gene_annotations_dict:
         feature_text = "\nAdditional gene information:\n"
@@ -202,6 +243,8 @@ def make_batch_cluster_analysis_prompt(
     screen_context=None,
     template_path=None,
     template_string=None,
+    retrieved_context=None,
+    cot_instructions=None,
 ):
     """
     Create a prompt for batch analysis of multiple gene clusters with concise output,
@@ -254,6 +297,45 @@ SCREEN INFORMATION:
 
 """
         prompt += screen_context
+
+    # Add retrieved evidence (batch-level) if provided
+    if retrieved_context and isinstance(retrieved_context, dict):
+        snippets = retrieved_context.get("snippets", [])
+        if snippets:
+            evidence_text = "\nRETRIEVED EVIDENCE (batch-level, ranked by relevance; cite by [number]):\n"
+            for i, sn in enumerate(snippets, 1):
+                txt = sn.get("text", "").strip()
+                src = sn.get("source", "")
+                meta = sn.get("meta", {})
+                relevance = sn.get("relevance_score", 0)
+                
+                # Format source tag based on source type
+                if src == "annotations":
+                    src_tag = f"Gene:{meta.get('gene', '')}"
+                elif src == "knowledge_file":
+                    src_tag = f"File:{meta.get('path', '')} (score:{meta.get('score', 0)})"
+                else:
+                    src_tag = "Screen Context"
+                
+                evidence_text += f"[{i}] {src_tag} [relevance:{relevance}]: {txt}\n"
+            
+            # Add retrieval metadata summary
+            ret_meta = retrieved_context.get("retrieval_metadata", {})
+            if ret_meta:
+                evidence_text += f"\nRetrieval Summary: {ret_meta.get('annotations_found', 0)} gene annotations, "
+                evidence_text += f"{ret_meta.get('knowledge_snippets_found', 0)} knowledge snippets from {ret_meta.get('total_retrieved', 0)} total sources.\n"
+                
+                # Note genes without annotations
+                genes_no_annot = ret_meta.get("genes_without_annotations", [])
+                if genes_no_annot:
+                    evidence_text += f"\nNOTE: The following genes lack direct functional annotations in the provided data: {', '.join(genes_no_annot)}\n"
+                    evidence_text += "These genes should be carefully evaluated based on pathway context and knowledge base evidence.\n"
+            
+            prompt += evidence_text
+
+    # Add optional CoT guidance
+    if cot_instructions and isinstance(cot_instructions, str):
+        prompt += f"\nREASONING STEPS (brief):\n{cot_instructions}\n"
 
     # Add gene features if provided - OPTIMIZED to only include genes in this batch
     if gene_annotations_dict:
