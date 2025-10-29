@@ -236,7 +236,7 @@ class ClusterAnalyzer:
 
         # Parse response
         try:
-            parsed = process_cluster_response(response, is_batch=False)
+            parsed = process_cluster_response(response)
 
             # Ensure cluster_id matches
             if parsed.get("cluster_id") != cluster_id:

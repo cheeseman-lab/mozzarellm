@@ -23,8 +23,6 @@ from .providers import (
 
 # Prompt constants (preserved)
 from .prompts import (
-    DEFAULT_CLUSTER_PROMPT,
-    DEFAULT_BATCH_PROMPT,
     ENHANCED_COT_INSTRUCTIONS,
     CONCISE_COT_INSTRUCTIONS,
     ROBUST_SCREEN_CONTEXT,
@@ -51,8 +49,6 @@ __all__ = [
     "GeminiProvider",
     "create_provider",
     # Prompt constants
-    "DEFAULT_CLUSTER_PROMPT",
-    "DEFAULT_BATCH_PROMPT",
     "ENHANCED_COT_INSTRUCTIONS",
     "CONCISE_COT_INSTRUCTIONS",
     "ROBUST_SCREEN_CONTEXT",

@@ -1,45 +1,5 @@
 # mozzarellm/prompts.py
 
-# Single cluster analysis prompt
-DEFAULT_CLUSTER_PROMPT = """
-Analyze gene cluster {cluster_id} to identify the dominant biological pathway and classify genes:
-
-Genes: {gene_list}
-
-Follow these steps:
-1. Identify the dominant biological pathway, focusing on specific molecular mechanisms rather than general terms
-2. Classify genes into THREE categories using these definitions:
-   - ESTABLISHED: Well-known members of the identified pathway with clear functional roles in this pathway
-   - UNCHARACTERIZED: Genes with minimal to no functional annotation in ANY published literature
-   - NOVEL_ROLE: Genes with published functional annotation in OTHER pathways that may have additional roles in the dominant pathway
-
-3. For both UNCHARACTERIZED and NOVEL_ROLE genes:
-   - Assign a priority score (1-10) for follow-up investigation
-   - Provide a rationale explaining why this gene merits investigation
-
-4. Provide a concise summary of the key findings
-"""
-
-# Batch analysis prompt
-DEFAULT_BATCH_PROMPT = """
-Analyze the following gene clusters to identify dominant biological pathways and classify genes:
-
-{clusters_text}
-
-For each cluster:
-1. Identify the dominant biological pathway, focusing on specific molecular mechanisms rather than general terms
-2. Classify genes into THREE categories using these definitions:
-   - ESTABLISHED: Well-known members of the identified pathway with clear functional roles in this pathway
-   - UNCHARACTERIZED: Genes with minimal to no functional annotation in ANY published literature
-   - NOVEL_ROLE: Genes with published functional annotation in OTHER pathways that may have additional roles in the dominant pathway
-
-3. For both UNCHARACTERIZED and NOVEL_ROLE genes:
-   - Assign a priority score (1-10) for follow-up investigation
-   - Provide a rationale explaining why this gene merits investigation
-
-4. Provide a concise summary of the key findings for each cluster
-"""
-
 # Optimized context for robustly analyzing gene clusters
 ROBUST_SCREEN_CONTEXT = """
 Genes grouped within a cluster tend to exhibit similar morphological phenotypes in this context, suggesting that they may participate in the same biological process or pathway. However, not all clusters will correspond to a defined or coherent biological pathway.

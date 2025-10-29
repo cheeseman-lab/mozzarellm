@@ -53,12 +53,10 @@ def load_prompt_template(
 
 def get_default_template(template_type):
     """Get the default template constant for a given type"""
-    from mozzarellm.prompts import DEFAULT_CLUSTER_PROMPT, DEFAULT_BATCH_PROMPT
+    from mozzarellm.prompts import ROBUST_CLUSTER_PROMPT
 
     if template_type == "cluster":
-        return DEFAULT_CLUSTER_PROMPT
-    elif template_type == "batch_cluster":
-        return DEFAULT_BATCH_PROMPT
+        return ROBUST_CLUSTER_PROMPT
     else:
         raise ValueError(f"Unknown template type: {template_type}")
 
@@ -89,38 +87,6 @@ Provide a concise analysis in this exact JSON format:
   ],
   "summary": "key findings summary"
 }}
-"""
-    elif template_type == "batch_cluster":
-        return """
-Provide analysis for each cluster in this exact JSON array format:
-
-[
-  {{
-    "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id as provided in the prompt for each cluster
-    "dominant_process": "specific pathway name",
-    "pathway_confidence": "High",
-    "established_genes": ["GeneA", "GeneB"],
-    "uncharacterized_genes": [
-      {{
-        "gene": "GeneC",
-        "priority": 8,
-        "rationale": "explanation"
-      }}
-    ],
-    "novel_role_genes": [
-      {{
-        "gene": "GeneD",
-        "priority": 7,
-        "rationale": "explanation"
-      }}
-    ],
-    "summary": "key findings summary"
-  }}
-]
-
-CRITICAL: Your response MUST classify *every gene* into one of the three categories and include all three categories in the output.
-CRITICAL: You MUST maintain the exact cluster_id as provided in the prompt for each cluster in your response.
-Your response MUST be a valid JSON array starting with '[' and ending with ']'. Do not include explanations outside the JSON.
 """
     else:
         raise ValueError(f"Unknown template type: {template_type}")
@@ -233,132 +199,5 @@ IMPORTANT: The additional gene information provided above should be used to:
             print(f"Added {relevant_feature_count} gene feature descriptions to prompt")
         else:
             print("No relevant gene features found for this cluster")
-
-    return prompt
-
-
-def make_batch_cluster_analysis_prompt(
-    clusters,
-    gene_annotations_dict=None,
-    screen_context=None,
-    template_path=None,
-    template_string=None,
-    retrieved_context=None,
-    cot_instructions=None,
-):
-    """
-    Create a prompt for batch analysis of multiple gene clusters with concise output,
-    distinguishing between uncharacterized genes and characterized genes with novel roles.
-
-    Args:
-        clusters: Dictionary mapping cluster IDs to lists of genes
-        gene_annotations_dict: Dictionary mapping gene IDs to annotations (optional)
-        screen_context: String with context about the experiment/screen (optional)
-        template_path: Path to custom template file (optional)
-        template_string: Custom template string (optional)
-
-    Returns:
-        prompt: Formatted prompt string for batch analysis
-    """
-    # Create formatted clusters text and collect genes present in this batch
-    clusters_text = ""
-    batch_genes = set()  # Use a set for efficient lookups
-
-    for cluster_id, genes in clusters.items():
-        gene_list = ", ".join(genes)
-        clusters_text += f"Cluster {cluster_id}: {gene_list}\n\n"
-        # Add all genes from this cluster to our set
-        batch_genes.update(genes)
-
-    # Load template (will fall back to default if needed)
-    template = load_prompt_template(
-        template_path=template_path,
-        template_string=template_string,
-        template_type="batch_cluster",
-    )
-
-    # Format template with clusters_text
-    prompt_vars = {"clusters_text": clusters_text}
-    try:
-        prompt = template.format(**prompt_vars)
-    except KeyError:
-        # Handle errors by escaping all braces and then restoring only our placeholder
-        escaped_template = template.replace("{", "{{").replace("}", "}}")
-        escaped_template = escaped_template.replace(
-            "{{clusters_text}}", "{clusters_text}"
-        )
-        prompt = escaped_template.format(**prompt_vars)
-
-    # Add screen information if provided
-    if screen_context:
-        screen_context = f"""
-SCREEN INFORMATION:
-{screen_context}
-
-"""
-        prompt += screen_context
-
-    # Add retrieved evidence (batch-level) if provided
-    if retrieved_context and isinstance(retrieved_context, dict):
-        snippets = retrieved_context.get("snippets", [])
-        if snippets:
-            evidence_text = "\nRETRIEVED EVIDENCE (batch-level, ranked by relevance; cite by [number]):\n"
-            for i, sn in enumerate(snippets, 1):
-                txt = sn.get("text", "").strip()
-                src = sn.get("source", "")
-                meta = sn.get("meta", {})
-                relevance = sn.get("relevance_score", 0)
-                
-                # Format source tag based on source type
-                if src == "annotations":
-                    src_tag = f"Gene:{meta.get('gene', '')}"
-                elif src == "knowledge_file":
-                    src_tag = f"File:{meta.get('path', '')} (score:{meta.get('score', 0)})"
-                else:
-                    src_tag = "Screen Context"
-                
-                evidence_text += f"[{i}] {src_tag} [relevance:{relevance}]: {txt}\n"
-            
-            # Add retrieval metadata summary
-            ret_meta = retrieved_context.get("retrieval_metadata", {})
-            if ret_meta:
-                evidence_text += f"\nRetrieval Summary: {ret_meta.get('annotations_found', 0)} gene annotations, "
-                evidence_text += f"{ret_meta.get('knowledge_snippets_found', 0)} knowledge snippets from {ret_meta.get('total_retrieved', 0)} total sources.\n"
-                
-                # Note genes without annotations
-                genes_no_annot = ret_meta.get("genes_without_annotations", [])
-                if genes_no_annot:
-                    evidence_text += f"\nNOTE: The following genes lack direct functional annotations in the provided data: {', '.join(genes_no_annot)}\n"
-                    evidence_text += "These genes should be carefully evaluated based on pathway context and knowledge base evidence.\n"
-            
-            prompt += evidence_text
-
-    # Add optional CoT guidance
-    if cot_instructions and isinstance(cot_instructions, str):
-        prompt += f"\nREASONING STEPS (brief):\n{cot_instructions}\n"
-
-    # Add gene features if provided - OPTIMIZED to only include genes in this batch
-    if gene_annotations_dict:
-        feature_text = "\nAdditional gene information:\n"
-        relevant_feature_count = 0
-
-        # Only include features for genes in this batch
-        for gene, features in gene_annotations_dict.items():
-            if gene in batch_genes:
-                feature_text += f"{gene}: {features}\n"
-                relevant_feature_count += 1
-
-        # Only add the feature section if we found relevant features
-        if relevant_feature_count > 0:
-            feature_explanation = """
-IMPORTANT: The additional gene information provided above should be used to:
-1. Better determine if genes are truly UNCHARACTERIZED
-2. Evaluate potential pathway connections for CHARACTERIZED_OTHER_PATHWAY genes
-3. Identify ESTABLISHED genes for the dominant process
-"""
-            prompt += feature_text + feature_explanation
-            print(f"Added {relevant_feature_count} gene feature descriptions to prompt")
-        else:
-            print("No relevant gene features found for this batch")
 
     return prompt
