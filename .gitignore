@@ -49,6 +49,7 @@ results/
 examples/ops/results/
 examples/depmap/results/
 examples/proteomics/results/
+examples/benchmark_results/
 
 # Legacy examples
 examples/old/
