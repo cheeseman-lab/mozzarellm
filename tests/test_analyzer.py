@@ -202,6 +202,13 @@ class TestClusterAnalyzerAnalysis:
     def test_analyze_skips_invalid_genes(self, mock_create_provider):
         """Test that analysis skips rows with invalid gene data."""
         mock_provider = Mock()
+        mock_provider.query.return_value = (
+            '''{{"cluster_id": "2", "dominant_process": "test",
+            "pathway_confidence": "Medium", "established_genes": [],
+            "uncharacterized_genes": [], "novel_role_genes": [],
+            "summary": "test"}}''',
+            None
+        )
         mock_create_provider.return_value = mock_provider
 
         # Create DataFrame with invalid gene data
@@ -214,8 +221,10 @@ class TestClusterAnalyzerAnalysis:
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
             result = analyzer.analyze(df)
 
-        # Should skip cluster 1, process cluster 2
-        assert mock_provider.query.call_count == 0  # Actually 0 because we mock the response
+        # Should skip cluster 1 (invalid), process cluster 2
+        assert mock_provider.query.call_count == 1  # Only called for cluster 2
+        assert len(result.clusters) == 1
+        assert "2" in result.clusters
 
     @patch("mozzarellm.analyzer.create_provider")
     @patch("mozzarellm.analyzer.retrieve_context")

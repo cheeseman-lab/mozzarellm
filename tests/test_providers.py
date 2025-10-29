@@ -75,7 +75,7 @@ class TestOpenAIProvider:
             with pytest.raises(ValueError, match="OPENAI_API_KEY"):
                 OpenAIProvider(model="gpt-4o")
 
-    @patch("mozzarellm.providers.OpenAI")
+    @patch("openai.OpenAI")
     def test_query_success(self, mock_openai_class):
         """Test successful query."""
         # Mock the OpenAI client
@@ -95,7 +95,7 @@ class TestOpenAIProvider:
         assert error is None
         mock_client.chat.completions.create.assert_called_once()
 
-    @patch("mozzarellm.providers.OpenAI")
+    @patch("openai.OpenAI")
     def test_query_with_retry(self, mock_openai_class):
         """Test query with retry logic."""
         mock_client = Mock()
@@ -134,12 +134,12 @@ class TestAnthropicProvider:
             with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
                 AnthropicProvider(model="claude-3-7-sonnet-20250219")
 
-    @patch("mozzarellm.providers.anthropic")
-    def test_query_success(self, mock_anthropic_module):
+    @patch("anthropic.Anthropic")
+    def test_query_success(self, mock_anthropic_class):
         """Test successful query."""
         # Mock the Anthropic client
         mock_client = Mock()
-        mock_anthropic_module.Anthropic.return_value = mock_client
+        mock_anthropic_class.return_value = mock_client
 
         # Mock the response
         mock_response = Mock()
@@ -174,12 +174,12 @@ class TestGeminiProvider:
             with pytest.raises(ValueError, match="GOOGLE_API_KEY"):
                 GeminiProvider(model="gemini-2.5-pro-preview-03-25")
 
-    @patch("mozzarellm.providers.genai")
-    def test_query_success(self, mock_genai_module):
+    @patch("google.genai.Client")
+    def test_query_success(self, mock_genai_client):
         """Test successful query."""
         # Mock the Gemini client
         mock_client = Mock()
-        mock_genai_module.Client.return_value = mock_client
+        mock_genai_client.return_value = mock_client
 
         # Mock the response
         mock_response = Mock(text="Test response")
@@ -199,7 +199,7 @@ class TestGeminiProvider:
 class TestProviderErrorHandling:
     """Tests for error handling across all providers."""
 
-    @patch("mozzarellm.providers.OpenAI")
+    @patch("openai.OpenAI")
     def test_max_retries_exceeded(self, mock_openai_class):
         """Test that max retries returns error message."""
         mock_client = Mock()

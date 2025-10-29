@@ -51,17 +51,41 @@ Prioritized candidates for validation
 
 ## Installation
 
+### Quick Install (PyPI)
+
 ```bash
-# From PyPI (once published)
+# Once published
 pip install mozzarellm
+```
 
-# From GitHub
-pip install git+https://github.com/cheeseman-lab/mozzarellm.git
+### Development Installation (Recommended)
 
-# For development
+We recommend using [uv](https://github.com/astral-sh/uv) for fast, reliable package installation:
+
+```bash
+# Clone the repository
 git clone https://github.com/cheeseman-lab/mozzarellm.git
 cd mozzarellm
-pip install -e .
+
+# Create conda environment with Python 3.11, uv, and pip
+conda create -n mozzarellm -c conda-forge python=3.11 uv pip -y
+conda activate mozzarellm
+
+# Option 1: Install all at once (main + dev dependencies + editable package)
+uv pip install -e ".[dev]"
+
+# Option 2: Step-by-step installation
+uv pip install -r pyproject.toml  # Main dependencies
+uv pip install -e .                # Editable package install
+uv pip install pytest pytest-cov ruff  # Dev dependencies
+```
+
+### Alternative: Standard pip installation
+
+```bash
+git clone https://github.com/cheeseman-lab/mozzarellm.git
+cd mozzarellm
+pip install -e ".[dev]"
 ```
 
 Create a `.env` file with your API keys:

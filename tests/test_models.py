@@ -121,6 +121,44 @@ class TestClusterResult:
         assert len(high_priority) == 2
         assert all(g.priority >= 8 for g in high_priority)
 
+    def test_get_quality_summary(self):
+        """Test quality summary helper method."""
+        # High quality cluster
+        result_high = ClusterResult(
+            cluster_id="1",
+            dominant_process="DNA repair",
+            pathway_confidence="High",
+            established_genes=["BRCA1", "BRCA2", "TP53"],
+            summary="test",
+            missed_genes=[],
+            total_genes_in_cluster=10,
+            classification_completeness=1.0,
+            established_gene_ratio=0.3,  # 3/10 = 30%
+        )
+        quality = result_high.get_quality_summary()
+        assert quality["classification_complete"] is True  # 100% complete
+        assert quality["has_pathway_support"] is True  # 30% > 5%
+        assert quality["confidence_validated"] is True  # High confidence with 30% established
+        assert quality["missed_count"] == 0
+
+        # Low quality cluster with confidence mismatch
+        result_low = ClusterResult(
+            cluster_id="2",
+            dominant_process="Unknown pathway",
+            pathway_confidence="High",  # High confidence but...
+            established_genes=["GENE1"],  # Only 1 established gene
+            summary="test",
+            missed_genes=["GENE2", "GENE3", "GENE4"],
+            total_genes_in_cluster=50,
+            classification_completeness=0.8,  # 40/50 classified
+            established_gene_ratio=0.02,  # 1/50 = 2% < 5% threshold!
+        )
+        quality = result_low.get_quality_summary()
+        assert quality["classification_complete"] is False  # 80% < 90%
+        assert quality["has_pathway_support"] is False  # 2% < 5%
+        assert quality["confidence_validated"] is False  # High confidence with only 2% established!
+        assert quality["missed_count"] == 3
+
 
 class TestAnalysisResult:
     """Tests for AnalysisResult model."""

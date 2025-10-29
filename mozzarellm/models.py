@@ -5,7 +5,7 @@ These models provide type safety, validation, and clear contracts
 for data flowing through the analysis pipeline.
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -81,7 +81,7 @@ class ClusterResult(BaseModel):
         """Return genes with priority >= threshold."""
         return [gene for gene in self.get_all_flagged_genes() if gene.priority >= threshold]
 
-    def get_quality_summary(self) -> dict[str, any]:
+    def get_quality_summary(self) -> dict[str, Any]:
         """
         Return quality metrics summary for this cluster.
 
@@ -108,7 +108,7 @@ class AnalysisResult(BaseModel):
     clusters: dict[str, ClusterResult] = Field(
         default_factory=dict, description="Dictionary mapping cluster IDs to results"
     )
-    metadata: dict[str, any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict, description="Analysis metadata (timestamp, model, etc.)"
     )
 
