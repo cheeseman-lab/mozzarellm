@@ -1,0 +1,19 @@
+gene_symbol,cluster,expected_function,validation_gene
+C18orf21,C5255,RNase mitochondrial RNA processing,C18orf21
+GON7,C5255,,
+MAGED2,C5255,,
+OSGEP,C5255,,
+POP1,C5255,,
+POP4,C5255,,
+POP5,C5255,,
+POP7,C5255,,
+RNASEH1,C5255,,
+RPP14,C5255,,
+RPP25L,C5255,,
+RPP30,C5255,,
+RPP38,C5255,,
+RPP40,C5255,,
+DPP9,C5415,interferon response regulation,DPP9
+IRF9,C5415,,
+STAT1,C5415,,
+STAT2,C5415,,

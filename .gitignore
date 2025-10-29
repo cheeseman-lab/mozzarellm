@@ -42,7 +42,14 @@ debug/
 
 # Results and data (optional, comment out if you want to track these)
 results/
-data/benchmarks/
+
+# Benchmark results in examples/
+examples/ops/results/
+examples/depmap/results/
+examples/proteomics/results/
+
+# Legacy examples
+examples/old/
 
 # IDE files
 .idea/
