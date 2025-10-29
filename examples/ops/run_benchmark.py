@@ -16,7 +16,7 @@ from mozzarellm import ClusterAnalyzer, reshape_to_clusters
 load_dotenv()
 
 # Configuration
-MODEL = "gpt-4o"  # Change to test different models
+MODEL = "claude-sonnet-4-5-20250929"  # Change to test different models
 TEMPERATURE = 0.0
 OUTPUT_DIR = "results"
 
@@ -28,8 +28,9 @@ VALIDATION_DATA = {
         "genes": ["C7orf26"],
     },
     "99": {
-        "function": "No coherent pathway",
-        "genes": ["MCL1", "MDC1", "PUM3", "UFSP2"],
+        "function": "No coherent biological pathway",
+        "confidence": "Low",  # Should detect nontargeting controls
+        "genes": [],  # Don't validate specific genes for noise cluster
     },
     "121": {"function": "Myc regulation/transcription", "genes": ["SETD2"]},
     "149": {"function": "mitochondrial homeostasis", "genes": ["KRAS", "BRAF"]},
@@ -37,13 +38,11 @@ VALIDATION_DATA = {
     "197": {"function": "m6A mRNA modification", "genes": ["HNRNPD"]},
 }
 
-# Screen context for OPS data
-SCREEN_CONTEXT = """
-This is from an optical pooled screen (OPS) analyzing interphase cells.
-Genes in each cluster co-localize and likely participate in related biological processes.
-Focus on identifying the dominant biological process and classifying genes based on their
-known vs. novel roles in that process.
-"""
+# Import robust screen context
+from mozzarellm.prompts import ROBUST_SCREEN_CONTEXT
+
+# Use robust screen context which handles nontargeting controls
+SCREEN_CONTEXT = ROBUST_SCREEN_CONTEXT
 
 
 def categorize_gene(gene, cluster):
@@ -86,23 +85,39 @@ def validate_results(results):
             term in predicted_func.lower() for term in expected_func.lower().split()
         )
 
-        if function_match:
+        # Check confidence if specified
+        confidence_match = True
+        if "confidence" in expected:
+            expected_conf = expected["confidence"]
+            predicted_conf = cluster.pathway_confidence
+            confidence_match = expected_conf == predicted_conf
+
+        # Overall match requires both function and confidence (if specified)
+        overall_match = function_match and confidence_match
+
+        if overall_match:
             total_function_matches += 1
 
         print(f"\nCluster {cluster_id}:")
         print(f"  Expected: {expected_func}")
         print(f"  Predicted: {predicted_func}")
         print(f"  {'✓' if function_match else '✗'} Function match")
-        print("  Validation genes:")
-
-        # Check validation genes
-        for gene in expected["genes"]:
-            category = categorize_gene(gene, cluster)
-            if category != "not_classified":
-                total_genes_classified += 1
-                print(f"    ✓ {gene}: {category}")
-            else:
-                print(f"    ✗ {gene}: not classified")
+        if "confidence" in expected:
+            print(f"  Expected confidence: {expected['confidence']}")
+            print(f"  Predicted confidence: {cluster.pathway_confidence}")
+            print(f"  {'✓' if confidence_match else '✗'} Confidence match")
+        # Check validation genes (if any specified)
+        if expected["genes"]:
+            print("  Validation genes:")
+            for gene in expected["genes"]:
+                category = categorize_gene(gene, cluster)
+                if category != "not_classified":
+                    total_genes_classified += 1
+                    print(f"    ✓ {gene}: {category}")
+                else:
+                    print(f"    ✗ {gene}: not classified")
+        else:
+            print("  (No specific gene validation for this cluster)")
 
     # Summary
     print("\n" + "=" * 60)
@@ -152,13 +167,13 @@ def main():
 
     # Initialize analyzer
     print(f"\nInitializing ClusterAnalyzer with model: {MODEL}")
-    analyzer = ClusterAnalyzer(
-        model=MODEL, temperature=TEMPERATURE, screen_context=SCREEN_CONTEXT, show_progress=True
-    )
+    analyzer = ClusterAnalyzer(model=MODEL, temperature=TEMPERATURE, show_progress=True)
 
     # Run analysis
     print("\nRunning analysis...")
-    results = analyzer.analyze(cluster_df, gene_annotations=gene_annotations)
+    results = analyzer.analyze(
+        cluster_df, gene_annotations=gene_annotations, screen_context=SCREEN_CONTEXT
+    )
 
     # Save results
     output_file = os.path.join(OUTPUT_DIR, f"{MODEL.replace('/', '_')}_results.json")

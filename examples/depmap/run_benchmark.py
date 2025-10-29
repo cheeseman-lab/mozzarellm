@@ -16,7 +16,7 @@ from mozzarellm import ClusterAnalyzer, reshape_to_clusters
 load_dotenv()
 
 # Configuration
-MODEL = "gpt-4o"  # Change to test different models
+MODEL = "claude-sonnet-4-5-20250929"  # Change to test different models
 TEMPERATURE = 0.0
 OUTPUT_DIR = "results"
 

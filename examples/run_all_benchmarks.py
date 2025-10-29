@@ -18,17 +18,17 @@ from pathlib import Path
 
 # Default models to benchmark (latest/most advanced models - Oct 2025)
 DEFAULT_MODELS = [
-    # "o4-mini",  # OpenAI's fast reasoning model (April 2025)
+    "o4-mini",  # OpenAI's fast reasoning model (April 2025)
     "claude-sonnet-4-5-20250929",  # Latest Claude Sonnet (Sept 2025)
-    # "gemini-2.5-pro",  # Stable Gemini Pro (June 2025)
-    # "gpt-4o",  # OpenAI's flagship model
+    "gemini-2.5-pro",  # Stable Gemini Pro (June 2025)
+    "gpt-4o",  # OpenAI's flagship model
 ]
 
 # Benchmark configurations
 BENCHMARKS = [
     {"name": "OPS", "dir": "ops", "script": "run_benchmark.py"},
-    # {"name": "DepMap", "dir": "depmap", "script": "run_benchmark.py"},
-    # {"name": "Proteomics", "dir": "proteomics", "script": "run_benchmark.py"},
+    {"name": "DepMap", "dir": "depmap", "script": "run_benchmark.py"},
+    {"name": "Proteomics", "dir": "proteomics", "script": "run_benchmark.py"},
 ]
 
 
