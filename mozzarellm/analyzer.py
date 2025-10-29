@@ -199,7 +199,8 @@ class ClusterAnalyzer:
         # Check for missed genes
         if result.missed_genes:
             warnings.append(
-                f"{len(result.missed_genes)} genes not classified: {', '.join(result.missed_genes[:5])}"
+                f"Classification incomplete: {len(result.missed_genes)}/{result.total_genes_in_cluster} "
+                f"genes not classified: {', '.join(result.missed_genes[:5])}"
                 + ("..." if len(result.missed_genes) > 5 else "")
             )
 

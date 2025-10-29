@@ -87,8 +87,11 @@ class LLMProvider(ABC):
                 return response, None
 
             except Exception as e:
-                error_msg = f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}"
-                logger.error(f"{self.__class__.__name__}: {error_msg}")
+                error_str = str(e)[:100]  # Truncate long errors
+                error_msg = (
+                    f"Attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}: {error_str}"
+                )
+                logger.warning(f"{self.__class__.__name__}: {error_msg}")
 
                 if attempt < max_retries - 1:
                     wait_time = 2**attempt  # Exponential backoff

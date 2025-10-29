@@ -81,6 +81,26 @@ class ClusterResult(BaseModel):
         """Return genes with priority >= threshold."""
         return [gene for gene in self.get_all_flagged_genes() if gene.priority >= threshold]
 
+    def get_quality_summary(self) -> dict[str, any]:
+        """
+        Return quality metrics summary for this cluster.
+
+        Returns:
+            Dictionary with quality checks:
+            - classification_complete: True if >=90% of genes classified
+            - has_pathway_support: True if >=5% established genes
+            - confidence_validated: True if confidence matches established gene ratio
+            - missed_count: Number of genes not classified by LLM
+        """
+        return {
+            "classification_complete": self.classification_completeness >= 0.9,
+            "has_pathway_support": self.established_gene_ratio >= 0.05,
+            "confidence_validated": (
+                self.pathway_confidence != "High" or self.established_gene_ratio >= 0.05
+            ),
+            "missed_count": len(self.missed_genes),
+        }
+
 
 class AnalysisResult(BaseModel):
     """Complete analysis results for all clusters."""

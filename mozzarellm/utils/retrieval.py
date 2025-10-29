@@ -60,6 +60,11 @@ def _search_file_for_terms(
                 # Boost score for multiple occurrences and exact case matches
                 score += matches * 2 if re.search(rf"\b{re.escape(t)}\b", ln) else matches
                 matched.append(t)
+
+        # Bonus for having multiple terms in same line (proximity bonus)
+        if len(matched) > 1:
+            score += len(matched) * 2
+
         if score > 0:
             line_scores.append((idx, score, matched))
 
