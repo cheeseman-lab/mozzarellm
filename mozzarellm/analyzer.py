@@ -6,15 +6,15 @@ interface for analyzing gene clusters using LLMs.
 """
 
 import logging
-import pandas as pd
-from typing import Optional, Dict, List
 from datetime import datetime
+
+import pandas as pd
 from tqdm import tqdm
 
-from .models import ClusterInput, ClusterResult, AnalysisResult
-from .providers import create_provider, LLMProvider
-from .utils.prompt_factory import make_cluster_analysis_prompt
+from .models import AnalysisResult, ClusterResult
+from .providers import create_provider
 from .utils.llm_analysis_utils import process_cluster_response
+from .utils.prompt_factory import make_cluster_analysis_prompt
 from .utils.retrieval import retrieve_context
 
 logger = logging.getLogger(__name__)
@@ -33,12 +33,12 @@ class ClusterAnalyzer:
         model: str,
         temperature: float = 0.0,
         max_tokens: int = 8000,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         use_retrieval: bool = False,
-        knowledge_dir: Optional[str] = None,
+        knowledge_dir: str | None = None,
         retriever_k: int = 10,
-        cot_instructions: Optional[str] = None,
-        api_key: Optional[str] = None,
+        cot_instructions: str | None = None,
+        api_key: str | None = None,
         show_progress: bool = True,
     ):
         """
@@ -92,9 +92,9 @@ class ClusterAnalyzer:
     def analyze(
         self,
         cluster_df: pd.DataFrame,
-        gene_annotations: Optional[pd.DataFrame] = None,
-        screen_context: Optional[str] = None,
-        cluster_analysis_prompt: Optional[str] = None,
+        gene_annotations: pd.DataFrame | None = None,
+        screen_context: str | None = None,
+        cluster_analysis_prompt: str | None = None,
         gene_column: str = "genes",
         gene_sep: str = ";",
         cluster_id_column: str = "cluster_id",
@@ -127,16 +127,19 @@ class ClusterAnalyzer:
             gene_col = gene_annotations.columns[0]
             annot_col = gene_annotations.columns[1]
             annotations_dict = dict(
-                zip(gene_annotations[gene_col], gene_annotations[annot_col])
+                zip(gene_annotations[gene_col], gene_annotations[annot_col], strict=True)
             )
             logger.info(f"Loaded {len(annotations_dict)} gene annotations")
 
         # Process each cluster
         results = {}
-        iterator = tqdm(cluster_df.iterrows(), total=len(cluster_df), desc="Analyzing clusters") \
-            if self.show_progress else cluster_df.iterrows()
+        iterator = (
+            tqdm(cluster_df.iterrows(), total=len(cluster_df), desc="Analyzing clusters")
+            if self.show_progress
+            else cluster_df.iterrows()
+        )
 
-        for idx, row in iterator:
+        for _idx, row in iterator:
             cluster_id = str(row[cluster_id_column])
             genes_str = row[gene_column]
 
@@ -181,7 +184,7 @@ class ClusterAnalyzer:
         logger.info(f"Analysis complete: {len(results)} clusters processed")
         return analysis_result
 
-    def _validate_cluster_result(self, result: ClusterResult) -> List[str]:
+    def _validate_cluster_result(self, result: ClusterResult) -> list[str]:
         """
         Validate cluster result for quality issues.
 
@@ -233,11 +236,11 @@ class ClusterAnalyzer:
     def _analyze_single_cluster(
         self,
         cluster_id: str,
-        genes: List[str],
-        gene_annotations: Optional[Dict[str, str]],
-        screen_context: Optional[str],
-        cluster_analysis_prompt: Optional[str],
-    ) -> Optional[ClusterResult]:
+        genes: list[str],
+        gene_annotations: dict[str, str] | None,
+        screen_context: str | None,
+        cluster_analysis_prompt: str | None,
+    ) -> ClusterResult | None:
         """
         Analyze a single cluster.
 
@@ -303,8 +306,12 @@ class ClusterAnalyzer:
 
             missed_genes = list(input_genes_set - classified_genes_set)
             total_genes = len(genes)
-            classification_completeness = len(classified_genes_set) / total_genes if total_genes > 0 else 1.0
-            established_ratio = len(parsed["established_genes"]) / total_genes if total_genes > 0 else 0.0
+            classification_completeness = (
+                len(classified_genes_set) / total_genes if total_genes > 0 else 1.0
+            )
+            established_ratio = (
+                len(parsed["established_genes"]) / total_genes if total_genes > 0 else 0.0
+            )
 
             # Convert to ClusterResult
             cluster_result = ClusterResult(
@@ -335,10 +342,7 @@ class ClusterAnalyzer:
             return None
 
     def analyze_dataframe(
-        self,
-        df: pd.DataFrame,
-        annotations_df: Optional[pd.DataFrame] = None,
-        **kwargs
+        self, df: pd.DataFrame, annotations_df: pd.DataFrame | None = None, **kwargs
     ) -> AnalysisResult:
         """
         Convenience method - alias for analyze().
@@ -351,8 +355,4 @@ class ClusterAnalyzer:
         Returns:
             AnalysisResult object
         """
-        return self.analyze(
-            cluster_df=df,
-            gene_annotations=annotations_df,
-            **kwargs
-        )
+        return self.analyze(cluster_df=df, gene_annotations=annotations_df, **kwargs)

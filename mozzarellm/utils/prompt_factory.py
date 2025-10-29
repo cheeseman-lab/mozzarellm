@@ -1,6 +1,12 @@
-def load_prompt_template(
-    template_path=None, template_string=None, template_type="cluster"
-):
+"""
+Prompt construction utilities for gene cluster analysis.
+
+This module provides functions to build and format prompts for LLM analysis,
+including template loading, context integration, and evidence formatting.
+"""
+
+
+def load_prompt_template(template_path=None, template_string=None, template_type="cluster"):
     """
     Load a prompt template from file, string, or constants.
 
@@ -25,7 +31,7 @@ def load_prompt_template(
 
         if os.path.exists(template_path):
             try:
-                with open(template_path, "r") as f:
+                with open(template_path) as f:
                     template = f.read()
                 print(f"Successfully loaded template ({len(template)} characters)")
             except Exception as e:
@@ -142,13 +148,15 @@ SCREEN INFORMATION:
     if retrieved_context and isinstance(retrieved_context, dict):
         snippets = retrieved_context.get("snippets", [])
         if snippets:
-            evidence_text = "\nRETRIEVED EVIDENCE (ranked by relevance; cite by [number] in your reasoning):\n"
+            evidence_text = (
+                "\nRETRIEVED EVIDENCE (ranked by relevance; cite by [number] in your reasoning):\n"
+            )
             for i, sn in enumerate(snippets, 1):
                 txt = sn.get("text", "").strip()
                 src = sn.get("source", "")
                 meta = sn.get("meta", {})
                 relevance = sn.get("relevance_score", 0)
-                
+
                 # Format source tag based on source type
                 if src == "annotations":
                     src_tag = f"Gene:{meta.get('gene', '')}"
@@ -156,26 +164,28 @@ SCREEN INFORMATION:
                     src_tag = f"File:{meta.get('path', '')} (score:{meta.get('score', 0)})"
                 else:
                     src_tag = "Screen Context"
-                
+
                 evidence_text += f"[{i}] {src_tag} [relevance:{relevance}]: {txt}\n"
-            
+
             # Add retrieval metadata summary
             ret_meta = retrieved_context.get("retrieval_metadata", {})
             if ret_meta:
                 evidence_text += f"\nRetrieval Summary: {ret_meta.get('annotations_found', 0)} gene annotations, "
                 evidence_text += f"{ret_meta.get('knowledge_snippets_found', 0)} knowledge snippets from {ret_meta.get('total_retrieved', 0)} total sources.\n"
-                
+
                 # Note genes without annotations
                 genes_no_annot = ret_meta.get("genes_without_annotations", [])
                 if genes_no_annot:
                     evidence_text += f"\nNOTE: The following genes lack direct functional annotations in the provided data: {', '.join(genes_no_annot)}\n"
                     evidence_text += "These genes should be carefully evaluated based on pathway context and knowledge base evidence.\n"
-            
+
             prompt += evidence_text
 
     # Add concise, structured CoT guidance if provided
     if cot_instructions and isinstance(cot_instructions, str):
-        prompt += f"\nREASONING STEPS (keep to brief bullet points; no long prose):\n{cot_instructions}\n"
+        prompt += (
+            f"\nREASONING STEPS (keep to brief bullet points; no long prose):\n{cot_instructions}\n"
+        )
 
     # Add gene features if provided - only for genes in this cluster
     if gene_annotations_dict:

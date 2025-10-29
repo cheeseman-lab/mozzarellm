@@ -5,11 +5,10 @@ This module provides a consistent interface for querying different LLM providers
 (OpenAI, Anthropic, Google Gemini) with automatic retry logic and error handling.
 """
 
+import logging
 import os
 import time
-import logging
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ class LLMProvider(ABC):
         model: str,
         temperature: float = 0.0,
         max_tokens: int = 8000,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ):
         """
         Initialize LLM provider.
@@ -40,7 +39,7 @@ class LLMProvider(ABC):
         self._validate_api_key()
 
     @abstractmethod
-    def _get_api_key_from_env(self) -> Optional[str]:
+    def _get_api_key_from_env(self) -> str | None:
         """Get API key from environment variable."""
         pass
 
@@ -52,9 +51,7 @@ class LLMProvider(ABC):
     def _validate_api_key(self):
         """Validate that API key is available."""
         if not self.api_key:
-            raise ValueError(
-                f"{self._get_env_var_name()} not found in environment or constructor"
-            )
+            raise ValueError(f"{self._get_env_var_name()} not found in environment or constructor")
 
     @abstractmethod
     def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
@@ -66,7 +63,7 @@ class LLMProvider(ABC):
         system_prompt: str,
         user_prompt: str,
         max_retries: int = 3,
-    ) -> Tuple[Optional[str], Optional[str]]:
+    ) -> tuple[str | None, str | None]:
         """
         Query the LLM with retry logic.
 
@@ -109,7 +106,7 @@ class OpenAIProvider(LLMProvider):
     def _get_env_var_name(self) -> str:
         return "OPENAI_API_KEY"
 
-    def _get_api_key_from_env(self) -> Optional[str]:
+    def _get_api_key_from_env(self) -> str | None:
         return os.environ.get(self._get_env_var_name())
 
     def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
@@ -144,7 +141,7 @@ class AnthropicProvider(LLMProvider):
     def _get_env_var_name(self) -> str:
         return "ANTHROPIC_API_KEY"
 
-    def _get_api_key_from_env(self) -> Optional[str]:
+    def _get_api_key_from_env(self) -> str | None:
         return os.environ.get(self._get_env_var_name())
 
     def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
@@ -174,7 +171,7 @@ class GeminiProvider(LLMProvider):
     def _get_env_var_name(self) -> str:
         return "GOOGLE_API_KEY"
 
-    def _get_api_key_from_env(self) -> Optional[str]:
+    def _get_api_key_from_env(self) -> str | None:
         return os.environ.get(self._get_env_var_name())
 
     def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
@@ -202,7 +199,7 @@ def create_provider(
     model: str,
     temperature: float = 0.0,
     max_tokens: int = 8000,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> LLMProvider:
     """
     Factory function to create the appropriate provider based on model name.

@@ -1,4 +1,9 @@
-# mozzarellm/prompts.py
+"""
+Prompt templates and instructions for gene cluster analysis.
+
+This module contains prompt templates and chain-of-thought instructions
+optimized for analyzing functional genomics clusters with LLMs.
+"""
 
 # Optimized context for robustly analyzing gene clusters
 ROBUST_SCREEN_CONTEXT = """

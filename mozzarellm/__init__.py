@@ -7,26 +7,26 @@ __version__ = "0.2.0"
 # New unified API
 from .analyzer import ClusterAnalyzer
 from .models import (
-    ClusterResult,
     AnalysisResult,
-    GeneClassification,
     ClusterInput,
+    ClusterResult,
+    GeneClassification,
     RetrievalContext,
-)
-from .providers import (
-    LLMProvider,
-    OpenAIProvider,
-    AnthropicProvider,
-    GeminiProvider,
-    create_provider,
 )
 
 # Prompt constants (preserved)
 from .prompts import (
-    ENHANCED_COT_INSTRUCTIONS,
     CONCISE_COT_INSTRUCTIONS,
-    ROBUST_SCREEN_CONTEXT,
+    ENHANCED_COT_INSTRUCTIONS,
     ROBUST_CLUSTER_PROMPT,
+    ROBUST_SCREEN_CONTEXT,
+)
+from .providers import (
+    AnthropicProvider,
+    GeminiProvider,
+    LLMProvider,
+    OpenAIProvider,
+    create_provider,
 )
 
 # Utility functions (preserved)

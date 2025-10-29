@@ -1,4 +1,12 @@
+"""
+Utilities for reshaping and processing gene cluster data.
+
+This module provides functions to transform gene-level data into
+cluster-level format suitable for analysis.
+"""
+
 import os
+
 import pandas as pd
 
 
@@ -169,9 +177,7 @@ def reshape_to_clusters(
         except Exception as e:
             # If conversion to numeric fails, sort as strings
             if verbose:
-                print(
-                    f"Could not convert cluster_id to numeric: {e}. Sorting as strings."
-                )
+                print(f"Could not convert cluster_id to numeric: {e}. Sorting as strings.")
             cluster_df = cluster_df.sort_values("cluster_id")
 
     # Save to output file if provided

@@ -1,10 +1,11 @@
+import datetime
 import json
-import re
-import pandas as pd
 import logging
 import os
+import re
 import time
-import datetime
+
+import pandas as pd
 
 # Constants for cluster analysis scoring
 HIGH_PRIORITY_THRESHOLD = 8
@@ -29,16 +30,12 @@ def process_analysis(analysis_text):
     detailed_analysis = analysis_text
 
     # Try to extract function name
-    name_match = re.search(
-        r"FUNCTION NAME:?\s*(.*?)(?:\n|$)", analysis_text, re.IGNORECASE
-    )
+    name_match = re.search(r"FUNCTION NAME:?\s*(.*?)(?:\n|$)", analysis_text, re.IGNORECASE)
     if name_match:
         function_name = name_match.group(1).strip()
 
     # Try to extract confidence score
-    score_match = re.search(
-        r"CONFIDENCE SCORE:?\s*([\d\.]+)", analysis_text, re.IGNORECASE
-    )
+    score_match = re.search(r"CONFIDENCE SCORE:?\s*([\d\.]+)", analysis_text, re.IGNORECASE)
     if score_match:
         confidence_score = score_match.group(1).strip()
 
@@ -144,9 +141,7 @@ def process_cluster_response(analysis_text):
             logging.info("Direct JSON parsing failed, trying regex extraction...")
 
             # Clean up common JSON formatting issues
-            cleaned_text = re.sub(
-                r",(\s*[}\]])", r"\1", cleaned_text
-            )  # Remove trailing commas
+            cleaned_text = re.sub(r",(\s*[}\]])", r"\1", cleaned_text)  # Remove trailing commas
             cleaned_text = re.sub(
                 r"([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)", r'\1"\2"\3', cleaned_text
             )  # Quote unquoted keys
@@ -162,9 +157,7 @@ def process_cluster_response(analysis_text):
                     analysis_json = json.loads(json_str)
                     return _standardize_cluster_format(analysis_json, analysis_text)
                 except json.JSONDecodeError as e:
-                    logging.error(
-                        f"Failed to parse JSON object from regex match: {e}"
-                    )
+                    logging.error(f"Failed to parse JSON object from regex match: {e}")
 
             # If regex fails, try another approach - find a complete JSON object
             start_idx = cleaned_text.find("{")
@@ -179,32 +172,24 @@ def process_cluster_response(analysis_text):
                     logging.error(f"Failed to parse JSON object using indices: {e}")
 
         # Last resort - try a completely different approach for particularly problematic responses
-        logging.warning(
-            "All standard parsing methods failed, attempting final recovery approach"
-        )
+        logging.warning("All standard parsing methods failed, attempting final recovery approach")
 
         # Find all key-value pairs using regex and reconstruct JSON
         try:
             reconstructed_json = {}
 
             # Extract cluster_id
-            cluster_id_match = re.search(
-                r'"cluster_id"\s*:\s*"([^"]+)"', cleaned_text
-            )
+            cluster_id_match = re.search(r'"cluster_id"\s*:\s*"([^"]+)"', cleaned_text)
             if cluster_id_match:
                 reconstructed_json["cluster_id"] = cluster_id_match.group(1)
 
             # Extract dominant_process
-            process_match = re.search(
-                r'"dominant_process"\s*:\s*"([^"]+)"', cleaned_text
-            )
+            process_match = re.search(r'"dominant_process"\s*:\s*"([^"]+)"', cleaned_text)
             if process_match:
                 reconstructed_json["dominant_process"] = process_match.group(1)
 
             # Extract pathway_confidence
-            confidence_match = re.search(
-                r'"pathway_confidence"\s*:\s*"([^"]+)"', cleaned_text
-            )
+            confidence_match = re.search(r'"pathway_confidence"\s*:\s*"([^"]+)"', cleaned_text)
             if confidence_match:
                 reconstructed_json["pathway_confidence"] = confidence_match.group(1)
 
@@ -214,9 +199,7 @@ def process_cluster_response(analysis_text):
                 reconstructed_json["summary"] = summary_match.group(1)
 
             if reconstructed_json.get("cluster_id"):
-                return _standardize_cluster_format(
-                    reconstructed_json, analysis_text
-                )
+                return _standardize_cluster_format(reconstructed_json, analysis_text)
         except Exception as e:
             logging.error(f"Final recovery approach failed: {e}")
 
@@ -263,9 +246,7 @@ def _standardize_cluster_format(cluster_data, raw_text):
     if "novel_genes" in cluster_data and not standardized.get("uncharacterized_genes"):
         standardized["uncharacterized_genes"] = cluster_data.pop("novel_genes")
 
-    if "characterized_genes" in cluster_data and not standardized.get(
-        "novel_role_genes"
-    ):
+    if "characterized_genes" in cluster_data and not standardized.get("novel_role_genes"):
         characterized = cluster_data.pop("characterized_genes")
         if isinstance(characterized, list):
             if characterized and isinstance(characterized[0], str):
@@ -344,9 +325,13 @@ def _calculate_cluster_statistics(analysis):
 
     # Calculate derived statistics
     max_unchar_priority = max(unchar_priorities) if unchar_priorities else 0
-    avg_unchar_priority = sum(unchar_priorities) / len(unchar_priorities) if unchar_priorities else 0
+    avg_unchar_priority = (
+        sum(unchar_priorities) / len(unchar_priorities) if unchar_priorities else 0
+    )
     max_novel_role_priority = max(novel_role_priorities) if novel_role_priorities else 0
-    avg_novel_role_priority = sum(novel_role_priorities) / len(novel_role_priorities) if novel_role_priorities else 0
+    avg_novel_role_priority = (
+        sum(novel_role_priorities) / len(novel_role_priorities) if novel_role_priorities else 0
+    )
 
     return {
         "pathway_confidence": pathway_confidence,
@@ -384,8 +369,7 @@ def _calculate_cluster_importance_score(cluster_stats):
 
     # Get confidence score
     confidence_score = CONFIDENCE_SCORE_WEIGHTS.get(
-        pathway_confidence.split()[0] if isinstance(pathway_confidence, str) else "Unknown",
-        0
+        pathway_confidence.split()[0] if isinstance(pathway_confidence, str) else "Unknown", 0
     )
 
     # Calculate scores for both gene types
@@ -442,14 +426,14 @@ def save_cluster_analysis(
     """
     Process and optionally save cluster analysis results to JSON and multiple CSV formats.
     Returns the processed DataFrames regardless of whether they're saved to disk.
-    
+
     Args:
         clusters_dict: Dictionary with cluster analysis results in JSON format
         out_file_base: Base filename for output files (without extension), required if save_outputs=True
         original_df: Optional original DataFrame with cluster_id and other original data
         include_raw: Whether to include raw text in JSON output
         save_outputs: Whether to write results to disk (default: True)
-    
+
     Returns:
         dict: Dictionary containing the following keys:
             - 'json_data': The complete JSON data structure
@@ -457,25 +441,21 @@ def save_cluster_analysis(
             - 'cluster_df': DataFrame with cluster-level analysis
     """
     # Initialize return dictionary
-    results = {
-        'json_data': None,
-        'gene_df': None,
-        'cluster_df': None
-    }
-    
+    results = {"json_data": None, "gene_df": None, "cluster_df": None}
+
     # Validate parameters
     if save_outputs and not out_file_base:
         logging.warning("Cannot save outputs without out_file_base parameter")
         save_outputs = False
-    
+
     # Set paths if saving
     json_path = f"{out_file_base}_clusters.json" if out_file_base else None
-    
+
     # Check if the JSON file already exists and load previous results
     existing_clusters = {}
     if save_outputs and os.path.exists(json_path):
         try:
-            with open(json_path, "r") as f:
+            with open(json_path) as f:
                 existing_data = json.load(f)
                 if "clusters" in existing_data:
                     existing_clusters = existing_data["clusters"]
@@ -484,17 +464,17 @@ def save_cluster_analysis(
             logging.info(f"Loaded {len(existing_clusters)} existing clusters from {json_path}")
         except Exception as e:
             logging.warning(f"Failed to load existing clusters file: {e}")
-    
+
     # Merge existing clusters with new ones
     combined_clusters = {**existing_clusters, **clusters_dict}
-    
+
     # Option to exclude raw text to save space
     processed_clusters = combined_clusters.copy()
     if not include_raw:
         for cluster_id in processed_clusters:
             if "raw_text" in processed_clusters[cluster_id]:
                 processed_clusters[cluster_id].pop("raw_text", None)
-    
+
     # Add metadata
     output_data = {
         "metadata": {
@@ -504,15 +484,15 @@ def save_cluster_analysis(
         },
         "clusters": processed_clusters,
     }
-    
+
     # Store the JSON data in the results
-    results['json_data'] = output_data
-    
+    results["json_data"] = output_data
+
     # Save full results to JSON if requested
     if save_outputs and json_path:
         with open(json_path, "w") as f:
             json.dump(output_data, f, indent=2)
-    
+
     # Process and create gene-level and cluster-level tables
     if combined_clusters:
         # Create gene-level tables - one for uncharacterized genes and one for novel role genes
@@ -552,9 +532,7 @@ def save_cluster_analysis(
                     # Ensure cluster_id is the same type in both DataFrames
                     gene_df["cluster_id"] = gene_df["cluster_id"].astype(str)
                     original_df_copy = original_df.copy()
-                    original_df_copy["cluster_id"] = original_df_copy[
-                        "cluster_id"
-                    ].astype(str)
+                    original_df_copy["cluster_id"] = original_df_copy["cluster_id"].astype(str)
 
                     # Select only columns from original_df that are not already in gene_df
                     # except for cluster_id which is used for merging
@@ -587,8 +565,8 @@ def save_cluster_analysis(
                     ascending=[True, False, False],
                 )
                 # Store in results
-                results['gene_df'] = gene_df
-                
+                results["gene_df"] = gene_df
+
                 # Save if requested
                 if save_outputs and out_file_base:
                     gene_path = f"{out_file_base}_flagged_genes.csv"
@@ -619,7 +597,9 @@ def save_cluster_analysis(
 
                 # Get quality metrics if available
                 missed_genes = analysis.get("missed_genes", [])
-                total_genes_in_cluster = analysis.get("total_genes_in_cluster", cluster_stats["total_count"])
+                total_genes_in_cluster = analysis.get(
+                    "total_genes_in_cluster", cluster_stats["total_count"]
+                )
                 classification_completeness = analysis.get("classification_completeness", 1.0)
                 established_ratio = (
                     cluster_stats["established_count"] / total_genes_in_cluster
@@ -669,9 +649,7 @@ def save_cluster_analysis(
                     # Ensure cluster_id is the same type in both DataFrames
                     cluster_df["cluster_id"] = cluster_df["cluster_id"].astype(str)
                     original_df_copy = original_df.copy()
-                    original_df_copy["cluster_id"] = original_df_copy[
-                        "cluster_id"
-                    ].astype(str)
+                    original_df_copy["cluster_id"] = original_df_copy["cluster_id"].astype(str)
 
                     # Select only columns from original_df that are not already in cluster_df
                     # except for cluster_id which is used for merging
@@ -708,8 +686,8 @@ def save_cluster_analysis(
                     cluster_df = cluster_df.sort_values("cluster_id")
 
                 # Store in results
-                results['cluster_df'] = cluster_df
-                
+                results["cluster_df"] = cluster_df
+
                 # Save if requested
                 if save_outputs and out_file_base:
                     cluster_path = f"{out_file_base}_clusters.csv"

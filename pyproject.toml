@@ -8,7 +8,7 @@ version = "0.2.0"
 authors = [
     {name = "Matteo Di Bernardo", email = "mdiberna@whitehead.mit.edu"},
 ]
-description = "Tools for analyzing gene clusters using Large Language Models (LLMs)"
+description = "LLM-powered analysis of functional genomics screens for gene function discovery"
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
@@ -33,6 +33,7 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "ruff>=0.8.0",
 ]
 
 [project.urls]
@@ -42,3 +43,45 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["mozzarellm*"]
+
+[tool.ruff]
+# Target Python 3.11+
+target-version = "py311"
+
+# Set line length
+line-length = 100
+
+# Enable specific rule sets
+lint.select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+
+# Ignore specific rules
+lint.ignore = [
+    "E501",  # Line too long (handled by formatter)
+]
+
+# Exclude patterns
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Indent with spaces
+indent-style = "space"
