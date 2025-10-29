@@ -5,7 +5,7 @@ and aggregates the validation results for easy comparison.
 
 Usage:
     python run_all_benchmarks.py                    # Run with default models
-    python run_all_benchmarks.py --models o1 claude-3-7-sonnet-20250219
+    python run_all_benchmarks.py --models o4-mini claude-sonnet-4-5-20250929
     python run_all_benchmarks.py --output custom_results.json
 """
 
@@ -16,11 +16,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# Default models to benchmark (latest/most advanced models)
+# Default models to benchmark (latest/most advanced models - Oct 2025)
 DEFAULT_MODELS = [
-    "o1",  # OpenAI's reasoning model
-    "claude-3-7-sonnet-20250219",  # Latest Claude Sonnet
-    "gemini-2.5-pro-preview-03-25",  # Latest Gemini Pro
+    "o4-mini",  # OpenAI's fast reasoning model (April 2025)
+    "claude-sonnet-4-5-20250929",  # Latest Claude Sonnet (Sept 2025)
+    "gemini-2.5-pro",  # Stable Gemini Pro (June 2025)
     "gpt-4o",  # OpenAI's flagship model
 ]
 

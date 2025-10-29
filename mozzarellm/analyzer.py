@@ -33,6 +33,9 @@ class ClusterAnalyzer:
         model: str,
         temperature: float = 0.0,
         max_tokens: int = 8000,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        stop_sequences: list[str] | None = None,
         system_prompt: str | None = None,
         use_retrieval: bool = False,
         knowledge_dir: str | None = None,
@@ -45,9 +48,12 @@ class ClusterAnalyzer:
         Initialize the ClusterAnalyzer.
 
         Args:
-            model: Model identifier (e.g., "gpt-4o", "claude-3-7-sonnet-20250219")
+            model: Model identifier (e.g., "gpt-4o", "claude-sonnet-4-5-20250929")
             temperature: Temperature for generation (0.0-1.0)
             max_tokens: Maximum tokens to generate per request
+            top_p: Nucleus sampling parameter (0.0-1.0, optional)
+            top_k: Top-K sampling parameter (optional, Claude/Gemini only)
+            stop_sequences: List of stop sequences (optional)
             system_prompt: Optional custom system prompt (uses default if None)
             use_retrieval: Whether to use RAG with retrieved evidence
             knowledge_dir: Directory containing knowledge files for RAG
@@ -75,6 +81,9 @@ class ClusterAnalyzer:
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
+            top_p=top_p,
+            top_k=top_k,
+            stop_sequences=stop_sequences,
             api_key=api_key,
         )
 

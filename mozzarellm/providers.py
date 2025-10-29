@@ -21,20 +21,29 @@ class LLMProvider(ABC):
         model: str,
         temperature: float = 0.0,
         max_tokens: int = 8000,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        stop_sequences: list[str] | None = None,
         api_key: str | None = None,
     ):
         """
         Initialize LLM provider.
 
         Args:
-            model: Model identifier (e.g., "gpt-4o", "claude-3-7-sonnet-20250219")
+            model: Model identifier (e.g., "gpt-4o", "claude-sonnet-4-5-20250929")
             temperature: Temperature for generation (0.0-1.0)
             max_tokens: Maximum tokens to generate
+            top_p: Nucleus sampling parameter (0.0-1.0, optional)
+            top_k: Top-K sampling parameter (optional, Claude/Gemini only)
+            stop_sequences: List of stop sequences (optional)
             api_key: API key (if None, reads from environment)
         """
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.top_p = top_p
+        self.top_k = top_k
+        self.stop_sequences = stop_sequences
         self.api_key = api_key or self._get_api_key_from_env()
         self._validate_api_key()
 
@@ -122,13 +131,22 @@ class OpenAIProvider(LLMProvider):
             {"role": "user", "content": user_prompt},
         ]
 
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-            max_completion_tokens=self.max_tokens,
-            seed=42,  # For reproducibility
-        )
+        # Build kwargs with optional parameters
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_completion_tokens": self.max_tokens,
+            "seed": 42,  # For reproducibility
+        }
+
+        # Add optional sampling parameters
+        if self.top_p is not None:
+            kwargs["top_p"] = self.top_p
+        if self.stop_sequences:
+            kwargs["stop"] = self.stop_sequences
+
+        response = client.chat.completions.create(**kwargs)
 
         # Log token usage
         if hasattr(response, "usage"):
@@ -152,13 +170,24 @@ class AnthropicProvider(LLMProvider):
 
         client = anthropic.Anthropic(api_key=self.api_key)
 
-        response = client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            system=system_prompt,
-            messages=[{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
-        )
+        # Build kwargs with optional parameters
+        kwargs = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
+        }
+
+        # Add optional sampling parameters
+        if self.top_p is not None:
+            kwargs["top_p"] = self.top_p
+        if self.top_k is not None:
+            kwargs["top_k"] = self.top_k
+        if self.stop_sequences:
+            kwargs["stop_sequences"] = self.stop_sequences
+
+        response = client.messages.create(**kwargs)
 
         # Log token usage
         if hasattr(response, "usage"):
@@ -183,13 +212,22 @@ class GeminiProvider(LLMProvider):
 
         client = genai.Client(api_key=self.api_key)
 
-        config = types.GenerateContentConfig(
-            temperature=self.temperature,
-            max_output_tokens=self.max_tokens,
-            top_p=1,
-            top_k=32,
-            system_instruction=system_prompt,
-        )
+        # Build config with optional parameters (no hardcoded values!)
+        config_kwargs = {
+            "temperature": self.temperature,
+            "max_output_tokens": self.max_tokens,
+            "system_instruction": system_prompt,
+        }
+
+        # Add optional sampling parameters
+        if self.top_p is not None:
+            config_kwargs["top_p"] = self.top_p
+        if self.top_k is not None:
+            config_kwargs["top_k"] = self.top_k
+        if self.stop_sequences:
+            config_kwargs["stop_sequences"] = self.stop_sequences
+
+        config = types.GenerateContentConfig(**config_kwargs)
 
         response = client.models.generate_content(
             model=self.model, contents=user_prompt, config=config
@@ -202,6 +240,9 @@ def create_provider(
     model: str,
     temperature: float = 0.0,
     max_tokens: int = 8000,
+    top_p: float | None = None,
+    top_k: int | None = None,
+    stop_sequences: list[str] | None = None,
     api_key: str | None = None,
 ) -> LLMProvider:
     """
@@ -211,6 +252,9 @@ def create_provider(
         model: Model identifier
         temperature: Temperature for generation
         max_tokens: Maximum tokens to generate
+        top_p: Nucleus sampling parameter (0.0-1.0, optional)
+        top_k: Top-K sampling parameter (optional, Claude/Gemini only)
+        stop_sequences: List of stop sequences (optional)
         api_key: Optional API key (reads from env if None)
 
     Returns:
@@ -223,15 +267,17 @@ def create_provider(
 
     # OpenAI models
     if any(model_lower.startswith(prefix) for prefix in ["gpt", "o4", "o3", "o1"]):
-        return OpenAIProvider(model, temperature, max_tokens, api_key)
+        return OpenAIProvider(model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key)
 
     # Anthropic models
     elif model_lower.startswith("claude"):
-        return AnthropicProvider(model, temperature, max_tokens, api_key)
+        return AnthropicProvider(
+            model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key
+        )
 
     # Google models
     elif model_lower.startswith("gemini"):
-        return GeminiProvider(model, temperature, max_tokens, api_key)
+        return GeminiProvider(model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key)
 
     else:
         raise ValueError(

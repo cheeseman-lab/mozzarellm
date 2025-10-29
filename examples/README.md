@@ -5,11 +5,11 @@ Benchmarks and examples demonstrating mozzarellm's ability to analyze gene clust
 ## Quick Start
 
 ```bash
-# Run all benchmarks with default models (o1, claude-3-7-sonnet, gemini-2.5-pro, gpt-4o)
+# Run all benchmarks with default models (o4-mini, claude-sonnet-4-5, gemini-2.5-pro, gpt-4o)
 python run_all_benchmarks.py
 
 # Run with specific models
-python run_all_benchmarks.py --models o1 gpt-4o
+python run_all_benchmarks.py --models o4-mini claude-sonnet-4-5-20250929
 
 # Run individual benchmark
 cd ops && python run_benchmark.py
@@ -55,7 +55,7 @@ examples/
 python run_all_benchmarks.py
 
 # Specific models
-python run_all_benchmarks.py --models o1 claude-3-7-sonnet-20250219
+python run_all_benchmarks.py --models o4-mini claude-sonnet-4-5-20250929
 
 # Custom output location
 python run_all_benchmarks.py --output my_results.json
@@ -86,7 +86,7 @@ python run_benchmark.py  # Uses MODEL="gpt-4o" by default
 
 To test different models, edit `MODEL` in `run_benchmark.py`:
 ```python
-MODEL = "o1"  # or "claude-3-7-sonnet-20250219", "gemini-2.5-pro-preview-03-25", etc.
+MODEL = "o4-mini"  # or "claude-sonnet-4-5-20250929", "gemini-2.5-pro", etc.
 ```
 
 ## How It Works
