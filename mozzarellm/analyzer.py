@@ -181,6 +181,55 @@ class ClusterAnalyzer:
         logger.info(f"Analysis complete: {len(results)} clusters processed")
         return analysis_result
 
+    def _validate_cluster_result(self, result: ClusterResult) -> List[str]:
+        """
+        Validate cluster result for quality issues.
+
+        Args:
+            result: ClusterResult to validate
+
+        Returns:
+            List of warning messages
+        """
+        warnings = []
+
+        # Check for missed genes
+        if result.missed_genes:
+            warnings.append(
+                f"{len(result.missed_genes)} genes not classified: {', '.join(result.missed_genes[:5])}"
+                + ("..." if len(result.missed_genes) > 5 else "")
+            )
+
+        # Check classification completeness
+        if result.classification_completeness < 0.9:
+            warnings.append(
+                f"Only {result.classification_completeness:.1%} of genes were classified"
+            )
+
+        # Check established ratio vs confidence - High confidence should have good support
+        if result.pathway_confidence == "High":
+            if result.established_gene_ratio < 0.05:
+                warnings.append(
+                    f"CRITICAL: High confidence but only {result.established_gene_ratio:.1%} "
+                    f"({len(result.established_genes)}/{result.total_genes_in_cluster}) "
+                    f"established genes - pathway assignment likely incorrect"
+                )
+            elif result.established_gene_ratio < 0.10:
+                warnings.append(
+                    f"WARNING: High confidence but only {result.established_gene_ratio:.1%} "
+                    f"({len(result.established_genes)}/{result.total_genes_in_cluster}) "
+                    f"established genes - verify pathway assignment"
+                )
+
+        # Check Medium confidence should have at least some support
+        if result.pathway_confidence == "Medium" and result.established_gene_ratio < 0.03:
+            warnings.append(
+                f"Medium confidence with very few established genes "
+                f"({result.established_gene_ratio:.1%}) - may need review"
+            )
+
+        return warnings
+
     def _analyze_single_cluster(
         self,
         cluster_id: str,
@@ -246,6 +295,17 @@ class ClusterAnalyzer:
                 )
                 parsed["cluster_id"] = cluster_id
 
+            # Calculate quality metrics
+            input_genes_set = set(genes)
+            classified_genes_set = set(parsed["established_genes"])
+            classified_genes_set.update(g["gene"] for g in parsed["uncharacterized_genes"])
+            classified_genes_set.update(g["gene"] for g in parsed["novel_role_genes"])
+
+            missed_genes = list(input_genes_set - classified_genes_set)
+            total_genes = len(genes)
+            classification_completeness = len(classified_genes_set) / total_genes if total_genes > 0 else 1.0
+            established_ratio = len(parsed["established_genes"]) / total_genes if total_genes > 0 else 0.0
+
             # Convert to ClusterResult
             cluster_result = ClusterResult(
                 cluster_id=parsed["cluster_id"],
@@ -256,7 +316,16 @@ class ClusterAnalyzer:
                 novel_role_genes=parsed["novel_role_genes"],
                 summary=parsed["summary"],
                 raw_response=response,
+                missed_genes=missed_genes,
+                total_genes_in_cluster=total_genes,
+                classification_completeness=classification_completeness,
+                established_gene_ratio=established_ratio,
             )
+
+            # Validate quality and log warnings
+            warnings = self._validate_cluster_result(cluster_result)
+            for warning in warnings:
+                logger.warning(f"Cluster {cluster_id}: {warning}")
 
             logger.info(f"Successfully analyzed cluster {cluster_id}")
             return cluster_result

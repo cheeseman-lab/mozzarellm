@@ -257,6 +257,66 @@ class TestClusterAnalyzerAnalysis:
         assert len(result.clusters) == 1
 
 
+class TestClusterAnalyzerQualityMetrics:
+    """Tests for quality metrics tracking."""
+
+    @patch("mozzarellm.analyzer.create_provider")
+    def test_missed_genes_tracking(self, mock_create_provider):
+        """Test that missed genes are tracked when LLM doesn't classify all genes."""
+        # LLM response only classifies 2 of 3 genes
+        mock_provider = Mock()
+        mock_provider.query.return_value = (
+            '''{"cluster_id": "1", "dominant_process": "DNA repair",
+            "pathway_confidence": "High", "established_genes": ["BRCA1"],
+            "uncharacterized_genes": [{"gene": "BRCA2", "priority": 8, "rationale": "test"}],
+            "novel_role_genes": [],
+            "summary": "test"}''',
+            None
+        )
+        mock_create_provider.return_value = mock_provider
+
+        df = pd.DataFrame({
+            "cluster_id": ["1"],
+            "genes": ["BRCA1;BRCA2;TP53"]  # 3 genes, but TP53 won't be in response
+        })
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+            analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
+            result = analyzer.analyze(df)
+
+        cluster = result.clusters["1"]
+        assert "TP53" in cluster.missed_genes
+        assert len(cluster.missed_genes) == 1
+        assert cluster.classification_completeness == 2/3  # 2 out of 3 classified
+
+    @patch("mozzarellm.analyzer.create_provider")
+    def test_established_gene_ratio(self, mock_create_provider):
+        """Test established gene ratio calculation."""
+        mock_provider = Mock()
+        mock_provider.query.return_value = (
+            '''{"cluster_id": "1", "dominant_process": "DNA repair",
+            "pathway_confidence": "High", "established_genes": ["BRCA1", "BRCA2"],
+            "uncharacterized_genes": [{"gene": "GENE1", "priority": 8, "rationale": "test"}],
+            "novel_role_genes": [],
+            "summary": "test"}''',
+            None
+        )
+        mock_create_provider.return_value = mock_provider
+
+        df = pd.DataFrame({
+            "cluster_id": ["1"],
+            "genes": ["BRCA1;BRCA2;GENE1"]  # 2 of 3 are established
+        })
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+            analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
+            result = analyzer.analyze(df)
+
+        cluster = result.clusters["1"]
+        assert cluster.established_gene_ratio == pytest.approx(2/3, rel=0.01)
+        assert cluster.total_genes_in_cluster == 3
+
+
 class TestClusterAnalyzerAliases:
     """Tests for ClusterAnalyzer convenience methods."""
 

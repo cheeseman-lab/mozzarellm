@@ -48,6 +48,28 @@ class ClusterResult(BaseModel):
     summary: str = Field(..., description="Concise summary of key findings")
     raw_response: Optional[str] = Field(None, description="Raw LLM response text")
 
+    # Quality metrics
+    missed_genes: List[str] = Field(
+        default_factory=list,
+        description="Genes in cluster that were not classified by LLM"
+    )
+    total_genes_in_cluster: int = Field(
+        default=0,
+        description="Total number of genes in the input cluster"
+    )
+    classification_completeness: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Ratio of classified genes to total genes (0.0-1.0)"
+    )
+    established_gene_ratio: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Ratio of established genes to total genes (0.0-1.0)"
+    )
+
     @field_validator('cluster_id')
     @classmethod
     def cluster_id_not_empty(cls, v: str) -> str:

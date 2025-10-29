@@ -6,6 +6,10 @@ import os
 import time
 import datetime
 
+# Constants for cluster analysis scoring
+HIGH_PRIORITY_THRESHOLD = 8
+CONFIDENCE_SCORE_WEIGHTS = {"High": 3, "Medium": 2, "Low": 1, "Unknown": 0}
+
 
 def process_analysis(analysis_text):
     """
@@ -291,6 +295,147 @@ def _standardize_cluster_format(cluster_data, raw_text):
     return standardized
 
 
+def _calculate_cluster_statistics(analysis):
+    """
+    Calculate all statistics for a cluster.
+
+    Args:
+        analysis: Cluster analysis dictionary
+
+    Returns:
+        Dictionary with all cluster statistics
+    """
+    pathway_confidence = analysis.get("pathway_confidence", "Unknown")
+
+    # Get gene lists
+    established_genes = analysis.get("established_genes", [])
+    uncharacterized_genes_info = analysis.get("uncharacterized_genes", [])
+    novel_role_genes_info = analysis.get("novel_role_genes", [])
+
+    # Extract gene names
+    uncharacterized_genes = [g.get("gene", "Unknown") for g in uncharacterized_genes_info]
+    novel_role_genes = [g.get("gene", "Unknown") for g in novel_role_genes_info]
+
+    # Calculate counts
+    established_count = len(established_genes)
+    uncharacterized_count = len(uncharacterized_genes)
+    novel_role_count = len(novel_role_genes)
+    total_count = established_count + uncharacterized_count + novel_role_count
+
+    # Get uncharacterized gene statistics
+    unchar_priorities = []
+    high_unchar_genes = []
+    for unchar_gene in uncharacterized_genes_info:
+        gene_name = unchar_gene.get("gene", "Unknown")
+        priority = unchar_gene.get("priority", 0)
+        unchar_priorities.append(priority)
+        if priority >= HIGH_PRIORITY_THRESHOLD:
+            high_unchar_genes.append(f"{gene_name}:{priority}")
+
+    # Get novel role gene statistics
+    novel_role_priorities = []
+    high_novel_role_genes = []
+    for novel_role_gene in novel_role_genes_info:
+        gene_name = novel_role_gene.get("gene", "Unknown")
+        priority = novel_role_gene.get("priority", 0)
+        novel_role_priorities.append(priority)
+        if priority >= HIGH_PRIORITY_THRESHOLD:
+            high_novel_role_genes.append(f"{gene_name}:{priority}")
+
+    # Calculate derived statistics
+    max_unchar_priority = max(unchar_priorities) if unchar_priorities else 0
+    avg_unchar_priority = sum(unchar_priorities) / len(unchar_priorities) if unchar_priorities else 0
+    max_novel_role_priority = max(novel_role_priorities) if novel_role_priorities else 0
+    avg_novel_role_priority = sum(novel_role_priorities) / len(novel_role_priorities) if novel_role_priorities else 0
+
+    return {
+        "pathway_confidence": pathway_confidence,
+        "dominant_process": analysis.get("dominant_process", "Unknown"),
+        "summary": analysis.get("summary", "None provided"),
+        "established_genes": established_genes,
+        "uncharacterized_genes": uncharacterized_genes,
+        "novel_role_genes": novel_role_genes,
+        "established_count": established_count,
+        "uncharacterized_count": uncharacterized_count,
+        "novel_role_count": novel_role_count,
+        "total_count": total_count,
+        "max_unchar_priority": max_unchar_priority,
+        "avg_unchar_priority": round(avg_unchar_priority, 2),
+        "high_unchar_count": len(high_unchar_genes),
+        "high_unchar_genes": high_unchar_genes,
+        "max_novel_role_priority": max_novel_role_priority,
+        "avg_novel_role_priority": round(avg_novel_role_priority, 2),
+        "high_novel_role_count": len(high_novel_role_genes),
+        "high_novel_role_genes": high_novel_role_genes,
+    }
+
+
+def _calculate_cluster_importance_score(cluster_stats):
+    """
+    Calculate cluster importance score from statistics.
+
+    Args:
+        cluster_stats: Dictionary from _calculate_cluster_statistics
+
+    Returns:
+        Float cluster importance score
+    """
+    pathway_confidence = cluster_stats["pathway_confidence"]
+
+    # Get confidence score
+    confidence_score = CONFIDENCE_SCORE_WEIGHTS.get(
+        pathway_confidence.split()[0] if isinstance(pathway_confidence, str) else "Unknown",
+        0
+    )
+
+    # Calculate scores for both gene types
+    unchar_score = (
+        confidence_score
+        * (1 + cluster_stats["high_unchar_count"] / 10)
+        * (cluster_stats["max_unchar_priority"] / 10)
+    )
+    novel_role_score = (
+        confidence_score
+        * (1 + cluster_stats["high_novel_role_count"] / 10)
+        * (cluster_stats["max_novel_role_priority"] / 10)
+    )
+
+    return round(max(unchar_score, novel_role_score), 2)
+
+
+def _create_gene_entry(gene_info, cluster_id, cluster_stats, cluster_score, gene_category):
+    """
+    Create a single gene entry dictionary.
+
+    Args:
+        gene_info: Dictionary with gene, priority, rationale
+        cluster_id: Cluster identifier
+        cluster_stats: Dictionary from _calculate_cluster_statistics
+        cluster_score: Cluster importance score
+        gene_category: "uncharacterized" or "novel_role"
+
+    Returns:
+        Dictionary with gene entry data
+    """
+    return {
+        "gene_name": gene_info.get("gene", "Unknown"),
+        "gene_description": gene_info.get("rationale", ""),
+        "gene_importance_score": gene_info.get("priority", 0),
+        "cluster_id": cluster_id,
+        "cluster_biological_process": cluster_stats["dominant_process"],
+        "pathway_confidence_level": cluster_stats["pathway_confidence"],
+        "cluster_importance_score": cluster_score,
+        "follow_up_suggestion": cluster_stats["summary"],
+        "established_genes": ";".join(cluster_stats["established_genes"]),
+        "established_gene_count": cluster_stats["established_count"],
+        "uncharacterized_genes": ";".join(cluster_stats["uncharacterized_genes"]),
+        "uncharacterized_gene_count": cluster_stats["uncharacterized_count"],
+        "novel_role_genes": ";".join(cluster_stats["novel_role_genes"]),
+        "novel_role_gene_count": cluster_stats["novel_role_count"],
+        "gene_category": gene_category,
+    }
+
+
 def save_cluster_analysis(
     clusters_dict, out_file_base=None, original_df=None, include_raw=True, save_outputs=True
 ):
@@ -377,125 +522,22 @@ def save_cluster_analysis(
             novel_role_gene_data = []
 
             for cluster_id, analysis in combined_clusters.items():
-                pathway_confidence = analysis.get("pathway_confidence", "Unknown")
-                cluster_score = 0
-                summary = analysis.get("summary", "None provided")
-
-                # Calculate cluster score
-                confidence_order = {"High": 3, "Medium": 2, "Low": 1, "Unknown": 0}
-                confidence_score = confidence_order.get(
-                    pathway_confidence.split()[0]
-                    if isinstance(pathway_confidence, str)
-                    else "Unknown",
-                    0,
-                )
-
-                # Get established genes
-                established_genes = analysis.get("established_genes", [])
-
-                # Get uncharacterized gene statistics
-                unchar_priorities = []
-                high_unchar_count = 0
-
-                for unchar_gene in analysis.get("uncharacterized_genes", []):
-                    if unchar_gene.get("priority", 0) >= 8:
-                        high_unchar_count += 1
-                    unchar_priorities.append(unchar_gene.get("priority", 0))
-
-                # Get novel role gene statistics
-                novel_role_priorities = []
-                high_novel_role_count = 0
-
-                for novel_role_gene in analysis.get("novel_role_genes", []):
-                    if novel_role_gene.get("priority", 0) >= 8:
-                        high_novel_role_count += 1
-                    novel_role_priorities.append(novel_role_gene.get("priority", 0))
-
-                # Get max priorities
-                max_unchar_priority = max(unchar_priorities) if unchar_priorities else 0
-                max_novel_role_priority = (
-                    max(novel_role_priorities) if novel_role_priorities else 0
-                )
-
-                # Calculate cluster score based on both gene types
-                unchar_score = (
-                    confidence_score
-                    * (1 + high_unchar_count / 10)
-                    * (max_unchar_priority / 10)
-                )
-                novel_role_score = (
-                    confidence_score
-                    * (1 + high_novel_role_count / 10)
-                    * (max_novel_role_priority / 10)
-                )
-                cluster_score = round(max(unchar_score, novel_role_score), 2)
-
-                # Get all uncharacterized genes
-                unchar_genes = [
-                    gene.get("gene", "Unknown")
-                    for gene in analysis.get("uncharacterized_genes", [])
-                ]
-
-                # Get all novel role genes
-                novel_role_genes = [
-                    gene.get("gene", "Unknown")
-                    for gene in analysis.get("novel_role_genes", [])
-                ]
+                # Calculate statistics ONCE per cluster
+                cluster_stats = _calculate_cluster_statistics(analysis)
+                cluster_score = _calculate_cluster_importance_score(cluster_stats)
 
                 # Create entries for each uncharacterized gene
                 for unchar_gene in analysis.get("uncharacterized_genes", []):
-                    gene_name = unchar_gene.get("gene", "Unknown")
-                    gene_desc = unchar_gene.get("rationale", "")
-                    priority = unchar_gene.get("priority", 0)
-
-                    gene_entry = {
-                        "gene_name": gene_name,
-                        "gene_description": gene_desc,
-                        "gene_importance_score": priority,
-                        "cluster_id": cluster_id,
-                        "cluster_biological_process": analysis.get(
-                            "dominant_process", "Unknown"
-                        ),
-                        "pathway_confidence_level": pathway_confidence,
-                        "cluster_importance_score": cluster_score,
-                        "follow_up_suggestion": summary,
-                        "established_genes": ";".join(established_genes),
-                        "established_gene_count": len(established_genes),
-                        "uncharacterized_genes": ";".join(unchar_genes),
-                        "uncharacterized_gene_count": len(unchar_genes),
-                        "novel_role_genes": ";".join(novel_role_genes),
-                        "novel_role_gene_count": len(novel_role_genes),
-                        "gene_category": "uncharacterized",
-                    }
-
+                    gene_entry = _create_gene_entry(
+                        unchar_gene, cluster_id, cluster_stats, cluster_score, "uncharacterized"
+                    )
                     uncharacterized_gene_data.append(gene_entry)
 
                 # Create entries for each novel role gene
                 for novel_role_gene in analysis.get("novel_role_genes", []):
-                    gene_name = novel_role_gene.get("gene", "Unknown")
-                    gene_desc = novel_role_gene.get("rationale", "")
-                    priority = novel_role_gene.get("priority", 0)
-
-                    gene_entry = {
-                        "gene_name": gene_name,
-                        "gene_description": gene_desc,
-                        "gene_importance_score": priority,
-                        "cluster_id": cluster_id,
-                        "cluster_biological_process": analysis.get(
-                            "dominant_process", "Unknown"
-                        ),
-                        "pathway_confidence_level": pathway_confidence,
-                        "cluster_importance_score": cluster_score,
-                        "follow_up_suggestion": summary,
-                        "established_genes": ";".join(established_genes),
-                        "established_gene_count": len(established_genes),
-                        "uncharacterized_genes": ";".join(unchar_genes),
-                        "uncharacterized_gene_count": len(unchar_genes),
-                        "novel_role_genes": ";".join(novel_role_genes),
-                        "novel_role_gene_count": len(novel_role_genes),
-                        "gene_category": "novel_role",
-                    }
-
+                    gene_entry = _create_gene_entry(
+                        novel_role_gene, cluster_id, cluster_stats, cluster_score, "novel_role"
+                    )
                     novel_role_gene_data.append(gene_entry)
 
             # Combine all gene data
@@ -564,122 +606,56 @@ def save_cluster_analysis(
             cluster_data = []
 
             for cluster_id, analysis in combined_clusters.items():
-                pathway_confidence = analysis.get("pathway_confidence", "Unknown")
-                biological_process = analysis.get("dominant_process", "Unknown")
+                # Calculate statistics ONCE per cluster
+                cluster_stats = _calculate_cluster_statistics(analysis)
+                cluster_score = _calculate_cluster_importance_score(cluster_stats)
 
-                # Get all genes by category
-                established_genes = analysis.get("established_genes", [])
-                uncharacterized_genes_info = analysis.get("uncharacterized_genes", [])
-                novel_role_genes_info = analysis.get("novel_role_genes", [])
-
-                # Extract gene names
-                uncharacterized_genes = [
-                    gene.get("gene", "Unknown") for gene in uncharacterized_genes_info
-                ]
-                novel_role_genes = [
-                    gene.get("gene", "Unknown") for gene in novel_role_genes_info
-                ]
-
-                # Create gene lists
-                all_genes = established_genes + uncharacterized_genes + novel_role_genes
-
-                # Count genes by category
-                established_count = len(established_genes)
-                uncharacterized_count = len(uncharacterized_genes)
-                novel_role_count = len(novel_role_genes)
-                total_count = (
-                    established_count + uncharacterized_count + novel_role_count
+                # Create all_genes list
+                all_genes = (
+                    cluster_stats["established_genes"]
+                    + cluster_stats["uncharacterized_genes"]
+                    + cluster_stats["novel_role_genes"]
                 )
 
-                # Calculate pathway confidence score
-                confidence_order = {"High": 3, "Medium": 2, "Low": 1, "Unknown": 0}
-                confidence_score = confidence_order.get(
-                    pathway_confidence.split()[0]
-                    if isinstance(pathway_confidence, str)
-                    else "Unknown",
-                    0,
+                # Get quality metrics if available
+                missed_genes = analysis.get("missed_genes", [])
+                total_genes_in_cluster = analysis.get("total_genes_in_cluster", cluster_stats["total_count"])
+                classification_completeness = analysis.get("classification_completeness", 1.0)
+                established_ratio = (
+                    cluster_stats["established_count"] / total_genes_in_cluster
+                    if total_genes_in_cluster > 0
+                    else 0.0
                 )
 
-                # Get uncharacterized gene statistics
-                unchar_priorities = []
-                high_unchar_genes = []
-
-                for unchar_gene in uncharacterized_genes_info:
-                    gene_name = unchar_gene.get("gene", "Unknown")
-                    priority = unchar_gene.get("priority", 0)
-                    unchar_priorities.append(priority)
-
-                    if priority >= 8:
-                        high_unchar_genes.append(f"{gene_name}:{priority}")
-
-                # Get novel role gene statistics
-                novel_role_priorities = []
-                high_novel_role_genes = []
-
-                for novel_role_gene in novel_role_genes_info:
-                    gene_name = novel_role_gene.get("gene", "Unknown")
-                    priority = novel_role_gene.get("priority", 0)
-                    novel_role_priorities.append(priority)
-
-                    if priority >= 8:
-                        high_novel_role_genes.append(f"{gene_name}:{priority}")
-
-                # Calculate statistics for uncharacterized genes
-                max_unchar_priority = max(unchar_priorities) if unchar_priorities else 0
-                avg_unchar_priority = (
-                    sum(unchar_priorities) / len(unchar_priorities)
-                    if unchar_priorities
-                    else 0
-                )
-                high_unchar_count = len(high_unchar_genes)
-
-                # Calculate statistics for novel role genes
-                max_novel_role_priority = (
-                    max(novel_role_priorities) if novel_role_priorities else 0
-                )
-                avg_novel_role_priority = (
-                    sum(novel_role_priorities) / len(novel_role_priorities)
-                    if novel_role_priorities
-                    else 0
-                )
-                high_novel_role_count = len(high_novel_role_genes)
-
-                # Combined score formula - take the higher of the two gene type scores
-                unchar_score = (
-                    confidence_score
-                    * (1 + high_unchar_count / 10)
-                    * (max_unchar_priority / 10)
-                )
-                novel_role_score = (
-                    confidence_score
-                    * (1 + high_novel_role_count / 10)
-                    * (max_novel_role_priority / 10)
-                )
-                cluster_priority_score = max(unchar_score, novel_role_score)
-
-                # Create cluster entry with added gene information
+                # Create cluster entry with all information including quality metrics
                 cluster_entry = {
                     "cluster_id": cluster_id,
-                    "cluster_biological_process": biological_process,
-                    "pathway_confidence_level": pathway_confidence,
-                    "cluster_importance_score": round(cluster_priority_score, 2),
-                    "follow_up_suggestion": analysis.get("summary", "None provided"),
-                    "established_genes": ";".join(established_genes),
-                    "established_gene_count": established_count,
-                    "uncharacterized_genes": ";".join(uncharacterized_genes),
-                    "uncharacterized_gene_count": uncharacterized_count,
-                    "novel_role_genes": ";".join(novel_role_genes),
-                    "novel_role_gene_count": novel_role_count,
-                    "total_gene_count": total_count,
-                    "highest_unchar_importance": max_unchar_priority,
-                    "average_unchar_importance": round(avg_unchar_priority, 2),
-                    "high_unchar_genes": ";".join(high_unchar_genes),
-                    "high_unchar_gene_count": high_unchar_count,
-                    "highest_novel_role_importance": max_novel_role_priority,
-                    "average_novel_role_importance": round(avg_novel_role_priority, 2),
-                    "high_novel_role_genes": ";".join(high_novel_role_genes),
-                    "high_novel_role_gene_count": high_novel_role_count,
+                    "cluster_biological_process": cluster_stats["dominant_process"],
+                    "pathway_confidence_level": cluster_stats["pathway_confidence"],
+                    "cluster_importance_score": cluster_score,
+                    "follow_up_suggestion": cluster_stats["summary"],
+                    "established_genes": ";".join(cluster_stats["established_genes"]),
+                    "established_gene_count": cluster_stats["established_count"],
+                    "uncharacterized_genes": ";".join(cluster_stats["uncharacterized_genes"]),
+                    "uncharacterized_gene_count": cluster_stats["uncharacterized_count"],
+                    "novel_role_genes": ";".join(cluster_stats["novel_role_genes"]),
+                    "novel_role_gene_count": cluster_stats["novel_role_count"],
+                    "total_gene_count": cluster_stats["total_count"],
+                    "highest_unchar_importance": cluster_stats["max_unchar_priority"],
+                    "average_unchar_importance": cluster_stats["avg_unchar_priority"],
+                    "high_unchar_genes": ";".join(cluster_stats["high_unchar_genes"]),
+                    "high_unchar_gene_count": cluster_stats["high_unchar_count"],
+                    "highest_novel_role_importance": cluster_stats["max_novel_role_priority"],
+                    "average_novel_role_importance": cluster_stats["avg_novel_role_priority"],
+                    "high_novel_role_genes": ";".join(cluster_stats["high_novel_role_genes"]),
+                    "high_novel_role_gene_count": cluster_stats["high_novel_role_count"],
                     "all_cluster_genes": ";".join(all_genes),
+                    # Quality metrics
+                    "total_genes_in_cluster": total_genes_in_cluster,
+                    "established_gene_ratio": round(established_ratio, 3),
+                    "missed_genes": ";".join(missed_genes),
+                    "missed_gene_count": len(missed_genes),
+                    "classification_completeness": round(classification_completeness, 3),
                 }
 
                 cluster_data.append(cluster_entry)

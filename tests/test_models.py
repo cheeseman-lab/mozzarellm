@@ -68,6 +68,23 @@ class TestClusterResult:
         assert len(result.established_genes) == 2
         assert len(result.get_all_flagged_genes()) == 2
 
+    def test_quality_metrics(self):
+        """Test quality metrics fields."""
+        result = ClusterResult(
+            cluster_id="1",
+            dominant_process="DNA repair",
+            pathway_confidence="High",
+            summary="Test",
+            missed_genes=["GENE3", "GENE4"],
+            total_genes_in_cluster=10,
+            classification_completeness=0.8,
+            established_gene_ratio=0.2,
+        )
+        assert result.missed_genes == ["GENE3", "GENE4"]
+        assert result.total_genes_in_cluster == 10
+        assert result.classification_completeness == 0.8
+        assert result.established_gene_ratio == 0.2
+
     def test_pathway_confidence_validation(self):
         """Test that pathway_confidence must be High/Medium/Low."""
         # Valid
