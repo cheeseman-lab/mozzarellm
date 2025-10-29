@@ -4,56 +4,59 @@ mozzarellm: Gene cluster analysis using Large Language Models (LLMs)
 
 __version__ = "0.2.0"
 
-# Import configuration and prompt constants
-from .configs import (
-    DEFAULT_CONFIG,
-    DEFAULT_OPENAI_CONFIG,
-    DEFAULT_ANTHROPIC_CONFIG,
-    DEFAULT_GEMINI_CONFIG,
+# New unified API
+from .analyzer import ClusterAnalyzer
+from .models import (
+    ClusterResult,
+    AnalysisResult,
+    GeneClassification,
+    ClusterInput,
+    RetrievalContext,
+)
+from .providers import (
+    LLMProvider,
+    OpenAIProvider,
+    AnthropicProvider,
+    GeminiProvider,
+    create_provider,
 )
 
+# Prompt constants (preserved)
 from .prompts import (
     DEFAULT_CLUSTER_PROMPT,
     DEFAULT_BATCH_PROMPT,
     ENHANCED_COT_INSTRUCTIONS,
     CONCISE_COT_INSTRUCTIONS,
+    ROBUST_SCREEN_CONTEXT,
+    ROBUST_CLUSTER_PROMPT,
 )
 
-# Import key functions
-from .utils.cluster_analyzer import (
-    analyze_gene_clusters,
-    process_clusters,
-    load_gene_annotations,
-    load_screen_context,
-)
+# Utility functions (preserved)
 from .utils.cluster_utils import reshape_to_clusters
-from .utils.prompt_factory import (
-    make_cluster_analysis_prompt,
-    make_batch_cluster_analysis_prompt,
-)
-from .utils.llm_analysis_utils import process_cluster_response, save_cluster_analysis
 
 # Expose package-level API
 __all__ = [
-    # Core functions
-    "analyze_gene_clusters",
-    "process_clusters",
-    "reshape_to_clusters",
-    # Configuration constants
-    "DEFAULT_CONFIG",
-    "DEFAULT_OPENAI_CONFIG",
-    "DEFAULT_ANTHROPIC_CONFIG",
-    "DEFAULT_GEMINI_CONFIG",
+    # Main API
+    "ClusterAnalyzer",
+    # Models
+    "ClusterResult",
+    "AnalysisResult",
+    "GeneClassification",
+    "ClusterInput",
+    "RetrievalContext",
+    # Providers
+    "LLMProvider",
+    "OpenAIProvider",
+    "AnthropicProvider",
+    "GeminiProvider",
+    "create_provider",
     # Prompt constants
     "DEFAULT_CLUSTER_PROMPT",
     "DEFAULT_BATCH_PROMPT",
     "ENHANCED_COT_INSTRUCTIONS",
     "CONCISE_COT_INSTRUCTIONS",
-    # Utility functions
-    "make_cluster_analysis_prompt",
-    "make_batch_cluster_analysis_prompt",
-    "process_cluster_response",
-    "save_cluster_analysis",
-    "load_gene_annotations",
-    "load_screen_context",
+    "ROBUST_SCREEN_CONTEXT",
+    "ROBUST_CLUSTER_PROMPT",
+    # Utilities
+    "reshape_to_clusters",
 ]
