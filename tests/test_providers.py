@@ -1,11 +1,13 @@
 """Tests for LLM providers."""
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+
 from mozzarellm.providers import (
-    OpenAIProvider,
     AnthropicProvider,
     GeminiProvider,
+    OpenAIProvider,
     create_provider,
 )
 
@@ -46,11 +48,7 @@ class TestProviderFactory:
     def test_custom_parameters(self):
         """Test creating provider with custom parameters."""
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            provider = create_provider(
-                model="gpt-4o",
-                temperature=0.7,
-                max_tokens=4000
-            )
+            provider = create_provider(model="gpt-4o", temperature=0.7, max_tokens=4000)
             assert provider.temperature == 0.7
             assert provider.max_tokens == 4000
 
@@ -71,9 +69,11 @@ class TestOpenAIProvider:
 
     def test_missing_api_key(self):
         """Test that missing API key raises ValueError."""
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError, match="OPENAI_API_KEY"):
-                OpenAIProvider(model="gpt-4o")
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            pytest.raises(ValueError, match="OPENAI_API_KEY"),
+        ):
+            OpenAIProvider(model="gpt-4o")
 
     @patch("openai.OpenAI")
     def test_query_success(self, mock_openai_class):
@@ -106,10 +106,7 @@ class TestOpenAIProvider:
         mock_response.choices = [Mock(message=Mock(content="Success"))]
         mock_response.usage = Mock(total_tokens=100)
 
-        mock_client.chat.completions.create.side_effect = [
-            Exception("API error"),
-            mock_response
-        ]
+        mock_client.chat.completions.create.side_effect = [Exception("API error"), mock_response]
 
         provider = OpenAIProvider(model="gpt-4o", api_key="test-key")
         response, error = provider.query("System", "User", max_retries=2)
@@ -130,9 +127,11 @@ class TestAnthropicProvider:
 
     def test_missing_api_key(self):
         """Test that missing API key raises ValueError."""
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
-                AnthropicProvider(model="claude-3-7-sonnet-20250219")
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            pytest.raises(ValueError, match="ANTHROPIC_API_KEY"),
+        ):
+            AnthropicProvider(model="claude-3-7-sonnet-20250219")
 
     @patch("anthropic.Anthropic")
     def test_query_success(self, mock_anthropic_class):
@@ -148,10 +147,7 @@ class TestAnthropicProvider:
         mock_response.usage = Mock(input_tokens=50, output_tokens=50)
         mock_client.messages.create.return_value = mock_response
 
-        provider = AnthropicProvider(
-            model="claude-3-7-sonnet-20250219",
-            api_key="test-key"
-        )
+        provider = AnthropicProvider(model="claude-3-7-sonnet-20250219", api_key="test-key")
         response, error = provider.query("System prompt", "User prompt")
 
         assert response == "Test response"
@@ -170,9 +166,11 @@ class TestGeminiProvider:
 
     def test_missing_api_key(self):
         """Test that missing API key raises ValueError."""
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError, match="GOOGLE_API_KEY"):
-                GeminiProvider(model="gemini-2.5-pro-preview-03-25")
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            pytest.raises(ValueError, match="GOOGLE_API_KEY"),
+        ):
+            GeminiProvider(model="gemini-2.5-pro-preview-03-25")
 
     @patch("google.genai.Client")
     def test_query_success(self, mock_genai_client):
@@ -185,10 +183,7 @@ class TestGeminiProvider:
         mock_response = Mock(text="Test response")
         mock_client.models.generate_content.return_value = mock_response
 
-        provider = GeminiProvider(
-            model="gemini-2.5-pro-preview-03-25",
-            api_key="test-key"
-        )
+        provider = GeminiProvider(model="gemini-2.5-pro-preview-03-25", api_key="test-key")
         response, error = provider.query("System prompt", "User prompt")
 
         assert response == "Test response"

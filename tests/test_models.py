@@ -2,11 +2,12 @@
 
 import pytest
 from pydantic import ValidationError
+
 from mozzarellm.models import (
-    GeneClassification,
-    ClusterResult,
     AnalysisResult,
     ClusterInput,
+    ClusterResult,
+    GeneClassification,
     RetrievalContext,
 )
 
@@ -17,9 +18,7 @@ class TestGeneClassification:
     def test_valid_gene_classification(self):
         """Test creating a valid gene classification."""
         gene = GeneClassification(
-            gene="BRCA1",
-            priority=8,
-            rationale="Strong evidence for novel pathway role"
+            gene="BRCA1", priority=8, rationale="Strong evidence for novel pathway role"
         )
         assert gene.gene == "BRCA1"
         assert gene.priority == 8
@@ -58,10 +57,8 @@ class TestClusterResult:
             uncharacterized_genes=[
                 GeneClassification(gene="GENE1", priority=8, rationale="Novel gene")
             ],
-            novel_role_genes=[
-                GeneClassification(gene="GENE2", priority=7, rationale="Novel role")
-            ],
-            summary="Strong DNA repair signature"
+            novel_role_genes=[GeneClassification(gene="GENE2", priority=7, rationale="Novel role")],
+            summary="Strong DNA repair signature",
         )
         assert result.cluster_id == "1"
         assert result.pathway_confidence == "High"
@@ -89,10 +86,7 @@ class TestClusterResult:
         """Test that pathway_confidence must be High/Medium/Low."""
         # Valid
         ClusterResult(
-            cluster_id="1",
-            dominant_process="test",
-            pathway_confidence="High",
-            summary="test"
+            cluster_id="1", dominant_process="test", pathway_confidence="High", summary="test"
         )
 
         # Invalid
@@ -101,7 +95,7 @@ class TestClusterResult:
                 cluster_id="1",
                 dominant_process="test",
                 pathway_confidence="Very High",
-                summary="test"
+                summary="test",
             )
 
     def test_get_high_priority_genes(self):
@@ -115,7 +109,7 @@ class TestClusterResult:
                 GeneClassification(gene="B", priority=7, rationale="test"),
                 GeneClassification(gene="C", priority=8, rationale="test"),
             ],
-            summary="test"
+            summary="test",
         )
         high_priority = result.get_high_priority_genes(threshold=8)
         assert len(high_priority) == 2
@@ -166,21 +160,18 @@ class TestAnalysisResult:
     def test_valid_analysis_result(self):
         """Test creating a valid analysis result."""
         cluster1 = ClusterResult(
-            cluster_id="1",
-            dominant_process="DNA repair",
-            pathway_confidence="High",
-            summary="test"
+            cluster_id="1", dominant_process="DNA repair", pathway_confidence="High", summary="test"
         )
         cluster2 = ClusterResult(
             cluster_id="2",
             dominant_process="Cell cycle",
             pathway_confidence="Medium",
-            summary="test"
+            summary="test",
         )
 
         result = AnalysisResult(
             clusters={"1": cluster1, "2": cluster2},
-            metadata={"model": "gpt-4o", "timestamp": "2024-01-01"}
+            metadata={"model": "gpt-4o", "timestamp": "2024-01-01"},
         )
 
         assert len(result.clusters) == 2
@@ -189,10 +180,7 @@ class TestAnalysisResult:
     def test_get_cluster(self):
         """Test retrieving a specific cluster."""
         cluster = ClusterResult(
-            cluster_id="1",
-            dominant_process="test",
-            pathway_confidence="High",
-            summary="test"
+            cluster_id="1", dominant_process="test", pathway_confidence="High", summary="test"
         )
         result = AnalysisResult(clusters={"1": cluster})
 
@@ -206,22 +194,13 @@ class TestAnalysisResult:
     def test_get_high_confidence_clusters(self):
         """Test filtering clusters by confidence."""
         cluster1 = ClusterResult(
-            cluster_id="1",
-            dominant_process="test",
-            pathway_confidence="High",
-            summary="test"
+            cluster_id="1", dominant_process="test", pathway_confidence="High", summary="test"
         )
         cluster2 = ClusterResult(
-            cluster_id="2",
-            dominant_process="test",
-            pathway_confidence="Medium",
-            summary="test"
+            cluster_id="2", dominant_process="test", pathway_confidence="Medium", summary="test"
         )
         cluster3 = ClusterResult(
-            cluster_id="3",
-            dominant_process="test",
-            pathway_confidence="High",
-            summary="test"
+            cluster_id="3", dominant_process="test", pathway_confidence="High", summary="test"
         )
 
         result = AnalysisResult(clusters={"1": cluster1, "2": cluster2, "3": cluster3})
@@ -239,7 +218,7 @@ class TestClusterInput:
         cluster = ClusterInput(
             cluster_id="1",
             genes=["BRCA1", "TP53", "PTEN"],
-            gene_annotations={"BRCA1": "DNA repair gene"}
+            gene_annotations={"BRCA1": "DNA repair gene"},
         )
         assert cluster.cluster_id == "1"
         assert len(cluster.genes) == 3
@@ -251,10 +230,7 @@ class TestClusterInput:
 
     def test_genes_cleaning(self):
         """Test that empty genes are filtered out."""
-        cluster = ClusterInput(
-            cluster_id="1",
-            genes=["BRCA1", "", "  ", "TP53"]
-        )
+        cluster = ClusterInput(cluster_id="1", genes=["BRCA1", "", "  ", "TP53"])
         # Should have cleaned out empty strings
         assert len(cluster.genes) == 2
         assert "BRCA1" in cluster.genes
@@ -267,11 +243,9 @@ class TestRetrievalContext:
     def test_valid_retrieval_context(self):
         """Test creating valid retrieval context."""
         context = RetrievalContext(
-            snippets=[
-                {"text": "Evidence 1", "source": "pubmed", "relevance_score": 0.9}
-            ],
+            snippets=[{"text": "Evidence 1", "source": "pubmed", "relevance_score": 0.9}],
             citations=[{"source": "pubmed", "id": "12345"}],
-            retrieval_metadata={"k": 10, "total": 100}
+            retrieval_metadata={"k": 10, "total": 100},
         )
         assert len(context.snippets) == 1
         assert context.retrieval_metadata["k"] == 10

@@ -15,7 +15,7 @@ This directory contains examples and benchmarks for mozzarellm.
 ## Benchmark Datasets
 
 Three benchmark datasets are included, each representing a different experimental approach. Each dataset folder contains:
-- `{author}_{year}_genes.csv` - Gene-wise data with validation metadata
+- `{author}_{year}.csv` - Gene-wise data
 - `run_benchmark.py` - Analysis script with inline validation
 
 ### OPS (Optical Pooled Screen)
@@ -23,7 +23,7 @@ Three benchmark datasets are included, each representing a different experimenta
 **Source:** Funk et al. (2022)
 **Data:** 6 gene clusters from interphase localization screen
 **Total genes:** 140
-**File:** `ops/funk_2022_genes.csv`
+**File:** `ops/funk_2022.csv`
 
 **Expected biological functions:**
 - Cluster 21: ribosome biogenesis
@@ -40,7 +40,7 @@ Three benchmark datasets are included, each representing a different experimenta
 **Source:** Wainberg et al. (2021)
 **Data:** 2 co-essential gene modules
 **Total genes:** 18
-**File:** `depmap/wainberg_2021_genes.csv`
+**File:** `depmap/wainberg_2021.csv`
 
 **Expected biological functions:**
 - Module 2067: clathrin-mediated endocytosis
@@ -53,7 +53,7 @@ Three benchmark datasets are included, each representing a different experimenta
 **Source:** Schaffer et al. (2025)
 **Data:** 2 protein assemblies
 **Total genes:** 18
-**File:** `proteomics/schaffer_2025_genes.csv`
+**File:** `proteomics/schaffer_2025.csv`
 
 **Expected biological functions:**
 - Assembly C5255: RNase mitochondrial RNA processing
@@ -131,21 +131,21 @@ Genes classified: 7/7 (100.0%)
 
 ### Gene-wise CSV Format
 
-Each benchmark uses a gene-wise CSV file with validation metadata:
+Each benchmark uses a simple gene-wise CSV file:
 
 ```csv
-gene_symbol,cluster,expected_function,validation_gene
-AATF,21,,
-C1orf131,21,ribosome biogenesis,C1orf131
-KRAS,149,mitochondrial homeostasis,KRAS
-BRAF,149,mitochondrial homeostasis,BRAF
+gene_symbol,cluster
+AATF,21
+C1orf131,21
+KRAS,149
+BRAF,149
 ```
 
 **Columns:**
 - `gene_symbol`: Gene name
 - `cluster`: Cluster/module/assembly ID
-- `expected_function`: Expected biological function (validation genes only)
-- `validation_gene`: Gene name if this is a validation point, empty otherwise
+
+**Note:** Validation metadata (expected functions and validation genes) is stored in `VALIDATION_DATA` constants within each `run_benchmark.py` script, not in the CSV files
 
 ### Reshaping to Cluster Format
 
@@ -168,6 +168,21 @@ cluster_id,genes
 21,AATF;C1orf131;DDX18;...
 149,KRAS;BRAF;CYC1;...
 ```
+
+### UniProt Annotations
+
+Each benchmark script loads UniProt gene annotations from `data/knowledge/uniprot_data.tsv` and passes them to the `ClusterAnalyzer`:
+
+```python
+# Load UniProt annotations
+uniprot_df = pd.read_csv("../../data/knowledge/uniprot_data.tsv", sep="\t")
+gene_annotations = uniprot_df[["gene_names", "function"]].copy()
+
+# Pass to analyzer
+results = analyzer.analyze(cluster_df, gene_annotations=gene_annotations)
+```
+
+The UniProt annotations provide functional descriptions for genes, which the LLM uses to identify biological pathways and classify genes
 
 ## Validation
 

@@ -4,9 +4,11 @@ This script analyzes gene clusters from the Funk et al. OPS screen dataset.
 Gene-wise data is reshaped to cluster format, analyzed, and validated inline.
 """
 
-import os
 import json
+import os
+
 import pandas as pd
+
 from mozzarellm import ClusterAnalyzer, reshape_to_clusters
 
 # Configuration
@@ -17,7 +19,10 @@ OUTPUT_DIR = "results"
 # Validation constants (from findings.csv)
 VALIDATION_DATA = {
     "21": {"function": "ribosome biogenesis", "genes": ["C1orf131"]},
-    "37": {"function": "mTOR signaling/ER-Golgi transport/Integrator complex", "genes": ["C7orf26"]},
+    "37": {
+        "function": "mTOR signaling/ER-Golgi transport/Integrator complex",
+        "genes": ["C7orf26"],
+    },
     "121": {"function": "Myc regulation/transcription", "genes": ["SETD2"]},
     "149": {"function": "mitochondrial homeostasis", "genes": ["KRAS", "BRAF"]},
     "167": {"function": "proteasome function", "genes": ["AKIRIN2"]},
@@ -51,9 +56,9 @@ def categorize_gene(gene, cluster):
 
 def validate_results(results):
     """Validate analysis results against ground truth."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("VALIDATION AGAINST GROUND TRUTH")
-    print("="*60)
+    print("=" * 60)
 
     total_function_matches = 0
     total_genes_classified = 0
@@ -70,8 +75,7 @@ def validate_results(results):
         expected_func = expected["function"]
         predicted_func = cluster.dominant_process
         function_match = any(
-            term in predicted_func.lower()
-            for term in expected_func.lower().split()
+            term in predicted_func.lower() for term in expected_func.lower().split()
         )
 
         if function_match:
@@ -81,7 +85,7 @@ def validate_results(results):
         print(f"  Expected: {expected_func}")
         print(f"  Predicted: {predicted_func}")
         print(f"  {'✓' if function_match else '✗'} Function match")
-        print(f"  Validation genes:")
+        print("  Validation genes:")
 
         # Check validation genes
         for gene in expected["genes"]:
@@ -93,13 +97,17 @@ def validate_results(results):
                 print(f"    ✗ {gene}: not classified")
 
     # Summary
-    print(f"\n" + "="*60)
-    print(f"VALIDATION SUMMARY")
-    print(f"="*60)
-    print(f"Function matches: {total_function_matches}/{len(VALIDATION_DATA)} "
-          f"({100*total_function_matches/len(VALIDATION_DATA):.1f}%)")
-    print(f"Genes classified: {total_genes_classified}/{total_validation_genes} "
-          f"({100*total_genes_classified/total_validation_genes:.1f}%)")
+    print("\n" + "=" * 60)
+    print("VALIDATION SUMMARY")
+    print("=" * 60)
+    print(
+        f"Function matches: {total_function_matches}/{len(VALIDATION_DATA)} "
+        f"({100 * total_function_matches / len(VALIDATION_DATA):.1f}%)"
+    )
+    print(
+        f"Genes classified: {total_genes_classified}/{total_validation_genes} "
+        f"({100 * total_genes_classified / total_validation_genes:.1f}%)"
+    )
 
 
 def main():
@@ -107,7 +115,7 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     # Load gene-wise data
-    gene_data_path = os.path.join(script_dir, "funk_2022_genes.csv")
+    gene_data_path = os.path.join(script_dir, "funk_2022.csv")
     print(f"Loading gene-wise data from: {gene_data_path}")
     gene_df = pd.read_csv(gene_data_path)
     print(f"Loaded {len(gene_df)} genes across {gene_df['cluster'].nunique()} clusters")
@@ -119,9 +127,16 @@ def main():
         gene_col="gene_symbol",
         cluster_col="cluster",
         verbose=False,
-        return_dataframes=True
+        return_dataframes=True,
     )
     print(f"Created {len(cluster_df)} cluster rows")
+
+    # Load UniProt annotations
+    uniprot_path = os.path.join(script_dir, "..", "..", "data", "knowledge", "uniprot_data.tsv")
+    print(f"\nLoading UniProt annotations from: {uniprot_path}")
+    uniprot_df = pd.read_csv(uniprot_path, sep="\t")
+    gene_annotations = uniprot_df[["gene_names", "function"]].copy()
+    print(f"Loaded {len(gene_annotations)} gene annotations")
 
     # Create output directory
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -129,15 +144,12 @@ def main():
     # Initialize analyzer
     print(f"\nInitializing ClusterAnalyzer with model: {MODEL}")
     analyzer = ClusterAnalyzer(
-        model=MODEL,
-        temperature=TEMPERATURE,
-        screen_context=SCREEN_CONTEXT,
-        show_progress=True
+        model=MODEL, temperature=TEMPERATURE, screen_context=SCREEN_CONTEXT, show_progress=True
     )
 
     # Run analysis
     print("\nRunning analysis...")
-    results = analyzer.analyze(cluster_df)
+    results = analyzer.analyze(cluster_df, gene_annotations=gene_annotations)
 
     # Save results
     output_file = os.path.join(OUTPUT_DIR, f"{MODEL.replace('/', '_')}_results.json")
@@ -158,11 +170,11 @@ def main():
                     for g in cluster.novel_role_genes
                 ],
                 "summary": cluster.summary,
-                "quality_metrics": cluster.get_quality_summary()
+                "quality_metrics": cluster.get_quality_summary(),
             }
             for cid, cluster in results.clusters.items()
         },
-        "metadata": results.metadata
+        "metadata": results.metadata,
     }
 
     with open(output_file, "w") as f:
@@ -171,9 +183,9 @@ def main():
     print(f"\n✓ Results saved to: {output_file}")
 
     # Print analysis summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("ANALYSIS SUMMARY")
-    print("="*60)
+    print("=" * 60)
     for cluster_id, cluster in results.clusters.items():
         quality = cluster.get_quality_summary()
         print(f"\nCluster {cluster_id}: {cluster.dominant_process}")
@@ -181,8 +193,10 @@ def main():
         print(f"  Established genes: {len(cluster.established_genes)}")
         print(f"  Novel role genes: {len(cluster.novel_role_genes)}")
         print(f"  Uncharacterized genes: {len(cluster.uncharacterized_genes)}")
-        print(f"  Quality: {'✓' if quality['classification_complete'] else '✗'} complete, "
-              f"{'✓' if quality['confidence_validated'] else '✗'} validated")
+        print(
+            f"  Quality: {'✓' if quality['classification_complete'] else '✗'} complete, "
+            f"{'✓' if quality['confidence_validated'] else '✗'} validated"
+        )
 
     # Validate against ground truth
     validate_results(results)

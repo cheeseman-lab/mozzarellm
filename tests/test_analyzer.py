@@ -1,8 +1,10 @@
 """Tests for ClusterAnalyzer."""
 
-import pytest
+from unittest.mock import Mock, patch
+
 import pandas as pd
-from unittest.mock import Mock, patch, MagicMock
+import pytest
+
 from mozzarellm.analyzer import ClusterAnalyzer
 from mozzarellm.models import AnalysisResult
 
@@ -28,7 +30,7 @@ class TestClusterAnalyzerInitialization:
                 max_tokens=4000,
                 use_retrieval=True,
                 knowledge_dir="data/knowledge",
-                retriever_k=5
+                retriever_k=5,
             )
             assert analyzer.temperature == 0.7
             assert analyzer.max_tokens == 4000
@@ -50,9 +52,8 @@ class TestClusterAnalyzerInitialization:
 
     def test_missing_api_key_error(self):
         """Test that missing API key raises error."""
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError):
-                ClusterAnalyzer(model="gpt-4o")
+        with patch.dict("os.environ", {}, clear=True), pytest.raises(ValueError):
+            ClusterAnalyzer(model="gpt-4o")
 
 
 class TestClusterAnalyzerAnalysis:
@@ -64,7 +65,7 @@ class TestClusterAnalyzerAnalysis:
         # Create mock provider
         mock_provider = Mock()
         mock_provider.query.return_value = (
-            '''```json
+            """```json
             {
                 "cluster_id": "1",
                 "dominant_process": "DNA repair",
@@ -74,16 +75,13 @@ class TestClusterAnalyzerAnalysis:
                 "novel_role_genes": [],
                 "summary": "Test summary"
             }
-            ```''',
-            None
+            ```""",
+            None,
         )
         mock_create_provider.return_value = mock_provider
 
         # Create test DataFrame
-        df = pd.DataFrame({
-            "cluster_id": ["1"],
-            "genes": ["BRCA1;BRCA2;TP53"]
-        })
+        df = pd.DataFrame({"cluster_id": ["1"], "genes": ["BRCA1;BRCA2;TP53"]})
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
@@ -101,23 +99,19 @@ class TestClusterAnalyzerAnalysis:
         # Create mock provider
         mock_provider = Mock()
         mock_provider.query.return_value = (
-            '''{"cluster_id": "1", "dominant_process": "test",
+            """{"cluster_id": "1", "dominant_process": "test",
             "pathway_confidence": "Medium", "established_genes": [],
             "uncharacterized_genes": [], "novel_role_genes": [],
-            "summary": "test"}''',
-            None
+            "summary": "test"}""",
+            None,
         )
         mock_create_provider.return_value = mock_provider
 
         # Create test DataFrames
-        cluster_df = pd.DataFrame({
-            "cluster_id": ["1"],
-            "genes": ["BRCA1;TP53"]
-        })
-        annotations_df = pd.DataFrame({
-            "gene": ["BRCA1", "TP53"],
-            "function": ["DNA repair", "Tumor suppressor"]
-        })
+        cluster_df = pd.DataFrame({"cluster_id": ["1"], "genes": ["BRCA1;TP53"]})
+        annotations_df = pd.DataFrame(
+            {"gene": ["BRCA1", "TP53"], "function": ["DNA repair", "Tumor suppressor"]}
+        )
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
@@ -133,27 +127,24 @@ class TestClusterAnalyzerAnalysis:
         mock_provider = Mock()
         mock_provider.query.side_effect = [
             (
-                '''{"cluster_id": "1", "dominant_process": "DNA repair",
+                """{"cluster_id": "1", "dominant_process": "DNA repair",
                 "pathway_confidence": "High", "established_genes": ["BRCA1"],
                 "uncharacterized_genes": [], "novel_role_genes": [],
-                "summary": "test1"}''',
-                None
+                "summary": "test1"}""",
+                None,
             ),
             (
-                '''{"cluster_id": "2", "dominant_process": "Cell cycle",
+                """{"cluster_id": "2", "dominant_process": "Cell cycle",
                 "pathway_confidence": "Medium", "established_genes": ["CDK1"],
                 "uncharacterized_genes": [], "novel_role_genes": [],
-                "summary": "test2"}''',
-                None
-            )
+                "summary": "test2"}""",
+                None,
+            ),
         ]
         mock_create_provider.return_value = mock_provider
 
         # Create test DataFrame
-        df = pd.DataFrame({
-            "cluster_id": ["1", "2"],
-            "genes": ["BRCA1;BRCA2", "CDK1;CDK2"]
-        })
+        df = pd.DataFrame({"cluster_id": ["1", "2"], "genes": ["BRCA1;BRCA2", "CDK1;CDK2"]})
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
@@ -173,10 +164,7 @@ class TestClusterAnalyzerAnalysis:
         mock_create_provider.return_value = mock_provider
 
         # Create test DataFrame
-        df = pd.DataFrame({
-            "cluster_id": ["1"],
-            "genes": ["BRCA1;BRCA2"]
-        })
+        df = pd.DataFrame({"cluster_id": ["1"], "genes": ["BRCA1;BRCA2"]})
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
@@ -188,10 +176,7 @@ class TestClusterAnalyzerAnalysis:
 
     def test_analyze_missing_required_column(self):
         """Test that analysis raises error for missing required columns."""
-        df = pd.DataFrame({
-            "wrong_column": ["1"],
-            "genes": ["BRCA1"]
-        })
+        df = pd.DataFrame({"wrong_column": ["1"], "genes": ["BRCA1"]})
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
@@ -203,19 +188,21 @@ class TestClusterAnalyzerAnalysis:
         """Test that analysis skips rows with invalid gene data."""
         mock_provider = Mock()
         mock_provider.query.return_value = (
-            '''{{"cluster_id": "2", "dominant_process": "test",
+            """{{"cluster_id": "2", "dominant_process": "test",
             "pathway_confidence": "Medium", "established_genes": [],
             "uncharacterized_genes": [], "novel_role_genes": [],
-            "summary": "test"}}''',
-            None
+            "summary": "test"}}""",
+            None,
         )
         mock_create_provider.return_value = mock_provider
 
         # Create DataFrame with invalid gene data
-        df = pd.DataFrame({
-            "cluster_id": ["1", "2"],
-            "genes": [123, "BRCA1;BRCA2"]  # First is not a string
-        })
+        df = pd.DataFrame(
+            {
+                "cluster_id": ["1", "2"],
+                "genes": [123, "BRCA1;BRCA2"],  # First is not a string
+            }
+        )
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
@@ -233,31 +220,28 @@ class TestClusterAnalyzerAnalysis:
         # Setup mocks
         mock_provider = Mock()
         mock_provider.query.return_value = (
-            '''{"cluster_id": "1", "dominant_process": "test",
+            """{"cluster_id": "1", "dominant_process": "test",
             "pathway_confidence": "High", "established_genes": [],
             "uncharacterized_genes": [], "novel_role_genes": [],
-            "summary": "test"}''',
-            None
+            "summary": "test"}""",
+            None,
         )
         mock_create_provider.return_value = mock_provider
 
         mock_retrieve.return_value = {
             "snippets": [{"text": "Evidence", "source": "pubmed", "relevance_score": 0.9}],
             "citations": [],
-            "retrieval_metadata": {}
+            "retrieval_metadata": {},
         }
 
-        df = pd.DataFrame({
-            "cluster_id": ["1"],
-            "genes": ["BRCA1;BRCA2"]
-        })
+        df = pd.DataFrame({"cluster_id": ["1"], "genes": ["BRCA1;BRCA2"]})
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(
                 model="gpt-4o",
                 use_retrieval=True,
                 knowledge_dir="data/knowledge",
-                show_progress=False
+                show_progress=False,
             )
             result = analyzer.analyze(df)
 
@@ -275,19 +259,21 @@ class TestClusterAnalyzerQualityMetrics:
         # LLM response only classifies 2 of 3 genes
         mock_provider = Mock()
         mock_provider.query.return_value = (
-            '''{"cluster_id": "1", "dominant_process": "DNA repair",
+            """{"cluster_id": "1", "dominant_process": "DNA repair",
             "pathway_confidence": "High", "established_genes": ["BRCA1"],
             "uncharacterized_genes": [{"gene": "BRCA2", "priority": 8, "rationale": "test"}],
             "novel_role_genes": [],
-            "summary": "test"}''',
-            None
+            "summary": "test"}""",
+            None,
         )
         mock_create_provider.return_value = mock_provider
 
-        df = pd.DataFrame({
-            "cluster_id": ["1"],
-            "genes": ["BRCA1;BRCA2;TP53"]  # 3 genes, but TP53 won't be in response
-        })
+        df = pd.DataFrame(
+            {
+                "cluster_id": ["1"],
+                "genes": ["BRCA1;BRCA2;TP53"],  # 3 genes, but TP53 won't be in response
+            }
+        )
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
@@ -296,33 +282,35 @@ class TestClusterAnalyzerQualityMetrics:
         cluster = result.clusters["1"]
         assert "TP53" in cluster.missed_genes
         assert len(cluster.missed_genes) == 1
-        assert cluster.classification_completeness == 2/3  # 2 out of 3 classified
+        assert cluster.classification_completeness == 2 / 3  # 2 out of 3 classified
 
     @patch("mozzarellm.analyzer.create_provider")
     def test_established_gene_ratio(self, mock_create_provider):
         """Test established gene ratio calculation."""
         mock_provider = Mock()
         mock_provider.query.return_value = (
-            '''{"cluster_id": "1", "dominant_process": "DNA repair",
+            """{"cluster_id": "1", "dominant_process": "DNA repair",
             "pathway_confidence": "High", "established_genes": ["BRCA1", "BRCA2"],
             "uncharacterized_genes": [{"gene": "GENE1", "priority": 8, "rationale": "test"}],
             "novel_role_genes": [],
-            "summary": "test"}''',
-            None
+            "summary": "test"}""",
+            None,
         )
         mock_create_provider.return_value = mock_provider
 
-        df = pd.DataFrame({
-            "cluster_id": ["1"],
-            "genes": ["BRCA1;BRCA2;GENE1"]  # 2 of 3 are established
-        })
+        df = pd.DataFrame(
+            {
+                "cluster_id": ["1"],
+                "genes": ["BRCA1;BRCA2;GENE1"],  # 2 of 3 are established
+            }
+        )
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
             result = analyzer.analyze(df)
 
         cluster = result.clusters["1"]
-        assert cluster.established_gene_ratio == pytest.approx(2/3, rel=0.01)
+        assert cluster.established_gene_ratio == pytest.approx(2 / 3, rel=0.01)
         assert cluster.total_genes_in_cluster == 3
 
 
@@ -334,18 +322,15 @@ class TestClusterAnalyzerAliases:
         """Test that analyze_dataframe() is an alias for analyze()."""
         mock_provider = Mock()
         mock_provider.query.return_value = (
-            '''{"cluster_id": "1", "dominant_process": "test",
+            """{"cluster_id": "1", "dominant_process": "test",
             "pathway_confidence": "High", "established_genes": [],
             "uncharacterized_genes": [], "novel_role_genes": [],
-            "summary": "test"}''',
-            None
+            "summary": "test"}""",
+            None,
         )
         mock_create_provider.return_value = mock_provider
 
-        df = pd.DataFrame({
-            "cluster_id": ["1"],
-            "genes": ["BRCA1"]
-        })
+        df = pd.DataFrame({"cluster_id": ["1"], "genes": ["BRCA1"]})
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             analyzer = ClusterAnalyzer(model="gpt-4o", show_progress=False)
