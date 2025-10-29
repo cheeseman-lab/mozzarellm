@@ -27,6 +27,10 @@ VALIDATION_DATA = {
         "function": "mTOR signaling/ER-Golgi transport/Integrator complex",
         "genes": ["C7orf26"],
     },
+    "99": {
+        "function": "No coherent pathway",
+        "genes": ["MCL1", "MDC1", "PUM3", "UFSP2"],
+    },
     "121": {"function": "Myc regulation/transcription", "genes": ["SETD2"]},
     "149": {"function": "mitochondrial homeostasis", "genes": ["KRAS", "BRAF"]},
     "167": {"function": "proteasome function", "genes": ["AKIRIN2"]},
@@ -130,6 +134,7 @@ def main():
         input_df=gene_df,
         gene_col="gene_symbol",
         cluster_col="cluster",
+        additional_cols=["up_features", "down_features", "phenotypic_strength"],
         verbose=False,
         return_dataframes=True,
     )

@@ -151,18 +151,59 @@ def reshape_to_clusters(
             # Process other additional columns
             for col in additional_cols:
                 if col != "gene_count" and col in df.columns:
-                    # For columns like cluster_group that should be the same for all genes in a cluster
-                    # Take the first non-null value or the most common value
-                    values = group[col].dropna().tolist()
-                    if values:
-                        if len(set(values)) == 1:  # All values are the same
-                            cluster_info[col] = values[0]
+                    # Special handling for up_features and down_features: find overlapping features
+                    if col in ["up_features", "down_features"]:
+                        feature_counts = {}
+                        for feature_str in group[col].dropna():
+                            if feature_str and isinstance(feature_str, str):
+                                features = [f.strip() for f in feature_str.split(",") if f.strip()]
+                                for feature in features:
+                                    feature_counts[feature] = feature_counts.get(feature, 0) + 1
+
+                        # Keep only features that appear in 2+ genes (overlapping)
+                        overlapping = [f for f, count in feature_counts.items() if count >= 2]
+                        # Sort by frequency (descending), then alphabetically
+                        overlapping.sort(key=lambda f: (-feature_counts[f], f))
+                        cluster_info[col] = ",".join(overlapping) if overlapping else ""
+
+                    # Special handling for phenotypic_strength: average numerators, keep denominator
+                    elif col == "phenotypic_strength":
+                        strengths = group[col].dropna().tolist()
+                        if strengths:
+                            numerators = []
+                            denominator = None
+                            for strength in strengths:
+                                if isinstance(strength, str) and "/" in strength:
+                                    parts = strength.split("/")
+                                    try:
+                                        numerators.append(float(parts[0]))
+                                        if denominator is None:
+                                            denominator = parts[1]
+                                    except ValueError:
+                                        continue
+
+                            if numerators and denominator:
+                                avg_numerator = sum(numerators) / len(numerators)
+                                cluster_info[col] = f"{avg_numerator:.1f}/{denominator}"
+                            else:
+                                cluster_info[col] = ""
                         else:
-                            # Get the most common value
-                            most_common = pd.Series(values).value_counts().index[0]
-                            cluster_info[col] = most_common
+                            cluster_info[col] = ""
+
+                    # Default handling for other columns
                     else:
-                        cluster_info[col] = None
+                        # For columns like cluster_group that should be the same for all genes in a cluster
+                        # Take the first non-null value or the most common value
+                        values = group[col].dropna().tolist()
+                        if values:
+                            if len(set(values)) == 1:  # All values are the same
+                                cluster_info[col] = values[0]
+                            else:
+                                # Get the most common value
+                                most_common = pd.Series(values).value_counts().index[0]
+                                cluster_info[col] = most_common
+                        else:
+                            cluster_info[col] = None
 
         clusters[cluster] = cluster_info
 
