@@ -77,6 +77,25 @@ claude-3-7-sonnet-20250219               OPS             6/6          7/7       
 ...
 ```
 
+### Running with verbose logging
+
+For detailed debugging and progress tracking, use the `--verbose` flag and redirect output to a log file:
+
+```bash
+# Run full benchmark suite with verbose logging
+python run_all_benchmarks.py --verbose 2>&1 | tee benchmark_full.log
+
+# Run OPS benchmark only with logging
+cd ops && python run_benchmark.py 2>&1 | tee ops_benchmark.log
+```
+
+The verbose mode shows:
+- File operations (reading, modifying scripts)
+- Real-time progress indicators
+- Full stdout/stderr from each benchmark
+- Immediate success/failure status
+- Detailed error messages for failures
+
 ### Running individual benchmarks
 
 ```bash

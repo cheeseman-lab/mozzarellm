@@ -46,15 +46,6 @@ This roadmap outlines the development priorities for enhancing MozzareLLM's anal
    - Option C: No caching (always fresh, but slower)
    - Consider: Balance between freshness and API rate limits
 
-3. **Error handling for missing/ambiguous genes?**
-   - How to handle genes not found in UniProt?
-   - How to handle deprecated gene symbols?
-   - Should we try alternative IDs (Ensembl, etc.)?
-
-4. **Integration point in retrieval flow?**
-   - Should UniProt data be treated as highest-priority evidence (like current annotations)?
-   - Should it be a separate evidence type with distinct relevance score?
-
 **Implementation Notes**:
 - Modify `retrieval.py::retrieve_context()` to add UniProt fetching
 - New function: `_fetch_uniprot_annotations(genes: list[str]) -> dict[str, str]`
@@ -102,12 +93,7 @@ This roadmap outlines the development priorities for enhancing MozzareLLM's anal
    - How to organize: By gene? By sub-process? Chronologically?
    - Should we include citation metadata (PMID, DOI, year)?
 
-4. **Update frequency?**
-   - Should knowledge files be regenerated periodically?
-   - Version control for knowledge files?
-   - How to handle conflicts between old and new literature?
-
-5. **Integration with Claude's native PubMed search?**
+4. **Integration with Claude's native PubMed search?**
    - Claude (Anthropic) has built-in PubMed search capability
    - Should we use Claude's native search or build independent pipeline?
    - Consider: Simplicity vs. control/reproducibility
@@ -409,7 +395,7 @@ This roadmap outlines the development priorities for enhancing MozzareLLM's anal
 
 ---
 
-## Phase 3: Prompt Engineering & Feature Integration (Lower Priority)
+## Phase 3: Prompt Engineering & Feature Integration
 **Owner**: Matteo  
 **Priority**: MEDIUM  
 **Goal**: Complete the prompt structure with advanced analytical features

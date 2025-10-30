@@ -17,7 +17,7 @@ from mozzarellm.utils.llm_analysis_utils import save_cluster_analysis
 load_dotenv()
 
 # Configuration
-MODEL = "claude-sonnet-4-5-20250929"  # Modified by run_all_benchmarks.py
+MODEL = "claude-sonnet-4-5-20250929"  # Change to test different models
 TEMPERATURE = 0.0
 OUTPUT_DIR = "results"
 
