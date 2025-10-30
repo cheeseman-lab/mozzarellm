@@ -87,9 +87,13 @@ def validate_results(results):
         # Check validation genes
         for gene in expected["genes"]:
             category = categorize_gene(gene, cluster)
-            if category != "not_classified":
+            # Validation genes should be classified as novel_role or uncharacterized
+            # (they represent novel discoveries, not established genes)
+            if category in ["novel_role", "uncharacterized"]:
                 total_genes_classified += 1
                 print(f"    ✓ {gene}: {category}")
+            elif category == "established":
+                print(f"    ✗ {gene}: {category} (expected novel_role or uncharacterized)")
             else:
                 print(f"    ✗ {gene}: not classified")
 
@@ -141,12 +145,12 @@ def main():
     # Initialize analyzer
     print(f"\nInitializing ClusterAnalyzer with model: {MODEL}")
     analyzer = ClusterAnalyzer(
-        model=MODEL, temperature=TEMPERATURE, screen_context=SCREEN_CONTEXT, show_progress=True
+        model=MODEL, temperature=TEMPERATURE, show_progress=True
     )
 
     # Run analysis
     print("\nRunning analysis...")
-    results = analyzer.analyze(cluster_df, gene_annotations=gene_annotations)
+    results = analyzer.analyze(cluster_df, gene_annotations=gene_annotations, screen_context=SCREEN_CONTEXT)
 
     # Save results
     output_file = os.path.join(OUTPUT_DIR, f"{MODEL.replace('/', '_')}_results.json")

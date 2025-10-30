@@ -111,9 +111,13 @@ def validate_results(results):
             print("  Validation genes:")
             for gene in expected["genes"]:
                 category = categorize_gene(gene, cluster)
-                if category != "not_classified":
+                # Validation genes should be classified as novel_role or uncharacterized
+                # (they represent novel discoveries, not established genes)
+                if category in ["novel_role", "uncharacterized"]:
                     total_genes_classified += 1
                     print(f"    ✓ {gene}: {category}")
+                elif category == "established":
+                    print(f"    ✗ {gene}: {category} (expected novel_role or uncharacterized)")
                 else:
                     print(f"    ✗ {gene}: not classified")
         else:
