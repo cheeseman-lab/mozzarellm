@@ -4,6 +4,7 @@ This script analyzes gene clusters from the Funk et al. OPS screen dataset.
 Gene-wise data is reshaped to cluster format, analyzed, and validated inline.
 """
 
+import json
 import os
 
 import pandas as pd
@@ -16,7 +17,7 @@ from mozzarellm.utils.llm_analysis_utils import save_cluster_analysis
 load_dotenv()
 
 # Configuration
-MODEL = "claude-sonnet-4-5-20250929"  # Modified by run_all_benchmarks.py
+MODEL = "claude-sonnet-4-5-20250929"  # Change to test different models
 TEMPERATURE = 0.0
 OUTPUT_DIR = "results"
 
@@ -206,7 +207,7 @@ def main():
     }
 
     # Save using built-in function (creates JSON + 2 CSVs)
-    save_cluster_analysis(
+    saved_results = save_cluster_analysis(
         clusters_dict,
         out_file_base=output_base,
         original_df=cluster_df,
@@ -214,7 +215,7 @@ def main():
         save_outputs=True,
     )
 
-    print("\n✓ Results saved to:")
+    print(f"\n✓ Results saved to:")
     print(f"  - {output_base}_clusters.json (cluster data)")
     print(f"  - {output_base}_flagged_genes.csv (gene-level analysis)")
     print(f"  - {output_base}_cluster_summary.csv (cluster-level summary)")
