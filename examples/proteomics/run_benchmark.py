@@ -144,13 +144,13 @@ def main():
 
     # Initialize analyzer
     print(f"\nInitializing ClusterAnalyzer with model: {MODEL}")
-    analyzer = ClusterAnalyzer(
-        model=MODEL, temperature=TEMPERATURE, show_progress=True
-    )
+    analyzer = ClusterAnalyzer(model=MODEL, temperature=TEMPERATURE, show_progress=True)
 
     # Run analysis
     print("\nRunning analysis...")
-    results = analyzer.analyze(cluster_df, gene_annotations=gene_annotations, screen_context=SCREEN_CONTEXT)
+    results = analyzer.analyze(
+        cluster_df, gene_annotations=gene_annotations, screen_context=SCREEN_CONTEXT
+    )
 
     # Save results
     output_file = os.path.join(OUTPUT_DIR, f"{MODEL.replace('/', '_')}_results.json")

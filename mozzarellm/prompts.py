@@ -1,50 +1,16 @@
 """
 Prompt templates and instructions for gene cluster analysis.
 
-This module contains prompt templates and chain-of-thought instructions
-optimized for analyzing functional genomics clusters with LLMs.
+This module contains modular prompt components organized in the order they appear
+in the final assembled prompt. Components are automatically concatenated by the
+prompt factory.
 """
 
-# Optimized context for robustly analyzing gene clusters
-ROBUST_SCREEN_CONTEXT = """
-Genes grouped within a cluster tend to exhibit similar morphological phenotypes in this context, suggesting that they may participate in the same biological process or pathway. However, not all clusters will correspond to a defined or coherent biological pathway.
+# =============================================================================
+# SECTION 1: CORE TASK (always first)
+# =============================================================================
 
-When evaluating pathway confidence, apply these stringent criteria:
-
-HIGH CONFIDENCE:
-- Multiple well-established genes (≥3) with strong literature support in the same specific pathway
-- Clear functional relationship between genes that explains the observed phenotypic clustering
-- Genes represent different aspects or components of the same biological process
-- The pathway assignment explains >60% of genes in the cluster
-
-MEDIUM CONFIDENCE:
-- Some established genes (1-2) from a specific pathway, with additional supporting genes
-- Functional relationship is plausible but has some gaps or uncertainties
-- Some genes in the cluster have unclear relationship to the proposed pathway
-- The pathway assignment explains 40-60% of genes in the cluster
-
-LOW CONFIDENCE:
-- Few or no established pathway genes, but a plausible functional theme
-- Significant heterogeneity in gene functions within the cluster
-- The proposed pathway is very broad or general
-- The pathway assignment explains <40% of genes in the cluster
-
-CLUSTERS WITH NO COHERENT PATHWAY:
-- For clusters with no clear functional relationship among genes
-- Clusters where genes belong to many unrelated pathways
-- Clusters containing nontargeting control genes
-- Clusters where you cannot identify a dominant biological process
-
-For clusters with no coherent pathway, set:
-- "pathway_confidence": "Low"
-- "dominant_process": "No coherent biological pathway"
-- And explain the reasoning clearly in the "summary" field
-
-The goal is NOT to force-fit clusters into pathways, but to identify clusters where a clear biological signal emerges from the phenotypic grouping. Mark clusters without a coherent biological signature as indicated above rather than assigning biologically implausible pathways.
-"""
-
-# Optimized context for analyzing gene clusters with specific pathway focus
-ROBUST_CLUSTER_PROMPT = """
+CLUSTER_ANALYSIS_TASK = """
 Analyze gene cluster {cluster_id} to identify the dominant biological pathway and classify genes:
 
 Genes: {gene_list}
@@ -61,7 +27,14 @@ For each cluster:
    - Provide a rationale explaining why this gene merits investigation
 
 4. Provide a concise summary of the key findings for each cluster
+"""
 
+
+# =============================================================================
+# SECTION 2: GENE CLASSIFICATION & PRIORITIZATION RULES (always second)
+# =============================================================================
+
+GENE_CLASSIFICATION_RULES = """
 When classifying and prioritizing genes, apply these specific criteria:
 
 1. ESTABLISHED PATHWAY GENES:
@@ -98,6 +71,72 @@ IMPORTANT CONSIDERATIONS:
 - For any gene with substantial literature, it should NOT be classified as UNCHARACTERIZED
 - The goal is not to speculate but to flag only the most promising candidates for follow-up
 """
+
+
+# =============================================================================
+# SECTION 3: SCREEN CONTEXT (inserted by prompt_factory)
+# =============================================================================
+# This section is where benchmark-specific or default context will be inserted.
+# Benchmarks provide their own SCREEN_CONTEXT describing the experimental approach.
+
+DEFAULT_SCREEN_CONTEXT = """
+Genes grouped within a cluster exhibit similar profiles in this functional genomics
+analysis, suggesting they may participate in related biological processes or pathways.
+"""
+
+
+# =============================================================================
+# SECTION 4: PATHWAY CONFIDENCE ASSESSMENT (always included after screen context)
+# =============================================================================
+
+PATHWAY_CONFIDENCE_CRITERIA = """
+When evaluating pathway confidence, apply these stringent criteria based on what percentage of
+genes in the cluster are explained by the proposed pathway:
+
+HIGH CONFIDENCE:
+- >70% of genes in the cluster fit the proposed pathway
+- Multiple well-established genes with strong literature support in this specific pathway
+- Clear functional relationship between genes that explains the observed phenotypic clustering
+- Genes represent different aspects or components of the same biological process
+
+MEDIUM CONFIDENCE:
+- 50-70% of genes in the cluster fit the proposed pathway
+- Some established genes from the pathway, with additional plausible supporting genes
+- Functional relationship is plausible but has some gaps or uncertainties
+- Some genes in the cluster have unclear relationship to the proposed pathway
+
+LOW CONFIDENCE:
+- 30-50% of genes in the cluster fit the proposed pathway
+- Few established pathway genes, but a plausible functional theme
+- Significant heterogeneity in gene functions within the cluster
+- The proposed pathway is very broad or general
+
+CLUSTERS WITH NO COHERENT PATHWAY:
+- <30% of genes in the cluster fit any single proposed pathway
+- Clusters where genes belong to many unrelated pathways
+- Clusters containing nontargeting control genes
+- Clusters where you cannot identify a dominant biological process
+
+For clusters with no coherent pathway, set:
+- "pathway_confidence": "Low"
+- "dominant_process": "No coherent biological pathway"
+- And explain the reasoning clearly in the "summary" field
+
+The goal is NOT to force-fit clusters into pathways, but to identify clusters where a clear
+biological signal emerges from the phenotypic grouping. Assess what percentage of genes are
+actually explained by the pathway - if most genes don't fit, the confidence should be low.
+"""
+
+
+# =============================================================================
+# SECTION 5: RETRIEVED EVIDENCE (inserted by prompt_factory when RAG enabled)
+# =============================================================================
+# Evidence snippets from knowledge base retrieval are inserted here
+
+
+# =============================================================================
+# SECTION 6: CHAIN-OF-THOUGHT INSTRUCTIONS (inserted by prompt_factory when CoT enabled)
+# =============================================================================
 
 ENHANCED_COT_INSTRUCTIONS = """
 STEP 1 - PATHWAY HYPOTHESIS (2-3 candidates):
@@ -143,4 +182,40 @@ CONCISE_COT_INSTRUCTIONS = """
 2) Classify each gene as ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE with 1-line rationale.
 3) Assign priority scores (1-10) based on novelty and impact; cite supporting evidence.
 4) Note contradictions or gaps in evidence; adjust confidence accordingly.
+"""
+
+
+# =============================================================================
+# SECTION 7: GENE ANNOTATIONS (inserted by prompt_factory if provided)
+# =============================================================================
+# Gene-specific functional annotations from UniProt/databases are inserted here
+
+
+# =============================================================================
+# SECTION 8: OUTPUT FORMAT (always last)
+# =============================================================================
+
+OUTPUT_FORMAT_JSON = """
+Provide a concise analysis in this exact JSON format:
+{
+  "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id provided in the prompt
+  "dominant_process": "specific pathway name",
+  "pathway_confidence": "High/Medium/Low",
+  "established_genes": ["GeneA", "GeneB"],
+  "uncharacterized_genes": [
+    {
+      "gene": "GeneC",
+      "priority": 8,
+      "rationale": "explanation"
+    }
+  ],
+  "novel_role_genes": [
+    {
+      "gene": "GeneD",
+      "priority": 7,
+      "rationale": "explanation"
+    }
+  ],
+  "summary": "key findings summary"
+}
 """

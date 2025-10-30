@@ -14,12 +14,15 @@ from .models import (
     RetrievalContext,
 )
 
-# Prompt constants (preserved)
+# Prompt components (modular)
 from .prompts import (
+    CLUSTER_ANALYSIS_TASK,
     CONCISE_COT_INSTRUCTIONS,
+    DEFAULT_SCREEN_CONTEXT,
     ENHANCED_COT_INSTRUCTIONS,
-    ROBUST_CLUSTER_PROMPT,
-    ROBUST_SCREEN_CONTEXT,
+    GENE_CLASSIFICATION_RULES,
+    OUTPUT_FORMAT_JSON,
+    PATHWAY_CONFIDENCE_CRITERIA,
 )
 from .providers import (
     AnthropicProvider,
@@ -48,11 +51,14 @@ __all__ = [
     "AnthropicProvider",
     "GeminiProvider",
     "create_provider",
-    # Prompt constants
+    # Prompt components
+    "CLUSTER_ANALYSIS_TASK",
+    "GENE_CLASSIFICATION_RULES",
+    "DEFAULT_SCREEN_CONTEXT",
+    "PATHWAY_CONFIDENCE_CRITERIA",
+    "OUTPUT_FORMAT_JSON",
     "ENHANCED_COT_INSTRUCTIONS",
     "CONCISE_COT_INSTRUCTIONS",
-    "ROBUST_SCREEN_CONTEXT",
-    "ROBUST_CLUSTER_PROMPT",
     # Utilities
     "reshape_to_clusters",
 ]

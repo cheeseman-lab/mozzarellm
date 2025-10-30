@@ -38,11 +38,13 @@ VALIDATION_DATA = {
     "197": {"function": "m6A mRNA modification", "genes": ["HNRNPD"]},
 }
 
-# Import robust screen context
-from mozzarellm.prompts import ROBUST_SCREEN_CONTEXT
-
-# Use robust screen context which handles nontargeting controls
-SCREEN_CONTEXT = ROBUST_SCREEN_CONTEXT
+# Screen context for OPS data
+SCREEN_CONTEXT = """
+This is from an optical pooled screen (OPS).
+Genes in each cluster were identified based on similar morphological phenotypes.
+Genes grouped within a cluster tend to exhibit similar phenotypes, suggesting they
+may participate in the same biological process or pathway.
+"""
 
 
 def categorize_gene(gene, cluster):
