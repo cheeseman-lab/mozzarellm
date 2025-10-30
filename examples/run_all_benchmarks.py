@@ -32,12 +32,13 @@ BENCHMARKS = [
 ]
 
 
-def run_benchmark(benchmark_dir: str, model: str) -> dict:
+def run_benchmark(benchmark_dir: str, model: str, verbose: bool = False) -> dict:
     """Run a single benchmark with a specific model.
 
     Args:
         benchmark_dir: Directory containing the benchmark script
         model: Model identifier to use
+        verbose: If True, print detailed output including stdout/stderr
 
     Returns:
         Dictionary with validation results
@@ -48,6 +49,18 @@ def run_benchmark(benchmark_dir: str, model: str) -> dict:
 
     # Modify the benchmark script to use the specified model
     script_path = Path(benchmark_dir) / "run_benchmark.py"
+
+    if not script_path.exists():
+        error_msg = f"Benchmark script not found: {script_path}"
+        print(f"✗ {error_msg}")
+        return {
+            "model": model,
+            "benchmark": benchmark_dir,
+            "success": False,
+            "error": error_msg,
+        }
+
+    print(f"📄 Reading benchmark script: {script_path}")
     script_content = script_path.read_text()
 
     # Replace MODEL line
@@ -58,13 +71,18 @@ def run_benchmark(benchmark_dir: str, model: str) -> dict:
             break
 
     if original_model_line:
+        print(f"🔧 Modifying MODEL from: {original_model_line.strip()}")
+        print(f"   to: MODEL = \"{model}\"")
         modified_content = script_content.replace(
             original_model_line, f'MODEL = "{model}"  # Modified by run_all_benchmarks.py'
         )
         script_path.write_text(modified_content)
+    else:
+        print("⚠️  Warning: Could not find MODEL line in script")
 
     try:
         # Run the benchmark
+        print(f"🚀 Executing benchmark...")
         result = subprocess.run(
             [sys.executable, "run_benchmark.py"],
             cwd=benchmark_dir,
@@ -76,23 +94,50 @@ def run_benchmark(benchmark_dir: str, model: str) -> dict:
         # Restore original model line
         if original_model_line:
             script_path.write_text(script_content)
+            print("✓ Restored original script content")
 
         # Parse validation results from output
         output = result.stdout
+        stderr = result.stderr
+
+        print(f"\n📊 Benchmark completed with return code: {result.returncode}")
+
+        if verbose or result.returncode != 0:
+            print("\n" + "-" * 70)
+            print("STDOUT:")
+            print("-" * 70)
+            print(output if output else "(no output)")
+
+        if stderr:
+            print("\n" + "-" * 70)
+            print("STDERR:")
+            print("-" * 70)
+            print(stderr)
+            print("-" * 70)
+
         validation_results = parse_validation_output(output)
 
         # Add model and benchmark info
         validation_results["model"] = model
         validation_results["benchmark"] = benchmark_dir
         validation_results["success"] = result.returncode == 0
+        validation_results["stdout"] = output
+        validation_results["stderr"] = stderr
 
         if result.returncode != 0:
-            validation_results["error"] = result.stderr
+            validation_results["error"] = stderr if stderr else "Non-zero return code"
+            print(f"✗ Benchmark FAILED")
+        else:
+            print(f"✓ Benchmark SUCCEEDED")
+            print(f"   Function matches: {validation_results.get('function_matches', 'N/A')}")
+            print(f"   Genes classified: {validation_results.get('genes_classified', 'N/A')}")
 
         return validation_results
 
     except subprocess.TimeoutExpired:
         print("⚠️  Benchmark timed out after 10 minutes")
+        if original_model_line:
+            script_path.write_text(script_content)
         return {
             "model": model,
             "benchmark": benchmark_dir,
@@ -101,6 +146,8 @@ def run_benchmark(benchmark_dir: str, model: str) -> dict:
         }
     except Exception as e:
         print(f"⚠️  Error running benchmark: {e}")
+        if original_model_line:
+            script_path.write_text(script_content)
         return {
             "model": model,
             "benchmark": benchmark_dir,
@@ -110,7 +157,10 @@ def run_benchmark(benchmark_dir: str, model: str) -> dict:
     finally:
         # Ensure original content is restored
         if original_model_line:
-            script_path.write_text(script_content)
+            try:
+                script_path.write_text(script_content)
+            except Exception as e:
+                print(f"⚠️  Warning: Could not restore original script: {e}")
 
 
 def parse_validation_output(output: str) -> dict:
@@ -168,6 +218,18 @@ def print_summary(all_results: list):
 
     print("=" * 80)
 
+    # Print error details if any failures
+    failed_results = [r for r in all_results if not r["success"]]
+    if failed_results:
+        print("\nFAILURE DETAILS:")
+        print("=" * 80)
+        for result in failed_results:
+            print(f"\n{result['benchmark'].upper()} - {result['model']}")
+            print(f"  Error: {result.get('error', 'Unknown error')}")
+            if result.get('stderr'):
+                print(f"  Stderr preview: {result['stderr'][:200]}...")
+        print("=" * 80)
+
 
 def main():
     """Main entry point."""
@@ -188,6 +250,12 @@ def main():
         action="store_true",
         help="Don't save results to file",
     )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Show verbose output including full stdout from benchmarks",
+    )
 
     args = parser.parse_args()
 
@@ -196,15 +264,27 @@ def main():
         f"Running benchmarks for {len(args.models)} model(s) across {len(BENCHMARKS)} benchmark(s)"
     )
     print(f"Models: {', '.join(args.models)}")
+    if args.verbose:
+        print("Verbose mode: ENABLED")
     print(f"{'=' * 80}")
 
     all_results = []
 
     # Run each benchmark for each model
-    for model in args.models:
-        for benchmark in BENCHMARKS:
-            result = run_benchmark(benchmark["dir"], model)
+    for i, model in enumerate(args.models):
+        print(f"\n{'#' * 80}")
+        print(f"MODEL {i+1}/{len(args.models)}: {model}")
+        print(f"{'#' * 80}")
+        for j, benchmark in enumerate(BENCHMARKS):
+            print(f"\n>>> Benchmark {j+1}/{len(BENCHMARKS)}: {benchmark['name']}")
+            result = run_benchmark(benchmark["dir"], model, verbose=args.verbose)
             all_results.append(result)
+
+            # Print immediate status
+            status_emoji = "✓" if result["success"] else "✗"
+            print(f"{status_emoji} {benchmark['name']} with {model}: {'SUCCESS' if result['success'] else 'FAILED'}")
+            if not result["success"]:
+                print(f"   Error: {result.get('error', 'Unknown error')}")
 
     # Print summary
     print_summary(all_results)
