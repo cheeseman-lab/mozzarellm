@@ -17,11 +17,11 @@ from datetime import datetime
 from pathlib import Path
 
 # Default models to benchmark (latest/most advanced models - Oct 2025)
+# One from each provider for comprehensive comparison
 DEFAULT_MODELS = [
-    "o4-mini",  # OpenAI's fast reasoning model (April 2025)
-    "claude-sonnet-4-5-20250929",  # Latest Claude Sonnet (Sept 2025)
-    "gemini-2.5-pro",  # Stable Gemini Pro (June 2025)
-    "gpt-4o",  # OpenAI's flagship model
+    "claude-sonnet-4-5-20250929",  # Anthropic - Latest Claude Sonnet (Sept 2025)
+    "gemini-2.5-pro",  # Google - Stable Gemini Pro (June 2025)
+    "gpt-4o",  # OpenAI - Flagship model
 ]
 
 # Benchmark configurations
