@@ -21,16 +21,21 @@ def make_cluster_analysis_prompt(
     """
     Create a prompt for gene cluster analysis by assembling modular components.
 
-    Default assembly order (non-RAG, non-CoT):
-    1. CLUSTER_ANALYSIS_TASK (formatted with cluster_id, genes)
-    2. GENE_CLASSIFICATION_RULES
-    3. SCREEN INFORMATION (benchmark-specific or default)
-    4. PATHWAY_CONFIDENCE_CRITERIA (always included)
-    5. Gene annotations (if provided)
-    6. OUTPUT_FORMAT_JSON
+    Assembly order:
+    1. CLUSTER_ANALYSIS_TASK (discovery mission)
+    2. SCREEN CONTEXT (experimental setup - WHY genes cluster)
+    3. GENE_CLASSIFICATION_RULES (framework for analysis)
+    4. GENE ANNOTATIONS (the data - if provided)
+    5. RETRIEVED EVIDENCE (additional context - if RAG enabled)
+    6. PATHWAY_CONFIDENCE_CRITERIA (assessment criteria - comes AFTER data)
+    7. CoT INSTRUCTIONS (reasoning steps - if enabled)
+    8. OUTPUT_FORMAT_JSON (response structure)
 
-    When RAG/CoT are enabled, retrieved evidence and CoT instructions are inserted
-    between pathway confidence criteria and gene annotations.
+    Rationale: Context before framework, data before assessment.
+    - Screen context establishes WHY genes cluster (phenotypic similarity)
+    - Classification framework makes sense after understanding the context
+    - All data (annotations + evidence) comes before assessment criteria
+    - Pathway confidence assessment comes AFTER seeing the data
 
     Custom templates (escape hatch):
     If template_path or template_string is provided, it completely replaces the
@@ -82,17 +87,12 @@ def make_cluster_analysis_prompt(
     )
 
     # =========================================================================
-    # SECTION 1: Core task (formatted)
+    # SECTION 1: Core task (discovery mission)
     # =========================================================================
     prompt = CLUSTER_ANALYSIS_TASK.format(cluster_id=str(cluster_id), gene_list=gene_list)
 
     # =========================================================================
-    # SECTION 2: Gene classification rules
-    # =========================================================================
-    prompt += "\n\n" + GENE_CLASSIFICATION_RULES
-
-    # =========================================================================
-    # SECTION 3: Screen context (custom or default)
+    # SECTION 2: Screen context (experimental background - establishes WHY genes cluster)
     # =========================================================================
     if screen_context:
         prompt += f"\n\nSCREEN INFORMATION:\n{screen_context}\n"
@@ -100,27 +100,32 @@ def make_cluster_analysis_prompt(
         prompt += f"\n\nSCREEN INFORMATION:\n{DEFAULT_SCREEN_CONTEXT}\n"
 
     # =========================================================================
-    # SECTION 4: Pathway confidence criteria (always included)
+    # SECTION 3: Gene classification rules (framework makes sense after context)
     # =========================================================================
-    prompt += "\n" + PATHWAY_CONFIDENCE_CRITERIA
+    prompt += "\n\n" + GENE_CLASSIFICATION_RULES
 
     # =========================================================================
-    # SECTION 5: Retrieved evidence (RAG mode)
+    # SECTION 4: Gene annotations (the data - must come before assessment)
+    # =========================================================================
+    if gene_annotations_dict:
+        prompt += _format_gene_annotations(gene_annotations_dict, genes)
+
+    # =========================================================================
+    # SECTION 5: Retrieved evidence (additional context - must come before assessment)
     # =========================================================================
     if retrieved_context and isinstance(retrieved_context, dict):
         prompt += _format_retrieved_evidence(retrieved_context)
 
     # =========================================================================
-    # SECTION 6: Chain-of-thought instructions (CoT mode)
+    # SECTION 6: Pathway confidence criteria (assess what you found - needs all data first)
+    # =========================================================================
+    prompt += "\n\n" + PATHWAY_CONFIDENCE_CRITERIA
+
+    # =========================================================================
+    # SECTION 7: Chain-of-thought instructions (reasoning process - comes after all context)
     # =========================================================================
     if cot_instructions and isinstance(cot_instructions, str):
         prompt += f"\n\nREASONING STEPS (keep to brief bullet points; no long prose):\n{cot_instructions}\n"
-
-    # =========================================================================
-    # SECTION 7: Gene annotations
-    # =========================================================================
-    if gene_annotations_dict:
-        prompt += _format_gene_annotations(gene_annotations_dict, genes)
 
     # =========================================================================
     # SECTION 8: Output format (always last)

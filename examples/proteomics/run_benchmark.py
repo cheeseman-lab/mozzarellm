@@ -4,13 +4,13 @@ This script analyzes protein assemblies from the Schaffer et al. U2OS Cell Map d
 Gene-wise data is reshaped to cluster format, analyzed, and validated inline.
 """
 
-import json
 import os
 
 import pandas as pd
 from dotenv import load_dotenv
 
 from mozzarellm import ClusterAnalyzer, reshape_to_clusters
+from mozzarellm.utils.llm_analysis_utils import save_cluster_analysis
 
 # Load environment variables from .env file
 load_dotenv()
@@ -152,36 +152,43 @@ def main():
         cluster_df, gene_annotations=gene_annotations, screen_context=SCREEN_CONTEXT
     )
 
-    # Save results
-    output_file = os.path.join(OUTPUT_DIR, f"{MODEL.replace('/', '_')}_results.json")
+    # Save results (JSON + CSVs)
+    output_base = os.path.join(OUTPUT_DIR, f"{MODEL.replace('/', '_')}_results")
 
-    results_dict = {
-        "clusters": {
-            cid: {
-                "cluster_id": cluster.cluster_id,
-                "dominant_process": cluster.dominant_process,
-                "pathway_confidence": cluster.pathway_confidence,
-                "established_genes": cluster.established_genes,
-                "uncharacterized_genes": [
-                    {"gene": g.gene, "priority": g.priority, "rationale": g.rationale}
-                    for g in cluster.uncharacterized_genes
-                ],
-                "novel_role_genes": [
-                    {"gene": g.gene, "priority": g.priority, "rationale": g.rationale}
-                    for g in cluster.novel_role_genes
-                ],
-                "summary": cluster.summary,
-                "quality_metrics": cluster.get_quality_summary(),
-            }
-            for cid, cluster in results.clusters.items()
-        },
-        "metadata": results.metadata,
+    # Convert results to dictionary format for save_cluster_analysis
+    clusters_dict = {
+        cid: {
+            "cluster_id": cluster.cluster_id,
+            "dominant_process": cluster.dominant_process,
+            "pathway_confidence": cluster.pathway_confidence,
+            "established_genes": cluster.established_genes,
+            "uncharacterized_genes": [
+                {"gene": g.gene, "priority": g.priority, "rationale": g.rationale}
+                for g in cluster.uncharacterized_genes
+            ],
+            "novel_role_genes": [
+                {"gene": g.gene, "priority": g.priority, "rationale": g.rationale}
+                for g in cluster.novel_role_genes
+            ],
+            "summary": cluster.summary,
+            "quality_metrics": cluster.get_quality_summary(),
+        }
+        for cid, cluster in results.clusters.items()
     }
 
-    with open(output_file, "w") as f:
-        json.dump(results_dict, f, indent=2)
+    # Save using built-in function (creates JSON + 2 CSVs)
+    save_cluster_analysis(
+        clusters_dict,
+        out_file_base=output_base,
+        original_df=cluster_df,
+        include_raw=False,
+        save_outputs=True,
+    )
 
-    print(f"\n✓ Results saved to: {output_file}")
+    print("\n✓ Results saved to:")
+    print(f"  - {output_base}_clusters.json (cluster data)")
+    print(f"  - {output_base}_flagged_genes.csv (gene-level analysis)")
+    print(f"  - {output_base}_cluster_summary.csv (cluster-level summary)")
 
     # Print analysis summary
     print("\n" + "=" * 60)
