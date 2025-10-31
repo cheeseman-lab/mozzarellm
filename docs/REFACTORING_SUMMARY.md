@@ -411,6 +411,146 @@ Added three placeholder sections in `prompts.py` for future implementation:
 
 ---
 
+## Phase 7: Benchmark Infrastructure Standardization
+
+### Problem
+
+Benchmark scripts had inconsistent interfaces and lacked proper validation tooling:
+- No CLI arguments (required editing scripts to change models)
+- No standardized validation CSV outputs
+- RAG comparison script didn't follow benchmark pattern
+- No aggregation across benchmarks/models for comparison
+- Difficult to compare how different models/approaches handled same clusters
+
+### Solution: Unified Benchmark Architecture
+
+**Created Shared Utilities (`examples/benchmark_utils.py`):**
+- `load_benchmark_data()` - Standardized data loading with reshaping
+- `load_uniprot_annotations()` - Load UniProt data from benchmark directories
+- `create_quick_validation_csv()` - Cluster-level validation metrics
+- `create_detailed_analysis_csv()` - Gene-level classification validation
+- `convert_results_to_dict()` - Convert Pydantic results to dict format
+- `save_benchmark_results()` - Save all outputs (JSON + CSVs)
+
+**Standardized All Benchmark Scripts:**
+
+All benchmarks now use consistent CLI interface:
+```bash
+python run_benchmark.py \
+  --model claude-sonnet-4-5-20250929 \
+  --temperature 0.0 \
+  --output-dir results
+```
+
+**Files Updated:**
+- `examples/ops/run_benchmark.py`
+- `examples/depmap/run_benchmark.py`
+- `examples/proteomics/run_benchmark.py`
+- `examples/rag/run_benchmark.py` (new)
+
+**RAG Comparison Enhancement:**
+
+Updated RAG benchmark to compare three approaches:
+1. Baseline (no RAG, no CoT)
+2. Enhanced RAG + CoT (k=15, structured reasoning)
+3. Concise RAG + CoT (k=10, faster)
+
+```bash
+# Run all three modes
+python run_benchmark.py
+
+# Run specific mode
+python run_benchmark.py --mode enhanced
+
+# Customize settings
+python run_benchmark.py \
+  --model claude-sonnet-4-5-20250929 \
+  --knowledge-dir ../../data/knowledge \
+  --retriever-k 15
+```
+
+**Aggregated Outputs:**
+
+Both RAG comparison and multi-model benchmarks now generate aggregated CSVs:
+
+**RAG Comparison** (`examples/rag/run_benchmark.py`):
+```
+results/
+├── baseline/, enhanced/, concise/  # Individual mode outputs
+├── combined_quick_validation.csv   # All modes, sorted by cluster
+└── combined_detailed_analysis.csv  # All modes, sorted by cluster+gene
+```
+
+**Multi-Model Benchmarks** (`examples/run_all_benchmarks.py`):
+```
+benchmark_results/run_TIMESTAMP/
+├── OPS_model/, DepMap_model/, Proteomics_model/  # Individual outputs
+├── master_validation.csv              # All benchmarks, sorted by cluster+model
+├── master_detailed_analysis.csv       # All benchmarks, sorted by cluster+gene+model
+└── results.json                       # Full metadata
+```
+
+### Validation CSV Schema
+
+**quick_validation.csv** (cluster-level):
+```csv
+dataset,model,cluster_id,predicted_function,expected_function,function_match,
+predicted_confidence,expected_confidence,confidence_match,gene_match_rate
+```
+
+**detailed_analysis.csv** (gene-level):
+```csv
+dataset,model,cluster_id,gene,expected_function,predicted_function,function_match,
+expected_category,actual_category,category_match,gene_priority,gene_rationale,cluster_summary
+```
+
+### Optimal Sorting for Comparison
+
+CSVs sorted for side-by-side analysis:
+- **Quick validation**: `["cluster_id", "model"]` - Compare models on same cluster
+- **Detailed analysis**: `["cluster_id", "gene", "model"]` - Compare models on same gene
+- **RAG comparison**: `["cluster_id", "gene"]` - Compare approaches on same gene
+
+Example detailed CSV view:
+```csv
+cluster_id,gene,model,predicted_category,priority,rationale
+21,C1orf131,claude-sonnet-4-5-20250929,Uncharacterized,9,...
+21,C1orf131,gpt-4o,Uncharacterized,8,...
+21,C1orf131,gemini-2.5-pro,Novel Role,7,...
+```
+
+This enables direct visual comparison in spreadsheets.
+
+### Updated Documentation
+
+**examples/README.md** - Complete rewrite:
+- New CLI usage examples
+- Output structure documentation
+- RAG comparison modes explained
+- Validation CSV schema documented
+
+**Files Modified:**
+- `examples/benchmark_utils.py` (new, 360 lines)
+- `examples/run_all_benchmarks.py` (complete rewrite)
+- `examples/rag/run_benchmark.py` (replaced run_rag_comparison.py)
+- `examples/ops/run_benchmark.py` (argparse + CSV outputs)
+- `examples/depmap/run_benchmark.py` (argparse + CSV outputs)
+- `examples/proteomics/run_benchmark.py` (argparse + CSV outputs)
+- `examples/README.md` (complete rewrite)
+
+**Files Removed:**
+- `examples/rag/run_rag_comparison.py` (replaced by run_benchmark.py)
+
+### Key Benefits
+
+1. **Consistency**: All benchmarks use identical CLI interface
+2. **Validation**: Structured CSV outputs enable systematic validation
+3. **Comparison**: Aggregated CSVs sorted for side-by-side model/approach comparison
+4. **Flexibility**: RAG comparison supports running individual modes or all at once
+5. **Documentation**: Clear examples/README.md guides usage
+
+---
+
 ## Acknowledgments
 
 Refactoring completed October 2025 by Claude Code with guidance from Matteo Di Bernardo.
