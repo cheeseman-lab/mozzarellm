@@ -1,11 +1,13 @@
 """Run all benchmarks across multiple models with CSV validation outputs.
 
-This script runs the OPS, DepMap, Proteomics, and RAG benchmarks for one or more models,
+This script runs the OPS, DepMap, and Proteomics benchmarks for one or more models,
 creates timestamped result directories, and aggregates validation CSVs.
 
 Usage:
     python run_all_benchmarks.py                    # Run with default models
     python run_all_benchmarks.py --models claude-sonnet-4-5-20250929 gpt-4o
+
+Note: For RAG comparison (baseline vs enhanced vs concise), use examples/rag/run_benchmark.py
 """
 
 import argparse
@@ -25,12 +27,11 @@ DEFAULT_MODELS = [
     "gpt-4o",  # OpenAI - Flagship model
 ]
 
-# Benchmark configurations
+# Benchmark configurations (three benchmark datasets)
 BENCHMARKS = [
     {"name": "OPS", "dir": "ops", "script": "run_benchmark.py"},
     {"name": "DepMap", "dir": "depmap", "script": "run_benchmark.py"},
     {"name": "Proteomics", "dir": "proteomics", "script": "run_benchmark.py"},
-    {"name": "RAG", "dir": "rag", "script": "run_benchmark.py"},
 ]
 
 
@@ -133,6 +134,9 @@ def aggregate_quick_validations(all_results: list, output_path: Path):
 
     if all_dfs:
         master_df = pd.concat(all_dfs, ignore_index=True)
+        # Sort by dataset and cluster for easy comparison across models
+        if "cluster_id" in master_df.columns:
+            master_df = master_df.sort_values(by=["dataset", "cluster_id"])
         master_df.to_csv(output_path, index=False)
         return master_df
     return None
@@ -236,6 +240,7 @@ def main():
     print("AGGREGATING RESULTS")
     print("=" * 80)
 
+    # Aggregate quick validations
     master_csv_path = base_output_dir / "master_validation.csv"
     master_df = aggregate_quick_validations(all_results, master_csv_path)
 
@@ -244,6 +249,24 @@ def main():
     else:
         print("⚠️  No successful results to aggregate")
         master_csv_path = None
+
+    # Aggregate detailed analysis CSVs
+    all_detailed_dfs = []
+    for result in all_results:
+        if result["success"] and "detailed_csv" in result:
+            detailed_csv_path = Path(result["detailed_csv"])
+            if detailed_csv_path.exists():
+                df = pd.read_csv(detailed_csv_path)
+                all_detailed_dfs.append(df)
+
+    if all_detailed_dfs:
+        master_detailed_df = pd.concat(all_detailed_dfs, ignore_index=True)
+        # Sort by dataset and cluster for easy comparison across models
+        if "cluster_id" in master_detailed_df.columns:
+            master_detailed_df = master_detailed_df.sort_values(by=["dataset", "cluster_id"])
+        master_detailed_path = base_output_dir / "master_detailed_analysis.csv"
+        master_detailed_df.to_csv(master_detailed_path, index=False)
+        print(f"✓ Master detailed analysis CSV saved to: {master_detailed_path}")
 
     # Save detailed results JSON
     results_json_path = base_output_dir / "results.json"

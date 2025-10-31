@@ -16,6 +16,7 @@ import argparse
 import os
 import sys
 
+import pandas as pd
 from dotenv import load_dotenv
 
 # Add parent directory to path for benchmark_utils import
@@ -248,10 +249,7 @@ def main():
     print(f"Knowledge directory: {knowledge_dir}\n")
 
     # Determine which modes to run
-    if args.mode == "all":
-        modes_to_run = ALL_MODES
-    else:
-        modes_to_run = {args.mode: ALL_MODES[args.mode]}
+    modes_to_run = ALL_MODES if args.mode == "all" else {args.mode: ALL_MODES[args.mode]}
 
     # Run selected modes
     all_mode_results = []
@@ -268,8 +266,44 @@ def main():
         )
         all_mode_results.append(result)
 
-    # Print summary if multiple modes were run
+    # Aggregate results if multiple modes were run
     if len(modes_to_run) > 1:
+        print("\n" + "=" * 70)
+        print("AGGREGATING RESULTS")
+        print("=" * 70)
+
+        # Aggregate quick validation CSVs
+        quick_dfs = []
+        for result in all_mode_results:
+            quick_csv_path = result["quick_csv"]
+            if os.path.exists(quick_csv_path):
+                df = pd.read_csv(quick_csv_path)
+                quick_dfs.append(df)
+
+        if quick_dfs:
+            combined_quick = pd.concat(quick_dfs, ignore_index=True)
+            # Sort by cluster for easy comparison
+            combined_quick = combined_quick.sort_values(by="cluster_id")
+            combined_quick_path = os.path.join(args.output_dir, "combined_quick_validation.csv")
+            combined_quick.to_csv(combined_quick_path, index=False)
+            print(f"✓ Combined quick validation: {combined_quick_path}")
+
+        # Aggregate detailed analysis CSVs
+        detailed_dfs = []
+        for result in all_mode_results:
+            detailed_csv_path = result["detailed_csv"]
+            if os.path.exists(detailed_csv_path):
+                df = pd.read_csv(detailed_csv_path)
+                detailed_dfs.append(df)
+
+        if detailed_dfs:
+            combined_detailed = pd.concat(detailed_dfs, ignore_index=True)
+            # Sort by cluster for easy comparison
+            combined_detailed = combined_detailed.sort_values(by="cluster_id")
+            combined_detailed_path = os.path.join(args.output_dir, "combined_detailed_analysis.csv")
+            combined_detailed.to_csv(combined_detailed_path, index=False)
+            print(f"✓ Combined detailed analysis: {combined_detailed_path}")
+
         print("\n" + "=" * 70)
         print("SUMMARY")
         print("=" * 70)
