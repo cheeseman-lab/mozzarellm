@@ -82,7 +82,7 @@ def run_benchmark(benchmark_dir: str, model: str, verbose: bool = False) -> dict
 
     try:
         # Run the benchmark
-        print(f"🚀 Executing benchmark...")
+        print("🚀 Executing benchmark...")
         result = subprocess.run(
             [sys.executable, "run_benchmark.py"],
             cwd=benchmark_dir,
@@ -126,9 +126,9 @@ def run_benchmark(benchmark_dir: str, model: str, verbose: bool = False) -> dict
 
         if result.returncode != 0:
             validation_results["error"] = stderr if stderr else "Non-zero return code"
-            print(f"✗ Benchmark FAILED")
+            print("✗ Benchmark FAILED")
         else:
-            print(f"✓ Benchmark SUCCEEDED")
+            print("✓ Benchmark SUCCEEDED")
             print(f"   Function matches: {validation_results.get('function_matches', 'N/A')}")
             print(f"   Genes classified: {validation_results.get('genes_classified', 'N/A')}")
 
