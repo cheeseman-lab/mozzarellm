@@ -134,9 +134,9 @@ def aggregate_quick_validations(all_results: list, output_path: Path):
 
     if all_dfs:
         master_df = pd.concat(all_dfs, ignore_index=True)
-        # Sort by dataset and cluster for easy comparison across models
+        # Sort by cluster for side-by-side model comparison
         if "cluster_id" in master_df.columns:
-            master_df = master_df.sort_values(by=["dataset", "cluster_id"])
+            master_df = master_df.sort_values(by=["cluster_id", "model"])
         master_df.to_csv(output_path, index=False)
         return master_df
     return None
@@ -261,9 +261,9 @@ def main():
 
     if all_detailed_dfs:
         master_detailed_df = pd.concat(all_detailed_dfs, ignore_index=True)
-        # Sort by dataset and cluster for easy comparison across models
-        if "cluster_id" in master_detailed_df.columns:
-            master_detailed_df = master_detailed_df.sort_values(by=["dataset", "cluster_id"])
+        # Sort by cluster and gene for side-by-side model comparison
+        if "cluster_id" in master_detailed_df.columns and "gene" in master_detailed_df.columns:
+            master_detailed_df = master_detailed_df.sort_values(by=["cluster_id", "gene", "model"])
         master_detailed_path = base_output_dir / "master_detailed_analysis.csv"
         master_detailed_df.to_csv(master_detailed_path, index=False)
         print(f"✓ Master detailed analysis CSV saved to: {master_detailed_path}")

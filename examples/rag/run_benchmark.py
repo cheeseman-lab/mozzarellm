@@ -298,8 +298,11 @@ def main():
 
         if detailed_dfs:
             combined_detailed = pd.concat(detailed_dfs, ignore_index=True)
-            # Sort by cluster for easy comparison
-            combined_detailed = combined_detailed.sort_values(by="cluster_id")
+            # Sort by cluster and gene for side-by-side approach comparison
+            if "gene" in combined_detailed.columns:
+                combined_detailed = combined_detailed.sort_values(by=["cluster_id", "gene"])
+            else:
+                combined_detailed = combined_detailed.sort_values(by="cluster_id")
             combined_detailed_path = os.path.join(args.output_dir, "combined_detailed_analysis.csv")
             combined_detailed.to_csv(combined_detailed_path, index=False)
             print(f"✓ Combined detailed analysis: {combined_detailed_path}")
