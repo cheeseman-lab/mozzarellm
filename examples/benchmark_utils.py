@@ -132,7 +132,224 @@ def validate_results(results, validation_data, check_confidence=False, mode_name
     }
 
 
-def load_benchmark_data(csv_path, gene_col="gene_symbol", cluster_col="cluster", additional_cols=None):
+def create_quick_validation_csv(
+    results, validation_data, dataset_name, model_name, output_path, check_confidence=False
+):
+    """Create a quick validation CSV with one row per cluster.
+
+    Args:
+        results: ClusterAnalysisResults object
+        validation_data: Dictionary mapping cluster IDs to expected results
+        dataset_name: Name of the dataset (e.g., "OPS", "DepMap")
+        model_name: Name of the model used
+        output_path: Path to save the CSV file
+        check_confidence: If True, include confidence validation (for OPS)
+
+    Returns:
+        DataFrame: Quick validation metrics
+    """
+    rows = []
+
+    for cluster_id, expected in validation_data.items():
+        if cluster_id not in results.clusters:
+            row = {
+                "dataset": dataset_name,
+                "model": model_name,
+                "cluster_id": cluster_id,
+                "expected_function": expected["function"],
+                "predicted_function": "NOT FOUND",
+                "function_match": False,
+                "gene_match_rate": "0/0",
+            }
+            if check_confidence:
+                row["expected_confidence"] = expected.get("confidence", "N/A")
+                row["predicted_confidence"] = "N/A"
+                row["confidence_match"] = False
+            rows.append(row)
+            continue
+
+        cluster = results.clusters[cluster_id]
+
+        # Check function match
+        expected_func = expected["function"]
+        predicted_func = cluster.dominant_process
+        function_match = any(
+            term in predicted_func.lower() for term in expected_func.lower().split()
+        )
+
+        # Check confidence if specified
+        confidence_match = True
+        if check_confidence and "confidence" in expected:
+            expected_conf = expected["confidence"]
+            predicted_conf = cluster.pathway_confidence
+            confidence_match = expected_conf == predicted_conf
+
+        # Count gene matches
+        total_genes = len(expected["genes"])
+        matched_genes = 0
+        for gene in expected["genes"]:
+            category = categorize_gene(gene, cluster)
+            if category in ["novel_role", "uncharacterized"]:
+                matched_genes += 1
+
+        row = {
+            "dataset": dataset_name,
+            "model": model_name,
+            "cluster_id": cluster_id,
+            "expected_function": expected_func,
+            "predicted_function": predicted_func,
+            "function_match": function_match,
+            "gene_match_rate": f"{matched_genes}/{total_genes}" if total_genes > 0 else "0/0",
+        }
+
+        if check_confidence:
+            row["expected_confidence"] = expected.get("confidence", "N/A")
+            row["predicted_confidence"] = cluster.pathway_confidence
+            row["confidence_match"] = confidence_match
+
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
+    df.to_csv(output_path, index=False)
+    return df
+
+
+def create_detailed_analysis_csv(
+    results, validation_data, dataset_name, model_name, output_path, check_confidence=False
+):
+    """Create a detailed analysis CSV with cluster AND gene-level information.
+
+    This table shows BOTH cluster classification and gene classification with model outputs,
+    enabling deep inspection of the analysis.
+
+    Args:
+        results: ClusterAnalysisResults object
+        validation_data: Dictionary mapping cluster IDs to expected results
+        dataset_name: Name of the dataset (e.g., "OPS", "DepMap")
+        model_name: Name of the model used
+        output_path: Path to save the CSV file
+        check_confidence: If True, include confidence columns (for OPS)
+
+    Returns:
+        DataFrame: Detailed cluster and gene analysis
+    """
+    rows = []
+
+    for cluster_id, expected in validation_data.items():
+        if cluster_id not in results.clusters:
+            # Cluster not found - create rows for expected genes if any
+            for gene in expected.get("genes", []):
+                row = {
+                    "dataset": dataset_name,
+                    "model": model_name,
+                    "cluster_id": cluster_id,
+                    "expected_function": expected["function"],
+                    "predicted_function": "NOT FOUND",
+                    "function_match": False,
+                    "gene": gene,
+                    "expected_category": "novel_role or uncharacterized",
+                    "actual_category": "not_found",
+                    "gene_priority": "N/A",
+                    "gene_rationale": "Cluster not found in results",
+                    "cluster_summary": "N/A",
+                }
+                if check_confidence:
+                    row["expected_confidence"] = expected.get("confidence", "N/A")
+                    row["predicted_confidence"] = "N/A"
+                    row["confidence_match"] = False
+                rows.append(row)
+            continue
+
+        cluster = results.clusters[cluster_id]
+
+        # Cluster-level information
+        expected_func = expected["function"]
+        predicted_func = cluster.dominant_process
+        function_match = any(
+            term in predicted_func.lower() for term in expected_func.lower().split()
+        )
+
+        confidence_match = True
+        if check_confidence and "confidence" in expected:
+            expected_conf = expected["confidence"]
+            predicted_conf = cluster.pathway_confidence
+            confidence_match = expected_conf == predicted_conf
+
+        # Gene-level information
+        validation_genes = expected.get("genes", [])
+        if not validation_genes:
+            # No genes to validate - create single row with cluster info
+            row = {
+                "dataset": dataset_name,
+                "model": model_name,
+                "cluster_id": cluster_id,
+                "expected_function": expected_func,
+                "predicted_function": predicted_func,
+                "function_match": function_match,
+                "gene": "N/A",
+                "expected_category": "N/A",
+                "actual_category": "N/A",
+                "gene_priority": "N/A",
+                "gene_rationale": "No validation genes for this cluster",
+                "cluster_summary": cluster.summary,
+            }
+            if check_confidence:
+                row["expected_confidence"] = expected.get("confidence", "N/A")
+                row["predicted_confidence"] = cluster.pathway_confidence
+                row["confidence_match"] = confidence_match
+            rows.append(row)
+        else:
+            # Create one row per validation gene
+            for gene in validation_genes:
+                category = categorize_gene(gene, cluster)
+
+                # Get priority and rationale if available
+                priority = "N/A"
+                rationale = "N/A"
+
+                if category == "novel_role":
+                    novel_genes = [g for g in cluster.novel_role_genes if g.gene == gene]
+                    if novel_genes:
+                        priority = novel_genes[0].priority
+                        rationale = novel_genes[0].rationale
+                elif category == "uncharacterized":
+                    unchar_genes = [g for g in cluster.uncharacterized_genes if g.gene == gene]
+                    if unchar_genes:
+                        priority = unchar_genes[0].priority
+                        rationale = unchar_genes[0].rationale
+                elif category == "established":
+                    rationale = "Classified as established gene"
+
+                row = {
+                    "dataset": dataset_name,
+                    "model": model_name,
+                    "cluster_id": cluster_id,
+                    "expected_function": expected_func,
+                    "predicted_function": predicted_func,
+                    "function_match": function_match,
+                    "gene": gene,
+                    "expected_category": "novel_role or uncharacterized",
+                    "actual_category": category,
+                    "gene_priority": priority,
+                    "gene_rationale": rationale,
+                    "cluster_summary": cluster.summary,
+                }
+
+                if check_confidence:
+                    row["expected_confidence"] = expected.get("confidence", "N/A")
+                    row["predicted_confidence"] = cluster.pathway_confidence
+                    row["confidence_match"] = confidence_match
+
+                rows.append(row)
+
+    df = pd.DataFrame(rows)
+    df.to_csv(output_path, index=False)
+    return df
+
+
+def load_benchmark_data(
+    csv_path, gene_col="gene_symbol", cluster_col="cluster", additional_cols=None
+):
     """Load and reshape gene-wise data to cluster format.
 
     Args:

@@ -1,12 +1,11 @@
-"""Run all benchmarks across multiple models.
+"""Run all benchmarks across multiple models with CSV validation outputs.
 
-This script runs the OPS, DepMap, and Proteomics benchmarks for one or more models
-and aggregates the validation results for easy comparison.
+This script runs the OPS, DepMap, Proteomics, and RAG benchmarks for one or more models,
+creates timestamped result directories, and aggregates validation CSVs.
 
 Usage:
     python run_all_benchmarks.py                    # Run with default models
-    python run_all_benchmarks.py --models o4-mini claude-sonnet-4-5-20250929
-    python run_all_benchmarks.py --output custom_results.json
+    python run_all_benchmarks.py --models claude-sonnet-4-5-20250929 gpt-4o
 """
 
 import argparse
@@ -15,6 +14,8 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+
+import pandas as pd
 
 # Default models to benchmark (latest/most advanced models - Oct 2025)
 # One from each provider for comprehensive comparison
@@ -29,194 +30,129 @@ BENCHMARKS = [
     {"name": "OPS", "dir": "ops", "script": "run_benchmark.py"},
     {"name": "DepMap", "dir": "depmap", "script": "run_benchmark.py"},
     {"name": "Proteomics", "dir": "proteomics", "script": "run_benchmark.py"},
+    {"name": "RAG", "dir": "rag", "script": "run_benchmark.py"},
 ]
 
 
-def run_benchmark(benchmark_dir: str, model: str, verbose: bool = False) -> dict:
-    """Run a single benchmark with a specific model.
+def run_benchmark(benchmark_dir: str, benchmark_name: str, model: str, output_dir: Path) -> dict:
+    """Run a single benchmark with a specific model using CLI arguments.
 
     Args:
         benchmark_dir: Directory containing the benchmark script
+        benchmark_name: Display name for the benchmark
         model: Model identifier to use
-        verbose: If True, print detailed output including stdout/stderr
+        output_dir: Output directory for this benchmark's results
 
     Returns:
-        Dictionary with validation results
+        Dictionary with success status and paths
     """
-    print(f"\n{'=' * 70}")
-    print(f"Running {benchmark_dir} benchmark with {model}")
-    print(f"{'=' * 70}\n")
+    print(f"  Running {benchmark_name}...")
 
-    # Modify the benchmark script to use the specified model
     script_path = Path(benchmark_dir) / "run_benchmark.py"
 
     if not script_path.exists():
         error_msg = f"Benchmark script not found: {script_path}"
-        print(f"✗ {error_msg}")
+        print(f"    ✗ {error_msg}")
         return {
             "model": model,
-            "benchmark": benchmark_dir,
+            "benchmark": benchmark_name,
             "success": False,
             "error": error_msg,
         }
 
-    print(f"📄 Reading benchmark script: {script_path}")
-    script_content = script_path.read_text()
-
-    # Replace MODEL line
-    original_model_line = None
-    for line in script_content.split("\n"):
-        if line.startswith('MODEL = "'):
-            original_model_line = line
-            break
-
-    if original_model_line:
-        print(f"🔧 Modifying MODEL from: {original_model_line.strip()}")
-        print(f"   to: MODEL = \"{model}\"")
-        modified_content = script_content.replace(
-            original_model_line, f'MODEL = "{model}"  # Modified by run_all_benchmarks.py'
-        )
-        script_path.write_text(modified_content)
-    else:
-        print("⚠️  Warning: Could not find MODEL line in script")
-
     try:
-        # Run the benchmark
-        print("🚀 Executing benchmark...")
+        # Run the benchmark with CLI args
         result = subprocess.run(
-            [sys.executable, "run_benchmark.py"],
+            [sys.executable, "run_benchmark.py", "--model", model, "--output-dir", str(output_dir)],
             cwd=benchmark_dir,
             capture_output=True,
             text=True,
             timeout=600,  # 10 minute timeout
         )
 
-        # Restore original model line
-        if original_model_line:
-            script_path.write_text(script_content)
-            print("✓ Restored original script content")
-
-        # Parse validation results from output
-        output = result.stdout
-        stderr = result.stderr
-
-        print(f"\n📊 Benchmark completed with return code: {result.returncode}")
-
-        if verbose or result.returncode != 0:
-            print("\n" + "-" * 70)
-            print("STDOUT:")
-            print("-" * 70)
-            print(output if output else "(no output)")
-
-        if stderr:
-            print("\n" + "-" * 70)
-            print("STDERR:")
-            print("-" * 70)
-            print(stderr)
-            print("-" * 70)
-
-        validation_results = parse_validation_output(output)
-
-        # Add model and benchmark info
-        validation_results["model"] = model
-        validation_results["benchmark"] = benchmark_dir
-        validation_results["success"] = result.returncode == 0
-        validation_results["stdout"] = output
-        validation_results["stderr"] = stderr
-
         if result.returncode != 0:
-            validation_results["error"] = stderr if stderr else "Non-zero return code"
-            print("✗ Benchmark FAILED")
+            print("    ✗ FAILED")
+            if result.stderr:
+                print(f"    Error: {result.stderr[:200]}")
+            return {
+                "model": model,
+                "benchmark": benchmark_name,
+                "success": False,
+                "error": result.stderr if result.stderr else "Non-zero return code",
+                "output_dir": str(output_dir),
+            }
         else:
-            print("✓ Benchmark SUCCEEDED")
-            print(f"   Function matches: {validation_results.get('function_matches', 'N/A')}")
-            print(f"   Genes classified: {validation_results.get('genes_classified', 'N/A')}")
-
-        return validation_results
+            print("    ✓ SUCCESS")
+            return {
+                "model": model,
+                "benchmark": benchmark_name,
+                "success": True,
+                "output_dir": str(output_dir),
+                "quick_csv": str(output_dir / "quick_validation.csv"),
+                "detailed_csv": str(output_dir / "detailed_analysis.csv"),
+            }
 
     except subprocess.TimeoutExpired:
-        print("⚠️  Benchmark timed out after 10 minutes")
-        if original_model_line:
-            script_path.write_text(script_content)
+        print("    ✗ Timeout after 10 minutes")
         return {
             "model": model,
-            "benchmark": benchmark_dir,
+            "benchmark": benchmark_name,
             "success": False,
             "error": "Timeout after 10 minutes",
+            "output_dir": str(output_dir),
         }
     except Exception as e:
-        print(f"⚠️  Error running benchmark: {e}")
-        if original_model_line:
-            script_path.write_text(script_content)
+        print(f"    ✗ Error: {e}")
         return {
             "model": model,
-            "benchmark": benchmark_dir,
+            "benchmark": benchmark_name,
             "success": False,
             "error": str(e),
+            "output_dir": str(output_dir),
         }
-    finally:
-        # Ensure original content is restored
-        if original_model_line:
-            try:
-                script_path.write_text(script_content)
-            except Exception as e:
-                print(f"⚠️  Warning: Could not restore original script: {e}")
 
 
-def parse_validation_output(output: str) -> dict:
-    """Parse validation results from benchmark output.
-
-    Args:
-        output: Stdout from benchmark script
-
-    Returns:
-        Dictionary with function_matches and genes_classified metrics
-    """
-    results = {}
-
-    for line in output.split("\n"):
-        if "Function matches:" in line:
-            # Extract: "Function matches: 6/6 (100.0%)"
-            parts = line.split("Function matches:")[1].strip()
-            count_part = parts.split("(")[0].strip()
-            results["function_matches"] = count_part
-
-        elif "Genes classified:" in line:
-            # Extract: "Genes classified: 7/7 (100.0%)"
-            parts = line.split("Genes classified:")[1].strip()
-            count_part = parts.split("(")[0].strip()
-            results["genes_classified"] = count_part
-
-    return results
-
-
-def print_summary(all_results: list):
-    """Print a summary table of all results.
+def aggregate_quick_validations(all_results: list, output_path: Path):
+    """Aggregate all quick validation CSVs into a master CSV.
 
     Args:
         all_results: List of result dictionaries
+        output_path: Path to save the aggregated CSV
+
+    Returns:
+        DataFrame with aggregated results or None if no successful results
+    """
+    all_dfs = []
+
+    for result in all_results:
+        if result["success"] and "quick_csv" in result:
+            csv_path = Path(result["quick_csv"])
+            if csv_path.exists():
+                df = pd.read_csv(csv_path)
+                all_dfs.append(df)
+
+    if all_dfs:
+        master_df = pd.concat(all_dfs, ignore_index=True)
+        master_df.to_csv(output_path, index=False)
+        return master_df
+    return None
+
+
+def print_summary(all_results: list, master_csv_path: Path = None):
+    """Print a summary of all benchmark results.
+
+    Args:
+        all_results: List of result dictionaries
+        master_csv_path: Optional path to master CSV for detailed summary
     """
     print("\n" + "=" * 80)
     print("BENCHMARK SUMMARY")
     print("=" * 80)
-    print(f"{'Model':<40} {'Benchmark':<15} {'Functions':<12} {'Genes':<12} {'Status'}")
-    print("-" * 80)
 
+    # Print basic status
     for result in all_results:
-        model = result["model"]
-        benchmark = result["benchmark"].upper()
         status = "✓" if result["success"] else "✗"
-
-        if result["success"]:
-            func = result.get("function_matches", "N/A")
-            genes = result.get("genes_classified", "N/A")
-        else:
-            func = "N/A"
-            genes = "N/A"
-
-        print(f"{model:<40} {benchmark:<15} {func:<12} {genes:<12} {status}")
-
-    print("=" * 80)
+        print(f"{status} {result['benchmark']:<15} {result['model']:<40}")
 
     # Print error details if any failures
     failed_results = [r for r in all_results if not r["success"]]
@@ -224,10 +160,20 @@ def print_summary(all_results: list):
         print("\nFAILURE DETAILS:")
         print("=" * 80)
         for result in failed_results:
-            print(f"\n{result['benchmark'].upper()} - {result['model']}")
+            print(f"\n{result['benchmark']} - {result['model']}")
             print(f"  Error: {result.get('error', 'Unknown error')}")
-            if result.get('stderr'):
-                print(f"  Stderr preview: {result['stderr'][:200]}...")
+        print("=" * 80)
+
+    # Print summary from master CSV if available
+    if master_csv_path and master_csv_path.exists():
+        print("\nVALIDATION SUMMARY:")
+        print("=" * 80)
+        df = pd.read_csv(master_csv_path)
+        # Group by dataset and model, show function match rates
+        for (dataset, model), group in df.groupby(["dataset", "model"]):
+            matches = group["function_match"].sum()
+            total = len(group)
+            print(f"{dataset:<15} {model:<40} {matches}/{total} functions matched")
         print("=" * 80)
 
 
@@ -241,31 +187,28 @@ def main():
         help=f"Models to benchmark (default: {', '.join(DEFAULT_MODELS)})",
     )
     parser.add_argument(
-        "--output",
+        "--output-base",
         type=str,
-        help="Path to save JSON results (default: benchmark_results/results_TIMESTAMP.json)",
-    )
-    parser.add_argument(
-        "--no-save",
-        action="store_true",
-        help="Don't save results to file",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Show verbose output including full stdout from benchmarks",
+        help="Base directory for outputs (default: benchmark_results/run_TIMESTAMP)",
     )
 
     args = parser.parse_args()
+
+    # Create timestamped output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if args.output_base:
+        base_output_dir = Path(args.output_base)
+    else:
+        base_output_dir = Path(__file__).parent / "benchmark_results" / f"run_{timestamp}"
+
+    base_output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\n{'=' * 80}")
     print(
         f"Running benchmarks for {len(args.models)} model(s) across {len(BENCHMARKS)} benchmark(s)"
     )
     print(f"Models: {', '.join(args.models)}")
-    if args.verbose:
-        print("Verbose mode: ENABLED")
+    print(f"Output directory: {base_output_dir}")
     print(f"{'=' * 80}")
 
     all_results = []
@@ -273,37 +216,52 @@ def main():
     # Run each benchmark for each model
     for i, model in enumerate(args.models):
         print(f"\n{'#' * 80}")
-        print(f"MODEL {i+1}/{len(args.models)}: {model}")
+        print(f"MODEL {i + 1}/{len(args.models)}: {model}")
         print(f"{'#' * 80}")
+
         for j, benchmark in enumerate(BENCHMARKS):
-            print(f"\n>>> Benchmark {j+1}/{len(BENCHMARKS)}: {benchmark['name']}")
-            result = run_benchmark(benchmark["dir"], model, verbose=args.verbose)
+            print(f"\n>>> Benchmark {j + 1}/{len(BENCHMARKS)}: {benchmark['name']}")
+
+            # Create benchmark-specific output directory
+            model_safe = model.replace("/", "_")
+            benchmark_output_dir = base_output_dir / f"{benchmark['name']}_{model_safe}"
+            benchmark_output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Run the benchmark
+            result = run_benchmark(benchmark["dir"], benchmark["name"], model, benchmark_output_dir)
             all_results.append(result)
 
-            # Print immediate status
-            status_emoji = "✓" if result["success"] else "✗"
-            print(f"{status_emoji} {benchmark['name']} with {model}: {'SUCCESS' if result['success'] else 'FAILED'}")
-            if not result["success"]:
-                print(f"   Error: {result.get('error', 'Unknown error')}")
+    # Aggregate validation CSVs
+    print("\n" + "=" * 80)
+    print("AGGREGATING RESULTS")
+    print("=" * 80)
+
+    master_csv_path = base_output_dir / "master_validation.csv"
+    master_df = aggregate_quick_validations(all_results, master_csv_path)
+
+    if master_df is not None:
+        print(f"✓ Master validation CSV saved to: {master_csv_path}")
+    else:
+        print("⚠️  No successful results to aggregate")
+        master_csv_path = None
+
+    # Save detailed results JSON
+    results_json_path = base_output_dir / "results.json"
+    with open(results_json_path, "w") as f:
+        json.dump(
+            {
+                "timestamp": timestamp,
+                "models": args.models,
+                "benchmarks": [b["name"] for b in BENCHMARKS],
+                "results": all_results,
+            },
+            f,
+            indent=2,
+        )
+    print(f"✓ Detailed results saved to: {results_json_path}")
 
     # Print summary
-    print_summary(all_results)
-
-    # Save results unless --no-save is specified
-    if not args.no_save:
-        # Determine output path
-        if args.output:
-            output_path = Path(args.output)
-        else:
-            # Default: save to benchmark_results/ with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            results_dir = Path(__file__).parent / "benchmark_results"
-            results_dir.mkdir(exist_ok=True)
-            output_path = results_dir / f"results_{timestamp}.json"
-
-        with open(output_path, "w") as f:
-            json.dump(all_results, f, indent=2)
-        print(f"\n✓ Results saved to: {output_path}")
+    print_summary(all_results, master_csv_path)
 
     # Exit with error if any benchmark failed
     if any(not r["success"] for r in all_results):

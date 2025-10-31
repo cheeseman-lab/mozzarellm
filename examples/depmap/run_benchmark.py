@@ -1,9 +1,10 @@
 """Run DepMap (Wainberg) benchmark analysis using mozzarellm.
 
 This script analyzes co-essential modules from the Wainberg et al. DepMap dataset.
-Gene-wise data is reshaped to cluster format, analyzed, and validated inline.
+Gene-wise data is reshaped to cluster format, analyzed, and validated with CSV outputs.
 """
 
+import argparse
 import os
 import sys
 
@@ -14,11 +15,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from benchmark_utils import (
     convert_results_to_dict,
+    create_detailed_analysis_csv,
+    create_quick_validation_csv,
     load_benchmark_data,
     load_uniprot_annotations,
-    print_analysis_summary,
     save_benchmark_results,
-    validate_results,
 )
 
 from mozzarellm import ClusterAnalyzer
@@ -26,10 +27,10 @@ from mozzarellm import ClusterAnalyzer
 # Load environment variables from .env file
 load_dotenv()
 
-# Configuration
-MODEL = "claude-sonnet-4-5-20250929"  # Change to test different models
-TEMPERATURE = 0.0
-OUTPUT_DIR = "results"
+# Default configuration
+DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+DEFAULT_TEMPERATURE = 0.0
+DEFAULT_OUTPUT_DIR = "results"
 
 # Validation constants (from findings.csv)
 VALIDATION_DATA = {
@@ -48,7 +49,30 @@ classifying genes based on their known vs. novel roles in that process.
 
 def main():
     """Run the benchmark analysis."""
+    parser = argparse.ArgumentParser(description="Run DepMap benchmark analysis")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL,
+        help=f"Model to use (default: {DEFAULT_MODEL})",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=DEFAULT_TEMPERATURE,
+        help=f"Temperature for model (default: {DEFAULT_TEMPERATURE})",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})",
+    )
+
+    args = parser.parse_args()
     script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    print(f"DepMap Benchmark - Model: {args.model}")
 
     # Load and reshape gene-wise data
     csv_path = os.path.join(script_dir, "wainberg_2021.csv")
@@ -58,30 +82,36 @@ def main():
     gene_annotations = load_uniprot_annotations(script_dir)
 
     # Create output directory
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
 
     # Initialize analyzer
-    print(f"\nInitializing ClusterAnalyzer with model: {MODEL}")
-    analyzer = ClusterAnalyzer(model=MODEL, temperature=TEMPERATURE, show_progress=True)
+    analyzer = ClusterAnalyzer(model=args.model, temperature=args.temperature, show_progress=True)
 
     # Run analysis
-    print("\nRunning analysis...")
+    print("Running analysis...")
     results = analyzer.analyze(
         cluster_df, gene_annotations=gene_annotations, screen_context=SCREEN_CONTEXT
     )
 
-    # Convert and save results
-    output_base = os.path.join(OUTPUT_DIR, f"{MODEL.replace('/', '_')}_results")
+    # Convert and save standard results
+    output_base = os.path.join(args.output_dir, f"{args.model.replace('/', '_')}_results")
     clusters_dict = convert_results_to_dict(results)
     save_benchmark_results(clusters_dict, output_base, cluster_df)
 
-    # Print analysis summary
-    print_analysis_summary(results)
+    # Generate validation CSVs
+    quick_csv = os.path.join(args.output_dir, "quick_validation.csv")
+    detailed_csv = os.path.join(args.output_dir, "detailed_analysis.csv")
 
-    # Validate against ground truth
-    validate_results(results, VALIDATION_DATA)
+    create_quick_validation_csv(
+        results, VALIDATION_DATA, "DepMap", args.model, quick_csv, check_confidence=False
+    )
+    create_detailed_analysis_csv(
+        results, VALIDATION_DATA, "DepMap", args.model, detailed_csv, check_confidence=False
+    )
 
-    print("\n✓ Benchmark complete!")
+    print(f"✓ CSVs saved to {args.output_dir}/")
+    print("  - quick_validation.csv")
+    print("  - detailed_analysis.csv")
 
 
 if __name__ == "__main__":
