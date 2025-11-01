@@ -1,102 +1,46 @@
-# mozzarellm/prompts.py
+"""
+Prompt templates and instructions for gene cluster analysis.
 
-# Single cluster analysis prompt
-DEFAULT_CLUSTER_PROMPT = """
-Analyze gene cluster {cluster_id} to identify the dominant biological pathway and classify genes:
-
-Genes: {gene_list}
-
-Follow these steps:
-1. Identify the dominant biological pathway, focusing on specific molecular mechanisms rather than general terms
-2. Classify genes into THREE categories using these definitions:
-   - ESTABLISHED: Well-known members of the identified pathway with clear functional roles in this pathway
-   - UNCHARACTERIZED: Genes with minimal to no functional annotation in ANY published literature
-   - NOVEL_ROLE: Genes with published functional annotation in OTHER pathways that may have additional roles in the dominant pathway
-
-3. For both UNCHARACTERIZED and NOVEL_ROLE genes:
-   - Assign a priority score (1-10) for follow-up investigation
-   - Provide a rationale explaining why this gene merits investigation
-
-4. Provide a concise summary of the key findings
+This module contains modular prompt components organized in the order they appear
+in the final assembled prompt. Components are automatically concatenated by the
+prompt factory.
 """
 
-# Batch analysis prompt
-DEFAULT_BATCH_PROMPT = """
-Analyze the following gene clusters to identify dominant biological pathways and classify genes:
+# =============================================================================
+# SECTION 1: CORE TASK (always first)
+# =============================================================================
 
-{clusters_text}
+CLUSTER_ANALYSIS_TASK = """
+Analyze gene cluster {cluster_id} from a functional genomics screen to identify biological pathways and discover understudied genes.
 
-For each cluster:
-1. Identify the dominant biological pathway, focusing on specific molecular mechanisms rather than general terms
-2. Classify genes into THREE categories using these definitions:
-   - ESTABLISHED: Well-known members of the identified pathway with clear functional roles in this pathway
-   - UNCHARACTERIZED: Genes with minimal to no functional annotation in ANY published literature
-   - NOVEL_ROLE: Genes with published functional annotation in OTHER pathways that may have additional roles in the dominant pathway
+GENES: {gene_list}
 
-3. For both UNCHARACTERIZED and NOVEL_ROLE genes:
-   - Assign a priority score (1-10) for follow-up investigation
-   - Provide a rationale explaining why this gene merits investigation
+MISSION: Functional genomics experiments cluster genes by phenotypic similarity. Your goal is to:
+1. Identify the dominant biological pathway that explains why these genes cluster together
+2. Classify ALL genes relative to this pathway (ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE)
+3. Prioritize understudied genes (UNCHARACTERIZED and NOVEL_ROLE) for follow-up experiments
 
-4. Provide a concise summary of the key findings for each cluster
+The pathway is not the end goal - it's the lens for discovering which genes merit investigation.
 """
 
-# Optimized context for robustly analyzing gene clusters
-ROBUST_SCREEN_CONTEXT = """
-Genes grouped within a cluster tend to exhibit similar morphological phenotypes in this context, suggesting that they may participate in the same biological process or pathway. However, not all clusters will correspond to a defined or coherent biological pathway.
 
-When evaluating pathway confidence, apply these stringent criteria:
+# =============================================================================
+# SECTION 2: SCREEN CONTEXT (experimental background - WHY genes cluster)
+# =============================================================================
+# This section is where benchmark-specific or default context will be inserted.
+# Benchmarks provide their own SCREEN_CONTEXT describing the experimental approach.
 
-HIGH CONFIDENCE:
-- Multiple well-established genes (≥3) with strong literature support in the same specific pathway
-- Clear functional relationship between genes that explains the observed phenotypic clustering
-- Genes represent different aspects or components of the same biological process
-- The pathway assignment explains >60% of genes in the cluster
-
-MEDIUM CONFIDENCE:
-- Some established genes (1-2) from a specific pathway, with additional supporting genes
-- Functional relationship is plausible but has some gaps or uncertainties
-- Some genes in the cluster have unclear relationship to the proposed pathway
-- The pathway assignment explains 40-60% of genes in the cluster
-
-LOW CONFIDENCE:
-- Few or no established pathway genes, but a plausible functional theme
-- Significant heterogeneity in gene functions within the cluster
-- The proposed pathway is very broad or general
-- The pathway assignment explains <40% of genes in the cluster
-
-CLUSTERS WITH NO COHERENT PATHWAY:
-- For clusters with no clear functional relationship among genes
-- Clusters where genes belong to many unrelated pathways
-- Clusters containing nontargeting control genes
-- Clusters where you cannot identify a dominant biological process
-
-For clusters with no coherent pathway, set:
-- "pathway_confidence": "Low"
-- "dominant_process": "No coherent biological pathway"
-- And explain the reasoning clearly in the "summary" field
-
-The goal is NOT to force-fit clusters into pathways, but to identify clusters where a clear biological signal emerges from the phenotypic grouping. Mark clusters without a coherent biological signature as indicated above rather than assigning biologically implausible pathways.
+DEFAULT_SCREEN_CONTEXT = """
+Genes grouped within a cluster exhibit similar profiles in this functional genomics
+analysis, suggesting they may participate in related biological processes or pathways.
 """
 
-# Optimized context for analyzing gene clusters with specific pathway focus
-ROBUST_CLUSTER_PROMPT = """
-Analyze gene cluster {cluster_id} to identify the dominant biological pathway and classify genes:
 
-Genes: {gene_list}
+# =============================================================================
+# SECTION 3: GENE CLASSIFICATION & PRIORITIZATION RULES (framework for analysis)
+# =============================================================================
 
-For each cluster:
-1. Identify the dominant biological pathway, focusing on specific molecular mechanisms rather than general terms
-2. For clusters with coherent biological signatures, classify each gene into one of three mutually exclusive categories:
-   - ESTABLISHED: Well-known members of the identified pathway with clear functional roles in this pathway
-   - UNCHARACTERIZED: Genes with minimal to no functional annotation in ANY published literature
-   - NOVEL_ROLE: Genes with published functional annotation in OTHER pathways that may have additional roles in the dominant pathway
-
-3. For both UNCHARACTERIZED and NOVEL_ROLE genes:
-   - Assign a priority score (1-10) for follow-up investigation
-   - Provide a rationale explaining why this gene merits investigation
-
-4. Provide a concise summary of the key findings for each cluster
-
+GENE_CLASSIFICATION_RULES = """
 When classifying and prioritizing genes, apply these specific criteria:
 
 1. ESTABLISHED PATHWAY GENES:
@@ -133,6 +77,196 @@ IMPORTANT CONSIDERATIONS:
 - For any gene with substantial literature, it should NOT be classified as UNCHARACTERIZED
 - The goal is not to speculate but to flag only the most promising candidates for follow-up
 """
+
+
+# =============================================================================
+# SECTION 4: GENE ANNOTATIONS (inserted by prompt_factory if provided)
+# =============================================================================
+# Gene-specific functional annotations from UniProt/databases are inserted here
+
+
+# =============================================================================
+# SECTION 5: RETRIEVED EVIDENCE (inserted by prompt_factory when RAG enabled)
+# =============================================================================
+# Evidence snippets from knowledge base retrieval are inserted here
+
+
+# =============================================================================
+# SECTION 6: PATHWAY CONFIDENCE ASSESSMENT (comes AFTER data to enable assessment)
+# =============================================================================
+
+PATHWAY_CONFIDENCE_CRITERIA = """
+ASSESSING PATHWAY CONFIDENCE:
+
+Once you have identified a candidate pathway, evaluate how well it explains the cluster using
+these stringent criteria based on what percentage of genes fit the proposed pathway:
+
+HIGH CONFIDENCE:
+- >70% of genes in the cluster fit the proposed pathway
+- Multiple well-established genes with strong literature support in this specific pathway
+- Clear functional relationship between genes that explains the observed phenotypic clustering
+- Genes represent different aspects or components of the same biological process
+
+MEDIUM CONFIDENCE:
+- 50-70% of genes in the cluster fit the proposed pathway
+- Some established genes from the pathway, with additional plausible supporting genes
+- Functional relationship is plausible but has some gaps or uncertainties
+- Some genes in the cluster have unclear relationship to the proposed pathway
+
+LOW CONFIDENCE:
+- 30-50% of genes in the cluster fit the proposed pathway
+- Few established pathway genes, but a plausible functional theme
+- Significant heterogeneity in gene functions within the cluster
+- The proposed pathway is very broad or general
+
+NO COHERENT PATHWAY:
+- <30% of genes in the cluster fit any single proposed pathway
+- Clusters where genes belong to many unrelated pathways
+- Clusters containing nontargeting control genes
+- Clusters where you cannot identify a dominant biological process
+
+For clusters with no coherent pathway, set:
+- "pathway_confidence": "Low"
+- "dominant_process": "No coherent biological pathway"
+- And explain the reasoning clearly in the "summary" field
+
+Remember: The goal is to honestly assess pathway support, not to force-fit genes into pathways.
+Low confidence clusters may still contain valuable discovery opportunities if individual genes
+are understudied.
+"""
+
+
+# =============================================================================
+# SECTION 7: PHENOTYPIC-STRENGTH-CONFIDENCE CROSS-CHECK (inserted by prompt_factory if phenotypic strength available)
+# =============================================================================
+# PLACEHOLDER: To be implemented
+#
+# Purpose: Cross-validate pathway confidence against phenotypic strength to identify edge cases
+# Timing: AFTER establishing pathway confidence in Section 6
+#
+# This section should:
+# - Present the phenotypic strength for the cluster (e.g., "8.5/10" or "strong"/"weak")
+# - Cross-check against the confidence level just assigned
+# - Identify and flag four scenarios:
+#   * HIGH confidence + HIGH strength → Affirm: "Well-supported, strong signal - ideal case"
+#   * LOW confidence + LOW strength → Affirm: "Weak signal - appropriately uncertain"
+#   * HIGH confidence + LOW strength → FLAG: "Reconsider - is the pathway too broad/generic? Are you overcalling confidence?"
+#   * LOW confidence + HIGH strength → FLAG: "Deep dive needed - strong effect suggests important biology. You may be missing the true pathway or this could be novel."
+# - For mismatched cases, prompt re-examination of the pathway hypothesis
+# - Request updated reasoning in the summary if confidence should be adjusted
+#
+# Example structure:
+# """
+# PHENOTYPIC-STRENGTH-CONFIDENCE CROSS-CHECK:
+# Your pathway assignment: {confidence_level} confidence
+# Phenotypic strength: {strength_level} (score: {strength_value})
+#
+# Evaluate the alignment:
+# - ALIGNED (High/High or Low/Low): Your assessment is consistent with effect strength
+# - MISMATCH (High confidence + Low strength): Are you overcalling confidence? Is the pathway too generic?
+# - MISMATCH (Low confidence + High strength): Strong phenotype suggests important biology - dig deeper for the true pathway. This could be a discovery opportunity.
+#
+# If mismatched, revisit your pathway hypothesis and explain your reasoning in the summary.
+# """
+
+PHENOTYPIC_STRENGTH_CONFIDENCE_EVALUATION = None  # Placeholder for future implementation
+
+
+# =============================================================================
+# SECTION 8: MECHANISTIC HYPOTHESIS FROM FEATURE DIRECTIONALITY (inserted by prompt_factory if features available)
+# =============================================================================
+# PLACEHOLDER: To be implemented
+#
+# Purpose: Generate mechanistic hypotheses based on which features are up/down regulated
+# Timing: AFTER confidence assessment and phenotypic strength check - uses pathway context to interpret directionality
+#
+# This section should:
+# - Present up-regulated vs down-regulated features/genes/imaging features
+# - Guide hypothesis generation about WHAT IS HAPPENING mechanistically in this cluster
+# - Connect directional changes to specific pathway components or processes
+# - For perturbation screens (Perturb-seq): suggest which pathway branch/component is being affected
+# - For imaging screens (OPS): suggest which cellular processes are altered based on feature changes
+# - Frame as hypothesis generation to guide experiments, NOT as validation/refinement of the pathway
+# - Create a bridge between pathway identification and experimental design
+#
+# Example structure:
+# """
+# MECHANISTIC HYPOTHESIS (based on feature directionality):
+# The following features show consistent directional changes across genes in this cluster:
+#
+# UP-REGULATED: {up_features}
+# DOWN-REGULATED: {down_features}
+#
+# Given the {pathway_name} pathway you identified, generate mechanistic hypotheses:
+# - What might be happening at the molecular/cellular level? (e.g., "Upregulation of X with downregulation of Y suggests activation of the upstream regulatory branch")
+# - Which specific components or branches of the pathway are likely affected?
+# - Are these changes consistent with activation, inhibition, feedback, or compensation within the pathway?
+# - What cellular process is being altered to produce these specific directional changes?
+# - Does this suggest a particular mechanistic model within the broader pathway?
+#
+# Frame your mechanistic hypothesis to set up follow-up experimental validation.
+# """
+
+FEATURE_DIRECTIONALITY_HYPOTHESIS = None  # Placeholder for future implementation
+
+
+# =============================================================================
+# SECTION 9: FOLLOW-UP EXPERIMENT SUGGESTIONS (inserted by prompt_factory if enabled)
+# =============================================================================
+# PLACEHOLDER: To be implemented
+#
+# Purpose: Suggest specific, actionable experiments to validate pathway assignment and test mechanistic hypotheses
+# Timing: FINAL analytical section - after pathway, confidence, phenotypic strength, and mechanistic hypothesis
+#
+# This section should:
+# - Suggest 2-4 concrete, specific follow-up experiments
+# - Target three goals:
+#   1. Validate the pathway assignment (confirm pathway involvement)
+#   2. Test high-priority genes (validate UNCHARACTERIZED and NOVEL_ROLE genes)
+#   3. Test mechanistic hypotheses (if feature directionality data available)
+# - Be specific: name genes to test, specific assays/techniques, expected readouts
+# - Consider the experimental modality (genetic perturbations, biochemical assays, imaging, epistasis, etc.)
+# - Tailor suggestions to confidence level and phenotypic strength:
+#   * High confidence + high strength: focus on mechanism and novel genes
+#   * Mismatched cases: suggest experiments to resolve the discrepancy
+# - Prioritize experiments that test high-priority (score ≥8) genes
+# - Be actionable and implementable in a real lab setting
+#
+# Example structure:
+# """
+# SUGGESTED FOLLOW-UP EXPERIMENTS:
+# Based on your analysis (pathway: {pathway_name}, confidence: {confidence}, phenotypic strength: {strength}, mechanism: {hypothesis}), suggest 2-4 specific experiments:
+#
+# 1. VALIDATE PATHWAY ASSIGNMENT:
+#    - Experiment: [specific assay/technique]
+#    - Genes to test: [which established genes as positive controls]
+#    - Expected outcome: [what would confirm pathway involvement]
+#
+# 2. TEST HIGH-PRIORITY GENES:
+#    - For UNCHARACTERIZED genes: [specific experiment to test pathway role]
+#    - For NOVEL_ROLE genes: [specific experiment to test proposed new function]
+#    - Focus on priority ≥8 genes: [list specific genes]
+#    - Expected outcomes: [what would validate their roles]
+#
+# 3. TEST MECHANISTIC HYPOTHESIS (if directionality available):
+#    - Experiment: [assay to test your mechanistic model]
+#    - Readouts: [what measurements distinguish between mechanisms]
+#    - Expected outcomes: [results that support/refute hypothesis]
+#
+# 4. RESOLVE AMBIGUITY (if applicable):
+#    - For low confidence: [experiment to increase confidence in pathway]
+#    - For strength mismatch: [experiment to explain the discrepancy]
+#    - For heterogeneous clusters: [experiment to identify subclusters or alternative pathways]
+#
+# Be specific and actionable: name genes, assays, techniques, and expected results.
+# """
+
+FOLLOW_UP_EXPERIMENT_SUGGESTIONS = None  # Placeholder for future implementation
+
+
+# =============================================================================
+# SECTION 10: CHAIN-OF-THOUGHT INSTRUCTIONS (inserted by prompt_factory when CoT enabled)
+# =============================================================================
 
 ENHANCED_COT_INSTRUCTIONS = """
 STEP 1 - PATHWAY HYPOTHESIS (2-3 candidates):
@@ -178,4 +312,34 @@ CONCISE_COT_INSTRUCTIONS = """
 2) Classify each gene as ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE with 1-line rationale.
 3) Assign priority scores (1-10) based on novelty and impact; cite supporting evidence.
 4) Note contradictions or gaps in evidence; adjust confidence accordingly.
+"""
+
+
+# =============================================================================
+# SECTION 11: OUTPUT FORMAT (always last)
+# =============================================================================
+
+OUTPUT_FORMAT_JSON = """
+Provide a concise analysis in this exact JSON format:
+{
+  "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id provided in the prompt
+  "dominant_process": "specific pathway name",
+  "pathway_confidence": "High/Medium/Low",
+  "established_genes": ["GeneA", "GeneB"],
+  "uncharacterized_genes": [
+    {
+      "gene": "GeneC",
+      "priority": 8,
+      "rationale": "explanation"
+    }
+  ],
+  "novel_role_genes": [
+    {
+      "gene": "GeneD",
+      "priority": 7,
+      "rationale": "explanation"
+    }
+  ],
+  "summary": "key findings summary"
+}
 """
