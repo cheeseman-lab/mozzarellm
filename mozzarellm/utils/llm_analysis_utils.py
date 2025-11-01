@@ -1,10 +1,15 @@
+import datetime
 import json
-import re
-import pandas as pd
 import logging
 import os
+import re
 import time
-import datetime
+
+import pandas as pd
+
+# Constants for cluster analysis scoring
+HIGH_PRIORITY_THRESHOLD = 8
+CONFIDENCE_SCORE_WEIGHTS = {"High": 3, "Medium": 2, "Low": 1, "Unknown": 0}
 
 
 def process_analysis(analysis_text):
@@ -25,16 +30,12 @@ def process_analysis(analysis_text):
     detailed_analysis = analysis_text
 
     # Try to extract function name
-    name_match = re.search(
-        r"FUNCTION NAME:?\s*(.*?)(?:\n|$)", analysis_text, re.IGNORECASE
-    )
+    name_match = re.search(r"FUNCTION NAME:?\s*(.*?)(?:\n|$)", analysis_text, re.IGNORECASE)
     if name_match:
         function_name = name_match.group(1).strip()
 
     # Try to extract confidence score
-    score_match = re.search(
-        r"CONFIDENCE SCORE:?\s*([\d\.]+)", analysis_text, re.IGNORECASE
-    )
+    score_match = re.search(r"CONFIDENCE SCORE:?\s*([\d\.]+)", analysis_text, re.IGNORECASE)
     if score_match:
         confidence_score = score_match.group(1).strip()
 
@@ -96,18 +97,15 @@ def extract_json_from_markdown(text):
     return text
 
 
-def process_cluster_response(analysis_text, is_batch=False):
+def process_cluster_response(analysis_text):
     """
-    Unified function to process cluster analysis output from an LLM.
-    Handles both single cluster and batch responses.
+    Process single cluster analysis output from an LLM.
 
     Args:
         analysis_text: Raw text response from LLM
-        is_batch: Boolean indicating if this is a batch response
 
     Returns:
-        If is_batch: Dictionary mapping cluster IDs to their analysis results
-        If not is_batch: Dictionary with structured analysis for a single cluster
+        Dictionary with structured analysis for a single cluster
     """
     # Save the raw response for debugging
     debug_dir = "debug"
@@ -135,163 +133,82 @@ def process_cluster_response(analysis_text, is_batch=False):
     try:
         # Try direct JSON parsing first
         try:
-            # For single cluster
-            if not is_batch:
-                parsed_json = json.loads(cleaned_text)
-                return _standardize_cluster_format(parsed_json, analysis_text)
-            # For batch clusters
-            else:
-                parsed_json = json.loads(cleaned_text)
-                if isinstance(parsed_json, list):
-                    clusters = {}
-                    for cluster_analysis in parsed_json:
-                        processed_cluster = _standardize_cluster_format(
-                            cluster_analysis, analysis_text
-                        )
-                        if processed_cluster["cluster_id"]:
-                            clusters[processed_cluster["cluster_id"]] = (
-                                processed_cluster
-                            )
-                    return clusters
+            parsed_json = json.loads(cleaned_text)
+            return _standardize_cluster_format(parsed_json, analysis_text)
 
         except json.JSONDecodeError:
             # If direct parsing fails, try more robust methods
             logging.info("Direct JSON parsing failed, trying regex extraction...")
 
             # Clean up common JSON formatting issues
-            cleaned_text = re.sub(
-                r",(\s*[}\]])", r"\1", cleaned_text
-            )  # Remove trailing commas
+            cleaned_text = re.sub(r",(\s*[}\]])", r"\1", cleaned_text)  # Remove trailing commas
             cleaned_text = re.sub(
                 r"([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)", r'\1"\2"\3', cleaned_text
             )  # Quote unquoted keys
 
             # Try to extract JSON using regex patterns
-            if is_batch:
-                # Look for a JSON array pattern
-                array_pattern = r"\[\s*\{.*\}\s*\]"
-                json_match = re.search(array_pattern, cleaned_text, re.DOTALL)
+            # Look for a JSON object pattern
+            object_pattern = r'\{\s*"cluster_id".*\}'
+            json_match = re.search(object_pattern, cleaned_text, re.DOTALL)
 
-                if json_match:
-                    try:
-                        json_str = json_match.group(0)
-                        analysis_array = json.loads(json_str)
+            if json_match:
+                try:
+                    json_str = json_match.group(0)
+                    analysis_json = json.loads(json_str)
+                    return _standardize_cluster_format(analysis_json, analysis_text)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Failed to parse JSON object from regex match: {e}")
 
-                        # Process each cluster in the array
-                        clusters = {}
-                        for cluster_analysis in analysis_array:
-                            processed_cluster = _standardize_cluster_format(
-                                cluster_analysis, analysis_text
-                            )
-                            if processed_cluster["cluster_id"]:
-                                clusters[processed_cluster["cluster_id"]] = (
-                                    processed_cluster
-                                )
+            # If regex fails, try another approach - find a complete JSON object
+            start_idx = cleaned_text.find("{")
+            end_idx = cleaned_text.rfind("}")
 
-                        return clusters
-                    except json.JSONDecodeError as e:
-                        logging.error(
-                            f"Failed to parse JSON array from regex match: {e}"
-                        )
-
-                # If regex fails, try another approach - look for properly formed JSON objects
-                object_pattern = r'\{\s*"cluster_id".*?\}'
-                json_matches = re.findall(object_pattern, cleaned_text, re.DOTALL)
-
-                if json_matches:
-                    clusters = {}
-                    for json_str in json_matches:
-                        try:
-                            cluster_analysis = json.loads(json_str)
-                            processed_cluster = _standardize_cluster_format(
-                                cluster_analysis, analysis_text
-                            )
-                            if processed_cluster["cluster_id"]:
-                                clusters[processed_cluster["cluster_id"]] = (
-                                    processed_cluster
-                                )
-                        except json.JSONDecodeError:
-                            continue
-
-                    if clusters:
-                        return clusters
-
-            else:
-                # Single cluster mode - look for a JSON object pattern
-                object_pattern = r'\{\s*"cluster_id".*\}'
-                json_match = re.search(object_pattern, cleaned_text, re.DOTALL)
-
-                if json_match:
-                    try:
-                        json_str = json_match.group(0)
-                        analysis_json = json.loads(json_str)
-                        return _standardize_cluster_format(analysis_json, analysis_text)
-                    except json.JSONDecodeError as e:
-                        logging.error(
-                            f"Failed to parse JSON object from regex match: {e}"
-                        )
-
-                # If regex fails, try another approach - find a complete JSON object
-                start_idx = cleaned_text.find("{")
-                end_idx = cleaned_text.rfind("}")
-
-                if start_idx >= 0 and end_idx > start_idx:
-                    try:
-                        json_str = cleaned_text[start_idx : end_idx + 1]
-                        analysis_json = json.loads(json_str)
-                        return _standardize_cluster_format(analysis_json, analysis_text)
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse JSON object using indices: {e}")
+            if start_idx >= 0 and end_idx > start_idx:
+                try:
+                    json_str = cleaned_text[start_idx : end_idx + 1]
+                    analysis_json = json.loads(json_str)
+                    return _standardize_cluster_format(analysis_json, analysis_text)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Failed to parse JSON object using indices: {e}")
 
         # Last resort - try a completely different approach for particularly problematic responses
-        logging.warning(
-            "All standard parsing methods failed, attempting final recovery approach"
-        )
+        logging.warning("All standard parsing methods failed, attempting final recovery approach")
 
         # Find all key-value pairs using regex and reconstruct JSON
-        if not is_batch:
-            try:
-                reconstructed_json = {}
+        try:
+            reconstructed_json = {}
 
-                # Extract cluster_id
-                cluster_id_match = re.search(
-                    r'"cluster_id"\s*:\s*"([^"]+)"', cleaned_text
-                )
-                if cluster_id_match:
-                    reconstructed_json["cluster_id"] = cluster_id_match.group(1)
+            # Extract cluster_id
+            cluster_id_match = re.search(r'"cluster_id"\s*:\s*"([^"]+)"', cleaned_text)
+            if cluster_id_match:
+                reconstructed_json["cluster_id"] = cluster_id_match.group(1)
 
-                # Extract dominant_process
-                process_match = re.search(
-                    r'"dominant_process"\s*:\s*"([^"]+)"', cleaned_text
-                )
-                if process_match:
-                    reconstructed_json["dominant_process"] = process_match.group(1)
+            # Extract dominant_process
+            process_match = re.search(r'"dominant_process"\s*:\s*"([^"]+)"', cleaned_text)
+            if process_match:
+                reconstructed_json["dominant_process"] = process_match.group(1)
 
-                # Extract pathway_confidence
-                confidence_match = re.search(
-                    r'"pathway_confidence"\s*:\s*"([^"]+)"', cleaned_text
-                )
-                if confidence_match:
-                    reconstructed_json["pathway_confidence"] = confidence_match.group(1)
+            # Extract pathway_confidence
+            confidence_match = re.search(r'"pathway_confidence"\s*:\s*"([^"]+)"', cleaned_text)
+            if confidence_match:
+                reconstructed_json["pathway_confidence"] = confidence_match.group(1)
 
-                # Extract summary
-                summary_match = re.search(r'"summary"\s*:\s*"([^"]+)"', cleaned_text)
-                if summary_match:
-                    reconstructed_json["summary"] = summary_match.group(1)
+            # Extract summary
+            summary_match = re.search(r'"summary"\s*:\s*"([^"]+)"', cleaned_text)
+            if summary_match:
+                reconstructed_json["summary"] = summary_match.group(1)
 
-                if reconstructed_json.get("cluster_id"):
-                    return _standardize_cluster_format(
-                        reconstructed_json, analysis_text
-                    )
-            except Exception as e:
-                logging.error(f"Final recovery approach failed: {e}")
+            if reconstructed_json.get("cluster_id"):
+                return _standardize_cluster_format(reconstructed_json, analysis_text)
+        except Exception as e:
+            logging.error(f"Final recovery approach failed: {e}")
 
         # If all approaches fail, return the default
-        return default_structure if not is_batch else {}
+        return default_structure
 
     except Exception as e:
         logging.error(f"Error processing cluster analysis: {e}")
-        return default_structure if not is_batch else {}
+        return default_structure
 
 
 def _standardize_cluster_format(cluster_data, raw_text):
@@ -329,9 +246,7 @@ def _standardize_cluster_format(cluster_data, raw_text):
     if "novel_genes" in cluster_data and not standardized.get("uncharacterized_genes"):
         standardized["uncharacterized_genes"] = cluster_data.pop("novel_genes")
 
-    if "characterized_genes" in cluster_data and not standardized.get(
-        "novel_role_genes"
-    ):
+    if "characterized_genes" in cluster_data and not standardized.get("novel_role_genes"):
         characterized = cluster_data.pop("characterized_genes")
         if isinstance(characterized, list):
             if characterized and isinstance(characterized[0], str):
@@ -361,20 +276,164 @@ def _standardize_cluster_format(cluster_data, raw_text):
     return standardized
 
 
+def _calculate_cluster_statistics(analysis):
+    """
+    Calculate all statistics for a cluster.
+
+    Args:
+        analysis: Cluster analysis dictionary
+
+    Returns:
+        Dictionary with all cluster statistics
+    """
+    pathway_confidence = analysis.get("pathway_confidence", "Unknown")
+
+    # Get gene lists
+    established_genes = analysis.get("established_genes", [])
+    uncharacterized_genes_info = analysis.get("uncharacterized_genes", [])
+    novel_role_genes_info = analysis.get("novel_role_genes", [])
+
+    # Extract gene names
+    uncharacterized_genes = [g.get("gene", "Unknown") for g in uncharacterized_genes_info]
+    novel_role_genes = [g.get("gene", "Unknown") for g in novel_role_genes_info]
+
+    # Calculate counts
+    established_count = len(established_genes)
+    uncharacterized_count = len(uncharacterized_genes)
+    novel_role_count = len(novel_role_genes)
+    total_count = established_count + uncharacterized_count + novel_role_count
+
+    # Get uncharacterized gene statistics
+    unchar_priorities = []
+    high_unchar_genes = []
+    for unchar_gene in uncharacterized_genes_info:
+        gene_name = unchar_gene.get("gene", "Unknown")
+        priority = unchar_gene.get("priority", 0)
+        unchar_priorities.append(priority)
+        if priority >= HIGH_PRIORITY_THRESHOLD:
+            high_unchar_genes.append(f"{gene_name}:{priority}")
+
+    # Get novel role gene statistics
+    novel_role_priorities = []
+    high_novel_role_genes = []
+    for novel_role_gene in novel_role_genes_info:
+        gene_name = novel_role_gene.get("gene", "Unknown")
+        priority = novel_role_gene.get("priority", 0)
+        novel_role_priorities.append(priority)
+        if priority >= HIGH_PRIORITY_THRESHOLD:
+            high_novel_role_genes.append(f"{gene_name}:{priority}")
+
+    # Calculate derived statistics
+    max_unchar_priority = max(unchar_priorities) if unchar_priorities else 0
+    avg_unchar_priority = (
+        sum(unchar_priorities) / len(unchar_priorities) if unchar_priorities else 0
+    )
+    max_novel_role_priority = max(novel_role_priorities) if novel_role_priorities else 0
+    avg_novel_role_priority = (
+        sum(novel_role_priorities) / len(novel_role_priorities) if novel_role_priorities else 0
+    )
+
+    return {
+        "pathway_confidence": pathway_confidence,
+        "dominant_process": analysis.get("dominant_process", "Unknown"),
+        "summary": analysis.get("summary", "None provided"),
+        "established_genes": established_genes,
+        "uncharacterized_genes": uncharacterized_genes,
+        "novel_role_genes": novel_role_genes,
+        "established_count": established_count,
+        "uncharacterized_count": uncharacterized_count,
+        "novel_role_count": novel_role_count,
+        "total_count": total_count,
+        "max_unchar_priority": max_unchar_priority,
+        "avg_unchar_priority": round(avg_unchar_priority, 2),
+        "high_unchar_count": len(high_unchar_genes),
+        "high_unchar_genes": high_unchar_genes,
+        "max_novel_role_priority": max_novel_role_priority,
+        "avg_novel_role_priority": round(avg_novel_role_priority, 2),
+        "high_novel_role_count": len(high_novel_role_genes),
+        "high_novel_role_genes": high_novel_role_genes,
+    }
+
+
+def _calculate_cluster_importance_score(cluster_stats):
+    """
+    Calculate cluster importance score from statistics.
+
+    Args:
+        cluster_stats: Dictionary from _calculate_cluster_statistics
+
+    Returns:
+        Float cluster importance score
+    """
+    pathway_confidence = cluster_stats["pathway_confidence"]
+
+    # Get confidence score
+    confidence_score = CONFIDENCE_SCORE_WEIGHTS.get(
+        pathway_confidence.split()[0] if isinstance(pathway_confidence, str) else "Unknown", 0
+    )
+
+    # Calculate scores for both gene types
+    unchar_score = (
+        confidence_score
+        * (1 + cluster_stats["high_unchar_count"] / 10)
+        * (cluster_stats["max_unchar_priority"] / 10)
+    )
+    novel_role_score = (
+        confidence_score
+        * (1 + cluster_stats["high_novel_role_count"] / 10)
+        * (cluster_stats["max_novel_role_priority"] / 10)
+    )
+
+    return round(max(unchar_score, novel_role_score), 2)
+
+
+def _create_gene_entry(gene_info, cluster_id, cluster_stats, cluster_score, gene_category):
+    """
+    Create a single gene entry dictionary.
+
+    Args:
+        gene_info: Dictionary with gene, priority, rationale
+        cluster_id: Cluster identifier
+        cluster_stats: Dictionary from _calculate_cluster_statistics
+        cluster_score: Cluster importance score
+        gene_category: "uncharacterized" or "novel_role"
+
+    Returns:
+        Dictionary with gene entry data
+    """
+    return {
+        "gene_name": gene_info.get("gene", "Unknown"),
+        "gene_description": gene_info.get("rationale", ""),
+        "gene_importance_score": gene_info.get("priority", 0),
+        "cluster_id": cluster_id,
+        "cluster_biological_process": cluster_stats["dominant_process"],
+        "pathway_confidence_level": cluster_stats["pathway_confidence"],
+        "cluster_importance_score": cluster_score,
+        "follow_up_suggestion": cluster_stats["summary"],
+        "established_genes": ";".join(cluster_stats["established_genes"]),
+        "established_gene_count": cluster_stats["established_count"],
+        "uncharacterized_genes": ";".join(cluster_stats["uncharacterized_genes"]),
+        "uncharacterized_gene_count": cluster_stats["uncharacterized_count"],
+        "novel_role_genes": ";".join(cluster_stats["novel_role_genes"]),
+        "novel_role_gene_count": cluster_stats["novel_role_count"],
+        "gene_category": gene_category,
+    }
+
+
 def save_cluster_analysis(
     clusters_dict, out_file_base=None, original_df=None, include_raw=True, save_outputs=True
 ):
     """
     Process and optionally save cluster analysis results to JSON and multiple CSV formats.
     Returns the processed DataFrames regardless of whether they're saved to disk.
-    
+
     Args:
         clusters_dict: Dictionary with cluster analysis results in JSON format
         out_file_base: Base filename for output files (without extension), required if save_outputs=True
         original_df: Optional original DataFrame with cluster_id and other original data
         include_raw: Whether to include raw text in JSON output
         save_outputs: Whether to write results to disk (default: True)
-    
+
     Returns:
         dict: Dictionary containing the following keys:
             - 'json_data': The complete JSON data structure
@@ -382,25 +441,21 @@ def save_cluster_analysis(
             - 'cluster_df': DataFrame with cluster-level analysis
     """
     # Initialize return dictionary
-    results = {
-        'json_data': None,
-        'gene_df': None,
-        'cluster_df': None
-    }
-    
+    results = {"json_data": None, "gene_df": None, "cluster_df": None}
+
     # Validate parameters
     if save_outputs and not out_file_base:
         logging.warning("Cannot save outputs without out_file_base parameter")
         save_outputs = False
-    
+
     # Set paths if saving
     json_path = f"{out_file_base}_clusters.json" if out_file_base else None
-    
+
     # Check if the JSON file already exists and load previous results
     existing_clusters = {}
     if save_outputs and os.path.exists(json_path):
         try:
-            with open(json_path, "r") as f:
+            with open(json_path) as f:
                 existing_data = json.load(f)
                 if "clusters" in existing_data:
                     existing_clusters = existing_data["clusters"]
@@ -409,17 +464,17 @@ def save_cluster_analysis(
             logging.info(f"Loaded {len(existing_clusters)} existing clusters from {json_path}")
         except Exception as e:
             logging.warning(f"Failed to load existing clusters file: {e}")
-    
+
     # Merge existing clusters with new ones
     combined_clusters = {**existing_clusters, **clusters_dict}
-    
+
     # Option to exclude raw text to save space
     processed_clusters = combined_clusters.copy()
     if not include_raw:
         for cluster_id in processed_clusters:
             if "raw_text" in processed_clusters[cluster_id]:
                 processed_clusters[cluster_id].pop("raw_text", None)
-    
+
     # Add metadata
     output_data = {
         "metadata": {
@@ -429,15 +484,15 @@ def save_cluster_analysis(
         },
         "clusters": processed_clusters,
     }
-    
+
     # Store the JSON data in the results
-    results['json_data'] = output_data
-    
+    results["json_data"] = output_data
+
     # Save full results to JSON if requested
     if save_outputs and json_path:
         with open(json_path, "w") as f:
             json.dump(output_data, f, indent=2)
-    
+
     # Process and create gene-level and cluster-level tables
     if combined_clusters:
         # Create gene-level tables - one for uncharacterized genes and one for novel role genes
@@ -447,125 +502,22 @@ def save_cluster_analysis(
             novel_role_gene_data = []
 
             for cluster_id, analysis in combined_clusters.items():
-                pathway_confidence = analysis.get("pathway_confidence", "Unknown")
-                cluster_score = 0
-                summary = analysis.get("summary", "None provided")
-
-                # Calculate cluster score
-                confidence_order = {"High": 3, "Medium": 2, "Low": 1, "Unknown": 0}
-                confidence_score = confidence_order.get(
-                    pathway_confidence.split()[0]
-                    if isinstance(pathway_confidence, str)
-                    else "Unknown",
-                    0,
-                )
-
-                # Get established genes
-                established_genes = analysis.get("established_genes", [])
-
-                # Get uncharacterized gene statistics
-                unchar_priorities = []
-                high_unchar_count = 0
-
-                for unchar_gene in analysis.get("uncharacterized_genes", []):
-                    if unchar_gene.get("priority", 0) >= 8:
-                        high_unchar_count += 1
-                    unchar_priorities.append(unchar_gene.get("priority", 0))
-
-                # Get novel role gene statistics
-                novel_role_priorities = []
-                high_novel_role_count = 0
-
-                for novel_role_gene in analysis.get("novel_role_genes", []):
-                    if novel_role_gene.get("priority", 0) >= 8:
-                        high_novel_role_count += 1
-                    novel_role_priorities.append(novel_role_gene.get("priority", 0))
-
-                # Get max priorities
-                max_unchar_priority = max(unchar_priorities) if unchar_priorities else 0
-                max_novel_role_priority = (
-                    max(novel_role_priorities) if novel_role_priorities else 0
-                )
-
-                # Calculate cluster score based on both gene types
-                unchar_score = (
-                    confidence_score
-                    * (1 + high_unchar_count / 10)
-                    * (max_unchar_priority / 10)
-                )
-                novel_role_score = (
-                    confidence_score
-                    * (1 + high_novel_role_count / 10)
-                    * (max_novel_role_priority / 10)
-                )
-                cluster_score = round(max(unchar_score, novel_role_score), 2)
-
-                # Get all uncharacterized genes
-                unchar_genes = [
-                    gene.get("gene", "Unknown")
-                    for gene in analysis.get("uncharacterized_genes", [])
-                ]
-
-                # Get all novel role genes
-                novel_role_genes = [
-                    gene.get("gene", "Unknown")
-                    for gene in analysis.get("novel_role_genes", [])
-                ]
+                # Calculate statistics ONCE per cluster
+                cluster_stats = _calculate_cluster_statistics(analysis)
+                cluster_score = _calculate_cluster_importance_score(cluster_stats)
 
                 # Create entries for each uncharacterized gene
                 for unchar_gene in analysis.get("uncharacterized_genes", []):
-                    gene_name = unchar_gene.get("gene", "Unknown")
-                    gene_desc = unchar_gene.get("rationale", "")
-                    priority = unchar_gene.get("priority", 0)
-
-                    gene_entry = {
-                        "gene_name": gene_name,
-                        "gene_description": gene_desc,
-                        "gene_importance_score": priority,
-                        "cluster_id": cluster_id,
-                        "cluster_biological_process": analysis.get(
-                            "dominant_process", "Unknown"
-                        ),
-                        "pathway_confidence_level": pathway_confidence,
-                        "cluster_importance_score": cluster_score,
-                        "follow_up_suggestion": summary,
-                        "established_genes": ";".join(established_genes),
-                        "established_gene_count": len(established_genes),
-                        "uncharacterized_genes": ";".join(unchar_genes),
-                        "uncharacterized_gene_count": len(unchar_genes),
-                        "novel_role_genes": ";".join(novel_role_genes),
-                        "novel_role_gene_count": len(novel_role_genes),
-                        "gene_category": "uncharacterized",
-                    }
-
+                    gene_entry = _create_gene_entry(
+                        unchar_gene, cluster_id, cluster_stats, cluster_score, "uncharacterized"
+                    )
                     uncharacterized_gene_data.append(gene_entry)
 
                 # Create entries for each novel role gene
                 for novel_role_gene in analysis.get("novel_role_genes", []):
-                    gene_name = novel_role_gene.get("gene", "Unknown")
-                    gene_desc = novel_role_gene.get("rationale", "")
-                    priority = novel_role_gene.get("priority", 0)
-
-                    gene_entry = {
-                        "gene_name": gene_name,
-                        "gene_description": gene_desc,
-                        "gene_importance_score": priority,
-                        "cluster_id": cluster_id,
-                        "cluster_biological_process": analysis.get(
-                            "dominant_process", "Unknown"
-                        ),
-                        "pathway_confidence_level": pathway_confidence,
-                        "cluster_importance_score": cluster_score,
-                        "follow_up_suggestion": summary,
-                        "established_genes": ";".join(established_genes),
-                        "established_gene_count": len(established_genes),
-                        "uncharacterized_genes": ";".join(unchar_genes),
-                        "uncharacterized_gene_count": len(unchar_genes),
-                        "novel_role_genes": ";".join(novel_role_genes),
-                        "novel_role_gene_count": len(novel_role_genes),
-                        "gene_category": "novel_role",
-                    }
-
+                    gene_entry = _create_gene_entry(
+                        novel_role_gene, cluster_id, cluster_stats, cluster_score, "novel_role"
+                    )
                     novel_role_gene_data.append(gene_entry)
 
             # Combine all gene data
@@ -580,9 +532,7 @@ def save_cluster_analysis(
                     # Ensure cluster_id is the same type in both DataFrames
                     gene_df["cluster_id"] = gene_df["cluster_id"].astype(str)
                     original_df_copy = original_df.copy()
-                    original_df_copy["cluster_id"] = original_df_copy[
-                        "cluster_id"
-                    ].astype(str)
+                    original_df_copy["cluster_id"] = original_df_copy["cluster_id"].astype(str)
 
                     # Select only columns from original_df that are not already in gene_df
                     # except for cluster_id which is used for merging
@@ -615,8 +565,8 @@ def save_cluster_analysis(
                     ascending=[True, False, False],
                 )
                 # Store in results
-                results['gene_df'] = gene_df
-                
+                results["gene_df"] = gene_df
+
                 # Save if requested
                 if save_outputs and out_file_base:
                     gene_path = f"{out_file_base}_flagged_genes.csv"
@@ -634,122 +584,58 @@ def save_cluster_analysis(
             cluster_data = []
 
             for cluster_id, analysis in combined_clusters.items():
-                pathway_confidence = analysis.get("pathway_confidence", "Unknown")
-                biological_process = analysis.get("dominant_process", "Unknown")
+                # Calculate statistics ONCE per cluster
+                cluster_stats = _calculate_cluster_statistics(analysis)
+                cluster_score = _calculate_cluster_importance_score(cluster_stats)
 
-                # Get all genes by category
-                established_genes = analysis.get("established_genes", [])
-                uncharacterized_genes_info = analysis.get("uncharacterized_genes", [])
-                novel_role_genes_info = analysis.get("novel_role_genes", [])
-
-                # Extract gene names
-                uncharacterized_genes = [
-                    gene.get("gene", "Unknown") for gene in uncharacterized_genes_info
-                ]
-                novel_role_genes = [
-                    gene.get("gene", "Unknown") for gene in novel_role_genes_info
-                ]
-
-                # Create gene lists
-                all_genes = established_genes + uncharacterized_genes + novel_role_genes
-
-                # Count genes by category
-                established_count = len(established_genes)
-                uncharacterized_count = len(uncharacterized_genes)
-                novel_role_count = len(novel_role_genes)
-                total_count = (
-                    established_count + uncharacterized_count + novel_role_count
+                # Create all_genes list
+                all_genes = (
+                    cluster_stats["established_genes"]
+                    + cluster_stats["uncharacterized_genes"]
+                    + cluster_stats["novel_role_genes"]
                 )
 
-                # Calculate pathway confidence score
-                confidence_order = {"High": 3, "Medium": 2, "Low": 1, "Unknown": 0}
-                confidence_score = confidence_order.get(
-                    pathway_confidence.split()[0]
-                    if isinstance(pathway_confidence, str)
-                    else "Unknown",
-                    0,
+                # Get quality metrics if available
+                missed_genes = analysis.get("missed_genes", [])
+                total_genes_in_cluster = analysis.get(
+                    "total_genes_in_cluster", cluster_stats["total_count"]
+                )
+                classification_completeness = analysis.get("classification_completeness", 1.0)
+                established_ratio = (
+                    cluster_stats["established_count"] / total_genes_in_cluster
+                    if total_genes_in_cluster > 0
+                    else 0.0
                 )
 
-                # Get uncharacterized gene statistics
-                unchar_priorities = []
-                high_unchar_genes = []
-
-                for unchar_gene in uncharacterized_genes_info:
-                    gene_name = unchar_gene.get("gene", "Unknown")
-                    priority = unchar_gene.get("priority", 0)
-                    unchar_priorities.append(priority)
-
-                    if priority >= 8:
-                        high_unchar_genes.append(f"{gene_name}:{priority}")
-
-                # Get novel role gene statistics
-                novel_role_priorities = []
-                high_novel_role_genes = []
-
-                for novel_role_gene in novel_role_genes_info:
-                    gene_name = novel_role_gene.get("gene", "Unknown")
-                    priority = novel_role_gene.get("priority", 0)
-                    novel_role_priorities.append(priority)
-
-                    if priority >= 8:
-                        high_novel_role_genes.append(f"{gene_name}:{priority}")
-
-                # Calculate statistics for uncharacterized genes
-                max_unchar_priority = max(unchar_priorities) if unchar_priorities else 0
-                avg_unchar_priority = (
-                    sum(unchar_priorities) / len(unchar_priorities)
-                    if unchar_priorities
-                    else 0
-                )
-                high_unchar_count = len(high_unchar_genes)
-
-                # Calculate statistics for novel role genes
-                max_novel_role_priority = (
-                    max(novel_role_priorities) if novel_role_priorities else 0
-                )
-                avg_novel_role_priority = (
-                    sum(novel_role_priorities) / len(novel_role_priorities)
-                    if novel_role_priorities
-                    else 0
-                )
-                high_novel_role_count = len(high_novel_role_genes)
-
-                # Combined score formula - take the higher of the two gene type scores
-                unchar_score = (
-                    confidence_score
-                    * (1 + high_unchar_count / 10)
-                    * (max_unchar_priority / 10)
-                )
-                novel_role_score = (
-                    confidence_score
-                    * (1 + high_novel_role_count / 10)
-                    * (max_novel_role_priority / 10)
-                )
-                cluster_priority_score = max(unchar_score, novel_role_score)
-
-                # Create cluster entry with added gene information
+                # Create cluster entry with all information including quality metrics
                 cluster_entry = {
                     "cluster_id": cluster_id,
-                    "cluster_biological_process": biological_process,
-                    "pathway_confidence_level": pathway_confidence,
-                    "cluster_importance_score": round(cluster_priority_score, 2),
-                    "follow_up_suggestion": analysis.get("summary", "None provided"),
-                    "established_genes": ";".join(established_genes),
-                    "established_gene_count": established_count,
-                    "uncharacterized_genes": ";".join(uncharacterized_genes),
-                    "uncharacterized_gene_count": uncharacterized_count,
-                    "novel_role_genes": ";".join(novel_role_genes),
-                    "novel_role_gene_count": novel_role_count,
-                    "total_gene_count": total_count,
-                    "highest_unchar_importance": max_unchar_priority,
-                    "average_unchar_importance": round(avg_unchar_priority, 2),
-                    "high_unchar_genes": ";".join(high_unchar_genes),
-                    "high_unchar_gene_count": high_unchar_count,
-                    "highest_novel_role_importance": max_novel_role_priority,
-                    "average_novel_role_importance": round(avg_novel_role_priority, 2),
-                    "high_novel_role_genes": ";".join(high_novel_role_genes),
-                    "high_novel_role_gene_count": high_novel_role_count,
+                    "cluster_biological_process": cluster_stats["dominant_process"],
+                    "pathway_confidence_level": cluster_stats["pathway_confidence"],
+                    "cluster_importance_score": cluster_score,
+                    "follow_up_suggestion": cluster_stats["summary"],
+                    "established_genes": ";".join(cluster_stats["established_genes"]),
+                    "established_gene_count": cluster_stats["established_count"],
+                    "uncharacterized_genes": ";".join(cluster_stats["uncharacterized_genes"]),
+                    "uncharacterized_gene_count": cluster_stats["uncharacterized_count"],
+                    "novel_role_genes": ";".join(cluster_stats["novel_role_genes"]),
+                    "novel_role_gene_count": cluster_stats["novel_role_count"],
+                    "total_gene_count": cluster_stats["total_count"],
+                    "highest_unchar_importance": cluster_stats["max_unchar_priority"],
+                    "average_unchar_importance": cluster_stats["avg_unchar_priority"],
+                    "high_unchar_genes": ";".join(cluster_stats["high_unchar_genes"]),
+                    "high_unchar_gene_count": cluster_stats["high_unchar_count"],
+                    "highest_novel_role_importance": cluster_stats["max_novel_role_priority"],
+                    "average_novel_role_importance": cluster_stats["avg_novel_role_priority"],
+                    "high_novel_role_genes": ";".join(cluster_stats["high_novel_role_genes"]),
+                    "high_novel_role_gene_count": cluster_stats["high_novel_role_count"],
                     "all_cluster_genes": ";".join(all_genes),
+                    # Quality metrics
+                    "total_genes_in_cluster": total_genes_in_cluster,
+                    "established_gene_ratio": round(established_ratio, 3),
+                    "missed_genes": ";".join(missed_genes),
+                    "missed_gene_count": len(missed_genes),
+                    "classification_completeness": round(classification_completeness, 3),
                 }
 
                 cluster_data.append(cluster_entry)
@@ -763,9 +649,7 @@ def save_cluster_analysis(
                     # Ensure cluster_id is the same type in both DataFrames
                     cluster_df["cluster_id"] = cluster_df["cluster_id"].astype(str)
                     original_df_copy = original_df.copy()
-                    original_df_copy["cluster_id"] = original_df_copy[
-                        "cluster_id"
-                    ].astype(str)
+                    original_df_copy["cluster_id"] = original_df_copy["cluster_id"].astype(str)
 
                     # Select only columns from original_df that are not already in cluster_df
                     # except for cluster_id which is used for merging
@@ -802,8 +686,8 @@ def save_cluster_analysis(
                     cluster_df = cluster_df.sort_values("cluster_id")
 
                 # Store in results
-                results['cluster_df'] = cluster_df
-                
+                results["cluster_df"] = cluster_df
+
                 # Save if requested
                 if save_outputs and out_file_base:
                     cluster_path = f"{out_file_base}_clusters.csv"
