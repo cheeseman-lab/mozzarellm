@@ -45,6 +45,10 @@ debug/
 # Results and data (optional, comment out if you want to track these)
 results/
 
+# Documentation and tests (keeping local only)
+docs/
+tests/
+
 # Benchmark results in examples/
 examples/ops/results/
 examples/depmap/results/
