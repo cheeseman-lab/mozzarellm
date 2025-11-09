@@ -65,8 +65,8 @@ def save_progress(df, analysis_dict, out_file_base):
 
     # Save raw responses to JSON
     json_path = f"{out_file_base}.json"
-    with open(json_path, "w") as f:
-        json.dump(analysis_dict, f, indent=2)
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(analysis_dict, f, indent=2, ensure_ascii=False)
 
     # Log the save
     logging.info(f"Progress saved to {tsv_path} and {json_path}")
@@ -114,7 +114,7 @@ def process_cluster_response(analysis_text, is_batch=False):
     if not os.path.exists(debug_dir):
         os.makedirs(debug_dir)
     debug_filename = os.path.join(debug_dir, f"debug_response_{int(time.time())}.txt")
-    with open(debug_filename, "w") as f:
+    with open(debug_filename, "w", encoding="utf-8") as f:
         f.write(analysis_text)
 
     # Default structure for a single cluster
@@ -400,7 +400,7 @@ def save_cluster_analysis(
     existing_clusters = {}
     if save_outputs and os.path.exists(json_path):
         try:
-            with open(json_path, "r") as f:
+            with open(json_path, encoding="utf-8") as f:
                 existing_data = json.load(f)
                 if "clusters" in existing_data:
                     existing_clusters = existing_data["clusters"]
@@ -435,9 +435,9 @@ def save_cluster_analysis(
     
     # Save full results to JSON if requested
     if save_outputs and json_path:
-        with open(json_path, "w") as f:
-            json.dump(output_data, f, indent=2)
-    
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
+
     # Process and create gene-level and cluster-level tables
     if combined_clusters:
         # Create gene-level tables - one for uncharacterized genes and one for novel role genes

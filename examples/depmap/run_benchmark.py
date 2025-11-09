@@ -49,6 +49,7 @@ classifying genes based on their known vs. novel roles in that process.
 
 def main():
     """Run the benchmark analysis."""
+    sys.stdout.reconfigure(encoding='utf-8')
     parser = argparse.ArgumentParser(description="Run DepMap benchmark analysis")
     parser.add_argument(
         "--model",
