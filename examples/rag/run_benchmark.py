@@ -249,7 +249,9 @@ def main():
     print(f"Knowledge directory: {knowledge_dir}\n")
 
     # Determine which modes to run
-    modes_to_run = ALL_MODES if args.mode == "all" else {args.mode: ALL_MODES[args.mode]}
+    modes_to_run = (
+        ALL_MODES if args.mode == "all" else {args.mode: ALL_MODES[args.mode]}
+    )
 
     # Run selected modes
     all_mode_results = []
@@ -284,7 +286,9 @@ def main():
             combined_quick = pd.concat(quick_dfs, ignore_index=True)
             # Sort by cluster for easy comparison
             combined_quick = combined_quick.sort_values(by="cluster_id")
-            combined_quick_path = os.path.join(args.output_dir, "combined_quick_validation.csv")
+            combined_quick_path = os.path.join(
+                args.output_dir, "combined_quick_validation.csv"
+            )
             combined_quick.to_csv(combined_quick_path, index=False)
             print(f"✓ Combined quick validation: {combined_quick_path}")
 
@@ -300,10 +304,14 @@ def main():
             combined_detailed = pd.concat(detailed_dfs, ignore_index=True)
             # Sort by cluster and gene for side-by-side approach comparison
             if "gene" in combined_detailed.columns:
-                combined_detailed = combined_detailed.sort_values(by=["cluster_id", "gene"])
+                combined_detailed = combined_detailed.sort_values(
+                    by=["cluster_id", "gene"]
+                )
             else:
                 combined_detailed = combined_detailed.sort_values(by="cluster_id")
-            combined_detailed_path = os.path.join(args.output_dir, "combined_detailed_analysis.csv")
+            combined_detailed_path = os.path.join(
+                args.output_dir, "combined_detailed_analysis.csv"
+            )
             combined_detailed.to_csv(combined_detailed_path, index=False)
             print(f"✓ Combined detailed analysis: {combined_detailed_path}")
 

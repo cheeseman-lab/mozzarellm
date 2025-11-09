@@ -100,7 +100,9 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Initialize analyzer
-    analyzer = ClusterAnalyzer(model=args.model, temperature=args.temperature, show_progress=True)
+    analyzer = ClusterAnalyzer(
+        model=args.model, temperature=args.temperature, show_progress=True
+    )
 
     # Run analysis
     print("Running analysis...")
@@ -109,7 +111,9 @@ def main():
     )
 
     # Convert and save standard results
-    output_base = os.path.join(args.output_dir, f"{args.model.replace('/', '_')}_results")
+    output_base = os.path.join(
+        args.output_dir, f"{args.model.replace('/', '_')}_results"
+    )
     clusters_dict = convert_results_to_dict(results)
     save_benchmark_results(clusters_dict, output_base, cluster_df)
 
@@ -124,7 +128,7 @@ def main():
         results, VALIDATION_DATA, "OPS", args.model, detailed_csv, check_confidence=True
     )
 
-    print(f"✓ CSVs saved to {args.output_dir}/")
+    print(f"CSVs saved to {args.output_dir}/")
     print("  - quick_validation.csv")
     print("  - detailed_analysis.csv")
 

@@ -35,7 +35,9 @@ BENCHMARKS = [
 ]
 
 
-def run_benchmark(benchmark_dir: str, benchmark_name: str, model: str, output_dir: Path) -> dict:
+def run_benchmark(
+    benchmark_dir: str, benchmark_name: str, model: str, output_dir: Path
+) -> dict:
     """Run a single benchmark with a specific model using CLI arguments.
 
     Args:
@@ -53,7 +55,7 @@ def run_benchmark(benchmark_dir: str, benchmark_name: str, model: str, output_di
 
     if not script_path.exists():
         error_msg = f"Benchmark script not found: {script_path}"
-        print(f"    ✗ {error_msg}")
+        print(f"    [FAIL] {error_msg}")
         return {
             "model": model,
             "benchmark": benchmark_name,
@@ -64,7 +66,14 @@ def run_benchmark(benchmark_dir: str, benchmark_name: str, model: str, output_di
     try:
         # Run the benchmark with CLI args
         result = subprocess.run(
-            [sys.executable, "run_benchmark.py", "--model", model, "--output-dir", str(output_dir)],
+            [
+                sys.executable,
+                "run_benchmark.py",
+                "--model",
+                model,
+                "--output-dir",
+                str(output_dir),
+            ],
             cwd=benchmark_dir,
             capture_output=True,
             text=True,
@@ -72,7 +81,7 @@ def run_benchmark(benchmark_dir: str, benchmark_name: str, model: str, output_di
         )
 
         if result.returncode != 0:
-            print("    ✗ FAILED")
+            print("    [FAIL]")
             if result.stderr:
                 print(f"    Error: {result.stderr[:200]}")
             return {
@@ -83,7 +92,7 @@ def run_benchmark(benchmark_dir: str, benchmark_name: str, model: str, output_di
                 "output_dir": str(output_dir),
             }
         else:
-            print("    ✓ SUCCESS")
+            print("    [PASS]")
             return {
                 "model": model,
                 "benchmark": benchmark_name,
@@ -94,7 +103,7 @@ def run_benchmark(benchmark_dir: str, benchmark_name: str, model: str, output_di
             }
 
     except subprocess.TimeoutExpired:
-        print("    ✗ Timeout after 10 minutes")
+        print("    [FAIL] Timeout after 10 minutes")
         return {
             "model": model,
             "benchmark": benchmark_name,
@@ -103,7 +112,7 @@ def run_benchmark(benchmark_dir: str, benchmark_name: str, model: str, output_di
             "output_dir": str(output_dir),
         }
     except Exception as e:
-        print(f"    ✗ Error: {e}")
+        print(f"    [FAIL] Error: {e}")
         return {
             "model": model,
             "benchmark": benchmark_name,
@@ -155,7 +164,7 @@ def print_summary(all_results: list, master_csv_path: Path = None):
 
     # Print basic status
     for result in all_results:
-        status = "✓" if result["success"] else "✗"
+        status = "[PASS]" if result["success"] else "[FAIL]"
         print(f"{status} {result['benchmark']:<15} {result['model']:<40}")
 
     # Print error details if any failures
@@ -183,7 +192,9 @@ def print_summary(all_results: list, master_csv_path: Path = None):
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Run all benchmarks across multiple models")
+    parser = argparse.ArgumentParser(
+        description="Run all benchmarks across multiple models"
+    )
     parser.add_argument(
         "--models",
         nargs="+",
@@ -203,7 +214,9 @@ def main():
     if args.output_base:
         base_output_dir = Path(args.output_base)
     else:
-        base_output_dir = Path(__file__).parent / "benchmark_results" / f"run_{timestamp}"
+        base_output_dir = (
+            Path(__file__).parent / "benchmark_results" / f"run_{timestamp}"
+        )
 
     base_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -232,7 +245,9 @@ def main():
             benchmark_output_dir.mkdir(parents=True, exist_ok=True)
 
             # Run the benchmark
-            result = run_benchmark(benchmark["dir"], benchmark["name"], model, benchmark_output_dir)
+            result = run_benchmark(
+                benchmark["dir"], benchmark["name"], model, benchmark_output_dir
+            )
             all_results.append(result)
 
     # Aggregate validation CSVs
@@ -245,9 +260,9 @@ def main():
     master_df = aggregate_quick_validations(all_results, master_csv_path)
 
     if master_df is not None:
-        print(f"✓ Master validation CSV saved to: {master_csv_path}")
+        print(f"Master validation CSV saved to: {master_csv_path}")
     else:
-        print("⚠️  No successful results to aggregate")
+        print("WARNING: No successful results to aggregate")
         master_csv_path = None
 
     # Aggregate detailed analysis CSVs
@@ -262,11 +277,16 @@ def main():
     if all_detailed_dfs:
         master_detailed_df = pd.concat(all_detailed_dfs, ignore_index=True)
         # Sort by cluster and gene for side-by-side model comparison
-        if "cluster_id" in master_detailed_df.columns and "gene" in master_detailed_df.columns:
-            master_detailed_df = master_detailed_df.sort_values(by=["cluster_id", "gene", "model"])
+        if (
+            "cluster_id" in master_detailed_df.columns
+            and "gene" in master_detailed_df.columns
+        ):
+            master_detailed_df = master_detailed_df.sort_values(
+                by=["cluster_id", "gene", "model"]
+            )
         master_detailed_path = base_output_dir / "master_detailed_analysis.csv"
         master_detailed_df.to_csv(master_detailed_path, index=False)
-        print(f"✓ Master detailed analysis CSV saved to: {master_detailed_path}")
+        print(f"Master detailed analysis CSV saved to: {master_detailed_path}")
 
     # Save detailed results JSON
     results_json_path = base_output_dir / "results.json"
@@ -281,17 +301,17 @@ def main():
             f,
             indent=2,
         )
-    print(f"✓ Detailed results saved to: {results_json_path}")
+    print(f"Detailed results saved to: {results_json_path}")
 
     # Print summary
     print_summary(all_results, master_csv_path)
 
     # Exit with error if any benchmark failed
     if any(not r["success"] for r in all_results):
-        print("\n⚠️  Some benchmarks failed")
+        print("\nWARNING: Some benchmarks failed")
         sys.exit(1)
     else:
-        print("\n✓ All benchmarks completed successfully!")
+        print("\nAll benchmarks completed successfully!")
         sys.exit(0)
 
 

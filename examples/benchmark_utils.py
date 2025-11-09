@@ -106,7 +106,9 @@ def validate_results(results, validation_data, check_confidence=False, mode_name
                     total_genes_classified += 1
                     print(f"    ✓ {gene}: {category}")
                 elif category == "established":
-                    print(f"    ✗ {gene}: {category} (expected novel_role or uncharacterized)")
+                    print(
+                        f"    ✗ {gene}: {category} (expected novel_role or uncharacterized)"
+                    )
                 else:
                     print(f"    ✗ {gene}: not classified")
         else:
@@ -133,7 +135,12 @@ def validate_results(results, validation_data, check_confidence=False, mode_name
 
 
 def create_quick_validation_csv(
-    results, validation_data, dataset_name, model_name, output_path, check_confidence=False
+    results,
+    validation_data,
+    dataset_name,
+    model_name,
+    output_path,
+    check_confidence=False,
 ):
     """Create a quick validation CSV with one row per cluster.
 
@@ -199,7 +206,9 @@ def create_quick_validation_csv(
             "expected_function": expected_func,
             "predicted_function": predicted_func,
             "function_match": function_match,
-            "gene_match_rate": f"{matched_genes}/{total_genes}" if total_genes > 0 else "0/0",
+            "gene_match_rate": f"{matched_genes}/{total_genes}"
+            if total_genes > 0
+            else "0/0",
         }
 
         if check_confidence:
@@ -215,7 +224,12 @@ def create_quick_validation_csv(
 
 
 def create_detailed_analysis_csv(
-    results, validation_data, dataset_name, model_name, output_path, check_confidence=False
+    results,
+    validation_data,
+    dataset_name,
+    model_name,
+    output_path,
+    check_confidence=False,
 ):
     """Create a detailed analysis CSV with cluster AND gene-level information.
 
@@ -308,12 +322,16 @@ def create_detailed_analysis_csv(
                 rationale = "N/A"
 
                 if category == "novel_role":
-                    novel_genes = [g for g in cluster.novel_role_genes if g.gene == gene]
+                    novel_genes = [
+                        g for g in cluster.novel_role_genes if g.gene == gene
+                    ]
                     if novel_genes:
                         priority = novel_genes[0].priority
                         rationale = novel_genes[0].rationale
                 elif category == "uncharacterized":
-                    unchar_genes = [g for g in cluster.uncharacterized_genes if g.gene == gene]
+                    unchar_genes = [
+                        g for g in cluster.uncharacterized_genes if g.gene == gene
+                    ]
                     if unchar_genes:
                         priority = unchar_genes[0].priority
                         rationale = unchar_genes[0].rationale
@@ -363,7 +381,9 @@ def load_benchmark_data(
     """
     print(f"Loading gene-wise data from: {csv_path}")
     gene_df = pd.read_csv(csv_path)
-    print(f"Loaded {len(gene_df)} genes across {gene_df[cluster_col].nunique()} clusters")
+    print(
+        f"Loaded {len(gene_df)} genes across {gene_df[cluster_col].nunique()} clusters"
+    )
 
     print("\nReshaping gene-wise data to cluster format...")
     cluster_df = reshape_to_clusters(
@@ -390,7 +410,9 @@ def load_uniprot_annotations(script_dir=None):
         DataFrame: Gene annotations with columns ["gene_names", "function"]
     """
     if script_dir:
-        uniprot_path = os.path.join(script_dir, "..", "..", "data", "knowledge", "uniprot_data.tsv")
+        uniprot_path = os.path.join(
+            script_dir, "..", "..", "data", "knowledge", "uniprot_data.tsv"
+        )
     else:
         uniprot_path = "../../data/knowledge/uniprot_data.tsv"
 
