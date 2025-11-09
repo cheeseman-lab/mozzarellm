@@ -63,7 +63,7 @@ def validate_results(results):
 
     for cluster_id, expected in VALIDATION_DATA.items():
         if cluster_id not in results.clusters:
-            print(f"\n✗ Module {cluster_id}: Not found in results")
+            print(f"\n[FAIL] Module {cluster_id}: Not found in results")
             continue
 
         cluster = results.clusters[cluster_id]
@@ -81,7 +81,7 @@ def validate_results(results):
         print(f"\nModule {cluster_id}:")
         print(f"  Expected: {expected_func}")
         print(f"  Predicted: {predicted_func}")
-        print(f"  {'✓' if function_match else '✗'} Function match")
+        print(f"  [{'PASS' if function_match else 'FAIL'}] Function match")
         print("  Validation genes:")
 
         # Check validation genes
@@ -89,9 +89,9 @@ def validate_results(results):
             category = categorize_gene(gene, cluster)
             if category != "not_classified":
                 total_genes_classified += 1
-                print(f"    ✓ {gene}: {category}")
+                print(f"    [PASS] {gene}: {category}")
             else:
-                print(f"    ✗ {gene}: not classified")
+                print(f"    [FAIL] {gene}: not classified")
 
     # Summary
     print("\n" + "=" * 60)
@@ -177,7 +177,7 @@ def main():
     with open(output_file, "w") as f:
         json.dump(results_dict, f, indent=2)
 
-    print(f"\n✓ Results saved to: {output_file}")
+    print(f"\nResults saved to: {output_file}")
 
     # Print analysis summary
     print("\n" + "=" * 60)
@@ -191,14 +191,14 @@ def main():
         print(f"  Novel role genes: {len(cluster.novel_role_genes)}")
         print(f"  Uncharacterized genes: {len(cluster.uncharacterized_genes)}")
         print(
-            f"  Quality: {'✓' if quality['classification_complete'] else '✗'} complete, "
-            f"{'✓' if quality['confidence_validated'] else '✗'} validated"
+            f"  Quality: [{'PASS' if quality['classification_complete'] else 'FAIL'}] complete, "
+            f"[{'PASS' if quality['confidence_validated'] else 'FAIL'}] validated"
         )
 
     # Validate against ground truth
     validate_results(results)
 
-    print("\n✓ Benchmark complete!")
+    print("\nBenchmark complete!")
 
 
 if __name__ == "__main__":

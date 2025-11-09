@@ -92,7 +92,7 @@ def run_benchmark(benchmark_dir: str, model: str) -> dict:
         return validation_results
 
     except subprocess.TimeoutExpired:
-        print("⚠️  Benchmark timed out after 10 minutes")
+        print("WARNING: Benchmark timed out after 10 minutes")
         return {
             "model": model,
             "benchmark": benchmark_dir,
@@ -100,7 +100,7 @@ def run_benchmark(benchmark_dir: str, model: str) -> dict:
             "error": "Timeout after 10 minutes",
         }
     except Exception as e:
-        print(f"⚠️  Error running benchmark: {e}")
+        print(f"WARNING: Error running benchmark: {e}")
         return {
             "model": model,
             "benchmark": benchmark_dir,
@@ -155,7 +155,7 @@ def print_summary(all_results: list):
     for result in all_results:
         model = result["model"]
         benchmark = result["benchmark"].upper()
-        status = "✓" if result["success"] else "✗"
+        status = "PASS" if result["success"] else "FAIL"
 
         if result["success"]:
             func = result.get("function_matches", "N/A")
@@ -223,14 +223,14 @@ def main():
 
         with open(output_path, "w") as f:
             json.dump(all_results, f, indent=2)
-        print(f"\n✓ Results saved to: {output_path}")
+        print(f"\nResults saved to: {output_path}")
 
     # Exit with error if any benchmark failed
     if any(not r["success"] for r in all_results):
-        print("\n⚠️  Some benchmarks failed")
+        print("\nWARNING: Some benchmarks failed")
         sys.exit(1)
     else:
-        print("\n✓ All benchmarks completed successfully!")
+        print("\nAll benchmarks completed successfully!")
         sys.exit(0)
 
 
