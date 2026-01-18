@@ -20,6 +20,7 @@ dependencies = [
     "pandas",
     "numpy",
     "tqdm",
+    "openpyxl",
     "python-dotenv",
     "requests",
     "ipykernel",
