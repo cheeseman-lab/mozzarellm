@@ -1,0 +1,37 @@
+
+{
+  "TODO": {
+    "description": "Copy this template, fill in the values, add/remove fields as needed, and remove the entire TODO field.",
+    "save_instructions": "Save as a .json file in the interface/screens/ directory."
+  },
+  "assay_type": "required",
+  "target_phenotype": "required",
+  "organism": "required",
+  "cell_line_or_system": "required",
+  "perturbation": {
+    "type": "required",
+    "library_or_reagent": "required"
+  },
+  "readout": {
+    "measurement": "required",
+    "instrument_or_platform": "required",
+    "primary_metric": "required"
+  },
+  "clustering": {
+    "method": "required",
+    "parameters": {
+      "resolution": "adjustable",
+      "k_neighbors": "adjustable"
+    }
+  },
+  "controls": {
+    "negative_controls": "required",
+    "positive_controls": "required"
+  },
+  "provenance": {
+    "dataset_name": "required",
+    "citation": "required",
+    "data_source": "required"
+  },
+  "notes": "optional"
+}
