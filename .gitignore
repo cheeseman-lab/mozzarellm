@@ -34,6 +34,8 @@ ENV/
 .coverage
 htmlcov/
 .pytest_cache/
+.ruff_cache/
+.claude/
 
 # Logs
 *.log
@@ -42,7 +44,19 @@ debug/
 
 # Results and data (optional, comment out if you want to track these)
 results/
-data/benchmarks/
+
+# Benchmark results in examples/
+examples/ops/results/
+examples/depmap/results/
+examples/proteomics/results/
+examples/benchmark_results/
+
+# OPS additional data and merge script
+examples/ops/additional_llm_data.csv
+examples/ops/merge_additional_data.py
+
+# Legacy examples
+examples/old/
 
 # IDE files
 .idea/
