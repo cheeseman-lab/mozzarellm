@@ -2,7 +2,7 @@
 {
   "TODO": {
     "description": "Copy this template, fill in the values, add/remove fields as needed, and remove the entire TODO field.",
-    "save_instructions": "Save as a .json file in the interface/screens/ directory."
+    "save_instructions": "Save as a .json file in the interface/directory."
   },
   "assay_type": "required",
   "target_phenotype": "required",
