@@ -6,8 +6,6 @@ creates timestamped result directories, and aggregates validation CSVs.
 Usage:
     python run_all_benchmarks.py                    # Run with default models
     python run_all_benchmarks.py --models claude-sonnet-4-5-20250929 gpt-4o
-
-Note: For RAG comparison (baseline vs enhanced vs concise), use examples/rag/run_benchmark.py
 """
 
 import argparse

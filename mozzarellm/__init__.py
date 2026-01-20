@@ -11,15 +11,12 @@ from .models import (
     ClusterInput,
     ClusterResult,
     GeneClassification,
-    RetrievalContext,
 )
 
 # Prompt components (modular)
 from .prompts import (
     CLUSTER_ANALYSIS_TASK,
-    CONCISE_COT_INSTRUCTIONS,
     DEFAULT_SCREEN_CONTEXT,
-    ENHANCED_COT_INSTRUCTIONS,
     GENE_CLASSIFICATION_RULES,
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,
@@ -44,7 +41,6 @@ __all__ = [
     "AnalysisResult",
     "GeneClassification",
     "ClusterInput",
-    "RetrievalContext",
     # Providers
     "LLMProvider",
     "OpenAIProvider",
@@ -57,8 +53,6 @@ __all__ = [
     "DEFAULT_SCREEN_CONTEXT",
     "PATHWAY_CONFIDENCE_CRITERIA",
     "OUTPUT_FORMAT_JSON",
-    "ENHANCED_COT_INSTRUCTIONS",
-    "CONCISE_COT_INSTRUCTIONS",
     # Utilities
     "reshape_to_clusters",
 ]
