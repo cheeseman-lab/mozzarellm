@@ -81,6 +81,61 @@ def load_cluster_table(
     )
 
 
+def _cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
+    """Chunk a gene-level table into smaller per-cluster DataFrames slices.
+
+    Returns:
+        List of DataFrames, one for each cluster.
+
+    Raises:
+        ValueError: If cluster_id_column is not found in DataFrame.
+
+    Note:
+        Will handle both sorted and interleaved cluster IDs. Relative order of genes within each cluster is preserved from the original DataFrame.
+    """
+    if cluster_id_column not in df.columns:
+        raise ValueError(f"Cluster ID column '{cluster_id_column}' not found in DataFrame.")
+    return [
+        df[df[cluster_id_column] == cluster_id] for cluster_id in df[cluster_id_column].unique()
+    ]
+
+def _add_annotations_to_chunk(chunk: pd.DataFrame) -> pd.DataFrame:
+    """Add annotation columns to a chunk of gene-level data. Calls UniprotAPIClient to fetch annotations."""
+    pass
+
+def _chunk_slice_to_nested_json(chunk: pd.DataFrame, gene_column: str, cluster_id_column: str) -> dict:
+    """Convert a dataframe chunk of gene-level data into a nested JSON structure.
+    NOTE: anticipated utility function for future use.
+    Returns:
+        dict: Nested JSON structure with cluster_id and genes.
+
+    EX: 
+    {
+        "cluster_id": "<cluster_id>",
+        "genes": {
+            "<gene_id_1>": {
+                "<column_name_1>": "<value>",
+                "<column_name_2>": "<value>",
+                "...": "..."
+            },
+            "<gene_id_2>": {
+                "<column_name_1>": "<value>",
+                "<column_name_2>": "<value>",
+                "...": "..."
+            }
+        }
+    }
+    """
+    return {
+        "cluster_id": chunk[cluster_id_column].iloc[0],
+        "genes": {
+            gene: {
+                col: chunk[col].iloc[i] for col in chunk.columns if col != gene_column
+            }
+            for i, gene in enumerate(chunk[gene_column])
+        },
+    }
+
 def build_evidence_bundles(
     screen_name: str | None = None,
     screen_context_path: str | Path | None = None,
@@ -106,4 +161,4 @@ def build_evidence_bundles(
     out_base = Path(out_dir)
     out_base.mkdir(parents=True, exist_ok=True)
 
-    pass # in progress
+    pass  # in progress

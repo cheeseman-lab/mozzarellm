@@ -171,12 +171,10 @@ def _format_retrieved_evidence(retrieved_context):
         relevance = sn.get("relevance_score", 0)
 
         # Format source tag based on source type
-        if src == "annotations":
-            src_tag = f"Gene:{meta.get('gene', '')}"
-        elif src == "knowledge_file":
+        if src == "knowledge_file":
             src_tag = f"File:{meta.get('path', '')} (score:{meta.get('score', 0)})"
         else:
-            src_tag = "Screen Context"
+            src_tag = str(src or "Unknown")
 
         evidence_text += f"[{i}] {src_tag} [relevance:{relevance}]: {txt}\n"
 

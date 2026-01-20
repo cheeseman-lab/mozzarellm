@@ -70,5 +70,6 @@ examples/old/
 .DS_Store
 Thumbs.db
 
-#development artifacts
+# Development artifacts
 dev/
+screen_context.json
