@@ -1,7 +1,7 @@
 """Shared utility functions for benchmark scripts.
 
 This module contains common validation, data loading, and result processing
-functions used across OPS, DepMap, Proteomics, and RAG benchmark scripts.
+functions used across OPS, DepMap, and Proteomics benchmark scripts.
 """
 
 import os
@@ -43,7 +43,7 @@ def validate_results(results, validation_data, check_confidence=False, mode_name
         results: ClusterAnalysisResults object
         validation_data: Dictionary mapping cluster IDs to expected results
         check_confidence: If True, validate confidence levels (for OPS benchmark)
-        mode_name: Optional name of analysis mode (for RAG comparison)
+        mode_name: Optional name of analysis mode
 
     Returns:
         dict: Validation summary with function matches and genes classified

@@ -5,8 +5,10 @@ This module provides the ClusterAnalyzer class, which is the primary
 interface for analyzing gene clusters using LLMs.
 """
 
+import json
 import logging
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 from tqdm import tqdm
@@ -98,6 +100,149 @@ class ClusterAnalyzer:
             "on published literature and gaps in knowledge of gene function."
         )
 
+    def _load_existing_results(self, output_dir: Path) -> dict[str, ClusterResult]:
+        """
+        Load completed cluster results from output directory for resume support.
+
+        Args:
+            output_dir: Directory containing clusters/ subdirectory with JSON files
+
+        Returns:
+            Dictionary mapping cluster IDs to ClusterResult objects
+        """
+        results_dir = output_dir / "clusters"
+        completed = {}
+
+        if not results_dir.exists():
+            return completed
+
+        for filepath in results_dir.iterdir():
+            if filepath.suffix == ".json":
+                try:
+                    with open(filepath) as f:
+                        data = json.load(f)
+                    cluster_id = data.get("cluster_id")
+                    if cluster_id is not None:
+                        completed[str(cluster_id)] = ClusterResult(**data)
+                except (json.JSONDecodeError, KeyError, Exception) as e:
+                    logger.warning(f"Failed to load {filepath}: {e}")
+                    continue
+
+        return completed
+
+    def _save_cluster_result(self, output_dir: Path, cluster_result: ClusterResult) -> None:
+        """
+        Save a single cluster result to JSON file.
+
+        Args:
+            output_dir: Base output directory
+            cluster_result: ClusterResult to save
+        """
+        results_dir = output_dir / "clusters"
+        results_dir.mkdir(parents=True, exist_ok=True)
+
+        filepath = results_dir / f"cluster_{cluster_result.cluster_id}.json"
+        with open(filepath, "w") as f:
+            json.dump(cluster_result.model_dump(), f, indent=2)
+
+    def _save_final_outputs(
+        self, output_dir: Path, results: dict[str, ClusterResult]
+    ) -> dict[str, Path]:
+        """
+        Combine all cluster results into final output files.
+
+        Args:
+            output_dir: Base output directory
+            results: Dictionary of cluster results
+
+        Returns:
+            Dictionary with paths to generated files
+        """
+        output_dir = Path(output_dir)
+        safe_model = self.model.replace("/", "_")
+
+        # Sort results by cluster ID (numeric if possible)
+        def sort_key(item):
+            try:
+                return int(item[0])
+            except ValueError:
+                return item[0]
+
+        sorted_results = sorted(results.items(), key=sort_key)
+
+        # Save combined JSON
+        combined_json_path = output_dir / f"{safe_model}_results.json"
+        combined_data = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "timestamp": datetime.now().isoformat(),
+            "clusters": [r.model_dump() for _, r in sorted_results],
+        }
+        with open(combined_json_path, "w") as f:
+            json.dump(combined_data, f, indent=2)
+
+        # Save summaries TSV
+        summaries = []
+        for cluster_id, cluster in sorted_results:
+            summaries.append(
+                {
+                    "cluster_id": cluster_id,
+                    "dominant_process": cluster.dominant_process,
+                    "pathway_confidence": cluster.pathway_confidence,
+                    "summary": cluster.summary,
+                    "num_established": len(cluster.established_genes),
+                    "num_novel": len(cluster.novel_role_genes),
+                    "num_uncharacterized": len(cluster.uncharacterized_genes),
+                    "classification_completeness": f"{cluster.classification_completeness:.1%}",
+                }
+            )
+
+        summaries_df = pd.DataFrame(summaries)
+        summaries_path = output_dir / f"{safe_model}_summaries.tsv"
+        summaries_df.to_csv(summaries_path, sep="\t", index=False)
+
+        # Save flagged genes TSV (all novel + uncharacterized genes)
+        flagged_genes = []
+        for cluster_id, cluster in sorted_results:
+            for gene in cluster.novel_role_genes:
+                flagged_genes.append(
+                    {
+                        "cluster_id": cluster_id,
+                        "gene": gene.gene,
+                        "category": "novel_role",
+                        "priority": gene.priority,
+                        "rationale": gene.rationale,
+                        "dominant_process": cluster.dominant_process,
+                    }
+                )
+            for gene in cluster.uncharacterized_genes:
+                flagged_genes.append(
+                    {
+                        "cluster_id": cluster_id,
+                        "gene": gene.gene,
+                        "category": "uncharacterized",
+                        "priority": gene.priority,
+                        "rationale": gene.rationale,
+                        "dominant_process": cluster.dominant_process,
+                    }
+                )
+
+        if flagged_genes:
+            flagged_df = pd.DataFrame(flagged_genes)
+            flagged_path = output_dir / f"{safe_model}_flagged_genes.tsv"
+            flagged_df.to_csv(flagged_path, sep="\t", index=False)
+        else:
+            flagged_path = None
+
+        logger.info(f"Saved combined results to {combined_json_path}")
+        logger.info(f"Saved summaries to {summaries_path}")
+
+        return {
+            "combined_json": combined_json_path,
+            "summaries_tsv": summaries_path,
+            "flagged_genes_tsv": flagged_path,
+        }
+
     def analyze(
         self,
         cluster_df: pd.DataFrame,
@@ -107,6 +252,7 @@ class ClusterAnalyzer:
         gene_column: str = "genes",
         gene_sep: str = ";",
         cluster_id_column: str = "cluster_id",
+        output_dir: str | Path | None = None,
     ) -> AnalysisResult:
         """
         Analyze gene clusters from a DataFrame.
@@ -120,6 +266,11 @@ class ClusterAnalyzer:
             gene_column: Column name containing genes (default: "genes")
             gene_sep: Separator for genes in gene_column (default: ";")
             cluster_id_column: Column name for cluster IDs (default: "cluster_id")
+            output_dir: Optional directory for incremental saving and resume support.
+                       When provided:
+                       - Results are saved after each cluster (crash-safe)
+                       - Already-completed clusters are skipped (resume support)
+                       - Final combined outputs are generated at the end
 
         Returns:
             AnalysisResult object with all cluster analysis results
@@ -129,6 +280,19 @@ class ClusterAnalyzer:
             raise ValueError(f"Column '{cluster_id_column}' not found in cluster_df")
         if gene_column not in cluster_df.columns:
             raise ValueError(f"Column '{gene_column}' not found in cluster_df")
+
+        # Set up output directory for incremental saving
+        output_path = Path(output_dir) if output_dir else None
+        if output_path:
+            output_path.mkdir(parents=True, exist_ok=True)
+
+        # Load existing results for resume support
+        completed_results = {}
+        skipped_count = 0
+        if output_path:
+            completed_results = self._load_existing_results(output_path)
+            if completed_results:
+                logger.info(f"Found {len(completed_results)} completed clusters (will skip)")
 
         # Convert gene annotations DataFrame to dict if provided
         annotations_dict = None
@@ -141,7 +305,7 @@ class ClusterAnalyzer:
             logger.info(f"Loaded {len(annotations_dict)} gene annotations")
 
         # Process each cluster
-        results = {}
+        results = dict(completed_results)  # Start with already-completed results
         iterator = (
             tqdm(cluster_df.iterrows(), total=len(cluster_df), desc="Analyzing clusters")
             if self.show_progress
@@ -151,6 +315,11 @@ class ClusterAnalyzer:
         for _idx, row in iterator:
             cluster_id = str(row[cluster_id_column])
             genes_str = row[gene_column]
+
+            # Skip if already completed (resume support)
+            if cluster_id in completed_results:
+                skipped_count += 1
+                continue
 
             if not isinstance(genes_str, str):
                 logger.warning(f"Skipping cluster {cluster_id}: genes not a string")
@@ -178,6 +347,20 @@ class ClusterAnalyzer:
             if cluster_result:
                 results[cluster_id] = cluster_result
 
+                # Incremental saving
+                if output_path:
+                    self._save_cluster_result(output_path, cluster_result)
+                    logger.debug(f"Saved cluster {cluster_id} to {output_path}")
+
+        # Log resume stats
+        if skipped_count > 0:
+            logger.info(f"Skipped {skipped_count} already-completed clusters")
+
+        # Generate final combined outputs
+        output_files = None
+        if output_path and results:
+            output_files = self._save_final_outputs(output_path, results)
+
         # Create AnalysisResult with metadata
         analysis_result = AnalysisResult(
             clusters=results,
@@ -186,7 +369,11 @@ class ClusterAnalyzer:
                 "model": self.model,
                 "temperature": self.temperature,
                 "total_clusters": len(results),
+                "skipped_clusters": skipped_count,
                 "use_retrieval": self.use_retrieval,
+                "output_files": {k: str(v) for k, v in output_files.items() if v}
+                if output_files
+                else None,
             },
         )
 
