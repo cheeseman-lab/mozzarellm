@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 logger = logging.getLogger(__name__)
 
 
-class LLMProvider(ABC):
+class LLMClientBase(ABC):
     """Abstract base class for LLM providers."""
 
     def __init__(
@@ -112,7 +112,7 @@ class LLMProvider(ABC):
         return None, "Maximum retries exceeded"
 
 
-class OpenAIProvider(LLMProvider):
+class OpenAIClient(LLMClientBase):
     """OpenAI API provider (GPT-4, o4-mini, o3-mini, etc.)"""
 
     def _get_env_var_name(self) -> str:
@@ -156,7 +156,7 @@ class OpenAIProvider(LLMProvider):
         return response.choices[0].message.content
 
 
-class AnthropicProvider(LLMProvider):
+class AnthropicClient(LLMClientBase):
     """Anthropic API provider (Claude models)"""
 
     def _get_env_var_name(self) -> str:
@@ -197,7 +197,7 @@ class AnthropicProvider(LLMProvider):
         return response.content[0].text
 
 
-class GeminiProvider(LLMProvider):
+class GeminiClient(LLMClientBase):
     """Google Gemini API provider"""
 
     def _get_env_var_name(self) -> str:
@@ -267,17 +267,17 @@ def create_provider(
 
     # OpenAI models
     if any(model_lower.startswith(prefix) for prefix in ["gpt", "o4", "o3", "o1"]):
-        return OpenAIProvider(model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key)
+        return OpenAIClient(model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key)
 
     # Anthropic models
     elif model_lower.startswith("claude"):
-        return AnthropicProvider(
+        return AnthropicClient(
             model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key
         )
 
     # Google models
     elif model_lower.startswith("gemini"):
-        return GeminiProvider(model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key)
+        return GeminiClient(model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key)
 
     else:
         raise ValueError(
