@@ -21,7 +21,9 @@ def test_local_knowledge_context_retriever_ignores_non_txt_md_files(tmp_path):
 
     (knowledge_dir / "notes.pdf").write_text("TP53 appears here", encoding="utf-8")
 
-    out = local_knowledge_context_retriever(cluster_genes=["TP53"], knowledge_dir=str(knowledge_dir), top_k=10)
+    out = local_knowledge_context_retriever(
+        cluster_genes=["TP53"], knowledge_dir=str(knowledge_dir), top_k=10
+    )
     assert out["snippets"] == []
     assert out["citations"] == []
     assert out["retrieval_metadata"]["knowledge_snippets_found"] == 0

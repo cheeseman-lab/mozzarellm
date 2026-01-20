@@ -6,8 +6,8 @@ This module deliberately avoids heavy vector-store deps. It harvests evidence fr
 
 Returned snippets include simple provenance fields so they can be logged downstream.
 """
-#TODO: add gene aliases in addition to gene symbols after uniprot api proxy
-#TODO: add pdf parsing functionality
+# TODO: add gene aliases in addition to gene symbols after uniprot api proxy
+# TODO: add pdf parsing functionality
 
 from __future__ import annotations
 

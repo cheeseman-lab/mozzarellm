@@ -15,7 +15,7 @@ from .models import AnalysisResult, ClusterResult
 from .providers import create_provider
 from .utils.llm_analysis_utils import process_cluster_response
 from .utils.prompt_factory import make_cluster_analysis_prompt
-from .utils.retrieval import retrieve_context
+from .utils.retrieval import local_knowledge_context_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -267,12 +267,10 @@ class ClusterAnalyzer:
         # Retrieve evidence if RAG is enabled
         retrieved_ctx = None
         if self.use_retrieval:
-            retrieved_ctx = retrieve_context(
+            retrieved_ctx = local_knowledge_context_retriever(
                 cluster_genes=genes,
-                gene_annotations=gene_annotations,
-                screen_context=screen_context,
                 knowledge_dir=self.knowledge_dir,
-                k=self.retriever_k,
+                top_k=self.retriever_k,
             )
 
         # Build prompt
