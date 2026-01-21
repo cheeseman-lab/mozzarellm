@@ -107,7 +107,9 @@ class UniProtClient:
         except Exception:
             return None
 
-    def _cache_set(self, cache_key: str, url: str, params: dict[str, Any] | None, data: dict[str, Any]) -> None:
+    def _cache_set(
+        self, cache_key: str, url: str, params: dict[str, Any] | None, data: dict[str, Any]
+    ) -> None:
         if self._cache_conn is None:
             return
         params_json = json.dumps(params or {}, sort_keys=True)

@@ -1,7 +1,7 @@
 """
 Unified LLM provider system for mozzarellm.
 
-This module provides a consistent interface for querying different LLM providers
+This module provides a consistent interface via client classes for querying different LLM providers
 (OpenAI, Anthropic, Google Gemini) with automatic retry logic and error handling.
 """
 
@@ -236,7 +236,7 @@ class GeminiClient(LLMClientBase):
         return response.text
 
 
-def create_provider(
+def create_client(
     model: str,
     temperature: float = 0.0,
     max_tokens: int = 8000,
@@ -244,9 +244,9 @@ def create_provider(
     top_k: int | None = None,
     stop_sequences: list[str] | None = None,
     api_key: str | None = None,
-) -> LLMProvider:
+):
     """
-    Factory function to create the appropriate provider based on model name.
+    Factory function to create the appropriate client based on model name.
 
     Args:
         model: Model identifier

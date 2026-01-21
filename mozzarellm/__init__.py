@@ -24,12 +24,12 @@ from .prompts import (
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,
 )
-from .providers import (
-    AnthropicProvider,
-    GeminiProvider,
-    LLMProvider,
-    OpenAIProvider,
-    create_provider,
+from .clients.LLM_api_clients import (
+    AnthropicClient,
+    GeminiClient,
+    LLMClientBase,
+    OpenAIClient,
+    create_client,
 )
 
 # Utility functions (preserved)
@@ -46,11 +46,11 @@ __all__ = [
     "ClusterInput",
     "RetrievalContext",
     # Providers
-    "LLMProvider",
-    "OpenAIProvider",
-    "AnthropicProvider",
-    "GeminiProvider",
-    "create_provider",
+    "LLMClientBase",
+    "OpenAIClient",
+    "AnthropicClient",
+    "GeminiClient",
+    "create_client",
     # Prompt components
     "CLUSTER_ANALYSIS_TASK",
     "GENE_CLASSIFICATION_RULES",

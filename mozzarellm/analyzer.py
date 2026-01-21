@@ -12,7 +12,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from .models import AnalysisResult, ClusterResult
-from .providers import create_provider
+from .clients.LLM_api_clients import create_client
 from .utils.llm_analysis_utils import process_cluster_response
 from .utils.prompt_factory import make_cluster_analysis_prompt
 from .utils.retrieval import local_knowledge_context_retriever
@@ -76,8 +76,8 @@ class ClusterAnalyzer:
         # Set system prompt
         self.system_prompt = system_prompt or self._get_default_system_prompt()
 
-        # Create LLM provider
-        self.provider = create_provider(
+        # Create LLM client
+        self.client = create_client(
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
@@ -285,7 +285,7 @@ class ClusterAnalyzer:
         )
 
         # Query LLM
-        response, error = self.provider.query(
+        response, error = self.client.query(
             system_prompt=self.system_prompt,
             user_prompt=prompt,
         )
