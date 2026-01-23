@@ -8,17 +8,10 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from typing import Any
+import pandas as pd
 
 import requests
 import warnings
-
-
-@dataclass(frozen=True)
-class UniProtHit:
-    accession: str
-    primary_gene: str | None = None
-    protein_name: str | None = None
-
 
 class UniProtClient:
     """Configurable UniProt REST client with in-memory caching and backoff."""
@@ -150,22 +143,11 @@ class UniProtClient:
                     raise last_error
         raise RuntimeError("UniProt request failed")
 
+ 
     @staticmethod
-    def _parse_primary_gene(entry: dict[str, Any]) -> str | None:
-        genes = entry.get("genes") or []
-        if not genes:
-            return None
-        gene_name = (genes[0] or {}).get("geneName") or {}
-        value = gene_name.get("value")
-        return str(value) if value else None
-
-    @staticmethod
-    def _parse_protein_name(entry: dict[str, Any]) -> str | None:
-        pd = entry.get("proteinDescription") or {}
-        rec = pd.get("recommendedName") or {}
-        full = rec.get("fullName") or {}
-        value = full.get("value")
-        return str(value) if value else None
+    def _parse_gene_function(entry: dict[str, Any]) -> list[str]:
+        functions = entry.get("comments") or []
+        return [func.get("text") for func in functions if func.get("text")]
 
     def search_by_gene_symbol(
         self,
@@ -173,7 +155,7 @@ class UniProtClient:
         *,
         organism_id: int | None = None,
         limit: int = 5,
-    ) -> list[UniProtHit]:
+    ) -> list[dict[str, Any]]:
         """Search UniProtKB for a gene symbol.
 
         Args:
@@ -186,7 +168,7 @@ class UniProtClient:
             q = f"{q} AND (organism_id:{organism_id})"
 
         data = self._get(
-            "/uniprotkb/search",
+            path="/uniprotkb/search",
             params={
                 "query": q,
                 "format": "json",
@@ -196,19 +178,67 @@ class UniProtClient:
         )
 
         results = data.get("results") or []
-        hits: list[UniProtHit] = []
+        hits: list[dict[str, Any]] = []
         for r in results:
             acc = r.get("primaryAccession")
             if not acc:
                 continue
             hits.append(
-                UniProtHit(
-                    accession=str(acc),
-                    primary_gene=self._parse_primary_gene(r),
-                    protein_name=self._parse_protein_name(r),
-                )
+                {
+                    "accession": str(acc),
+                    "primary_gene": self._parse_primary_gene(r),
+                    "protein_name": self._parse_protein_name(r),
+                }
             )
         return hits
+
+    def fetch_functional_annotations(
+        self,
+        query: str,
+        *,
+        limit: int = 100,  # entries per page of results (api default is 25)
+    ) -> pd.DataFrame:
+        """Search UniProtKB with a custom query.
+
+        Args:
+            query: UniProt search query (see https://www.uniprot.org/api-documentation/uniprotkb#operations-UniProtKB-searchCursor)
+            limit: max number of results to return
+        """
+        response = self._get(
+            path="/uniprotkb/search",
+            params={
+                "query": query,
+                "format": "json",
+                "size": str(limit),
+                "fields": "cc_function",
+            },
+        )
+
+        results = response.get("results") or []
+        if not results:
+            raise ValueError("No results found for query: {}".format(query))
+
+        accession_function_annotations = []
+        for entry in results:
+            accession = entry.get("primaryAccession")
+            if not accession:
+                continue
+
+            function_texts: list[str] = []
+            for comment in entry.get("comments") or []:
+                if (comment or {}).get("commentType") != "FUNCTION":
+                    continue
+                for text in (comment or {}).get("texts") or []:
+                    val = (text or {}).get("value")
+                    if val:
+                        function_texts.append(str(val))
+
+            if not function_texts:
+                continue
+
+            accession_function_annotations.append((str(accession), "\n".join(function_texts)))
+
+        return pd.DataFrame(accession_function_annotations, columns=["accession", "UniProt functional annotation"])
 
     def get_accession_from_gene_symbol(
         self,
@@ -247,23 +277,3 @@ class UniProtClient:
             if acc:
                 return str(acc)
         return ""
-
-    def function_text_for_accession(self, accession: str) -> str | None:
-        """Fetch functional annotation text (when available) for a UniProt accession."""
-        data = self._get(
-            path=f"/uniprotkb/{accession}",
-            params={"format": "json"},
-        )
-
-        comments = data.get("comments") or []
-        function_texts: list[str] = []
-        for c in comments:
-            if (c or {}).get("commentType") != "FUNCTION":
-                continue
-            for t in c.get("texts") or []:
-                val = (t or {}).get("value")
-                if val:
-                    function_texts.append(str(val))
-
-        out = "\n".join(function_texts) if function_texts else None
-        return out

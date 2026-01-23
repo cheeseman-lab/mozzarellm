@@ -222,7 +222,7 @@ def get_or_append_stable_accession(
         return df
 
 
-def _cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
+def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
     """Chunk a gene-level table into smaller per-cluster DataFrames slices.
 
     Returns:
@@ -239,13 +239,38 @@ def _cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFr
     # Single-pass split; sort=False preserves first-seen cluster order; row order within each chunk is preserved.
     return [group for _cluster_id, group in df.groupby(cluster_id_column, sort=False)]
 
+def generate_cluster_search_query(chunk: pd.DataFrame, stable_accession_col: str) -> str:
+    """Generate a search query for a chunk of gene-level data."""
+    if stable_accession_col in chunk.columns:
+        chunk_genes = chunk[stable_accession_col].tolist()
+    else:
+        chunk_genes = chunk["accession"].tolist()
+    return "(" + " OR ".join(chunk_genes) + ") AND reviewed:true"
+    # TODO: handle edge case where chunk is >100 genes (search query limit)
 
-def _add_annotations_to_chunk(chunk: pd.DataFrame) -> pd.DataFrame:
+def add_functional_annotations_to_chunk(chunk_annotated: pd.DataFrame, *, cluster_id_column: str, stable_accession_col: str | None = None, output_dir: Path = OUTPUT_DIR ) -> pd.DataFrame:
     """Add annotation columns to a chunk of gene-level data. Calls UniprotAPIClient to fetch annotations."""
-    pass
+    if stable_accession_col is None:
+        stable_accession_col = "accession"
+    chunk_annotated = chunk_annotated.copy()
+    cluster_id = chunk_annotated[cluster_id_column].iloc[0]
+    # initialize client
+    uniprot_client = UniProtClient()
+    # generate search query
+    search_query = generate_cluster_search_query(chunk_annotated, stable_accession_col)
+    # fetch annotations as 2 column dataframe
+    annotations = uniprot_client.fetch_functional_annotations(search_query)
+    # add annotations to chunk
+    chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
+    # save as csv; output dir interface/output/
+    output_dir.mkdir(
+        parents=True, exist_ok=True
+    )  # defense: make or assert that output dir exists
+    chunk_annotated.to_csv(output_dir / f"cluster_{cluster_id}_chunk_annotated.csv", index=False)
+    return chunk_annotated
 
 
-def _chunk_slice_to_nested_json(
+def chunk_slice_to_nested_json(
     chunk: pd.DataFrame, gene_column: str, cluster_id_column: str
 ) -> dict:
     """Convert a dataframe chunk of gene-level data into a nested JSON structure.
