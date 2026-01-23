@@ -45,7 +45,7 @@ debug/
 
 # Results and data (optional, comment out if you want to track these)
 results/
-intermediates/
+output/
 
 # Benchmark results in examples/
 examples/ops/results/

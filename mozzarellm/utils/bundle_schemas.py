@@ -99,7 +99,12 @@ class EvidenceBundle(BaseModel):
     cluster_id: str
     created_at: datetime
     screen_context: ScreenContext
+    # per-gene metadata keyed by gene symbol:
     genes: dict[str, BundleGene] = Field(default_factory=dict)
+    # aggregate metrics across all genes in the cluster:
+    up_features_overlap: list[dict[str, Any]] = Field(default_factory=list)
+    down_features_overlap: list[dict[str, Any]] = Field(default_factory=list)
+    average_phenotypic_strength: float | None = None
 
     @property
     def gene_symbols(self) -> list[str]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from mozzarellm.pipeline.bundle_builder import load_cluster_table
+from mozzarellm.pipeline.bundle_builder import load_table
 
 
 @pytest.mark.parametrize("delimiter,extension", [(",", ".csv"), ("\t", ".tsv"), ("\t", ".txt")])
@@ -35,7 +35,7 @@ def test_load_cluster_table_format_default_sep(tmp_path, delimiter, extension):
         }
     )
 
-    df = load_cluster_table(test_file)
+    df = load_table(test_file)
     pd.testing.assert_frame_equal(df, expected, check_dtype=True)
     assert list(df.columns) == [
         "gene_symbol",
@@ -50,7 +50,7 @@ def test_load_cluster_table_format_default_sep(tmp_path, delimiter, extension):
 def test_load_cluster_table_override_sep(tmp_path):
     test_tsv = tmp_path / "clusters.tsv"
     test_tsv.write_text("cluster_id,genes\n1,TP53;MDM2\n", encoding="utf-8")
-    df = load_cluster_table(test_tsv, sep=",")
+    df = load_table(test_tsv, sep=",")
     assert list(df.columns) == ["cluster_id", "genes"]
 
 
@@ -60,7 +60,7 @@ def test_load_cluster_table_xlsx_uses_read_excel(tmp_path):
     expected = pd.DataFrame({"cluster_id": [1], "genes": ["TP53"]})
     expected.to_excel(test_xlsx, index=False, sheet_name="Sheet1")
 
-    df = load_cluster_table(test_xlsx, sheet_name="Sheet1")
+    df = load_table(test_xlsx, sheet_name="Sheet1")
     pd.testing.assert_frame_equal(df, expected, check_dtype=True)
 
 
@@ -68,7 +68,7 @@ def test_load_cluster_table_unsupported_suffix_raises(tmp_path):
     test_json = tmp_path / "clusters.json"
     test_json.write_text("{}", encoding="utf-8")
     with pytest.raises(ValueError) as e:
-        load_cluster_table(test_json)
+        load_table(test_json)
     assert "Unsupported input format" in str(e.value)
 
 
@@ -79,5 +79,5 @@ def test_load_cluster_table_csv_wrong_delimiter_without_override(tmp_path):
         "gene_symbol\tcluster\nAATF\t21\n",
         encoding="utf-8",
     )
-    df = load_cluster_table(test_csv)
+    df = load_table(test_csv)
     assert list(df.columns) != ["gene_symbol", "cluster"]

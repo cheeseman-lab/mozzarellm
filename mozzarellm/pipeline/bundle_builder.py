@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, Dict, Mapping
 from datetime import datetime
 import json
+import warnings
 import pandas as pd
 from mozzarellm.utils.bundle_schemas import (
     BundleGene,
@@ -11,11 +12,11 @@ from mozzarellm.utils.bundle_schemas import (
 )
 from mozzarellm.utils.io import write_bundle
 from mozzarellm.utils.retrieval import local_knowledge_context_retriever
+from mozzarellm.clients.uniprot_api_client import UniProtClient
 
 
 # Default values
-screen_name = "screen_name"
-BUNDLE_OUTPUT_PATH_BASE = f"intermediates/{screen_name}__bundles/"
+OUTPUT_DIR = Path("output")
 JSON_BYTE_CAP = 5_000  # 5 KB -- conservative cap, needs to be adjusted
 
 
@@ -58,7 +59,7 @@ def load_screen_context_json(
         raise Exception(f"Error loading screen context JSON: {e}") from e
 
 
-def load_cluster_table(
+def load_table(
     input_path: str | Path,
     sep: str | None = None,
     sheet_name: str | int | None = None,
@@ -81,6 +82,146 @@ def load_cluster_table(
     )
 
 
+def find_feature_overlaps(df: pd.DataFrame, feature_columns: list[str]) -> dict[str, str]:
+    """Find overlapping comma-separated features in specified columns.
+
+    Returns a mapping from column name to a comma-separated string of features that
+    appear in 2+ rows.
+    """
+    overlaps: dict[str, str] = {}
+    for col in feature_columns:
+        if col not in df.columns:
+            overlaps[col] = ""
+            continue
+
+        feature_counts: dict[str, int] = {}
+        for feature_str in df[col].dropna():
+            if not isinstance(feature_str, str) or not feature_str:
+                continue
+            features = [f.strip() for f in feature_str.split(",") if f.strip()]
+            for feature in features:
+                feature_counts[feature] = feature_counts.get(feature, 0) + 1
+
+        overlapping = [f for f, count in feature_counts.items() if count >= 2]
+        overlapping.sort(key=lambda f: (-feature_counts[f], f))
+        overlaps[col] = ",".join(overlapping) if overlapping else ""
+
+    return overlaps
+
+
+def find_average_phenotypic_strength(df: pd.DataFrame, phenotypic_strength_column: str) -> str:
+    """Find average phenotypic strength in a DataFrame."""
+    if phenotypic_strength_column not in df.columns:
+        raise ValueError(f"Column {phenotypic_strength_column} not found in DataFrame")
+
+    numerators: list[float] = []
+    denominators: set[str] = set()
+    for strength in df[phenotypic_strength_column].dropna().tolist():
+        if not isinstance(strength, str) or "/" not in strength:
+            continue
+        num_str, denom_str = strength.split("/", 1)
+        try:
+            numerators.append(float(num_str))
+        except ValueError:
+            continue
+        denom_str = denom_str.strip()
+        if denom_str:
+            denominators.add(denom_str)
+
+    if not numerators or len(denominators) != 1:
+        return ""
+
+    denom = next(iter(denominators))
+    avg_numerator = sum(numerators) / len(numerators)
+    return f"{avg_numerator:.1f}/{denom}"
+
+
+# **NOTE above method under review: is this average biologically relevant? or misleading?
+# FOR: (potentially) indicator of overall cluster salience; may be useful for ranking/prioritizing clusters
+# AGAINST: may mask important nuances
+
+
+def map_gene_symbols_to_uniprot_accessions():
+    """
+    Map gene symbols from other databases to Uniprot stable accession numbers.
+    Seperate function; via ID mapping job.
+    """
+    # TODO: add support for mapping gene symbols from other databases to Uniprot stable accession numbers
+    # seperate function; via ID mapping job
+    pass
+
+
+def get_or_append_stable_accession(
+    *,
+    cluster_df: pd.DataFrame,
+    accession_table: Path | None = None,
+    accession_col: Path | None = None,
+    accession_table_sheetname: str | None = None,
+    accession_table_sep: str | None = None,
+    output_dir: Path = OUTPUT_DIR,
+    organism_id: int,
+    warn_on_fallback: bool,
+):
+    """
+    Assign stable accession numbers to gene symbols. Or append them from a provided table.
+    """
+    df = cluster_df.copy()  # avoid modifying original
+    if accession_table is not None and accession_col is not None:
+        # Append accession numbers from the provided table
+        accession_df = load_table(accession_table, accession_table_sep, accession_table_sheetname)
+        # slice just the accession column
+        accession_col_df = accession_df[[accession_col]]
+        # Merge acession col with cluster_df on gene symbol
+        accession_merged_cluster_df = df.merge(
+            accession_col_df, left_on="gene_symbol", right_on=accession_col, how="left"
+        )
+        # Rename the accession column to accession
+        accession_merged_cluster_df = accession_merged_cluster_df.rename(
+            columns={accession_col: "accession"}
+        )
+
+        # save as csv; output dir interface/output/
+        output_dir.mkdir(
+            parents=True, exist_ok=True
+        )  # defense: make or assert that output dir exists
+        accession_merged_cluster_df.to_csv(
+            output_dir / "accession_merged_cluster_df.csv", index=False
+        )
+
+        return accession_merged_cluster_df
+    else:
+        if "gene_symbol" not in df.columns:
+            raise ValueError("Expected column 'gene_symbol' to assign stable accessions")
+
+        # init client
+        uniprot_client = UniProtClient()
+
+        def _lookup_accession(gene_symbol: str) -> str:
+            gene_symbol = str(gene_symbol)
+            if not gene_symbol or gene_symbol == "nan":
+                return ""
+            if gene_symbol.startswith("nontargeting_"):
+                return "NON_TARGETING_CONTROL"
+            try:
+                accession = uniprot_client.get_accession_from_gene_symbol(
+                    gene_symbol=gene_symbol,
+                    organism_id=organism_id,
+                    warn_on_fallback=warn_on_fallback,
+                )
+            except Exception as e:
+                warnings.warn(f"UniProt lookup failed for gene_symbol '{gene_symbol}': {e}")
+                return ""
+            return accession or ""
+
+        df["accession"] = df["gene_symbol"].map(_lookup_accession)
+        output_dir.mkdir(
+            parents=True, exist_ok=True
+        )  # defense: make or assert that output dir exists
+        df.to_csv(output_dir / "fetched_accession_cluster_df.csv", index=False)
+
+        return df
+
+
 def _cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
     """Chunk a gene-level table into smaller per-cluster DataFrames slices.
 
@@ -95,21 +236,24 @@ def _cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFr
     """
     if cluster_id_column not in df.columns:
         raise ValueError(f"Cluster ID column '{cluster_id_column}' not found in DataFrame.")
-    return [
-        df[df[cluster_id_column] == cluster_id] for cluster_id in df[cluster_id_column].unique()
-    ]
+    # Single-pass split; sort=False preserves first-seen cluster order; row order within each chunk is preserved.
+    return [group for _cluster_id, group in df.groupby(cluster_id_column, sort=False)]
+
 
 def _add_annotations_to_chunk(chunk: pd.DataFrame) -> pd.DataFrame:
     """Add annotation columns to a chunk of gene-level data. Calls UniprotAPIClient to fetch annotations."""
     pass
 
-def _chunk_slice_to_nested_json(chunk: pd.DataFrame, gene_column: str, cluster_id_column: str) -> dict:
+
+def _chunk_slice_to_nested_json(
+    chunk: pd.DataFrame, gene_column: str, cluster_id_column: str
+) -> dict:
     """Convert a dataframe chunk of gene-level data into a nested JSON structure.
     NOTE: anticipated utility function for future use.
     Returns:
         dict: Nested JSON structure with cluster_id and genes.
 
-    EX: 
+    EX:
     {
         "cluster_id": "<cluster_id>",
         "genes": {
@@ -129,12 +273,11 @@ def _chunk_slice_to_nested_json(chunk: pd.DataFrame, gene_column: str, cluster_i
     return {
         "cluster_id": chunk[cluster_id_column].iloc[0],
         "genes": {
-            gene: {
-                col: chunk[col].iloc[i] for col in chunk.columns if col != gene_column
-            }
+            gene: {col: chunk[col].iloc[i] for col in chunk.columns if col != gene_column}
             for i, gene in enumerate(chunk[gene_column])
         },
     }
+
 
 def build_evidence_bundles(
     screen_name: str | None = None,
@@ -161,4 +304,4 @@ def build_evidence_bundles(
     out_base = Path(out_dir)
     out_base.mkdir(parents=True, exist_ok=True)
 
-    pass  # in progress
+    pass  # in progress*****

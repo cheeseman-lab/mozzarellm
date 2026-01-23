@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import requests
+import warnings
 
 
 @dataclass(frozen=True)
@@ -125,7 +126,7 @@ class UniProtClient:
             (cache_key, url, params_json, response_json, int(time.time())),
         )
 
-    def _get(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _get(self, *, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
 
         cache_key = self._make_cache_key(url, params)
@@ -209,21 +210,48 @@ class UniProtClient:
             )
         return hits
 
-    def accessions_for_gene_symbol(
+    def get_accession_from_gene_symbol(
         self,
         gene_symbol: str,
-        *,
-        organism_id: int | None = None,
-        limit: int = 5,
-    ) -> list[str]:
-        hits = self.search_by_gene_symbol(gene_symbol, organism_id=organism_id, limit=limit)
-        accs = [h.accession for h in hits]
-        return list(accs)
+        organism_id: int,
+        warn_on_fallback: bool = True,
+    ) -> str:
+        if not gene_symbol or gene_symbol == "nan":
+            raise ValueError("Gene symbol is required")
+
+        response = self._get(
+            path="/uniprotkb/search",
+            params={
+                "query": f"(gene_exact:{gene_symbol}) AND (organism_id:{organism_id})",
+                "format": "json",
+                "size": "10",
+                "fields": "accession,reviewed",
+            },
+        )
+
+        results = response.get("results") or []
+        if not results:
+            warnings.warn(f"No UniProt entries found for gene_symbol '{gene_symbol}'")
+            return ""
+
+        reviewed = [r.get("primaryAccession") for r in results if r.get("reviewed")]
+        reviewed = [str(a) for a in reviewed if a]
+        if reviewed:
+            return reviewed[0]  # explicit, best effort match
+        if warn_on_fallback:
+            warnings.warn(
+                f"No reviewed UniProt entries found for gene_symbol '{gene_symbol}', falling back to unreviewed entries"
+            )
+        for r in results:
+            acc = r.get("primaryAccession")
+            if acc:
+                return str(acc)
+        return ""
 
     def function_text_for_accession(self, accession: str) -> str | None:
         """Fetch functional annotation text (when available) for a UniProt accession."""
         data = self._get(
-            f"/uniprotkb/{accession}",
+            path=f"/uniprotkb/{accession}",
             params={"format": "json"},
         )
 
