@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
 from typing import Dict, Any
-from .bundle_schemas import ScreenContext
+from mozzarellm.schemas.bundle_schemas import ScreenContext
 
 JSON_BYTE_CAP = 5_000  # 5 KB -- conservative cap, needs to be adjusted
 
 
-def context_json_validator(data) -> bool:
+def _context_json_validator(data) -> bool:
     """Validate that the context JSON is valid and doesn't contain TODO fields."""
     if "TODO" in data.keys():
         raise ValueError(
@@ -38,7 +38,7 @@ def load_screen_context_json(
         with json_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
 
-        context_json_validator(data)  # size and completion check
+        _context_json_validator(data)  # size and completion check
         model = ScreenContext.model_validate(data)  # schema validation
         return model.model_dump()
     except Exception as e:

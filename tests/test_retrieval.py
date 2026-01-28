@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from mozzarellm.utils.retrieval import local_knowledge_context_retriever
+from mozzarellm.utils.local_retrieval import local_knowledge_context_retriever
 
 
 def test_local_knowledge_context_retriever_no_knowledge_dir_returns_empty():

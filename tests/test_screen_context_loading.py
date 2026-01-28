@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from mozzarellm.utils.io import load_screen_context_json
+from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
 
 def _valid_screen_context_dict() -> dict:

@@ -5,8 +5,8 @@ mozzarellm: Gene cluster analysis using Large Language Models (LLMs)
 __version__ = "0.2.0"
 
 # New unified API
-from .analyzer import ClusterAnalyzer
-from .models import (
+from .pipeline.analyzer import ClusterAnalyzer
+from .schemas.analysis_output_schemas import (
     AnalysisResult,
     ClusterInput,
     ClusterResult,
