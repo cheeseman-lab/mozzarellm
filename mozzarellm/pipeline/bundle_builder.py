@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any
 from datetime import datetime
 import json
 import warnings
@@ -10,137 +10,15 @@ from mozzarellm.utils.bundle_schemas import (
     EvidenceBundle,
     ScreenContext,
 )
-from mozzarellm.utils.io import write_bundle
+from mozzarellm.utils.io import load_table, write_bundle
+from mozzarellm.utils.screen_context_utils import load_screen_context_json
 from mozzarellm.utils.retrieval import local_knowledge_context_retriever
+from mozzarellm.utils.cluster_utils import cluster_chunker, find_feature_overlaps
 from mozzarellm.clients.uniprot_api_client import UniProtClient
 
 
 # Default values
 OUTPUT_DIR = Path("output")
-JSON_BYTE_CAP = 5_000  # 5 KB -- conservative cap, needs to be adjusted
-
-
-### Screen Context Utilities ###
-def context_json_validator(data) -> bool:
-    """Validate that the context JSON is valid and doesn't contain TODO fields."""
-    if "TODO" in data.keys():
-        raise ValueError(
-            "Screen context JSON contains TODO field. Please double check the file and remove it."
-        )
-    if (
-        len(json.dumps(data).encode("utf-8")) > JSON_BYTE_CAP
-    ):  # intended as a model agnostic cap; chars is an alt option
-        raise ValueError("Screen context JSON is too large. Please reduce the size of the file.")
-    return True
-
-
-def load_screen_context_json(
-    path: str | Path | None,
-    *,
-    override: bool = False,  # optional kwarg
-) -> Dict[str, Any] | None:
-    """Load structured screen context from JSON."""
-    try:
-        if path is None:
-            if override:  # testing convenience, to see how much context changes response
-                return {}
-            raise ValueError("Screen context path is required")
-
-        json_path = Path(path)
-        if not json_path.exists():
-            raise FileNotFoundError(f"Screen context file not found: {json_path}")
-
-        with json_path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        context_json_validator(data)  # size and completion check
-        model = ScreenContext.model_validate(data)  # schema validation
-        return model.model_dump()
-    except Exception as e:
-        raise Exception(f"Error loading screen context JSON: {e}") from e
-
-
-def load_table(
-    input_path: str | Path,
-    sep: str | None = None,
-    sheet_name: str | int | None = None,
-    **kwargs,
-) -> pd.DataFrame:
-    """Load a cluster/gene table from CSV/TSV/TXT/XLSX into a DataFrame. Extra pandas kwargs are forwarded to pandas read_csv/read_excel."""
-    path = Path(input_path)
-    suffix = path.suffix.lower()
-
-    if suffix == ".xlsx":
-        return pd.read_excel(path, sheet_name=sheet_name, **kwargs)
-
-    if suffix in {".csv", ".tsv", ".txt"}:
-        default_sep = "," if suffix == ".csv" else "\t"
-        return pd.read_csv(path, sep=(sep or default_sep), **kwargs)
-
-    raise ValueError(
-        f"Unsupported input format for cluster table: {suffix}. "
-        "Expected one of .csv, .tsv, .txt, .xlsx."
-    )
-
-
-### Cluster Utilities ###
-def find_feature_overlaps(df: pd.DataFrame, feature_columns: list[str]) -> dict[str, str]:
-    """Find overlapping comma-separated features in specified columns.
-
-    Returns a mapping from column name to a comma-separated string of features that
-    appear in 2+ rows.
-    """
-    overlaps: dict[str, str] = {}
-    for col in feature_columns:
-        if col not in df.columns:
-            overlaps[col] = ""
-            continue
-
-        feature_counts: dict[str, int] = {}
-        for feature_str in df[col].dropna():
-            if not isinstance(feature_str, str) or not feature_str:
-                continue
-            features = [f.strip() for f in feature_str.split(",") if f.strip()]
-            for feature in features:
-                feature_counts[feature] = feature_counts.get(feature, 0) + 1
-
-        overlapping = [f for f, count in feature_counts.items() if count >= 2]
-        overlapping.sort(key=lambda f: (-feature_counts[f], f))
-        overlaps[col] = ",".join(overlapping) if overlapping else ""
-
-    return overlaps
-
-
-def find_average_phenotypic_strength(df: pd.DataFrame, phenotypic_strength_column: str) -> str:
-    """Find average phenotypic strength in a DataFrame."""
-    if phenotypic_strength_column not in df.columns:
-        raise ValueError(f"Column {phenotypic_strength_column} not found in DataFrame")
-
-    numerators: list[float] = []
-    denominators: set[str] = set()
-    for strength in df[phenotypic_strength_column].dropna().tolist():
-        if not isinstance(strength, str) or "/" not in strength:
-            continue
-        num_str, denom_str = strength.split("/", 1)
-        try:
-            numerators.append(float(num_str))
-        except ValueError:
-            continue
-        denom_str = denom_str.strip()
-        if denom_str:
-            denominators.add(denom_str)
-
-    if not numerators or len(denominators) != 1:
-        return ""
-
-    denom = next(iter(denominators))
-    avg_numerator = sum(numerators) / len(numerators)
-    return f"{avg_numerator:.1f}/{denom}"
-
-
-# **NOTE above method under review: is this average biologically relevant? or misleading?
-# FOR: (potentially) indicator of overall cluster salience; may be useful for ranking/prioritizing clusters
-# AGAINST: may mask important nuances
 
 
 def get_or_append_stable_accession(
@@ -214,34 +92,6 @@ def get_or_append_stable_accession(
         return df
 
 
-def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
-    """Chunk a gene-level table into smaller per-cluster DataFrames slices.
-
-    Returns:
-        List of DataFrames, one for each cluster.
-
-    Raises:
-        ValueError: If cluster_id_column is not found in DataFrame.
-
-    Note:
-        Will handle both sorted and interleaved cluster IDs. Relative order of genes within each cluster is preserved from the original DataFrame.
-    """
-    if cluster_id_column not in df.columns:
-        raise ValueError(f"Cluster ID column '{cluster_id_column}' not found in DataFrame.")
-    # Single-pass split; sort=False preserves first-seen cluster order; row order within each chunk is preserved.
-    return [group for _cluster_id, group in df.groupby(cluster_id_column, sort=False)]
-
-
-def _generate_cluster_search_query(chunk: pd.DataFrame, stable_accession_col: str) -> str:
-    """Generate a search query for a chunk of gene-level data."""
-    if stable_accession_col in chunk.columns:
-        chunk_genes = chunk[stable_accession_col].tolist()
-    else:
-        chunk_genes = chunk["accession"].tolist()
-    return "(" + " OR ".join(chunk_genes) + ") AND reviewed:true"
-    # TODO: handle edge case where chunk is >100 genes (search query limit)
-
-
 def add_functional_annotations_to_chunk(
     chunk: pd.DataFrame,
     *,
@@ -254,12 +104,11 @@ def add_functional_annotations_to_chunk(
         stable_accession_col = "accession"
     chunk_annotated = chunk.copy()
     cluster_id = chunk_annotated[cluster_id_column].iloc[0]
+
     # initialize client
     uniprot_client = UniProtClient()
-    # generate search query
-    search_query = _generate_cluster_search_query(chunk_annotated, stable_accession_col)
     # fetch annotations as 2 column dataframe
-    annotations = uniprot_client.fetch_functional_annotations(search_query)
+    annotations = uniprot_client.fetch_functional_annotations(chunk_annotated, stable_accession_col)
     # add annotations to chunk
     chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
     # save as csv; output dir interface/output/
@@ -335,6 +184,7 @@ def build_evidence_bundles(
 
         # screen context + cluster info = evidence bundle
         evidence_bundle = {
+            "screen_name": screen_name,
             "screen_context": screen_context,
             "cluster_id": str(cluster_id),
             "cluster_genes": cluster_as_json,

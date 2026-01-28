@@ -191,9 +191,20 @@ class UniProtClient:
             )
         return hits
 
+    @staticmethod
+    def _generate_cluster_search_query(chunk: pd.DataFrame, stable_accession_col: str) -> str:
+        """Generate a search query for a chunk of gene-level data."""
+        if stable_accession_col in chunk.columns:
+            chunk_genes = chunk[stable_accession_col].tolist()
+        else:
+            chunk_genes = chunk["accession"].tolist()
+        return "(" + " OR ".join(chunk_genes) + ") AND reviewed:true"
+        # TODO: handle edge case where chunk is >100 genes (search query limit)
+
     def fetch_functional_annotations(
         self,
-        query: str,
+        chunk: pd.DataFrame,
+        stable_accession_col: str,
         *,
         limit: int = 100,  # entries per page of results (api default is 25)
     ) -> pd.DataFrame:
@@ -203,6 +214,9 @@ class UniProtClient:
             query: UniProt search query (see https://www.uniprot.org/api-documentation/uniprotkb#operations-UniProtKB-searchCursor)
             limit: max number of results to return
         """
+
+        query = self._generate_cluster_search_query(chunk, stable_accession_col)
+
         response = self._get(
             path="/uniprotkb/search",
             params={

@@ -24,16 +24,13 @@ from .prompts import (
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,
 )
-from .clients.LLM_api_clients import (
+from .clients.llm_api_clients import (
     AnthropicClient,
     GeminiClient,
     LLMClientBase,
     OpenAIClient,
     create_client,
 )
-
-# Utility functions (preserved)
-from .utils.cluster_utils import reshape_to_clusters
 
 # Expose package-level API
 __all__ = [
@@ -59,6 +56,4 @@ __all__ = [
     "OUTPUT_FORMAT_JSON",
     "ENHANCED_COT_INSTRUCTIONS",
     "CONCISE_COT_INSTRUCTIONS",
-    # Utilities
-    "reshape_to_clusters",
 ]

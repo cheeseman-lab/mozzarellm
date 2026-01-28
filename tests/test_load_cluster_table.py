@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from mozzarellm.pipeline.bundle_builder import load_table
+from mozzarellm.utils.io import load_table
 
 
 @pytest.mark.parametrize("delimiter,extension", [(",", ".csv"), ("\t", ".tsv"), ("\t", ".txt")])
