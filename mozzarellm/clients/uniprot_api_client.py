@@ -6,12 +6,12 @@ import os
 import platform
 import sqlite3
 import time
-from dataclasses import dataclass
 from typing import Any
 import pandas as pd
 
 import requests
 import warnings
+
 
 class UniProtClient:
     """Configurable UniProt REST client with in-memory caching and backoff."""
@@ -143,7 +143,6 @@ class UniProtClient:
                     raise last_error
         raise RuntimeError("UniProt request failed")
 
- 
     @staticmethod
     def _parse_gene_function(entry: dict[str, Any]) -> list[str]:
         functions = entry.get("comments") or []
@@ -238,7 +237,9 @@ class UniProtClient:
 
             accession_function_annotations.append((str(accession), "\n".join(function_texts)))
 
-        return pd.DataFrame(accession_function_annotations, columns=["accession", "UniProt functional annotation"])
+        return pd.DataFrame(
+            accession_function_annotations, columns=["accession", "UniProt_functional_annotation"]
+        )
 
     def get_accession_from_gene_symbol(
         self,

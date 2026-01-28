@@ -20,6 +20,7 @@ OUTPUT_DIR = Path("output")
 JSON_BYTE_CAP = 5_000  # 5 KB -- conservative cap, needs to be adjusted
 
 
+### Screen Context Utilities ###
 def context_json_validator(data) -> bool:
     """Validate that the context JSON is valid and doesn't contain TODO fields."""
     if "TODO" in data.keys():
@@ -82,6 +83,7 @@ def load_table(
     )
 
 
+### Cluster Utilities ###
 def find_feature_overlaps(df: pd.DataFrame, feature_columns: list[str]) -> dict[str, str]:
     """Find overlapping comma-separated features in specified columns.
 
@@ -139,16 +141,6 @@ def find_average_phenotypic_strength(df: pd.DataFrame, phenotypic_strength_colum
 # **NOTE above method under review: is this average biologically relevant? or misleading?
 # FOR: (potentially) indicator of overall cluster salience; may be useful for ranking/prioritizing clusters
 # AGAINST: may mask important nuances
-
-
-def map_gene_symbols_to_uniprot_accessions():
-    """
-    Map gene symbols from other databases to Uniprot stable accession numbers.
-    Seperate function; via ID mapping job.
-    """
-    # TODO: add support for mapping gene symbols from other databases to Uniprot stable accession numbers
-    # seperate function; via ID mapping job
-    pass
 
 
 def get_or_append_stable_accession(
@@ -239,7 +231,8 @@ def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFra
     # Single-pass split; sort=False preserves first-seen cluster order; row order within each chunk is preserved.
     return [group for _cluster_id, group in df.groupby(cluster_id_column, sort=False)]
 
-def generate_cluster_search_query(chunk: pd.DataFrame, stable_accession_col: str) -> str:
+
+def _generate_cluster_search_query(chunk: pd.DataFrame, stable_accession_col: str) -> str:
     """Generate a search query for a chunk of gene-level data."""
     if stable_accession_col in chunk.columns:
         chunk_genes = chunk[stable_accession_col].tolist()
@@ -248,85 +241,111 @@ def generate_cluster_search_query(chunk: pd.DataFrame, stable_accession_col: str
     return "(" + " OR ".join(chunk_genes) + ") AND reviewed:true"
     # TODO: handle edge case where chunk is >100 genes (search query limit)
 
-def add_functional_annotations_to_chunk(chunk_annotated: pd.DataFrame, *, cluster_id_column: str, stable_accession_col: str | None = None, output_dir: Path = OUTPUT_DIR ) -> pd.DataFrame:
+
+def add_functional_annotations_to_chunk(
+    chunk: pd.DataFrame,
+    *,
+    cluster_id_column: str,
+    stable_accession_col: str | None = None,
+    output_dir: Path = OUTPUT_DIR,
+) -> pd.DataFrame:
     """Add annotation columns to a chunk of gene-level data. Calls UniprotAPIClient to fetch annotations."""
     if stable_accession_col is None:
         stable_accession_col = "accession"
-    chunk_annotated = chunk_annotated.copy()
+    chunk_annotated = chunk.copy()
     cluster_id = chunk_annotated[cluster_id_column].iloc[0]
     # initialize client
     uniprot_client = UniProtClient()
     # generate search query
-    search_query = generate_cluster_search_query(chunk_annotated, stable_accession_col)
+    search_query = _generate_cluster_search_query(chunk_annotated, stable_accession_col)
     # fetch annotations as 2 column dataframe
     annotations = uniprot_client.fetch_functional_annotations(search_query)
     # add annotations to chunk
     chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
     # save as csv; output dir interface/output/
-    output_dir.mkdir(
-        parents=True, exist_ok=True
-    )  # defense: make or assert that output dir exists
+    output_dir.mkdir(parents=True, exist_ok=True)  # defense: make or assert that output dir exists
+    # TODO: add override option for output to json
     chunk_annotated.to_csv(output_dir / f"cluster_{cluster_id}_chunk_annotated.csv", index=False)
     return chunk_annotated
 
 
-def chunk_slice_to_nested_json(
-    chunk: pd.DataFrame, gene_column: str, cluster_id_column: str
-) -> dict:
-    """Convert a dataframe chunk of gene-level data into a nested JSON structure.
-    NOTE: anticipated utility function for future use.
-    Returns:
-        dict: Nested JSON structure with cluster_id and genes.
-
-    EX:
-    {
-        "cluster_id": "<cluster_id>",
-        "genes": {
-            "<gene_id_1>": {
-                "<column_name_1>": "<value>",
-                "<column_name_2>": "<value>",
-                "...": "..."
-            },
-            "<gene_id_2>": {
-                "<column_name_1>": "<value>",
-                "<column_name_2>": "<value>",
-                "...": "..."
-            }
-        }
-    }
-    """
-    return {
-        "cluster_id": chunk[cluster_id_column].iloc[0],
-        "genes": {
-            gene: {col: chunk[col].iloc[i] for col in chunk.columns if col != gene_column}
-            for i, gene in enumerate(chunk[gene_column])
-        },
-    }
+def add_local_evidence_to_chunk(
+    chunk: pd.DataFrame,
+    knowledge_dir: str | Path | None = None,
+    cluster_id_column: str | None = None,
+    stable_accession_col: str | None = None,
+) -> pd.DataFrame:
+    """Add local evidence to a chunk of gene-level data. Calls local_knowledge_context_retriever to fetch evidence."""
+    # TODO: implement improvel local knowledge context retriever and add logic here
+    pass
 
 
 def build_evidence_bundles(
+    *,
     screen_name: str | None = None,
     screen_context_path: str | Path | None = None,
-    cluster_df: pd.DataFrame | None = None,
-    gene_column: str = "genes",
-    cluster_id_column: str = "cluster_id",
-    use_retrieval: bool = True,
+    acc_cluster_df: pd.DataFrame | None = None,  # cluster table must have accession numbers
+    gene_column: str | None = None,
+    cluster_id_column: str | None = None,
+    stable_accession_col: str | None = None,
+    feature_columns: list[str] | None = None,
     override_screen_context: bool = False,
+    use_retrieval: bool = False,  # false for now; true for future use
     knowledge_dir: str
     | Path
     | None = None,  # optionally change the directory where the knowledge files are stored
-    top_k: int = 10,  #
+    top_k: int = 10,
+    output_dir: Path = OUTPUT_DIR,
 ) -> list[Path]:
     # validate required columns
-    if cluster_id_column not in cluster_df.columns:
+    if cluster_id_column not in acc_cluster_df.columns:
         raise ValueError(f"Missing column '{cluster_id_column}' in cluster table")
-    if gene_column not in cluster_df.columns:
+    if gene_column not in acc_cluster_df.columns:
         raise ValueError(f"Missing column '{gene_column}' in cluster table")
+    print(f"Using gene column: {gene_column}")
+    # defense: make or assert that output dir exists
+    output_dir = Path(output_dir / f"{screen_name}_evidence_bundles")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     screen_context = load_screen_context_json(screen_context_path, override=override_screen_context)
+    if not screen_context:
+        raise ValueError("Screen context not found")
 
-    # Create output directory
-    out_base = Path(out_dir)
-    out_base.mkdir(parents=True, exist_ok=True)
+    # chunk cluster df
+    cluster_chunks = cluster_chunker(acc_cluster_df, cluster_id_column)
+    print(f"Processing {len(cluster_chunks)} clusters")
+    # annotate each cluster
 
-    pass  # in progress*****
+    for chunk in cluster_chunks:
+        cluster_id = chunk[cluster_id_column].iloc[0]
+        annotated_chunk = add_functional_annotations_to_chunk(
+            chunk,
+            cluster_id_column=cluster_id_column,
+            stable_accession_col=stable_accession_col,
+            output_dir=output_dir,
+        )
+        print(f"Processing cluster {cluster_id}")
+
+        # prune redundant cluster column
+        annotated_chunk.drop(columns=[cluster_id_column], inplace=True)
+        # set NaNs to empty strings
+        annotated_chunk.fillna("", inplace=True)
+        # convert to json
+        cluster_as_json = annotated_chunk.to_dict(orient="records")
+
+        # screen context + cluster info = evidence bundle
+        evidence_bundle = {
+            "screen_context": screen_context,
+            "cluster_id": str(cluster_id),
+            "cluster_genes": cluster_as_json,
+        }
+
+        if feature_columns:
+            evidence_bundle["feature_overlaps"] = find_feature_overlaps(chunk, feature_columns)
+
+        # save bundle as json
+        output_path = Path(output_dir / f"{screen_name}_{cluster_id}_bundle.json")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w") as f:
+            json.dump(evidence_bundle, f, indent=2)
+        print(f"Saved bundle to {output_path}")
