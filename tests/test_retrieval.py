@@ -6,12 +6,12 @@ from mozzarellm.utils.retrieval import local_knowledge_context_retriever
 
 
 def test_local_knowledge_context_retriever_no_knowledge_dir_returns_empty():
-    out = local_knowledge_context_retriever(cluster_genes=["TP53"], knowledge_dir=None, top_k=10)
+    out = local_knowledge_context_retriever(keywords=["TP53"], knowledge_dir=None, top_k=10)
     assert out["snippets"] == []
     assert out["citations"] == []
     assert out["retrieval_metadata"]["knowledge_dir"] is None
     assert out["retrieval_metadata"]["k"] == 10
-    assert out["retrieval_metadata"]["genes_queried"] == 1
+    assert out["retrieval_metadata"]["keywords_queried"] == "TP53 (1)"
     assert out["retrieval_metadata"]["total_retrieved"] == 0
 
 
@@ -22,7 +22,7 @@ def test_local_knowledge_context_retriever_ignores_non_txt_md_files(tmp_path):
     (knowledge_dir / "notes.pdf").write_text("TP53 appears here", encoding="utf-8")
 
     out = local_knowledge_context_retriever(
-        cluster_genes=["TP53"], knowledge_dir=str(knowledge_dir), top_k=10
+        keywords=["TP53"], knowledge_dir=str(knowledge_dir), top_k=10
     )
     assert out["snippets"] == []
     assert out["citations"] == []
@@ -46,7 +46,7 @@ def test_local_knowledge_context_retriever_collects_snippets_and_citations(tmp_p
     )
 
     out = local_knowledge_context_retriever(
-        cluster_genes=["TP53", "BRCA1"],
+        keywords=["TP53", "BRCA1"],
         knowledge_dir=str(knowledge_dir),
         top_k=10,
         min_relevance_score=0,
@@ -84,7 +84,7 @@ def test_local_knowledge_context_retriever_respects_top_k(tmp_path):
     (knowledge_dir / "b.txt").write_text("TP53\n", encoding="utf-8")
 
     out = local_knowledge_context_retriever(
-        cluster_genes=["TP53"],
+        keywords=["TP53"],
         knowledge_dir=str(knowledge_dir),
         top_k=1,
         min_relevance_score=0,
@@ -101,7 +101,7 @@ def test_local_knowledge_context_retriever_min_relevance_score_filters_all(tmp_p
     (knowledge_dir / "a.txt").write_text("TP53\n", encoding="utf-8")
 
     out = local_knowledge_context_retriever(
-        cluster_genes=["TP53"],
+        keywords=["TP53"],
         knowledge_dir=str(knowledge_dir),
         top_k=10,
         min_relevance_score=10_000,

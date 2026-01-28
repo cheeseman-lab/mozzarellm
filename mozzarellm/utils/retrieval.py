@@ -6,7 +6,6 @@ This module deliberately avoids heavy vector-store deps. It harvests evidence fr
 
 Returned snippets include simple provenance fields so they can be logged downstream.
 """
-# TODO: add gene aliases in addition to gene symbols after uniprot api proxy
 # TODO: add pdf parsing functionality
 
 from __future__ import annotations
@@ -103,33 +102,41 @@ def _search_file_for_terms(
     return snippets
 
 
+# called once per gene in cluster
 def local_knowledge_context_retriever(
-    cluster_genes: list[str],
+    keywords: list[str],
     knowledge_dir: str | None = None,
     top_k: int = 10,
     min_relevance_score: int = 2,
 ) -> dict:
     """
-    Build a ranked set of evidence snippets for a cluster. Currently works best for gene-centric documents that contain gene names as keywords.
+    Build a ranked set of evidence snippets for a set of (gene relevant) keywords. Currently works best for gene-centric documents that contain gene names as keywords.
 
     Returns a dict with fields:
     - snippets: [{text, source, meta, relevance_score}] (sorted by relevance)
     - citations: [{source, path_or_id}]
     - retrieval_metadata: {knowledge_dir, k, genes_queried, total_retrieved}
     """
-    terms = [
-        g for g in cluster_genes if isinstance(g, str) and g
-    ]  # TODO: add gene aliases in addition to gene symbols after uniprot api proxy
-    # update: both screen context and functional annotations will be added directly to evidence bundle
-    all_snippets: list[dict] = []
+    # validate keywords
+    if not keywords:
+        raise ValueError("Keywords must not be empty")
+    if not all(isinstance(k, str) for k in keywords):
+        raise ValueError("All keywords must be strings")
+
+    # validate knowledge_dir
+    if knowledge_dir and not os.path.isdir(knowledge_dir):
+        raise ValueError("Knowledge directory must exist")
+
+    # TODO: add gene aliases in addition to gene symbols after uniprot api proxy --> in uniprot api proxy, add aliases to annotations
     citations: list[dict] = []
+    all_snippets: list[dict] = []
 
     # Retrieve from local knowledge (scored by relevance)
     knowledge_count = 0
     if knowledge_dir:
         files = _iter_knowledge_files(knowledge_dir)
         for p in files:
-            hits = _search_file_for_terms(p, terms, max_hits=5, context_window=4)
+            hits = _search_file_for_terms(p, keywords, max_hits=5, context_window=4)
             for htext, score, line_num in hits:
                 if score >= min_relevance_score:
                     all_snippets.append(
@@ -160,10 +167,11 @@ def local_knowledge_context_retriever(
     return {
         "snippets": top_snippets,
         "citations": citations,
+        # the below fields are for debugging and logging purposes; should not be used in evidence bundle
         "retrieval_metadata": {
             "knowledge_dir": knowledge_dir,
             "k": top_k,
-            "genes_queried": len(terms),
+            "keywords_queried": f"{', '.join(keywords)} ({len(keywords)})",
             "total_retrieved": len(all_snippets),
             "knowledge_snippets_found": knowledge_count,
         },
