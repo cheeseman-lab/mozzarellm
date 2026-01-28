@@ -1,10 +1,10 @@
 from pathlib import Path
 from typing import Any
-from datetime import datetime
+from pydantic import ValidationError
 import json
 import warnings
 import pandas as pd
-from mozzarellm.utils.bundle_schemas import (
+from mozzarellm.schemas.bundle_schemas import (
     BundleGene,
     BundleGeneAnnotations,
     EvidenceBundle,
@@ -12,7 +12,7 @@ from mozzarellm.utils.bundle_schemas import (
 )
 from mozzarellm.utils.io import load_table, write_bundle
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
-from mozzarellm.utils.retrieval import local_knowledge_context_retriever
+from mozzarellm.utils.local_retrieval import local_knowledge_context_retriever
 from mozzarellm.utils.cluster_utils import cluster_chunker, find_feature_overlaps
 from mozzarellm.clients.uniprot_api_client import UniProtClient
 
@@ -125,7 +125,7 @@ def add_local_evidence_to_chunk(
     stable_accession_col: str | None = None,
 ) -> pd.DataFrame:
     """Add local evidence to a chunk of gene-level data. Calls local_knowledge_context_retriever to fetch evidence."""
-    # TODO: implement improvel local knowledge context retriever and add logic here
+    # TODO: implement improved local knowledge context retriever and add logic here
     pass
 
 
@@ -146,7 +146,7 @@ def build_evidence_bundles(
     top_k: int = 10,
     output_dir: Path = OUTPUT_DIR,
 ) -> list[Path]:
-    # validate required columns
+    # validate required columns in cluster table
     if cluster_id_column not in acc_cluster_df.columns:
         raise ValueError(f"Missing column '{cluster_id_column}' in cluster table")
     if gene_column not in acc_cluster_df.columns:
@@ -156,15 +156,15 @@ def build_evidence_bundles(
     output_dir = Path(output_dir / f"{screen_name}_evidence_bundles")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    screen_context = load_screen_context_json(screen_context_path, override=override_screen_context)
+    screen_context = load_screen_context_json(screen_context_path, override=override_screen_context) # includes validation
     if not screen_context:
         raise ValueError("Screen context not found")
 
     # chunk cluster df
     cluster_chunks = cluster_chunker(acc_cluster_df, cluster_id_column)
     print(f"Processing {len(cluster_chunks)} clusters")
-    # annotate each cluster
 
+    # annotate each cluster
     for chunk in cluster_chunks:
         cluster_id = chunk[cluster_id_column].iloc[0]
         annotated_chunk = add_functional_annotations_to_chunk(
@@ -195,7 +195,5 @@ def build_evidence_bundles(
 
         # save bundle as json
         output_path = Path(output_dir / f"{screen_name}_{cluster_id}_bundle.json")
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w") as f:
-            json.dump(evidence_bundle, f, indent=2)
+        write_bundle(evidence_bundle, output_path)  # includes validation
         print(f"Saved bundle to {output_path}")
