@@ -6,9 +6,6 @@ from typing import Any, Literal, Annotated
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict
 
 
-SchemaVersion = Literal["0.1"]
-
-
 # Validation functions
 def _validate_required_string(v: Any) -> str:
     if not isinstance(v, str):
@@ -77,35 +74,26 @@ class ScreenContext(SemiFlexModel):
     provenance: Provenance
 
 
+# TO-DO: improve this class; currently a placeholder for future goal: better LLM readability
 class BundleGeneAnnotations(BaseModel):
     functional_text: str | None = None
     source: str | None = None
     retrieved_at: datetime | None = None
 
 
-class BundleGene(BaseModel):
-    up_features: list[dict[str, Any]] = Field(default_factory=list)
-    down_features: list[dict[str, Any]] = Field(default_factory=list)
-    annotations: BundleGeneAnnotations = Field(
-        default_factory=BundleGeneAnnotations
-    )  # canonical, per-gene annotations (e.g. Uniprot functional annotations)
-    evidence: list[dict[str, Any]] = Field(default_factory=list)  # from data/knowledge retrieval
+class BundleGene(SemiFlexModel):
+    gene_symbol: str | None = None
+    up_features: str | None = None
+    down_features: str | None = None
+    phenotypic_strength: str | None = None
+    # canonical, per-gene annotations (e.g. Uniprot functional annotations)
+    UniProt_functional_annotation: str | None = None
 
 
 # Main schema model
-class EvidenceBundle(BaseModel):
-    schema_version: SchemaVersion = "0.1"
+class EvidenceBundle(SemiFlexModel):
     screen_name: str | None = None
-    cluster_id: str
-    created_at: datetime
     screen_context: ScreenContext
+    cluster_id: str
     # per-gene metadata keyed by gene symbol:
     genes: dict[str, BundleGene] = Field(default_factory=dict)
-    # aggregate metrics across all genes in the cluster:
-    up_features_overlap: list[dict[str, Any]] = Field(default_factory=list)
-    down_features_overlap: list[dict[str, Any]] = Field(default_factory=list)
-    average_phenotypic_strength: float | None = None
-
-    @property
-    def gene_symbols(self) -> list[str]:
-        return list(self.genes.keys())
