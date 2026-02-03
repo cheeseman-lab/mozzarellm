@@ -55,7 +55,7 @@ def get_or_append_stable_accession(
             parents=True, exist_ok=True
         )  # defense: make or assert that output dir exists
         accession_merged_cluster_df.to_csv(
-            output_dir / "accession_merged_cluster_df.csv", index=False
+            output_dir / "appended_accession_cluster_df.csv", index=False
         )
 
         return accession_merged_cluster_df
@@ -87,7 +87,7 @@ def get_or_append_stable_accession(
         output_dir.mkdir(
             parents=True, exist_ok=True
         )  # defense: make or assert that output dir exists
-        df.to_csv(output_dir / "fetched_accession_cluster_df.csv", index=False)
+        df.to_csv(output_dir / "assigned_accession_cluster_df.csv", index=False)
 
         return df
 
@@ -132,7 +132,9 @@ def add_local_evidence_to_chunk(
 def build_evidence_bundles(
     *,
     screen_name: str | None = None,
-    screen_context_path: str | Path | None = None,
+    screen_context_path: str
+    | Path
+    | None = None,  # TODO: remove screen context from bundles and move to system prompt (saves memory)
     acc_cluster_df: pd.DataFrame | None = None,  # cluster table must have accession numbers
     gene_column: str | None = None,
     cluster_id_column: str | None = None,
@@ -156,7 +158,9 @@ def build_evidence_bundles(
     output_dir = Path(output_dir / f"{screen_name}_evidence_bundles")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    screen_context = load_screen_context_json(screen_context_path, override=override_screen_context) # includes validation
+    screen_context = load_screen_context_json(
+        screen_context_path, override=override_screen_context
+    )  # includes validation
     if not screen_context:
         raise ValueError("Screen context not found")
 
@@ -194,6 +198,6 @@ def build_evidence_bundles(
             evidence_bundle["feature_overlaps"] = find_feature_overlaps(chunk, feature_columns)
 
         # save bundle as json
-        output_path = Path(output_dir / f"{screen_name}_{cluster_id}_bundle.json")
+        output_path = Path(output_dir / f"{screen_name}__cluster_{cluster_id}__bundle.json")
         write_bundle(evidence_bundle, output_path)  # includes validation
         print(f"Saved bundle to {output_path}")

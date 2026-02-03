@@ -1,4 +1,5 @@
 import pandas as pd
+from pathlib import Path
 
 
 def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
@@ -44,3 +45,28 @@ def find_feature_overlaps(df: pd.DataFrame, feature_columns: list[str]) -> dict[
         overlaps[col] = ",".join(overlapping) if overlapping else ""
 
     return overlaps
+
+
+def build_cluster_id_to_bundle_path(
+    evidence_bundle_dir: Path,
+    screen_name: str,
+) -> dict[str, Path]:
+    """Construct a cluster-to-prompt map using the cluster ID column and the evidence bundle directory.
+
+    Greps the evidence bundle directory for all files with the name pattern {screen_name}__cluster_{#}__bundle.json and creates
+    a dictionary mapping cluster ID to bundle path."""
+
+    pattern = f"{screen_name}__cluster_*__bundle.json"
+
+    bundle_files = list(evidence_bundle_dir.glob(pattern))
+
+    cluster_id_to_bundle_path: dict[str, Path] = {}
+    for f in bundle_files:
+        name = f.name
+        if "__cluster_" not in name or not name.endswith("__bundle.json"):
+            continue
+        cluster_id = name.split("__cluster_", 1)[1].split("__bundle.json", 1)[0]
+        if cluster_id:
+            cluster_id_to_bundle_path[str(cluster_id)] = f
+
+    return cluster_id_to_bundle_path

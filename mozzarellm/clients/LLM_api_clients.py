@@ -8,7 +8,13 @@ This module provides a consistent interface via client classes for querying diff
 import logging
 import os
 import time
+from pathlib import Path
 from abc import ABC, abstractmethod
+
+import anthropic
+from anthropic.types.messages.batch_create_params import Request
+# NOTE: client specific imports (other than anthropic) are done in the methods to avoid import-time failures for optional dependencies
+
 
 logger = logging.getLogger(__name__)
 
@@ -67,14 +73,24 @@ class LLMClientBase(ABC):
         """Make the actual API call to the provider."""
         pass
 
+    @abstractmethod
+    def _make_batch_api_call(self, system_prompt: str, user_prompt: str) -> str:
+        """Make a batched API call to the provider."""
+        pass
+
     def query(
         self,
-        system_prompt: str,
-        user_prompt: str,
+        *,
         max_retries: int = 3,
+        batch: bool = False,
+        screen_name: str | None = None,
+        system_prompt: str,
+        # use one but not both of the following parameters
+        user_prompt: str | None = None,
+        cluster_to_prompt_map: dict[str, str] | None = None,  # *****
     ) -> tuple[str | None, str | None]:
         """
-        Query the LLM with retry logic.
+        Main wrapper function for querying the LLM with retry logic.
 
         Args:
             system_prompt: System/context prompt
@@ -88,7 +104,12 @@ class LLMClientBase(ABC):
         """
         for attempt in range(max_retries):
             try:
-                response = self._make_api_call(system_prompt, user_prompt)
+                if batch:
+                    response = self._make_batch_api_call(
+                        cluster_to_prompt_map, screen_name, system_prompt
+                    )
+                else:
+                    response = self._make_api_call(system_prompt, user_prompt)
                 logger.info(
                     f"{self.__class__.__name__} call successful "
                     f"(attempt {attempt + 1}/{max_retries})"
@@ -155,6 +176,14 @@ class OpenAIClient(LLMClientBase):
 
         return response.choices[0].message.content
 
+    def _make_batch_api_call(
+        self, cluster_to_prompt_map: dict[str, str], system_prompt: str, max_retries: int = 3
+    ) -> list[str]:
+        """
+        Makes a batch of requests to the OpenAI chat API.
+        """
+        pass  # TODO
+
 
 class AnthropicClient(LLMClientBase):
     """Anthropic API provider (Claude models)"""
@@ -165,8 +194,73 @@ class AnthropicClient(LLMClientBase):
     def _get_api_key_from_env(self) -> str | None:
         return os.environ.get(self._get_env_var_name())
 
+    ### Helper functions for batch requests ###
+    def _make_single_cluster_message_request(
+        self, cluster_id: str, path_to_evidence_bundle: str, system_prompt: str
+    ) -> Request:
+        bundle_obj = json.loads(Path(path_to_evidence_bundle).read_text(encoding="utf-8"))
+        bundle_text = json.dumps(
+            bundle_obj, ensure_ascii=False
+        )  # minify JSON; has no effect on readability for LLMs + saves tokens
+
+        kwargs = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "system": system_prompt,
+            "thinking": {"type": "enabled"},  # can eventually set a token budget here
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Here is the evidence bundle JSON for cluster "
+                            + cluster_id
+                            + ":\n\n```json\n"
+                            + bundle_text
+                            + "\n```",
+                        }
+                    ],
+                }
+            ],
+        }
+
+        # Add optional sampling parameters
+        if self.top_p is not None:
+            kwargs["top_p"] = self.top_p
+        if self.top_k is not None:
+            kwargs["top_k"] = self.top_k
+        if self.stop_sequences:
+            kwargs["stop_sequences"] = self.stop_sequences
+
+        cluster_request = Request(
+            custom_id=f"{cluster_id}_analysis_request",
+            params=kwargs,
+        )
+        return cluster_request
+
+    def _make_list_of_cluster_request_objs(
+        self, cluster_to_prompt_map: dict[str, str], system_prompt: str
+    ) -> list[str]:
+        """
+        Returns a list of Request objects for the Anthropic batch messages API.
+        """
+        requests = [
+            # NOTE: user_prompt is unique to the cluster
+            self._make_single_cluster_message_request(
+                cluster_id, path_to_evidence_bundle, system_prompt
+            )
+            for cluster_id, path_to_evidence_bundle in cluster_to_prompt_map.items()
+        ]
+        return requests
+
+    ### Endpoint access functions ###
     def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
-        import anthropic
+        """
+        Makes a single request to the Anthropic messages API.
+        https://platform.claude.com/docs/en/api/python/messages/create
+        """
 
         client = anthropic.Anthropic(api_key=self.api_key)
 
@@ -176,6 +270,7 @@ class AnthropicClient(LLMClientBase):
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
             "system": system_prompt,
+            "thinking": {"type": "enabled"},  # can eventually set a token budget here
             "messages": [{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
         }
 
@@ -195,6 +290,49 @@ class AnthropicClient(LLMClientBase):
             logger.info(f"Anthropic tokens used: {tokens}")
 
         return response.content[0].text
+
+    def _make_batch_api_call(
+        self,
+        cluster_to_prompt_map: dict[str, str],
+        screen_name: str,
+        system_prompt: str,
+    ) -> list[str]:
+        """
+        Makes a batch of requests to the Anthropic messages API.
+        https://platform.claude.com/docs/en/build-with-claude/batch-processing
+        """
+
+        client = anthropic.Anthropic(api_key=self.api_key)
+        request_list = self._make_list_of_cluster_request_objs(cluster_to_prompt_map, system_prompt)
+        message_batch = client.messages.batches.create(request_list)
+        batch_id = message_batch.id
+        # Polling for message batch completion
+        while True:
+            message_batch = client.messages.batches.retrieve(batch_id)
+            if message_batch.processing_status == "ended":
+                break
+            print(f"Batch {batch_id} is still processing...")
+            time.sleep(60)
+        # Stream results file in memory-efficient chunks, processing one at a time
+        for result in client.messages.batches.results(batch_id):
+            match result.result.type:
+                case "succeeded":
+                    path = Path(
+                        f"output/intermediates/{screen_name}_analysis/{result.custom_id}_analysis_response.jsonl"
+                    )
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(result.result, encoding="utf-8")
+                    print(f"{result.custom_id} succeeded. Saving response to {path}")
+                case "errored":
+                    if result.result.error.type == "invalid_request":
+                        # Request body must be fixed before re-sending request
+                        print(f"Validation error {result.custom_id}")
+                    else:
+                        # Request can be retried directly
+                        print(f"Server error {result.custom_id}")
+                case "expired":
+                    print(f"Request expired {result.custom_id}")
+        # TODO: log response metadata
 
 
 class GeminiClient(LLMClientBase):
@@ -234,6 +372,14 @@ class GeminiClient(LLMClientBase):
         )
 
         return response.text
+
+    def _make_batch_api_call(
+        self, cluster_to_prompt_map: dict[str, str], system_prompt: str, max_retries: int = 3
+    ) -> list[str]:
+        """
+        Makes a batch of requests to the Google Gemini API.
+        """
+        pass  # TODO
 
 
 def create_client(
