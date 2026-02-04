@@ -7,13 +7,11 @@ prompt factory.
 """
 
 # =============================================================================
-# SECTION 1: CORE TASK (always first)
+# CORE TASK (always first)
 # =============================================================================
 
 CLUSTER_ANALYSIS_TASK = """
 Analyze gene cluster {cluster_id} from a functional genomics screen to identify biological pathways and discover understudied genes.
-
-GENES: {gene_list}
 
 MISSION: Functional genomics experiments cluster genes by phenotypic similarity. Your goal is to:
 1. Identify the dominant biological pathway that explains why these genes cluster together
@@ -23,21 +21,8 @@ MISSION: Functional genomics experiments cluster genes by phenotypic similarity.
 The pathway is not the end goal - it's the lens for discovering which genes merit investigation.
 """
 
-
 # =============================================================================
-# SECTION 2: SCREEN CONTEXT (experimental background - WHY genes cluster)
-# =============================================================================
-# This section is where benchmark-specific or default context will be inserted.
-# Benchmarks provide their own SCREEN_CONTEXT describing the experimental approach.
-
-DEFAULT_SCREEN_CONTEXT = """
-Genes grouped within a cluster exhibit similar profiles in this functional genomics
-analysis, suggesting they may participate in related biological processes or pathways.
-"""
-
-
-# =============================================================================
-# SECTION 3: GENE CLASSIFICATION & PRIORITIZATION RULES (framework for analysis)
+# GENE CLASSIFICATION & PRIORITIZATION RULES (framework for analysis)
 # =============================================================================
 
 GENE_CLASSIFICATION_RULES = """
@@ -80,19 +65,13 @@ IMPORTANT CONSIDERATIONS:
 
 
 # =============================================================================
-# SECTION 4: GENE ANNOTATIONS (inserted by prompt_factory if provided)
-# =============================================================================
-# Gene-specific functional annotations from UniProt/databases are inserted here
-
-
-# =============================================================================
-# SECTION 5: RETRIEVED EVIDENCE (inserted by prompt_factory when RAG enabled)
+# ON HANDLING RETRIEVED EVIDENCE (inserted by prompt_factory when RAG enabled)
 # =============================================================================
 # Evidence snippets from knowledge base retrieval are inserted here
 
 
 # =============================================================================
-# SECTION 6: PATHWAY CONFIDENCE ASSESSMENT (comes AFTER data to enable assessment)
+# PATHWAY CONFIDENCE ASSESSMENT (comes AFTER data to enable assessment)
 # =============================================================================
 
 PATHWAY_CONFIDENCE_CRITERIA = """
@@ -137,12 +116,12 @@ are understudied.
 
 
 # =============================================================================
-# SECTION 7: PHENOTYPIC-STRENGTH-CONFIDENCE CROSS-CHECK (inserted by prompt_factory if phenotypic strength available)
+# PHENOTYPIC-STRENGTH-CONFIDENCE CROSS-CHECK (inserted by prompt_factory if phenotypic strength available)
 # =============================================================================
 # PLACEHOLDER: To be implemented
 #
 # Purpose: Cross-validate pathway confidence against phenotypic strength to identify edge cases
-# Timing: AFTER establishing pathway confidence in Section 6
+# Timing: AFTER establishing pathway confidence in Section 5
 #
 # This section should:
 # - Present the phenotypic strength for the cluster (e.g., "8.5/10" or "strong"/"weak")
@@ -173,7 +152,7 @@ PHENOTYPIC_STRENGTH_CONFIDENCE_EVALUATION = None  # Placeholder for future imple
 
 
 # =============================================================================
-# SECTION 8: MECHANISTIC HYPOTHESIS FROM FEATURE DIRECTIONALITY (inserted by prompt_factory if features available)
+# MECHANISTIC HYPOTHESIS FROM FEATURE DIRECTIONALITY (inserted by prompt_factory if features available)
 # =============================================================================
 # PLACEHOLDER: To be implemented
 #
@@ -211,7 +190,7 @@ FEATURE_DIRECTIONALITY_HYPOTHESIS = None  # Placeholder for future implementatio
 
 
 # =============================================================================
-# SECTION 9: FOLLOW-UP EXPERIMENT SUGGESTIONS (inserted by prompt_factory if enabled)
+# FOLLOW-UP EXPERIMENT SUGGESTIONS (inserted by prompt_factory if enabled)
 # =============================================================================
 # PLACEHOLDER: To be implemented
 #
@@ -265,7 +244,7 @@ FOLLOW_UP_EXPERIMENT_SUGGESTIONS = None  # Placeholder for future implementation
 
 
 # =============================================================================
-# SECTION 10: CHAIN-OF-THOUGHT INSTRUCTIONS (inserted by prompt_factory when CoT enabled)
+# CHAIN-OF-THOUGHT INSTRUCTIONS (inserted by prompt_factory when CoT enabled)
 # =============================================================================
 
 ENHANCED_COT_INSTRUCTIONS = """
@@ -316,9 +295,10 @@ CONCISE_COT_INSTRUCTIONS = """
 
 
 # =============================================================================
-# SECTION 11: OUTPUT FORMAT (always last)
+# OUTPUT FORMAT (always last)
 # =============================================================================
 
+# this could be passed tp claude as a tool
 OUTPUT_FORMAT_JSON = """
 Provide a concise analysis in this exact JSON format:
 {

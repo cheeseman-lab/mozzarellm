@@ -15,10 +15,9 @@ from .schemas.analysis_output_schemas import (
 )
 
 # Prompt components (modular)
-from .prompts import (
+from .prompt_components import (
     CLUSTER_ANALYSIS_TASK,
     CONCISE_COT_INSTRUCTIONS,
-    DEFAULT_SCREEN_CONTEXT,
     ENHANCED_COT_INSTRUCTIONS,
     GENE_CLASSIFICATION_RULES,
     OUTPUT_FORMAT_JSON,
@@ -31,6 +30,9 @@ from .clients.llm_api_clients import (
     OpenAIClient,
     create_client,
 )
+
+# IO utils
+from .utils.io import load_table, write_bundle
 
 # Expose package-level API
 __all__ = [
@@ -56,4 +58,7 @@ __all__ = [
     "OUTPUT_FORMAT_JSON",
     "ENHANCED_COT_INSTRUCTIONS",
     "CONCISE_COT_INSTRUCTIONS",
+    # IO utils
+    "load_table",
+    "write_bundle",
 ]
