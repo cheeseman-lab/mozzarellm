@@ -132,15 +132,11 @@ def add_local_evidence_to_chunk(
 def build_evidence_bundles(
     *,
     screen_name: str | None = None,
-    screen_context_path: str
-    | Path
-    | None = None,  # TODO: remove screen context from bundles and move to system prompt (saves memory)
     acc_cluster_df: pd.DataFrame | None = None,  # cluster table must have accession numbers
     gene_column: str | None = None,
     cluster_id_column: str | None = None,
     stable_accession_col: str | None = None,
     feature_columns: list[str] | None = None,
-    override_screen_context: bool = False,
     use_retrieval: bool = False,  # false for now; true for future use
     knowledge_dir: str
     | Path
@@ -157,12 +153,6 @@ def build_evidence_bundles(
     # defense: make or assert that output dir exists
     output_dir = Path(output_dir / f"{screen_name}_evidence_bundles")
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    screen_context = load_screen_context_json(
-        screen_context_path, override=override_screen_context
-    )  # includes validation
-    if not screen_context:
-        raise ValueError("Screen context not found")
 
     # chunk cluster df
     cluster_chunks = cluster_chunker(acc_cluster_df, cluster_id_column)
@@ -189,7 +179,6 @@ def build_evidence_bundles(
         # screen context + cluster info = evidence bundle
         evidence_bundle = {
             "screen_name": screen_name,
-            "screen_context": screen_context,
             "cluster_id": str(cluster_id),
             "cluster_genes": cluster_as_json,
         }

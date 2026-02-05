@@ -6,6 +6,7 @@ This module provides a consistent interface via client classes for querying diff
 """
 
 import logging
+import json
 import os
 import time
 from pathlib import Path
@@ -207,8 +208,17 @@ class AnthropicClient(LLMClientBase):
             "model": self.model,
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
-            "system": system_prompt,
-            "thinking": {"type": "enabled"},  # can eventually set a token budget here
+            "system": [
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {  # caching to reduce costs
+                        "type": "ephemeral",
+                        "ttl": "5m",  # can set ttl to 1h if needed
+                    },
+                },
+            ],
+            # "thinking": {"type": "enabled"},  # can eventually set a token budget here
             "messages": [
                 {
                     "role": "user",
@@ -270,7 +280,7 @@ class AnthropicClient(LLMClientBase):
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
             "system": system_prompt,
-            "thinking": {"type": "enabled"},  # can eventually set a token budget here
+            # "thinking": {"type": "enabled"},  # can eventually set a token budget here
             "messages": [{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
         }
 
@@ -304,7 +314,7 @@ class AnthropicClient(LLMClientBase):
 
         client = anthropic.Anthropic(api_key=self.api_key)
         request_list = self._make_list_of_cluster_request_objs(cluster_to_prompt_map, system_prompt)
-        message_batch = client.messages.batches.create(request_list)
+        message_batch = client.messages.batches.create(requests=request_list)
         batch_id = message_batch.id
         # Polling for message batch completion
         while True:
@@ -326,10 +336,10 @@ class AnthropicClient(LLMClientBase):
                 case "errored":
                     if result.result.error.type == "invalid_request":
                         # Request body must be fixed before re-sending request
-                        print(f"Validation error {result.custom_id}")
+                        print(f"Validation error {result.custom_id}: {result.result.error.type}")
                     else:
                         # Request can be retried directly
-                        print(f"Server error {result.custom_id}")
+                        print(f"Server error {result.custom_id}: {result.result.error.type}")
                 case "expired":
                     print(f"Request expired {result.custom_id}")
         # TODO: log response metadata

@@ -14,7 +14,6 @@ from tqdm import tqdm
 from ..schemas.analysis_output_schemas import AnalysisResult, ClusterResult
 from ..clients.llm_api_clients import create_client
 from ..utils.llm_analysis_utils import process_cluster_response
-from ..utils.prompt_factory import make_cluster_analysis_prompt
 from ..utils.local_retrieval import local_knowledge_context_retriever
 
 logger = logging.getLogger(__name__)

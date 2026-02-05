@@ -93,7 +93,6 @@ class BundleGene(SemiFlexModel):
 # Main schema model
 class EvidenceBundle(SemiFlexModel):
     screen_name: str | None = None
-    screen_context: ScreenContext
     cluster_id: str
     # per-gene metadata keyed by gene symbol:
-    genes: dict[str, BundleGene] = Field(default_factory=dict)
+    cluster_genes: list[BundleGene]
