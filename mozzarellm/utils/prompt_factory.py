@@ -89,11 +89,11 @@ def make_cluster_analysis_system_prompt(
     prompt = (
         CLUSTER_ANALYSIS_TASK
         + "\n\n"
-        + SCREEN_CONTEXT_TEXT
-        + "\n\n"
         + GENE_CLASSIFICATION_RULES
         + "\n\n"
         + PATHWAY_CONFIDENCE_CRITERIA
+        + "\n\nThe following experimental context is provided: "
+        + SCREEN_CONTEXT_TEXT
         + "\n\n"
         + OUTPUT_FORMAT_JSON
     )
