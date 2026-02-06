@@ -1,0 +1,10 @@
+output/
+    {screen_name}_analysis/
+        prompts_used/
+        {screen_name}_evidence_bundles/
+        intermediates/
+        phase1_single_cluster_LLM_analysis/
+        phase1_iterative_cluster_LLM_analysis/
+        phase1_batch_cluster_LLM_analysis/
+
+**Mostly a dev artifact. Users will likely have a subset of these depending on the options they select.

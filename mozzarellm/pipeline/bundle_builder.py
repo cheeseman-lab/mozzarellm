@@ -17,24 +17,21 @@ from mozzarellm.utils.cluster_utils import cluster_chunker, find_feature_overlap
 from mozzarellm.clients.uniprot_api_client import UniProtClient
 
 
-# Default values
-OUTPUT_DIR = Path("output")
-
-
 def get_or_append_stable_accession(
     *,
+    screen_name: str,
     cluster_df: pd.DataFrame,
     accession_table: Path | None = None,
     accession_col: Path | None = None,
     accession_table_sheetname: str | None = None,
     accession_table_sep: str | None = None,
-    output_dir: Path = OUTPUT_DIR,
     organism_id: int,
     warn_on_fallback: bool,
 ):
     """
     Assign stable accession numbers to gene symbols. Or append them from a provided table.
     """
+    OUTPUT_DIR = Path("output") / f"{screen_name}_analysis"
     df = cluster_df.copy()  # avoid modifying original
     if accession_table is not None and accession_col is not None:
         # Append accession numbers from the provided table
@@ -51,13 +48,17 @@ def get_or_append_stable_accession(
         )
 
         # save as csv; output dir interface/output/
-        output_dir.mkdir(
+        OUTPUT_DIR.mkdir(
             parents=True, exist_ok=True
         )  # defense: make or assert that output dir exists
+        (OUTPUT_DIR / "intermediates").mkdir(parents=True, exist_ok=True)
         accession_merged_cluster_df.to_csv(
-            output_dir / "appended_accession_cluster_df.csv", index=False
+            OUTPUT_DIR / "intermediates" / "appended_accession_cluster_df.csv", index=False
         )
-
+        print(
+            "Appended accession numbers to cluster df. Saved to: ",
+            OUTPUT_DIR / "intermediates" / "appended_accession_cluster_df.csv",
+        )
         return accession_merged_cluster_df
     else:
         if "gene_symbol" not in df.columns:
@@ -84,20 +85,24 @@ def get_or_append_stable_accession(
             return accession or ""
 
         df["accession"] = df["gene_symbol"].map(_lookup_accession)
-        output_dir.mkdir(
+        OUTPUT_DIR.mkdir(
             parents=True, exist_ok=True
         )  # defense: make or assert that output dir exists
-        df.to_csv(output_dir / "assigned_accession_cluster_df.csv", index=False)
-
+        (OUTPUT_DIR / "intermediates").mkdir(parents=True, exist_ok=True)
+        df.to_csv(OUTPUT_DIR / "intermediates" / "assigned_accession_cluster_df.csv", index=False)
+        print(
+            "Assigned accession numbers to cluster df. Saved to: ",
+            OUTPUT_DIR / "intermediates" / "assigned_accession_cluster_df.csv",
+        )
         return df
 
 
 def add_functional_annotations_to_chunk(
-    chunk: pd.DataFrame,
     *,
+    chunk: pd.DataFrame,
+    screen_name: str,
     cluster_id_column: str,
     stable_accession_col: str | None = None,
-    output_dir: Path = OUTPUT_DIR,
 ) -> pd.DataFrame:
     """Add annotation columns to a chunk of gene-level data. Calls UniprotAPIClient to fetch annotations."""
     if stable_accession_col is None:
@@ -112,9 +117,13 @@ def add_functional_annotations_to_chunk(
     # add annotations to chunk
     chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
     # save as csv; output dir interface/output/
-    output_dir.mkdir(parents=True, exist_ok=True)  # defense: make or assert that output dir exists
+    OUTPUT_DIR = Path("output") / f"{screen_name}_analysis"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)  # defense: make or assert that output dir exists
+    (OUTPUT_DIR / "intermediates").mkdir(parents=True, exist_ok=True)
     # TODO: add override option for output to json
-    chunk_annotated.to_csv(output_dir / f"cluster_{cluster_id}_chunk_annotated.csv", index=False)
+    chunk_annotated.to_csv(
+        OUTPUT_DIR / "intermediates" / f"cluster_{cluster_id}_chunk_annotated.csv", index=False
+    )
     return chunk_annotated
 
 
@@ -142,17 +151,18 @@ def build_evidence_bundles(
     | Path
     | None = None,  # optionally change the directory where the knowledge files are stored
     top_k: int = 10,
-    output_dir: Path = OUTPUT_DIR,
 ) -> list[Path]:
+    OUTPUT_DIR = Path("output") / f"{screen_name}_analysis"
     # validate required columns in cluster table
     if cluster_id_column not in acc_cluster_df.columns:
         raise ValueError(f"Missing column '{cluster_id_column}' in cluster table")
     if gene_column not in acc_cluster_df.columns:
         raise ValueError(f"Missing column '{gene_column}' in cluster table")
     print(f"Using gene column: {gene_column}")
+
     # defense: make or assert that output dir exists
-    output_dir = Path(output_dir / f"{screen_name}_evidence_bundles")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR = Path(OUTPUT_DIR / f"{screen_name}_evidence_bundles")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # chunk cluster df
     cluster_chunks = cluster_chunker(acc_cluster_df, cluster_id_column)
@@ -161,13 +171,13 @@ def build_evidence_bundles(
     # annotate each cluster
     for chunk in cluster_chunks:
         cluster_id = chunk[cluster_id_column].iloc[0]
+        print(f"Processing cluster {cluster_id}")
         annotated_chunk = add_functional_annotations_to_chunk(
-            chunk,
+            chunk=chunk,
+            screen_name=screen_name,
             cluster_id_column=cluster_id_column,
             stable_accession_col=stable_accession_col,
-            output_dir=output_dir,
         )
-        print(f"Processing cluster {cluster_id}")
 
         # prune redundant cluster column
         annotated_chunk.drop(columns=[cluster_id_column], inplace=True)
@@ -187,6 +197,6 @@ def build_evidence_bundles(
             evidence_bundle["feature_overlaps"] = find_feature_overlaps(chunk, feature_columns)
 
         # save bundle as json
-        output_path = Path(output_dir / f"{screen_name}__cluster_{cluster_id}__bundle.json")
+        output_path = Path(OUTPUT_DIR / f"{screen_name}__cluster_{cluster_id}__bundle.json")
         write_bundle(evidence_bundle, output_path)  # includes validation
         print(f"Saved bundle to {output_path}")

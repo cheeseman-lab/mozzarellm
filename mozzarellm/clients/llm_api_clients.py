@@ -9,6 +9,7 @@ import logging
 import json
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from abc import ABC, abstractmethod
 
@@ -316,6 +317,13 @@ class AnthropicClient(LLMClientBase):
         request_list = self._make_list_of_cluster_request_objs(cluster_to_prompt_map, system_prompt)
         message_batch = client.messages.batches.create(requests=request_list)
         batch_id = message_batch.id
+        # saving the batch ID with a timestamp in a text file for reference
+        Path(
+            f"output/{screen_name}_analysis/intermediates/msg_batch_ID_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        ).write_text(batch_id)
+        print(
+            f"Batch {batch_id} created. Saving as {batch_id}.txt in output/{screen_name}_analysis/intermediates/"
+        )
         # Polling for message batch completion
         while True:
             message_batch = client.messages.batches.retrieve(batch_id)
@@ -328,7 +336,7 @@ class AnthropicClient(LLMClientBase):
             match result.result.type:
                 case "succeeded":
                     path = Path(
-                        f"output/intermediates/{screen_name}_analysis/{result.custom_id}_analysis_response.jsonl"
+                        f"output/{screen_name}_analysis/phase1_batch_cluster_LLM_analysis/{result.custom_id}_analysis_response.jsonl"
                     )
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(result.result, encoding="utf-8")

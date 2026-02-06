@@ -20,6 +20,7 @@ Main components of any given user prompt:
 import os
 import json
 from pathlib import Path
+from datetime import datetime
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 from mozzarellm.prompt_components import (
     CLUSTER_ANALYSIS_TASK,
@@ -31,6 +32,7 @@ from mozzarellm.prompt_components import (
 
 def make_cluster_analysis_system_prompt(
     *,
+    screen_name: str,
     screen_context_path: Path | None = None,
     override_screen_context: bool = False,  # testing utility
     template_path: Path | None = None,
@@ -98,6 +100,15 @@ def make_cluster_analysis_system_prompt(
         + OUTPUT_FORMAT_JSON
     )
 
+    output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
+    output_dir.mkdir(exist_ok=True)
+    # save system prompt to file with timestamp
+    with open(
+        output_dir
+        / f"cluster_analysis_phase1_system_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+        "w",
+    ) as f:
+        f.write(prompt)
     return prompt
 
 
@@ -107,6 +118,9 @@ def make_single_cluster_analysis_user_prompt(cluster_id, screen_name, cluster_to
     # Build a user prompt from the bundle JSON
     bundle_obj = json.loads(Path(BUNDLE_PATH).read_text(encoding="utf-8"))
     bundle_text = json.dumps(bundle_obj, ensure_ascii=False)
+
+    output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
+    output_dir.mkdir(exist_ok=True)
     return (
         f"Here is the evidence bundle JSON for cluster {cluster_id}:\n\n```json\n{bundle_text}\n```"
     )
