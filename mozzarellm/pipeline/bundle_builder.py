@@ -11,41 +11,93 @@ from mozzarellm.schemas.bundle_schemas import (
     ScreenContext,
 )
 from mozzarellm.utils.io import load_table, write_bundle
-from mozzarellm.utils.screen_context_utils import load_screen_context_json
-from mozzarellm.utils.local_retrieval import local_knowledge_context_retriever
 from mozzarellm.utils.cluster_utils import cluster_chunker, find_feature_overlaps
 from mozzarellm.clients.uniprot_api_client import UniProtClient
+
+DEFAULT_ACCESSION_COL = "accession"
+
+
+def _lookup_accession(
+    gene_symbol: str, organism_id: int, warn_on_fallback: bool, uniprot_client: UniProtClient
+) -> str:
+    gene_symbol = str(gene_symbol)
+    if not gene_symbol or gene_symbol == "nan":
+        return ""
+    if gene_symbol.startswith("nontargeting_"):  # TODO: make this a config option
+        return "NON_TARGETING_CONTROL"
+    try:
+        accession = uniprot_client.get_accession_from_gene_symbol(
+            gene_symbol=gene_symbol,
+            organism_id=organism_id,
+            warn_on_fallback=warn_on_fallback,
+        )
+    except Exception as e:
+        warnings.warn(f"UniProt lookup failed for gene_symbol '{gene_symbol}': {e}")
+        return ""
+    return accession or ""
 
 
 def get_or_append_stable_accession(
     *,
     screen_name: str,
     cluster_df: pd.DataFrame,
-    accession_table: Path | None = None,
-    accession_col: Path | None = None,
-    accession_table_sheetname: str | None = None,
-    accession_table_sep: str | None = None,
+    gene_column: str,
     organism_id: int,
     warn_on_fallback: bool,
+    accession_table: Path | None = None,
+    accession_col: Path | None = None,
+    accession_table_gene_col: str | None = None,
+    accession_table_sheetname: str | None = None,
+    accession_table_sep: str | None = None,
 ):
     """
     Assign stable accession numbers to gene symbols. Or append them from a provided table.
     """
+    # init client
+    uniprot_client = UniProtClient()
     OUTPUT_DIR = Path("output") / f"{screen_name}_analysis"
     df = cluster_df.copy()  # avoid modifying original
-    if accession_table is not None and accession_col is not None:
-        # Append accession numbers from the provided table
+    if (
+        accession_table is not None and accession_col is not None
+    ):  # Append accession numbers from the provided table
         accession_df = load_table(accession_table, accession_table_sep, accession_table_sheetname)
-        # slice just the accession column
-        accession_col_df = accession_df[[accession_col]]
-        # Merge acession col with cluster_df on gene symbol
+        # slice just the gene and accession columns
+        accession_col_df = accession_df[[accession_table_gene_col, accession_col]]
+
+        # Check for and handle duplicates in accession table
+        duplicates = accession_col_df[accession_table_gene_col].duplicated(keep="first")
+        if duplicates.any():
+            dup_genes = accession_col_df[duplicates][accession_table_gene_col].unique()
+            print(
+                f"Warning: Found {len(dup_genes)} duplicate genes in accession table. Keeping first occurrence: {list(dup_genes)[:5]}..."
+            )
+            accession_col_df = accession_col_df.drop_duplicates(
+                subset=[accession_table_gene_col], keep="first"
+            )
+
+        # Merge accession col with cluster_df on gene symbol
         accession_merged_cluster_df = df.merge(
-            accession_col_df, left_on="gene_symbol", right_on=accession_col, how="left"
+            accession_col_df, left_on=gene_column, right_on=accession_table_gene_col, how="left"
         )
-        # Rename the accession column to accession
-        accession_merged_cluster_df = accession_merged_cluster_df.rename(
-            columns={accession_col: "accession"}
+        # Drop the duplicate gene column from accession table
+        accession_merged_cluster_df = accession_merged_cluster_df.drop(
+            columns=[accession_table_gene_col]
         )
+
+        # Check for missing accessions after merge (before renaming)
+        missing_accessions = accession_merged_cluster_df[accession_col].isna()
+        if missing_accessions.any():
+            missing_genes = accession_merged_cluster_df[missing_accessions][gene_column].unique()
+            print(
+                f"Warning: {len(missing_genes)} genes not found in accession table: {list(missing_genes)[:5]}..."
+            )
+            print(f"Falling back to UniProt API for missing genes...")
+
+            # Fill missing accessions using UniProt API
+            mask = accession_merged_cluster_df[accession_col].isna()
+            accession_merged_cluster_df.loc[mask, accession_col] = accession_merged_cluster_df.loc[
+                mask, gene_column
+            ].apply(lambda x: _lookup_accession(x, organism_id, warn_on_fallback, uniprot_client))
 
         # save as csv; output dir interface/output/
         OUTPUT_DIR.mkdir(
@@ -61,30 +113,12 @@ def get_or_append_stable_accession(
         )
         return accession_merged_cluster_df
     else:
-        if "gene_symbol" not in df.columns:
-            raise ValueError("Expected column 'gene_symbol' to assign stable accessions")
+        if gene_column not in df.columns:
+            raise ValueError(f"Expected column '{gene_column}' to assign stable accessions")
 
-        # init client
-        uniprot_client = UniProtClient()
-
-        def _lookup_accession(gene_symbol: str) -> str:
-            gene_symbol = str(gene_symbol)
-            if not gene_symbol or gene_symbol == "nan":
-                return ""
-            if gene_symbol.startswith("nontargeting_"):
-                return "NON_TARGETING_CONTROL"
-            try:
-                accession = uniprot_client.get_accession_from_gene_symbol(
-                    gene_symbol=gene_symbol,
-                    organism_id=organism_id,
-                    warn_on_fallback=warn_on_fallback,
-                )
-            except Exception as e:
-                warnings.warn(f"UniProt lookup failed for gene_symbol '{gene_symbol}': {e}")
-                return ""
-            return accession or ""
-
-        df["accession"] = df["gene_symbol"].map(_lookup_accession)
+        df[DEFAULT_ACCESSION_COL] = df[gene_column].map(
+            lambda x: _lookup_accession(x, organism_id, warn_on_fallback, uniprot_client)
+        )
         OUTPUT_DIR.mkdir(
             parents=True, exist_ok=True
         )  # defense: make or assert that output dir exists
@@ -106,14 +140,20 @@ def add_functional_annotations_to_chunk(
 ) -> pd.DataFrame:
     """Add annotation columns to a chunk of gene-level data. Calls UniprotAPIClient to fetch annotations."""
     if stable_accession_col is None:
-        stable_accession_col = "accession"
+        stable_accession_col = DEFAULT_ACCESSION_COL
     chunk_annotated = chunk.copy()
     cluster_id = chunk_annotated[cluster_id_column].iloc[0]
 
     # initialize client
     uniprot_client = UniProtClient()
     # fetch annotations as 2 column dataframe
-    annotations = uniprot_client.fetch_functional_annotations(chunk_annotated, stable_accession_col)
+    try:
+        annotations = uniprot_client.fetch_functional_annotations(
+            chunk_annotated, stable_accession_col
+        )
+    except Exception as e:
+        warnings.warn(f"UniProt lookup failed for cluster '{cluster_id}': {e}")
+        return chunk_annotated
     # add annotations to chunk
     chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
     # save as csv; output dir interface/output/
