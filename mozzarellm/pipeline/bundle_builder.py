@@ -191,7 +191,7 @@ def build_evidence_bundles(
     | Path
     | None = None,  # optionally change the directory where the knowledge files are stored
     top_k: int = 10,
-) -> list[Path]:
+):
     OUTPUT_DIR = Path("output") / f"{screen_name}_analysis"
     # validate required columns in cluster table
     if cluster_id_column not in acc_cluster_df.columns:
