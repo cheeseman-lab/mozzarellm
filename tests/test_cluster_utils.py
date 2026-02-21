@@ -1,12 +1,5 @@
 """
 Unit tests for mozzarellm.utils.cluster_utils
-
-Test Coverage:
-1. Cluster ID to bundle path mapping
-2. File globbing and pattern matching
-3. Filename parsing for cluster IDs
-4. Error handling for missing directories
-5. Edge cases (empty directories, malformed filenames)
 """
 
 from __future__ import annotations
@@ -20,6 +13,32 @@ from mozzarellm.utils.cluster_utils import (
     build_cluster_id_to_bundle_path,
     cluster_chunker,
 )
+
+
+####################### TEST CONSTANTS #######################
+
+CLUSTER_COL = "cluster"
+SCREEN_NAME = "test"
+
+####################### FIXTURES #######################
+
+
+@pytest.fixture
+def evidence_dir(tmp_path):
+    """Empty evidence_bundles directory under tmp_path."""
+    d = tmp_path / "evidence_bundles"
+    d.mkdir()
+    return d
+
+
+####################### HELPERS #######################
+
+
+def _bundle_file(directory, screen: str, cluster_id) -> Path:
+    """Write an empty bundle JSON and return its Path."""
+    p = directory / f"{screen}__cluster_{cluster_id}__bundle.json"
+    p.write_text("{}")
+    return p
 
 
 # =============================================================================
@@ -37,7 +56,7 @@ def test_cluster_chunker_basic():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     assert len(chunks) == 2
     assert len(chunks[0]) == 2  # Cluster 1 has 2 genes
@@ -55,7 +74,7 @@ def test_cluster_chunker_preserves_row_order():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     assert len(chunks) == 1
     assert list(chunks[0]["gene"]) == ["A", "B", "C", "D"]
@@ -72,7 +91,7 @@ def test_cluster_chunker_handles_interleaved_clusters():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     assert len(chunks) == 2
     # Cluster 1 should have genes A, C, E in that order
@@ -92,7 +111,7 @@ def test_cluster_chunker_single_cluster():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     assert len(chunks) == 1
     assert len(chunks[0]) == 3
@@ -107,7 +126,7 @@ def test_cluster_chunker_single_gene_per_cluster():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     assert len(chunks) == 3
     assert all(len(chunk) == 1 for chunk in chunks)
@@ -117,7 +136,7 @@ def test_cluster_chunker_empty_dataframe():
     """Test handling of empty DataFrame"""
     df = pd.DataFrame(columns=["gene", "cluster"])
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     assert isinstance(chunks, list)
     assert len(chunks) == 0
@@ -132,7 +151,7 @@ def test_cluster_chunker_string_cluster_ids():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     assert len(chunks) == 2
     assert len(chunks[0]) == 2  # Cluster A
@@ -148,11 +167,11 @@ def test_cluster_chunker_preserves_first_seen_order():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     # First cluster should be 3 (seen first), then 1
-    assert chunks[0]["cluster"].iloc[0] == 3
-    assert chunks[1]["cluster"].iloc[0] == 1
+    assert chunks[0][CLUSTER_COL].iloc[0] == 3
+    assert chunks[1][CLUSTER_COL].iloc[0] == 1
 
 
 def test_cluster_chunker_missing_column_raises():
@@ -164,8 +183,8 @@ def test_cluster_chunker_missing_column_raises():
         }
     )
 
-    with pytest.raises(ValueError, match="Cluster ID column 'cluster' not found"):
-        cluster_chunker(df, "cluster")
+    with pytest.raises(ValueError, match=f"Cluster ID column '{CLUSTER_COL}' not found"):
+        cluster_chunker(df, CLUSTER_COL)
 
 
 def test_cluster_chunker_preserves_all_columns():
@@ -180,11 +199,11 @@ def test_cluster_chunker_preserves_all_columns():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     assert len(chunks) == 1
     chunk = chunks[0]
-    assert list(chunk.columns) == ["gene", "cluster", "value1", "value2", "value3"]
+    assert list(chunk.columns) == ["gene", CLUSTER_COL, "value1", "value2", "value3"]
 
 
 def test_cluster_chunker_with_nan_cluster_ids():
@@ -196,7 +215,7 @@ def test_cluster_chunker_with_nan_cluster_ids():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     # Should create separate chunks for each unique value including NaN
     assert len(chunks) >= 2
@@ -211,7 +230,7 @@ def test_cluster_chunker_numeric_vs_string_cluster_ids():
         }
     )
 
-    chunks = cluster_chunker(df, "cluster")
+    chunks = cluster_chunker(df, CLUSTER_COL)
 
     # Should have 2 chunks: one for int 1, one for str "1"
     assert len(chunks) == 2
@@ -222,17 +241,15 @@ def test_cluster_chunker_numeric_vs_string_cluster_ids():
 # =============================================================================
 
 
-def test_build_cluster_id_to_bundle_path_basic(tmp_path):
+def test_build_cluster_id_to_bundle_path_basic(evidence_dir):
     """Test basic cluster ID to bundle path mapping"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
+    _bundle_file(evidence_dir, SCREEN_NAME, 1)
+    _bundle_file(evidence_dir, SCREEN_NAME, 2)
+    _bundle_file(evidence_dir, SCREEN_NAME, 42)
 
-    # Create test bundle files
-    (evidence_dir / "test__cluster_1__bundle.json").write_text("{}")
-    (evidence_dir / "test__cluster_2__bundle.json").write_text("{}")
-    (evidence_dir / "test__cluster_42__bundle.json").write_text("{}")
-
-    result = build_cluster_id_to_bundle_path(evidence_bundle_dir=evidence_dir, screen_name="test")
+    result = build_cluster_id_to_bundle_path(
+        evidence_bundle_dir=evidence_dir, screen_name=SCREEN_NAME
+    )
 
     assert isinstance(result, dict)
     assert len(result) == 3
@@ -242,15 +259,11 @@ def test_build_cluster_id_to_bundle_path_basic(tmp_path):
     assert isinstance(result["1"], Path)
 
 
-def test_build_cluster_id_to_bundle_path_filters_by_screen_name(tmp_path):
+def test_build_cluster_id_to_bundle_path_filters_by_screen_name(evidence_dir):
     """Test that only bundles matching screen name are included"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
-
-    # Create bundles for different screens
-    (evidence_dir / "screen1__cluster_1__bundle.json").write_text("{}")
-    (evidence_dir / "screen2__cluster_2__bundle.json").write_text("{}")
-    (evidence_dir / "screen1__cluster_3__bundle.json").write_text("{}")
+    _bundle_file(evidence_dir, "screen1", 1)
+    _bundle_file(evidence_dir, "screen2", 2)
+    _bundle_file(evidence_dir, "screen1", 3)
 
     result = build_cluster_id_to_bundle_path(
         evidence_bundle_dir=evidence_dir, screen_name="screen1"
@@ -262,88 +275,78 @@ def test_build_cluster_id_to_bundle_path_filters_by_screen_name(tmp_path):
     assert "2" not in result
 
 
-def test_build_cluster_id_to_bundle_path_empty_directory(tmp_path):
+def test_build_cluster_id_to_bundle_path_empty_directory(evidence_dir):
     """Test handling of empty evidence bundle directory"""
-    evidence_dir = tmp_path / "empty_bundles"
-    evidence_dir.mkdir()
-
-    result = build_cluster_id_to_bundle_path(evidence_bundle_dir=evidence_dir, screen_name="test")
+    result = build_cluster_id_to_bundle_path(
+        evidence_bundle_dir=evidence_dir, screen_name=SCREEN_NAME
+    )
 
     assert isinstance(result, dict)
     assert len(result) == 0
 
 
-def test_build_cluster_id_to_bundle_path_ignores_non_bundle_files(tmp_path):
+def test_build_cluster_id_to_bundle_path_ignores_non_bundle_files(evidence_dir):
     """Test that non-bundle files are ignored"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
-
-    # Create valid bundle
-    (evidence_dir / "test__cluster_1__bundle.json").write_text("{}")
+    _bundle_file(evidence_dir, SCREEN_NAME, 1)
 
     # Create files that should be ignored
-    (evidence_dir / "test__cluster_2.json").write_text("{}")  # Missing __bundle
-    (evidence_dir / "test_cluster_3__bundle.json").write_text("{}")  # Wrong separator
+    (evidence_dir / f"{SCREEN_NAME}__cluster_2.json").write_text("{}")  # Missing __bundle
+    (evidence_dir / f"{SCREEN_NAME}_cluster_3__bundle.json").write_text("{}")  # Wrong separator
     (evidence_dir / "readme.txt").write_text("info")
-    (evidence_dir / "test__cluster_4__data.json").write_text("{}")  # Wrong suffix
+    (evidence_dir / f"{SCREEN_NAME}__cluster_4__data.json").write_text("{}")  # Wrong suffix
 
-    result = build_cluster_id_to_bundle_path(evidence_bundle_dir=evidence_dir, screen_name="test")
+    result = build_cluster_id_to_bundle_path(
+        evidence_bundle_dir=evidence_dir, screen_name=SCREEN_NAME
+    )
 
     assert len(result) == 1
     assert "1" in result
 
 
-def test_build_cluster_id_to_bundle_path_numeric_cluster_ids(tmp_path):
+def test_build_cluster_id_to_bundle_path_numeric_cluster_ids(evidence_dir):
     """Test extraction of numeric cluster IDs"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
+    _bundle_file(evidence_dir, SCREEN_NAME, 0)
+    _bundle_file(evidence_dir, SCREEN_NAME, 999)
+    _bundle_file(evidence_dir, SCREEN_NAME, 12345)
 
-    (evidence_dir / "test__cluster_0__bundle.json").write_text("{}")
-    (evidence_dir / "test__cluster_999__bundle.json").write_text("{}")
-    (evidence_dir / "test__cluster_12345__bundle.json").write_text("{}")
-
-    result = build_cluster_id_to_bundle_path(evidence_bundle_dir=evidence_dir, screen_name="test")
+    result = build_cluster_id_to_bundle_path(
+        evidence_bundle_dir=evidence_dir, screen_name=SCREEN_NAME
+    )
 
     assert "0" in result
     assert "999" in result
     assert "12345" in result
 
 
-def test_build_cluster_id_to_bundle_path_string_cluster_ids(tmp_path):
+def test_build_cluster_id_to_bundle_path_string_cluster_ids(evidence_dir):
     """Test extraction of string cluster IDs"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
+    _bundle_file(evidence_dir, SCREEN_NAME, "abc")
+    _bundle_file(evidence_dir, SCREEN_NAME, "cluster_A")
 
-    (evidence_dir / "test__cluster_abc__bundle.json").write_text("{}")
-    (evidence_dir / "test__cluster_cluster_A__bundle.json").write_text("{}")
-
-    result = build_cluster_id_to_bundle_path(evidence_bundle_dir=evidence_dir, screen_name="test")
+    result = build_cluster_id_to_bundle_path(
+        evidence_bundle_dir=evidence_dir, screen_name=SCREEN_NAME
+    )
 
     assert "abc" in result
     assert "cluster_A" in result
 
 
-def test_build_cluster_id_to_bundle_path_returns_path_objects(tmp_path):
+def test_build_cluster_id_to_bundle_path_returns_path_objects(evidence_dir):
     """Test that returned values are Path objects"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
+    bundle_file = _bundle_file(evidence_dir, SCREEN_NAME, 1)
 
-    bundle_file = evidence_dir / "test__cluster_1__bundle.json"
-    bundle_file.write_text("{}")
-
-    result = build_cluster_id_to_bundle_path(evidence_bundle_dir=evidence_dir, screen_name="test")
+    result = build_cluster_id_to_bundle_path(
+        evidence_bundle_dir=evidence_dir, screen_name=SCREEN_NAME
+    )
 
     assert isinstance(result["1"], Path)
     assert result["1"] == bundle_file
 
 
-def test_build_cluster_id_to_bundle_path_handles_underscores_in_screen_name(tmp_path):
+def test_build_cluster_id_to_bundle_path_handles_underscores_in_screen_name(evidence_dir):
     """Test screen names with underscores"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
-
-    (evidence_dir / "my_screen_name__cluster_1__bundle.json").write_text("{}")
-    (evidence_dir / "my_screen_name__cluster_2__bundle.json").write_text("{}")
+    _bundle_file(evidence_dir, "my_screen_name", 1)
+    _bundle_file(evidence_dir, "my_screen_name", 2)
 
     result = build_cluster_id_to_bundle_path(
         evidence_bundle_dir=evidence_dir, screen_name="my_screen_name"
@@ -354,19 +357,17 @@ def test_build_cluster_id_to_bundle_path_handles_underscores_in_screen_name(tmp_
     assert "2" in result
 
 
-def test_build_cluster_id_to_bundle_path_skips_malformed_filenames(tmp_path):
+def test_build_cluster_id_to_bundle_path_skips_malformed_filenames(evidence_dir):
     """Test that malformed filenames are skipped gracefully"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
-
-    # Valid bundle
-    (evidence_dir / "test__cluster_1__bundle.json").write_text("{}")
+    _bundle_file(evidence_dir, SCREEN_NAME, 1)
 
     # Malformed bundles
-    (evidence_dir / "test__cluster___bundle.json").write_text("{}")  # Empty cluster ID
+    (evidence_dir / f"{SCREEN_NAME}__cluster___bundle.json").write_text("{}")  # Empty cluster ID
     (evidence_dir / "__cluster_2__bundle.json").write_text("{}")  # Missing screen name
 
-    result = build_cluster_id_to_bundle_path(evidence_bundle_dir=evidence_dir, screen_name="test")
+    result = build_cluster_id_to_bundle_path(
+        evidence_bundle_dir=evidence_dir, screen_name=SCREEN_NAME
+    )
 
     # Should only include valid bundle
     assert len(result) == 1
@@ -390,14 +391,13 @@ def test_build_cluster_id_to_bundle_path_nonexistent_directory():
         pass
 
 
-def test_build_cluster_id_to_bundle_path_preserves_cluster_id_as_string(tmp_path):
+def test_build_cluster_id_to_bundle_path_preserves_cluster_id_as_string(evidence_dir):
     """Test that cluster IDs are always strings in the result"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
+    _bundle_file(evidence_dir, SCREEN_NAME, 123)
 
-    (evidence_dir / "test__cluster_123__bundle.json").write_text("{}")
-
-    result = build_cluster_id_to_bundle_path(evidence_bundle_dir=evidence_dir, screen_name="test")
+    result = build_cluster_id_to_bundle_path(
+        evidence_bundle_dir=evidence_dir, screen_name=SCREEN_NAME
+    )
 
     # Keys should be strings, not integers
     assert "123" in result
@@ -405,19 +405,16 @@ def test_build_cluster_id_to_bundle_path_preserves_cluster_id_as_string(tmp_path
     assert isinstance(list(result.keys())[0], str)
 
 
-def test_build_cluster_id_to_bundle_path_duplicate_cluster_ids(tmp_path):
+def test_build_cluster_id_to_bundle_path_duplicate_cluster_ids(evidence_dir):
     """Test handling when multiple files have same cluster ID"""
-    evidence_dir = tmp_path / "evidence_bundles"
-    evidence_dir.mkdir()
+    _bundle_file(evidence_dir, SCREEN_NAME, 1)
+    (evidence_dir / f"{SCREEN_NAME}__cluster_1__bundle.json.bak").write_text(
+        "{}"
+    )  # Only .json should match
 
-    # Create duplicate cluster IDs (shouldn't happen in practice, but test robustness)
-    file1 = evidence_dir / "test__cluster_1__bundle.json"
-    file2 = evidence_dir / "test__cluster_1__bundle.json.bak"
-
-    file1.write_text("{}")
-    # Only .json files should match the pattern
-
-    result = build_cluster_id_to_bundle_path(evidence_bundle_dir=evidence_dir, screen_name="test")
+    result = build_cluster_id_to_bundle_path(
+        evidence_bundle_dir=evidence_dir, screen_name=SCREEN_NAME
+    )
 
     # Should have one entry for cluster 1
     assert "1" in result

@@ -1,3 +1,7 @@
+"""
+Unit tests for mozzarellm.utils.io.load_table
+"""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -6,11 +10,26 @@ import pytest
 from mozzarellm.utils.io import load_table
 
 
+####################### TEST CONSTANTS #######################
+
+
+CLUSTER_TABLE_COLUMNS = [
+    "gene_symbol",
+    "cluster",
+    "up_features",
+    "down_features",
+    "phenotypic_strength",
+]
+
+
+####################### TEST FUNCTIONS #######################
+
+
 @pytest.mark.parametrize("delimiter,extension", [(",", ".csv"), ("\t", ".tsv"), ("\t", ".txt")])
 def test_load_cluster_table_format_default_sep(tmp_path, delimiter, extension):
     test_file = tmp_path / f"clusters{extension}"
     test_file.write_text(
-        f"gene_symbol{delimiter}cluster{delimiter}up_features{delimiter}down_features{delimiter}phenotypic_strength\n"
+        f"{delimiter.join(CLUSTER_TABLE_COLUMNS)}\n"
         f'AATF{delimiter}21{delimiter}"interphase_cell_correlation_dapi_tubulin,interphase_cell_correlation_tubulin_phalloidin,interphase_nucleus_dapi_mean"{delimiter}"interphase_nucleus_area,interphase_cell_area,interphase_nucleus_solidity"{delimiter}669/5299\n'
         f'ABT1{delimiter}21{delimiter}"interphase_nucleus_gh2ax_mean,interphase_nucleus_dapi_mean,interphase_cell_correlation_dapi_tubulin,interphase_cell_correlation_tubulin_phalloidin,interphase_cell_phalloidin_mean"{delimiter}"interphase_nucleus_area,interphase_cell_area,interphase_nucleus_solidity"{delimiter}560/5299\n'
         f'BMS1{delimiter}21{delimiter}"interphase_nucleus_dapi_mean,interphase_cell_correlation_dapi_tubulin,interphase_cell_correlation_tubulin_phalloidin,interphase_nucleus_gh2ax_mean,interphase_cell_phalloidin_mean"{delimiter}"interphase_nucleus_area,interphase_cell_area,interphase_nucleus_solidity"{delimiter}446/5299\n',
@@ -37,13 +56,7 @@ def test_load_cluster_table_format_default_sep(tmp_path, delimiter, extension):
 
     df = load_table(test_file)
     pd.testing.assert_frame_equal(df, expected, check_dtype=True)
-    assert list(df.columns) == [
-        "gene_symbol",
-        "cluster",
-        "up_features",
-        "down_features",
-        "phenotypic_strength",
-    ]
+    assert list(df.columns) == CLUSTER_TABLE_COLUMNS
     assert df.iloc[0]["gene_symbol"] == "AATF"
 
 

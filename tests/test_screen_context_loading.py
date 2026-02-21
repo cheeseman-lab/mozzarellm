@@ -1,3 +1,7 @@
+"""
+Unit tests for mozzarellm.utils.screen_context_utils.load_screen_context_json
+"""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +11,12 @@ import pytest
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
 
-def _valid_screen_context_dict() -> dict:
+####################### FIXTURES #######################
+
+
+@pytest.fixture
+def valid_context() -> dict:
+    """Minimal valid screen context dict; each test gets its own mutable copy."""
     return {
         "assay_type": "CRISPRi",
         "target_phenotype": "Cell growth",
@@ -30,54 +39,54 @@ def _valid_screen_context_dict() -> dict:
     }
 
 
-def _write_json(tmp_path, data: dict) -> str:
-    p = tmp_path / "screen_context.json"
-    p.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    return str(p)
+@pytest.fixture
+def write_json(tmp_path):
+    """Factory that writes a dict to a temp JSON file and returns the path string."""
+
+    def _write(data: dict) -> str:
+        p = tmp_path / "screen_context.json"
+        p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return str(p)
+
+    return _write
 
 
-def test_load_screen_context_json_valid(tmp_path):
-    path = _write_json(tmp_path, _valid_screen_context_dict())
-    loaded = load_screen_context_json(path)
+####################### TEST FUNCTIONS #######################
+
+
+def test_load_screen_context_json_valid(valid_context, write_json):
+    loaded = load_screen_context_json(write_json(valid_context))
     assert isinstance(loaded, dict)
     assert loaded["assay_type"] == "CRISPRi"
     assert loaded["perturbation"]["type"] == "CRISPRi"
 
 
-def test_load_screen_context_json_allows_extra_fields(tmp_path):
-    data = _valid_screen_context_dict()
-    data["extra_top_level"] = "ok"
-    data["perturbation"]["extra_nested"] = "ok"
-    path = _write_json(tmp_path, data)
-    loaded = load_screen_context_json(path)
+def test_load_screen_context_json_allows_extra_fields(valid_context, write_json):
+    valid_context["extra_top_level"] = "ok"
+    valid_context["perturbation"]["extra_nested"] = "ok"
+    loaded = load_screen_context_json(write_json(valid_context))
     assert loaded["extra_top_level"] == "ok"
     assert loaded["perturbation"]["extra_nested"] == "ok"
 
 
-def test_load_screen_context_json_rejects_todo_field(tmp_path):
-    data = _valid_screen_context_dict()
-    data["TODO"] = {"description": "remove me"}
-    path = _write_json(tmp_path, data)
+def test_load_screen_context_json_rejects_todo_field(valid_context, write_json):
+    valid_context["TODO"] = {"description": "remove me"}
     with pytest.raises(Exception) as e:
-        load_screen_context_json(path)
+        load_screen_context_json(write_json(valid_context))
     assert "Screen context JSON contains TODO field." in str(e.value)
 
 
-def test_load_screen_context_json_rejects_template_placeholders(tmp_path):
-    data = _valid_screen_context_dict()
-    data["assay_type"] = "required"
-    path = _write_json(tmp_path, data)
+def test_load_screen_context_json_rejects_template_placeholders(valid_context, write_json):
+    valid_context["assay_type"] = "required"
     with pytest.raises(Exception) as e:
-        load_screen_context_json(path)
+        load_screen_context_json(write_json(valid_context))
     assert "template placeholder" in str(e.value)
 
 
-def test_load_screen_context_json_rejects_wrong_types(tmp_path):
-    data = _valid_screen_context_dict()
-    data["perturbation"] = "not an object"
-    path = _write_json(tmp_path, data)
+def test_load_screen_context_json_rejects_wrong_types(valid_context, write_json):
+    valid_context["perturbation"] = "not an object"
     with pytest.raises(Exception) as e:
-        load_screen_context_json(path)
+        load_screen_context_json(write_json(valid_context))
     assert "valid dictionary" in str(e.value).lower() or "dict" in str(e.value).lower()
 
 
