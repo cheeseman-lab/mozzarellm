@@ -53,7 +53,9 @@ def two_accession_chunk():
     return pd.DataFrame({ACCESSION_COL: ["P04637", "P38398"], "gene_symbol": ["TP53", "BRCA1"]})
 
 
-# helper function for test data
+####################### HELPERS #######################
+
+
 def _make_uniprot_entry(accession: str, function_text: str) -> dict:
     """Build a minimal UniProt API result entry for use in mocks."""
     return {
