@@ -12,16 +12,22 @@ import pandas as pd
 import requests
 import warnings
 
+##### CONSTANTS ##### (configurable)
+DEFAULT_TIMEOUT = 30.0
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_BACKOFF_TIME = 1.0
+BASE_URL = "https://rest.uniprot.org"
+
 
 class UniProtClient:
     """Configurable UniProt REST client with in-memory caching and backoff."""
 
     def __init__(
         self,
-        base_url: str = "https://rest.uniprot.org",
-        timeout: float = 30.0,  # timeout in seconds
-        max_retries: int = 3,
-        backoff_time: float = 1.0,  # initial backoff time in seconds
+        base_url: str = BASE_URL,
+        timeout: float = DEFAULT_TIMEOUT,  # timeout in seconds
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        backoff_time: float = DEFAULT_BACKOFF_TIME,  # initial backoff time in seconds
         cache_path: str | os.PathLike[str] | None = None,
         cache_ttl_seconds: int | None = None,
     ) -> None:
@@ -39,6 +45,7 @@ class UniProtClient:
         self._cache_path = os.fspath(cache_path) if cache_path is not None else None
         self._cache_conn = self._init_cache(self._cache_path) if self._cache_path else None
 
+    ### CACHE METHODS ###
     @staticmethod
     def _default_cache_dir(app_name: str) -> str:
         system = platform.system()
@@ -51,15 +58,21 @@ class UniProtClient:
         if system == "Darwin":
             return os.path.join(os.path.expanduser("~"), "Library", "Caches", app_name)
 
-        base = os.environ.get("XDG_CACHE_HOME")
+        base = os.environ.get("XDG_CACHE_HOME")  # linux
         if base:
             return os.path.join(base, app_name)
         return os.path.join(os.path.expanduser("~"), ".cache", app_name)
 
     @staticmethod
     def _init_cache(cache_path: str) -> sqlite3.Connection:
+        """Initialize SQLite cache with optimized settings.
+
+        Note: Uses Python's built-in sqlite3 module (SQLite 3.x).
+        Developed with SQLite 3.37+. Requires SQLite 3.7.0+ for WAL mode.
+        PRAGMA statements may change in future SQLite releases.
+        """
         conn = sqlite3.connect(cache_path, timeout=30.0, isolation_level=None)
-        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA journal_mode=WAL")  # Requires SQLite 3.7.0+
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA busy_timeout=30000")
         conn.execute(
@@ -119,6 +132,27 @@ class UniProtClient:
             (cache_key, url, params_json, response_json, int(time.time())),
         )
 
+    def clear_cache(self) -> int:
+        """Delete all entries from the cache. Returns number of rows deleted."""
+        if self._cache_conn is None:
+            return 0
+        cursor = self._cache_conn.execute("DELETE FROM uniprot_http_cache")
+        return cursor.rowcount
+
+    def evict_expired(self) -> int:
+        """Delete entries older than the current TTL. Returns number of rows deleted.
+
+        No-op if cache_ttl_seconds was not set (entries never expire).
+        """
+        if self._cache_conn is None or self._cache_ttl_seconds is None:
+            return 0
+        cutoff = int(time.time()) - self._cache_ttl_seconds
+        cursor = self._cache_conn.execute(
+            "DELETE FROM uniprot_http_cache WHERE created_at < ?", (cutoff,)
+        )
+        return cursor.rowcount
+
+    ### HTTP METHODS ###
     def _get(self, *, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
 
@@ -143,54 +177,7 @@ class UniProtClient:
                     raise last_error
         raise RuntimeError("UniProt request failed")
 
-    @staticmethod
-    def _parse_gene_function(entry: dict[str, Any]) -> list[str]:
-        functions = entry.get("comments") or []
-        return [func.get("text") for func in functions if func.get("text")]
-
-    def search_by_gene_symbol(
-        self,
-        gene_symbol: str,
-        *,
-        organism_id: int | None = None,
-        limit: int = 5,
-    ) -> list[dict[str, Any]]:
-        """Search UniProtKB for a gene symbol.
-
-        Args:
-            gene_symbol: e.g. "TP53"
-            organism_id: optional NCBI taxonomy id (e.g. 9606 for human)
-            limit: max number of results to return
-        """
-        q = f"(gene:{gene_symbol})"
-        if organism_id is not None:
-            q = f"{q} AND (organism_id:{organism_id})"
-
-        data = self._get(
-            path="/uniprotkb/search",
-            params={
-                "query": q,
-                "format": "json",
-                "size": str(limit),
-                "fields": "accession,protein_name,genes",
-            },
-        )
-
-        results = data.get("results") or []
-        hits: list[dict[str, Any]] = []
-        for r in results:
-            acc = r.get("primaryAccession")
-            if not acc:
-                continue
-            hits.append(
-                {
-                    "accession": str(acc),
-                    "primary_gene": self._parse_primary_gene(r),
-                    "protein_name": self._parse_protein_name(r),
-                }
-            )
-        return hits
-
+    ### QUERY GENERATION ###
     @staticmethod
     def _generate_cluster_search_query(chunk: pd.DataFrame, stable_accession_col: str) -> str:
         """Generate a search query for a chunk of gene-level data."""
@@ -217,6 +204,7 @@ class UniProtClient:
 
         query = self._generate_cluster_search_query(chunk, stable_accession_col)
 
+        # _get() handles HTTP errors and retries internally
         response = self._get(
             path="/uniprotkb/search",
             params={
@@ -226,12 +214,20 @@ class UniProtClient:
                 "fields": "cc_function",
             },
         )
-
         results = response.get("results") or []
-        if not results:
-            raise ValueError("No results found for query: {}".format(query))
 
+        # Check if any entries were found
+        num_accessions = len(chunk[stable_accession_col].unique())
+        if not results:
+            raise ValueError(
+                f"No UniProt entries found for {num_accessions} accession(s). "
+                f"Verify accessions are valid UniProt IDs."
+            )
+
+        # Extract functional annotations
         accession_function_annotations = []
+        accessions_without_annotations = []
+
         for entry in results:
             accession = entry.get("primaryAccession")
             if not accession:
@@ -247,9 +243,25 @@ class UniProtClient:
                         function_texts.append(str(val))
 
             if not function_texts:
+                accessions_without_annotations.append(str(accession))
                 continue
 
             accession_function_annotations.append((str(accession), "\n".join(function_texts)))
+
+        # Warn if some accessions lack functional annotations
+        if accessions_without_annotations:
+            warnings.warn(
+                f"{len(accessions_without_annotations)} accession(s) found but lack FUNCTION annotations: "
+                f"{accessions_without_annotations[:5]}"
+                + ("..." if len(accessions_without_annotations) > 5 else "")
+            )
+
+        # Raise if no annotations found at all
+        if not accession_function_annotations:
+            raise ValueError(
+                f"Found {len(results)} UniProt entries but none have FUNCTION annotations. "
+                f"Accessions queried: {accessions_without_annotations[:10]}"
+            )
 
         return pd.DataFrame(
             accession_function_annotations, columns=["accession", "UniProt_functional_annotation"]

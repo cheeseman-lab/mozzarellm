@@ -137,6 +137,7 @@ def add_functional_annotations_to_chunk(
     screen_name: str,
     cluster_id_column: str,
     stable_accession_col: str | None = None,
+    uniprot_client: UniProtClient | None = None,
 ) -> pd.DataFrame:
     """Add annotation columns to a chunk of gene-level data. Calls UniprotAPIClient to fetch annotations."""
     if stable_accession_col is None:
@@ -145,7 +146,9 @@ def add_functional_annotations_to_chunk(
     cluster_id = chunk_annotated[cluster_id_column].iloc[0]
 
     # initialize client
-    uniprot_client = UniProtClient()
+    if uniprot_client is None:
+        uniprot_client = UniProtClient()
+
     # fetch annotations as 2 column dataframe
     try:
         annotations = uniprot_client.fetch_functional_annotations(
@@ -191,7 +194,10 @@ def build_evidence_bundles(
     | Path
     | None = None,  # optionally change the directory where the knowledge files are stored
     top_k: int = 10,
+    uniprot_client: UniProtClient | None = None,  # Inject dependency
 ):
+    if uniprot_client is None:
+        uniprot_client = UniProtClient()  # Create once
     OUTPUT_DIR = Path("output") / f"{screen_name}_analysis"
     # validate required columns in cluster table
     if cluster_id_column not in acc_cluster_df.columns:
@@ -217,6 +223,7 @@ def build_evidence_bundles(
             screen_name=screen_name,
             cluster_id_column=cluster_id_column,
             stable_accession_col=stable_accession_col,
+            uniprot_client=uniprot_client,
         )
 
         # prune redundant cluster column
