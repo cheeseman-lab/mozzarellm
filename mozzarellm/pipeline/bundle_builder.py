@@ -49,14 +49,18 @@ def get_or_append_stable_accession(
     accession_table_gene_col: str | None = None,
     accession_table_sheetname: str | None = None,
     accession_table_sep: str | None = None,
-    output_dir: Path | str | None = None, # override default output dir (currently just used for unit tests)
+    output_dir: Path
+    | str
+    | None = None,  # override default output dir (currently just used for unit tests)
 ):
     """
     Assign stable accession numbers to gene symbols. Or append them from a provided table.
     """
     # init client
     uniprot_client = UniProtClient()
-    OUTPUT_DIR = Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
+    OUTPUT_DIR = (
+        Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
+    )
     df = cluster_df.copy()  # avoid modifying original
     if (
         accession_table is not None and accession_col is not None
@@ -162,7 +166,9 @@ def add_functional_annotations_to_chunk(
     # add annotations to chunk
     chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
     # save as csv; output dir interface/output/
-    OUTPUT_DIR = Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
+    OUTPUT_DIR = (
+        Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
+    )
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)  # defense: make or assert that output dir exists
     (OUTPUT_DIR / "intermediates").mkdir(parents=True, exist_ok=True)
     # TODO: add override option for output to json
@@ -201,7 +207,9 @@ def build_evidence_bundles(
 ):
     if uniprot_client is None:
         uniprot_client = UniProtClient()  # Create once
-    OUTPUT_DIR = Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
+    OUTPUT_DIR = (
+        Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
+    )
     # validate required columns in cluster table
     if cluster_id_column not in acc_cluster_df.columns:
         raise ValueError(f"Missing column '{cluster_id_column}' in cluster table")
