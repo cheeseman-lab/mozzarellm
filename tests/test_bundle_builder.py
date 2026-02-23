@@ -167,6 +167,7 @@ def test_get_or_append_stable_accession_from_external_table_csv(
         accession_table_gene_col=ACCESSION_TABLE_GENE_COLUMN,
         accession_table_sheetname=None,
         accession_table_sep=None,
+        output_dir=tmp_path,
     )
 
     assert STABLE_ACCESSION_COLUMN in result.columns
@@ -196,6 +197,7 @@ def test_get_or_append_stable_accession_from_external_table_tsv(
         accession_table_gene_col=ACCESSION_TABLE_GENE_COLUMN,
         accession_table_sheetname=None,
         accession_table_sep="\t",
+        output_dir=tmp_path,
     )
 
     assert STABLE_ACCESSION_COLUMN in result.columns
@@ -224,6 +226,7 @@ def test_get_or_append_stable_accession_from_external_table_excel(
         accession_table_sheetname="Sheet1",
         organism_id=ORGANISM_ID,
         warn_on_fallback=False,
+        output_dir=tmp_path,
     )
 
     assert STABLE_ACCESSION_COLUMN in result.columns
@@ -253,6 +256,7 @@ def test_get_or_append_stable_accession_merge_with_duplicate_entries(tmp_path, t
         accession_col=STABLE_ACCESSION_COLUMN,
         organism_id=ORGANISM_ID,
         warn_on_fallback=False,
+        output_dir=tmp_path,
     )
 
     assert STABLE_ACCESSION_COLUMN in result.columns
@@ -284,6 +288,7 @@ def test_get_or_append_stable_accession_missing_accessions_fallback(
             accession_col=STABLE_ACCESSION_COLUMN,
             organism_id=ORGANISM_ID,
             warn_on_fallback=False,
+            output_dir=tmp_path,
         )
 
     # Verify all 4 genes have accessions
@@ -301,7 +306,7 @@ def test_get_or_append_stable_accession_missing_accessions_fallback(
 
 ## assigned accessions: no accession table provided (complete fallback case)
 def test_get_or_append_stable_accession_no_accessions_fallback(
-    mock_uniprot_client, larger_test_cluster_df
+    tmp_path, mock_uniprot_client, larger_test_cluster_df
 ):
     """Test complete fallback to UniProt API when no accession table is provided"""
     with patch(
@@ -315,6 +320,7 @@ def test_get_or_append_stable_accession_no_accessions_fallback(
             accession_col=None,
             organism_id=ORGANISM_ID,
             warn_on_fallback=False,
+            output_dir=tmp_path,
         )
 
     assert DEFAULT_ACCESSION_COL in result.columns
@@ -328,7 +334,7 @@ def test_get_or_append_stable_accession_no_accessions_fallback(
 
 
 # exception handling
-def test_get_or_append_stable_accession_missing_gene_column_raises():
+def test_get_or_append_stable_accession_missing_gene_column_raises(tmp_path):
     """Test that missing gene column raises appropriate error"""
     cluster_df = pd.DataFrame({"wrong_column": ["TP53"], "cluster": [1]})
 
@@ -343,6 +349,7 @@ def test_get_or_append_stable_accession_missing_gene_column_raises():
             accession_col=None,
             organism_id=ORGANISM_ID,
             warn_on_fallback=False,
+            output_dir=tmp_path,
         )
 
 
@@ -351,7 +358,7 @@ def test_get_or_append_stable_accession_missing_gene_column_raises():
 # =============================================================================
 
 
-def test_add_functional_annotations_to_chunk_success(mock_uniprot_client, test_chunk):
+def test_add_functional_annotations_to_chunk_success(tmp_path, mock_uniprot_client, test_chunk):
     """Test adding functional annotations to gene chunk"""
     with patch(
         "mozzarellm.pipeline.bundle_builder.UniProtClient", return_value=mock_uniprot_client
@@ -361,6 +368,7 @@ def test_add_functional_annotations_to_chunk_success(mock_uniprot_client, test_c
             screen_name=TEST_SCREEN_NAME,
             cluster_id_column=CLUSTER_ID_COLUMN,
             stable_accession_col=DEFAULT_ACCESSION_COL,
+            output_dir=tmp_path,
         )
 
     assert "UniProt_functional_annotation" in result.columns
@@ -371,7 +379,7 @@ def test_add_functional_annotations_to_chunk_success(mock_uniprot_client, test_c
     assert result.loc[1, "UniProt_functional_annotation"] == "Bystin-like protein"
 
 
-def test_add_functional_annotations_handles_api_failure(mock_uniprot_client, test_chunk):
+def test_add_functional_annotations_handles_api_failure(tmp_path, mock_uniprot_client, test_chunk):
     """Test graceful handling when UniProt API fails - should return unmodified chunk with warning"""
     # Override the fixture's fetch_functional_annotations to raise an exception
     mock_uniprot_client.fetch_functional_annotations.side_effect = Exception("API error")
@@ -386,6 +394,7 @@ def test_add_functional_annotations_handles_api_failure(mock_uniprot_client, tes
                 screen_name=TEST_SCREEN_NAME,
                 cluster_id_column=CLUSTER_ID_COLUMN,
                 stable_accession_col=DEFAULT_ACCESSION_COL,
+                output_dir=tmp_path,
             )
 
         # Should return the original chunk unmodified (no annotation column added)
@@ -403,7 +412,7 @@ def test_add_functional_annotations_handles_api_failure(mock_uniprot_client, tes
 # =============================================================================
 
 
-def test_build_evidence_bundles_creates_json_files(tmp_path, mock_uniprot_client, monkeypatch):
+def test_build_evidence_bundles_creates_json_files(tmp_path, mock_uniprot_client):
     """Test that evidence bundles are created as JSON files"""
     acc_cluster_df = pd.DataFrame(
         {
@@ -415,9 +424,6 @@ def test_build_evidence_bundles_creates_json_files(tmp_path, mock_uniprot_client
         }
     )
 
-    monkeypatch.chdir(tmp_path)
-    output_base = tmp_path / "output"
-
     with patch(
         "mozzarellm.pipeline.bundle_builder.UniProtClient", return_value=mock_uniprot_client
     ):
@@ -428,11 +434,11 @@ def test_build_evidence_bundles_creates_json_files(tmp_path, mock_uniprot_client
             cluster_id_column="cluster",
             stable_accession_col="accession",
             feature_columns=["up_features", "down_features"],
+            output_dir=tmp_path,
         )
 
     # Verify directories were created
-    analysis_dir = output_base / "test_analysis"
-    bundles_dir = analysis_dir / "test_evidence_bundles"
+    bundles_dir = tmp_path / "test_analysis" / "test_evidence_bundles"
     assert bundles_dir.exists(), "Evidence bundles directory should be created"
 
     # Verify JSON bundle file was created
@@ -455,7 +461,7 @@ def test_build_evidence_bundles_creates_json_files(tmp_path, mock_uniprot_client
     assert "BRCA1" in gene_symbols
 
 
-def test_build_evidence_bundles_groups_by_cluster(tmp_path, mock_uniprot_client, monkeypatch):
+def test_build_evidence_bundles_groups_by_cluster(tmp_path, mock_uniprot_client):
     """Test that genes are grouped by cluster - should create separate bundle files"""
     acc_cluster_df = pd.DataFrame(
         {
@@ -467,9 +473,6 @@ def test_build_evidence_bundles_groups_by_cluster(tmp_path, mock_uniprot_client,
         }
     )
 
-    monkeypatch.chdir(tmp_path)
-    output_base = tmp_path / "output"
-
     with patch(
         "mozzarellm.pipeline.bundle_builder.UniProtClient", return_value=mock_uniprot_client
     ):
@@ -480,10 +483,11 @@ def test_build_evidence_bundles_groups_by_cluster(tmp_path, mock_uniprot_client,
             cluster_id_column="cluster",
             stable_accession_col="accession",
             feature_columns=["up_features", "down_features"],
+            output_dir=tmp_path,
         )
 
     # Verify two separate bundle files were created (one per cluster)
-    bundles_dir = output_base / "test_analysis" / "test_evidence_bundles"
+    bundles_dir = tmp_path / "test_analysis" / "test_evidence_bundles"
     assert bundles_dir.exists()
 
     bundle_files = list(bundles_dir.glob("test__cluster_*__bundle.json"))
@@ -502,12 +506,9 @@ def test_build_evidence_bundles_groups_by_cluster(tmp_path, mock_uniprot_client,
     assert cluster_2_bundle["cluster_genes"][0]["gene_symbol"] == "CDK1"
 
 
-def test_build_evidence_bundles_empty_dataframe(tmp_path, mock_uniprot_client, monkeypatch):
+def test_build_evidence_bundles_empty_dataframe(tmp_path, mock_uniprot_client):
     """Test handling of empty cluster dataframe - should create directory but no bundles"""
     empty_df = pd.DataFrame(columns=["gene_symbol", "cluster", "accession"])
-
-    monkeypatch.chdir(tmp_path)
-    output_base = tmp_path / "output"
 
     with patch(
         "mozzarellm.pipeline.bundle_builder.UniProtClient", return_value=mock_uniprot_client
@@ -519,10 +520,11 @@ def test_build_evidence_bundles_empty_dataframe(tmp_path, mock_uniprot_client, m
             cluster_id_column="cluster",
             stable_accession_col="accession",
             feature_columns=[],
+            output_dir=tmp_path,
         )
 
     # Verify directory was created but no bundle files
-    bundles_dir = output_base / "test_analysis" / "test_evidence_bundles"
+    bundles_dir = tmp_path / "test_analysis" / "test_evidence_bundles"
     assert bundles_dir.exists(), "Directory should be created even for empty dataframe"
 
     bundle_files = list(bundles_dir.glob("*.json"))
