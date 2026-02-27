@@ -18,7 +18,7 @@ from .schemas.analysis_output_schemas import (
 from .prompt_components import (
     CLUSTER_ANALYSIS_TASK,
     CONCISE_COT_INSTRUCTIONS,
-    ENHANCED_COT_INSTRUCTIONS,
+    COT_INSTRUCTIONS,
     GENE_CLASSIFICATION_RULES,
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,

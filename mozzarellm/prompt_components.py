@@ -23,7 +23,7 @@ The pathway is not the end goal - it's the lens for discovering which genes meri
 # GENE CLASSIFICATION & PRIORITIZATION RULES (framework for analysis)
 # =============================================================================
 
-GENE_CLASSIFICATION_RULES = """
+GENE_CLASSIFICATION_RULES = f"""
 When classifying and prioritizing genes, apply these specific criteria:
 
 1. ESTABLISHED PATHWAY GENES:
@@ -36,21 +36,9 @@ When classifying and prioritizing genes, apply these specific criteria:
    - Limited or no experimental validation of function in any pathway
    - Few (0-2) publications specifically focused on this gene
    - Unknown molecular function or biological process
-
-   Priority scoring for UNCHARACTERIZED genes:
-   - 8–10: Virtually unstudied (0–1 publications); uncharacterized molecular function; potential for novel discovery
-   - 6–7: Extremely limited data; may have 1–2 preliminary findings but little known function
-   - 4–5: Some characterization exists, but function remains unclear or incomplete
-   - 1–3: Partial evidence for involvement in known pathways; not a strong candidate for novel discovery
-
+   
 3. NOVEL_ROLE GENES:
    These are genes with established functions in other pathways, but plausibly contribute to the identified pathway in a novel way.
-
-   Priority scoring for NOVEL_ROLE genes:
-   - 8–10: Compelling rationale for a previously unrecognized role in this pathway; role would be surprising and high-impact; minimal existing literature makes this a major discovery risk
-   - 6–7: Some indirect or tangential evidence suggesting a new role; not previously linked to this pathway but fits plausibly
-   - 4–5: Functional overlap or localization hints at a novel connection, but likely already speculated or partially known
-   - 1–3: Existing data already supports involvement in this pathway; not a novel role — deprioritize
 
 High scores should only be assigned if the novel connection is plausible but not already established. Genes with substantial evidence for the pathway should receive a lower priority, as they are not truly "novel."
 
@@ -60,6 +48,13 @@ IMPORTANT CONSIDERATIONS:
 - For any gene with substantial literature, it should NOT be classified as UNCHARACTERIZED
 - The goal is not to speculate but to flag only the most promising candidates for follow-up
 """
+PRIORITIZATION_RULES = """   
+Priority scoring for NOVEL_ROLE genes:
+   - 8–10: Compelling rationale for a previously unrecognized role in this pathway; role would be surprising and high-impact; minimal existing literature makes this a major discovery risk
+   - 6–7: Some indirect or tangential evidence suggesting a new role; not previously linked to this pathway but fits plausibly
+   - 4–5: Functional overlap or localization hints at a novel connection, but likely already speculated or partially known
+   - 1–3: Existing data already supports involvement in this pathway; not a novel role — deprioritize
+   """
 
 # =============================================================================
 # PATHWAY CONFIDENCE ASSESSMENT (comes AFTER data to enable assessment)
@@ -109,35 +104,28 @@ are understudied.
 # CHAIN-OF-THOUGHT INSTRUCTIONS (inserted by prompt_factory when CoT enabled)
 # =============================================================================
 
-ENHANCED_COT_INSTRUCTIONS = """
+COT_INSTRUCTIONS = f"""
 STEP 1 - PATHWAY HYPOTHESIS (2-3 candidates):
 - Review gene annotations
 - List 2-3 candidate pathways with supporting genes
-- Note which evidence snippets support each hypothesis
+- Note which annotations support each hypothesis
 
 STEP 2 - PATHWAY SELECTION:
 - Select dominant pathway based on:
   * Number of established genes with direct roles
   * Coherence of functional relationships
   * Quality of supporting evidence (prioritize high-relevance snippets)
-- Assign confidence level (High/Medium/Low/None) using strict criteria from screen context
+- Assign confidence level using the following criteria: {PATHWAY_CONFIDENCE_CRITERIA}
 
 STEP 3 - GENE CLASSIFICATION (cite evidence):
-For each gene, determine ONE category:
-- ESTABLISHED: Well-documented role in selected pathway [cite evidence]
-- UNCHARACTERIZED: Minimal functional annotation anywhere [note lack of evidence]
-- NOVEL_ROLE: Known in other pathways but plausible new role here [cite supporting evidence]
+For each gene, determine ONE category according to the following rules: {GENE_CLASSIFICATION_RULES}
 
 STEP 4 - PRIORITIZATION (scores 1-10):
-- For UNCHARACTERIZED genes: Score based on the following criteria:
-  * Score 8-10: Gene absent from all retrieved evidence but fits pathway mechanistically
-  * Score 4-7: Gene mentioned in 1-2 snippets with indirect pathway connection
-  * Score 1-3: Gene well-documented in pathway across multiple evidence sources
-- For NOVEL_ROLE genes: Score based on surprise/impact of proposed new role relative to known functions
-- Cite specific evidence snippets that inform each priority score
+- For NOVEL_ROLE genes: Score based on the following criteria: {PRIORITIZATION_RULES}
+- Cite specific annotations that inform each priority score
 
 STEP 5 - VERIFICATION:
-- Check for contradictions between evidence snippets
+- Check for contradictions
 - Verify all genes are classified (no omissions)
 - Adjust confidence if evidence is weak or contradictory
 - Note any gaps in evidence that limit conclusions
@@ -160,7 +148,7 @@ CONCISE_COT_INSTRUCTIONS = """
 # OUTPUT FORMAT (always last)
 # =============================================================================
 
-# this could be passed tp claude as a tool
+# this could be passed to claude as a tool
 OUTPUT_FORMAT_JSON = """
 Provide a concise analysis in this exact JSON format:
 {
@@ -180,6 +168,31 @@ Provide a concise analysis in this exact JSON format:
       "gene": "GeneD",
       "priority": 7,
       "rationale": "explanation"
+    }
+  ],
+  "summary": "key findings summary"
+}
+"""
+NEW_OUTPUT_FORMAT_JSON = """
+Provide a concise analysis in this exact JSON format:
+{
+  "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id provided in the prompt
+  "dominant_process": "specific pathway name",
+  "pathway_confidence": "High/Medium/Low",
+  "established_genes": ["GeneA", "GeneB"],
+  "uncharacterized_genes": [
+    {
+      "gene": "GeneC",
+      "rationale": "explanation"
+      "evidence": "quote from annotations, and citations if present"
+    }
+  ],
+  "novel_role_genes": [
+    {
+      "gene": "GeneD",
+      "priority": 7,
+      "rationale": "explanation"
+      "evidence": "quote from annotations, and citations if present"
     }
   ],
   "summary": "key findings summary"

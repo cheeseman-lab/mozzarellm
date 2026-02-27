@@ -26,7 +26,10 @@ from mozzarellm.prompt_components import (
     CLUSTER_ANALYSIS_TASK,
     GENE_CLASSIFICATION_RULES,
     PATHWAY_CONFIDENCE_CRITERIA,
+    PRIORITIZATION_RULES,
     OUTPUT_FORMAT_JSON,
+    NEW_OUTPUT_FORMAT_JSON,
+    COT_INSTRUCTIONS,
 )
 
 
@@ -37,6 +40,7 @@ def make_cluster_analysis_system_prompt(
     override_screen_context: bool = False,  # testing utility
     template_path: Path | None = None,
     template_string: str | None = None,
+    CoT_mode: bool = False,
 ):
     """
     Creates a system prompt for gene cluster analysis by assembling modular components.
@@ -44,9 +48,12 @@ def make_cluster_analysis_system_prompt(
     Assembly order:
     1. CLUSTER_ANALYSIS_TASK (discovery mission)
     2. SCREEN CONTEXT (from screen_context.json)
-    3. GENE_CLASSIFICATION_RULES (framework for analysis)
-    4. PATHWAY_CONFIDENCE_CRITERIA (assessment criteria)
-    5. OUTPUT_FORMAT_JSON (response structure)
+    if not in CoT mode:
+        3. GENE_CLASSIFICATION_RULES (framework for analysis)
+        4. PATHWAY_CONFIDENCE_CRITERIA (assessment criteria)
+        5. OUTPUT_FORMAT_JSON (response structure)
+    if in CoT mode:
+        3. COT_INSTRUCTIONS (chain-of-thought instructions; include the above components in order)
 
     Args:
         cluster_id: Identifier for the cluster
@@ -87,18 +94,28 @@ def make_cluster_analysis_system_prompt(
     # =========================================================================
     # DEFAULT PROMPT CONSTRUCTION
     # =========================================================================
-
-    prompt = (
-        CLUSTER_ANALYSIS_TASK
-        + "\n\n"
-        + GENE_CLASSIFICATION_RULES
-        + "\n\n"
-        + PATHWAY_CONFIDENCE_CRITERIA
-        + "\n\nThe following experimental context is provided: "
-        + SCREEN_CONTEXT_TEXT
-        + "\n\n"
-        + OUTPUT_FORMAT_JSON
-    )
+    if CoT_mode:
+        prompt = (
+            CLUSTER_ANALYSIS_TASK
+            + "\n\n"
+            + COT_INSTRUCTIONS
+            + "\n\nThe following experimental context is provided: "
+            + SCREEN_CONTEXT_TEXT
+            + "\n\n"
+            + NEW_OUTPUT_FORMAT_JSON
+        )
+    else:
+        prompt = (
+            CLUSTER_ANALYSIS_TASK
+            + "\n\n"
+            + GENE_CLASSIFICATION_RULES
+            + "\n\n"
+            + PATHWAY_CONFIDENCE_CRITERIA
+            + "\n\nThe following experimental context is provided: "
+            + SCREEN_CONTEXT_TEXT
+            + "\n\n"
+            + OUTPUT_FORMAT_JSON
+        )
 
     output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
     output_dir.mkdir(exist_ok=True)
