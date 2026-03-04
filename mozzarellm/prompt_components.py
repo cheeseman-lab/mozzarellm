@@ -48,12 +48,20 @@ IMPORTANT CONSIDERATIONS:
 - For any gene with substantial literature, it should NOT be classified as UNCHARACTERIZED
 - The goal is not to speculate but to flag only the most promising candidates for follow-up
 """
-PRIORITIZATION_RULES = """   
+NOVEL_PRIORITIZATION_RULES = """   
 Priority scoring for NOVEL_ROLE genes:
    - 8–10: Compelling rationale for a previously unrecognized role in this pathway; role would be surprising and high-impact; minimal existing literature makes this a major discovery risk
    - 6–7: Some indirect or tangential evidence suggesting a new role; not previously linked to this pathway but fits plausibly
    - 4–5: Functional overlap or localization hints at a novel connection, but likely already speculated or partially known
    - 1–3: Existing data already supports involvement in this pathway; not a novel role — deprioritize
+   """
+
+UNCHARACTERIZED_PRIORITIZATION_RULES = """
+Priority scoring for UNCHARACTERIZED genes:
+   - 8–10: Virtually unstudied (0–1 publications); uncharacterized molecular function; potential for novel discovery
+   - 6–7: Extremely limited data; may have 1–2 preliminary findings but little known function
+   - 4–5: Some characterization exists, but function remains unclear or incomplete
+   - 1–3: Partial evidence for involvement in known pathways; not a strong candidate for novel discovery
    """
 
 # =============================================================================
@@ -121,7 +129,8 @@ STEP 3 - GENE CLASSIFICATION (cite evidence):
 For each gene, determine ONE category according to the following rules: {GENE_CLASSIFICATION_RULES}
 
 STEP 4 - PRIORITIZATION (scores 1-10):
-- For NOVEL_ROLE genes: Score based on the following criteria: {PRIORITIZATION_RULES}
+- For NOVEL_ROLE genes: Score based on the following criteria: {NOVEL_PRIORITIZATION_RULES}
+- For UNCHARACTERIZED genes: Score based on the following criteria: {UNCHARACTERIZED_PRIORITIZATION_RULES}
 - Cite specific annotations that inform each priority score
 
 STEP 5 - VERIFICATION:
