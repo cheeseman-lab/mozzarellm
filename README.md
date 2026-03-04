@@ -54,7 +54,7 @@ jupyter notebook example_notebook.ipynb
 import os
 import pandas as pd
 from mozzarellm import analyze_gene_clusters, reshape_to_clusters
-from mozzarellm.prompts import ROBUST_SCREEN_CONTEXT, ROBUST_CLUSTER_PROMPT
+from mozzarellm.prompt_components import ROBUST_SCREEN_CONTEXT, ROBUST_CLUSTER_PROMPT
 from mozzarellm.configs import DEFAULT_OPENAI_REASONING_CONFIG
 
 # Load sample data

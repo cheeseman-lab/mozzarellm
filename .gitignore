@@ -29,6 +29,7 @@ venv/
 env/
 ENV/
 .venv/
+.mozzvenv/
 
 # Testing
 .coverage
@@ -44,6 +45,7 @@ debug/
 
 # Results and data (optional, comment out if you want to track these)
 results/
+output/
 
 # Benchmark results in examples/
 examples/ops/results/
@@ -67,3 +69,7 @@ examples/old/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Development artifacts
+dev/
+screen_context.json

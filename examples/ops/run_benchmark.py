@@ -61,7 +61,7 @@ may participate in the same biological process or pathway.
 
 def main():
     """Run the benchmark analysis."""
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Run OPS benchmark analysis")
     parser.add_argument(
         "--model",

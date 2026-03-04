@@ -33,7 +33,7 @@ from benchmark_utils import (
 
 from mozzarellm import (
     CONCISE_COT_INSTRUCTIONS,
-    ENHANCED_COT_INSTRUCTIONS,
+    COT_INSTRUCTIONS,
     ClusterAnalyzer,
 )
 

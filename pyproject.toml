@@ -20,6 +20,7 @@ dependencies = [
     "pandas",
     "numpy",
     "tqdm",
+    "openpyxl",
     "python-dotenv",
     "requests",
     "ipykernel",
@@ -85,3 +86,37 @@ quote-style = "double"
 
 # Indent with spaces
 indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.coverage.run]
+source = ["mozzarellm"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+# NOTE: to run use: pytest --cov=mozzarellm --cov-report=html and check htmlcov/index.html
