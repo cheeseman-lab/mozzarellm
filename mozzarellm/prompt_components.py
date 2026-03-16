@@ -32,37 +32,41 @@ When classifying and prioritizing genes, apply these specific criteria:
    - Often serve as canonical members or markers of the pathway
 
 2. UNCHARACTERIZED GENES:
-   A gene is considered UNCHARACTERIZED only if MOST of these criteria are met:
-   - Limited or no experimental validation of function in any pathway
-   - Few (0-2) publications specifically focused on this gene
-   - Unknown molecular function or biological process
-   
+   No manuscript has established this gene's molecular function in human cells. This ranges from completely unstudied genes to genes with domain annotations or non-human characterization only.
+
 3. NOVEL_ROLE GENES:
-   These are genes with established functions in other pathways, but plausibly contribute to the identified pathway in a novel way.
+   At least one manuscript has focused on this gene's molecular function, but in a different pathway. The gene's known role is outside the identified pathway — it may represent a novel connection or a contradictory hit.
 
-High scores should only be assigned if the novel connection is plausible but not already established. Genes with substantial evidence for the pathway should receive a lower priority, as they are not truly "novel."
-
-IMPORTANT CONSIDERATIONS:
-- Do NOT use mere presence in the cluster as evidence for prioritization
-- Be conservative when assigning genes to the "NOVEL ROLE" or "UNCHARACTERIZED" categories. Do so only when there is a meaningful deviation from known pathway biology or a lack of functional annotation, respectively
-- For any gene with substantial literature, it should NOT be classified as UNCHARACTERIZED
-- The goal is not to speculate but to flag only the most promising candidates for follow-up
+BOUNDARY RULES:
+- ESTABLISHED vs NOVEL_ROLE: If a gene already has published evidence for this specific pathway, it is ESTABLISHED — not NOVEL_ROLE. NOVEL_ROLE is reserved for genes whose known function is in a different pathway.
+- ESTABLISHED vs UNCHARACTERIZED: A gene is characterized if at least one manuscript focuses on its molecular function (e.g., a paper titled after the gene, or a study that dissects its mechanism). Such genes are ESTABLISHED or NOVEL_ROLE, never UNCHARACTERIZED — even if their role in this particular pathway is unclear.
+- NOVEL_ROLE vs UNCHARACTERIZED: If no manuscript has focused on a gene's molecular function, it is UNCHARACTERIZED — not NOVEL_ROLE. NOVEL_ROLE requires an established function in another pathway.
 """
-NOVEL_PRIORITIZATION_RULES = """   
-Priority scoring for NOVEL_ROLE genes:
-   - 8–10: Compelling rationale for a previously unrecognized role in this pathway; role would be surprising and high-impact; minimal existing literature makes this a major discovery risk
-   - 6–7: Some indirect or tangential evidence suggesting a new role; not previously linked to this pathway but fits plausibly
-   - 4–5: Functional overlap or localization hints at a novel connection, but likely already speculated or partially known
-   - 1–3: Existing data already supports involvement in this pathway; not a novel role — deprioritize
-   """
+NOVEL_CLASSIFICATION_RULES = """
+Classification classes for NOVEL_ROLE genes (genes with established functions in other pathways):
 
-UNCHARACTERIZED_PRIORITIZATION_RULES = """
-Priority scoring for UNCHARACTERIZED genes:
-   - 8–10: Virtually unstudied (0–1 publications); uncharacterized molecular function; potential for novel discovery
-   - 6–7: Extremely limited data; may have 1–2 preliminary findings but little known function
-   - 4–5: Some characterization exists, but function remains unclear or incomplete
-   - 1–3: Partial evidence for involvement in known pathways; not a strong candidate for novel discovery
-   """
+  NO_EVIDENCE: No clear tie to the pathway at hand, but could represent new biology.
+  INDIRECT_EVIDENCE: Has a logical tie to the pathway based on basic rules of cell biology.
+  PARTIAL_EVIDENCE: Has some preliminary functional data tying to the pathway, but not established as a core player.
+  CONTRADICTORY_EVIDENCE: Completely illogical tie to this pathway; incompatible with existing literature of the pathway and the known function of this gene.
+
+Assign each NOVEL_ROLE gene exactly one class. Even for CONTRADICTORY_EVIDENCE genes, provide a confidence assessment on likelihood of pathway involvement.
+
+Then assign a separate priority score (1-10) representing overall follow-up priority, considering the class, evidence quality, pathway relevance, and experimental tractability.
+"""
+
+UNCHARACTERIZED_CLASSIFICATION_RULES = """
+Classification classes for UNCHARACTERIZED genes (genes with limited or no functional annotation):
+
+  DARK_GENE: Unnamed gene with no functional characterization.
+  NASCENT: Unnamed gene with some preliminary functional characterization.
+  ANNOTATED_ONLY: Named gene (e.g., transmembrane domain, coiled-coil, transcription factor domain) but poorly characterized.
+  NON_HUMAN_CHARACTERIZED: Characterized but not in human cells.
+
+Assign each UNCHARACTERIZED gene exactly one class. Even for NON_HUMAN_CHARACTERIZED genes, provide a confidence assessment on likelihood of pathway involvement.
+
+Then assign a separate priority score (1-10) representing overall follow-up priority, considering the class, evidence quality, pathway relevance, and experimental tractability.
+"""
 
 # =============================================================================
 # PATHWAY CONFIDENCE ASSESSMENT (comes AFTER data to enable assessment)
@@ -98,7 +102,7 @@ NO COHERENT PATHWAY:
 - Clusters containing nontargeting control genes
 - Clusters where you cannot identify a dominant biological process
 
-For clusters with no coherent pathway, set:
+If there is no coherent pathway, set:
 - "pathway_confidence": "Low"
 - "dominant_process": "No coherent biological pathway"
 - And explain the reasoning clearly in the "summary" field
@@ -129,8 +133,8 @@ STEP 3 - GENE CLASSIFICATION (cite evidence):
 For each gene, determine ONE category according to the following rules: {GENE_CLASSIFICATION_RULES}
 
 STEP 4 - PRIORITIZATION (scores 1-10):
-- For NOVEL_ROLE genes: Score based on the following criteria: {NOVEL_PRIORITIZATION_RULES}
-- For UNCHARACTERIZED genes: Score based on the following criteria: {UNCHARACTERIZED_PRIORITIZATION_RULES}
+- For NOVEL_ROLE genes: Score based on the following criteria: {NOVEL_CLASSIFICATION_RULES}
+- For UNCHARACTERIZED genes: Score based on the following criteria: {UNCHARACTERIZED_CLASSIFICATION_RULES}
 - Cite specific annotations that inform each priority score
 
 STEP 5 - VERIFICATION:
@@ -168,6 +172,7 @@ Provide a concise analysis in this exact JSON format:
   "uncharacterized_genes": [
     {
       "gene": "GeneC",
+      "class": "DARK_GENE",
       "priority": 8,
       "rationale": "explanation"
     }
@@ -175,6 +180,7 @@ Provide a concise analysis in this exact JSON format:
   "novel_role_genes": [
     {
       "gene": "GeneD",
+      "class": "NO_EVIDENCE",
       "priority": 7,
       "rationale": "explanation"
     }
@@ -192,6 +198,7 @@ Provide a concise analysis in this exact JSON format:
   "uncharacterized_genes": [
     {
       "gene": "GeneC",
+      "class": "DARK_GENE",
       "rationale": "explanation"
       "evidence": "quote from annotations, and citations if present"
     }
@@ -199,6 +206,7 @@ Provide a concise analysis in this exact JSON format:
   "novel_role_genes": [
     {
       "gene": "GeneD",
+      "class": "NO_EVIDENCE",
       "priority": 7,
       "rationale": "explanation"
       "evidence": "quote from annotations, and citations if present"

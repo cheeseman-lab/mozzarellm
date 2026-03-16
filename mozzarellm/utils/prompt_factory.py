@@ -26,8 +26,8 @@ from mozzarellm.prompt_components import (
     CLUSTER_ANALYSIS_TASK,
     GENE_CLASSIFICATION_RULES,
     PATHWAY_CONFIDENCE_CRITERIA,
-    NOVEL_PRIORITIZATION_RULES,
-    UNCHARACTERIZED_PRIORITIZATION_RULES,
+    NOVEL_CLASSIFICATION_RULES,
+    UNCHARACTERIZED_CLASSIFICATION_RULES,
     OUTPUT_FORMAT_JSON,
     NEW_OUTPUT_FORMAT_JSON,
     COT_INSTRUCTIONS,
@@ -111,9 +111,9 @@ def make_cluster_analysis_system_prompt(
             + "\n\n"
             + GENE_CLASSIFICATION_RULES
             + "\n\n"
-            + NOVEL_PRIORITIZATION_RULES
+            + NOVEL_CLASSIFICATION_RULES
             + "\n\n"
-            + UNCHARACTERIZED_PRIORITIZATION_RULES
+            + UNCHARACTERIZED_CLASSIFICATION_RULES
             + "\n\n"
             + PATHWAY_CONFIDENCE_CRITERIA
             + "\n\nThe following experimental context is provided: "
