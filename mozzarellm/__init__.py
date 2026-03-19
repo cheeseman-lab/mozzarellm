@@ -17,9 +17,10 @@ from .schemas.analysis_output_schemas import (
 # Prompt components (modular)
 from .prompt_components import (
     CLUSTER_ANALYSIS_TASK,
+    CLUSTER_ANALYSIS_TASK_MULTI,
     CONCISE_COT_INSTRUCTIONS,
     COT_INSTRUCTIONS,
-    GENE_CLASSIFICATION_RULES,
+    GENE_CATEGORIZATION_RULES,
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,
 )
@@ -52,7 +53,8 @@ __all__ = [
     "create_client",
     # Prompt components
     "CLUSTER_ANALYSIS_TASK",
-    "GENE_CLASSIFICATION_RULES",
+    "CLUSTER_ANALYSIS_TASK_MULTI",
+    "GENE_CATEGORIZATION_RULES",
     "DEFAULT_SCREEN_CONTEXT",
     "PATHWAY_CONFIDENCE_CRITERIA",
     "OUTPUT_FORMAT_JSON",
