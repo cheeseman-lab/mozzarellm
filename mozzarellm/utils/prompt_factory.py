@@ -29,8 +29,8 @@ from mozzarellm.prompt_components import (
     NOVEL_CLASSIFICATION_RULES,
     UNCHARACTERIZED_CLASSIFICATION_RULES,
     OUTPUT_FORMAT_JSON,
-    NEW_OUTPUT_FORMAT_JSON,
-    COT_INSTRUCTIONS,
+    COT_STEPS_DEFAULT,
+    assemble_cot_instructions,
 )
 
 
@@ -38,34 +38,31 @@ def make_cluster_analysis_system_prompt(
     *,
     screen_name: str,
     screen_context_path: Path | None = None,
+    override_CoT_steps: list[str] | None = None,  # testing utility
     override_screen_context: bool = False,  # testing utility
     template_path: Path | None = None,
     template_string: str | None = None,
     CoT_mode: bool = False,
-    output_dir: Path | None = None
+    output_dir: Path | None = None,
 ):
     """
     Creates a system prompt for gene cluster analysis by assembling modular components.
 
     Assembly order:
-    1. CLUSTER_ANALYSIS_TASK (discovery mission)
-    2. SCREEN CONTEXT (from screen_context.json)
-    if not in CoT mode:
-        3. GENE_CATEGORIZATION_RULES (framework for analysis)
-        4. PATHWAY_CONFIDENCE_CRITERIA (assessment criteria)
-        5. OUTPUT_FORMAT_JSON (response structure)
-    if in CoT mode:
-        3. COT_INSTRUCTIONS (chain-of-thought instructions; include the above components in order)
+    - Standard mode: MAIN TASK + CONTEXT + RULES/CRITERIA + OUTPUT_FORMAT
+    - CoT mode: COT_INSTRUCTIONS (pre-assembled with all components) + CONTEXT
+
+    COT_INSTRUCTIONS is built from modular steps via assemble_cot_instructions().
+    Use assemble_cot_instructions() with custom steps for prompt permutation testing.
 
     Args:
-        cluster_id: Identifier for the cluster
-        genes: List of gene identifiers in the cluster
-        gene_annotations_dict: Optional dict of gene functional annotations
-        screen_context: Optional benchmark-specific experimental context
+        screen_name: Name of the screen for output directory naming
+        screen_context_path: Path to screen_context.json file
+        override_screen_context: If True, use default context (testing utility)
         template_path: Path to custom template file (escape hatch - full control)
         template_string: Custom template string (escape hatch - full control)
-        retrieved_context: Optional dict with RAG evidence snippets
-        cot_instructions: Optional chain-of-thought instructions string
+        CoT_mode: If True, use chain-of-thought instructions
+        output_dir: Optional output directory for saving prompts
 
     Returns:
         prompt: Fully assembled prompt string
@@ -96,19 +93,15 @@ def make_cluster_analysis_system_prompt(
     # =========================================================================
     # DEFAULT PROMPT CONSTRUCTION
     # =========================================================================
-    if CoT_mode:
-        prompt = (
-            CLUSTER_ANALYSIS_TASK
-            + "\n\n"
-            + COT_INSTRUCTIONS
-            + "\n\nThe following experimental context is provided: "
-            + SCREEN_CONTEXT_TEXT
-            + "\n\n"
-            + NEW_OUTPUT_FORMAT_JSON
-        )
+    if CoT_mode and override_CoT_steps:
+        prompt = assemble_cot_instructions(override_CoT_steps, screen_context=SCREEN_CONTEXT_TEXT)
+    elif CoT_mode:
+        prompt = assemble_cot_instructions(COT_STEPS_DEFAULT, screen_context=SCREEN_CONTEXT_TEXT)
     else:
         prompt = (
             CLUSTER_ANALYSIS_TASK
+            + "\n\nThe following experimental context is provided: "
+            + SCREEN_CONTEXT_TEXT
             + "\n\n"
             + GENE_CATEGORIZATION_RULES
             + "\n\n"
@@ -117,8 +110,6 @@ def make_cluster_analysis_system_prompt(
             + UNCHARACTERIZED_CLASSIFICATION_RULES
             + "\n\n"
             + PATHWAY_CONFIDENCE_CRITERIA
-            + "\n\nThe following experimental context is provided: "
-            + SCREEN_CONTEXT_TEXT
             + "\n\n"
             + OUTPUT_FORMAT_JSON
         )
@@ -130,6 +121,7 @@ def make_cluster_analysis_system_prompt(
         output_dir
         / f"cluster_analysis_phase1_system_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
         "w",
+        encoding="utf-8",
     ) as f:
         f.write(prompt)
     return prompt
@@ -184,6 +176,7 @@ def _load_custom_template(template_path=None, template_string=None):
     raise ValueError("Custom template path not provided and template string not provided")
 
 
+## from previous version; may be reindroduced later
 def _format_retrieved_evidence(retrieved_context):
     """Format retrieved evidence snippets for RAG mode."""
     snippets = retrieved_context.get("snippets", [])

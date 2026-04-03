@@ -108,7 +108,9 @@ class LLMClientBase(ABC):
             try:
                 if batch:
                     response = self._make_batch_api_call(
-                        cluster_to_prompt_map, screen_name, system_prompt,
+                        cluster_to_prompt_map,
+                        screen_name,
+                        system_prompt,
                     )
                 else:
                     response = self._make_api_call(system_prompt, user_prompt)
@@ -351,7 +353,7 @@ class AnthropicClient(LLMClientBase):
                     error_msg = getattr(getattr(error_obj, "error", None), "message", None)
                     if error_type == "invalid_request_error":
                         print(f"Validation error {result.custom_id}: {error_type} -- {error_msg}")
-                        
+
                     else:
                         print(f"Server error {result.custom_id}: {error_type} -- {error_msg}")
                         errored_requests.append(result.custom_id)
@@ -359,13 +361,15 @@ class AnthropicClient(LLMClientBase):
                 case "expired":
                     print(f"Request expired {result.custom_id}")
                     errored_requests.append(result.custom_id)
-        
+
         if errored_requests:
             print(f"\n{len(errored_requests)} request(s) failed: {errored_requests}")
         # TODO: log response metadata
 
-# Error object for reference: ErrorResponse(error=InvalidRequestError(message='max_tokens: must be greater than or equal to 1', 
+
+# Error object for reference: ErrorResponse(error=InvalidRequestError(message='max_tokens: must be greater than or equal to 1',
 # type='invalid_request_error', details={'error_visibility': 'user_facing'}), request_id=None, type='error')
+
 
 class GeminiClient(LLMClientBase):
     """Google Gemini API provider"""

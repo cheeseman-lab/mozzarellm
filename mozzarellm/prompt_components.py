@@ -124,110 +124,125 @@ are understudied.
 """
 
 # =============================================================================
-# CHAIN-OF-THOUGHT INSTRUCTIONS (inserted by prompt_factory when CoT enabled)
-# =============================================================================
-
-COT_INSTRUCTIONS = f"""
-STEP 1 - PATHWAY HYPOTHESES (2-3 candidates):
-- Review gene annotations
-- List 2-3 candidate pathways with supporting genes
-- Note which annotations support each hypothesis
-
-STEP 2 - PATHWAY ASSESSMENT:
-- For each candidate pathway, assess:
-  * Number of established genes with direct roles
-  * Coherence of functional relationships
-  * Quality of supporting evidence (prioritize high-relevance snippets)
-- Select the pathway(s) that best explain the cluster
-- Assign confidence using: {PATHWAY_CONFIDENCE_CRITERIA}
-
-STEP 3 - GENE CATEGORIZATION (cite evidence):
-For each gene, assign it to its best-fit pathway(s), then categorize using: {GENE_CATEGORIZATION_RULES}
-
-STEP 4 - SUB-CLASSIFICATION & PRIORITIZATION:
-- For NOVEL_ROLE genes: Assign a class and priority score using: {NOVEL_CLASSIFICATION_RULES}
-- For UNCHARACTERIZED genes: Assign a class and priority score using: {UNCHARACTERIZED_CLASSIFICATION_RULES}
-- Cite specific annotations that inform each class assignment and priority score
-
-STEP 5 - VERIFICATION:
-- Check for contradictions
-- Verify all genes are categorized (no omissions)
-- Adjust confidence if evidence is weak or contradictory
-- Note any gaps in evidence that limit conclusions
-
-STEP 6 - FINAL JSON OUTPUT:
-- Compile structured JSON with all required fields
-- Ensure cluster_id matches input exactly
-- Include concise summary highlighting key findings and evidence quality
-"""
-
-CONCISE_COT_INSTRUCTIONS = """
-1) Identify 2-3 candidate pathways citing key genes and evidence snippets [numbers].
-2) Select the pathway(s) that best explain the cluster. Assign each gene to its best-fit pathway.
-3) Categorize each gene as ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE with 1-line rationale.
-4) For NOVEL_ROLE and UNCHARACTERIZED genes, classify into a sub-class and assign a priority score (1-10); cite supporting evidence.
-5) Note contradictions or gaps in evidence; adjust confidence accordingly.
-"""
-
-
-# =============================================================================
 # OUTPUT FORMAT (always last)
 # =============================================================================
 
-# this could be passed to claude as a tool
+# NOTE: Listing all class options in template to not unintentionally bias the LLM.
 OUTPUT_FORMAT_JSON = """
 Provide a concise analysis in this exact JSON format:
 {
-  "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id provided in the prompt
+  "cluster_id": "[CLUSTER_ID]",  // IMPORTANT: Use the exact cluster_id provided in the prompt
   "dominant_process": "pathway name (or comma-separated if multiple)",
   "pathway_confidence": "High/Medium/Low",
   "established_genes": ["GeneA", "GeneB"],
   "uncharacterized_genes": [
     {
       "gene": "GeneC",
-      "class": "DARK_GENE",
-      "priority": 8,
-      "rationale": "explanation",
+      "class": "DARK_GENE | NASCENT | ANNOTATED_ONLY | NON_HUMAN_CHARACTERIZED",
+      "rationale": "explanation of categorization and subclassification",
+      "evidence": "quote(s) from annotations or citations, if available"
     }
   ],
   "novel_role_genes": [
     {
       "gene": "GeneD",
-      "class": "NO_EVIDENCE",
-      "priority": 7,
-      "rationale": "explanation",
+      "class": "NO_EVIDENCE | INDIRECT_EVIDENCE | PARTIAL_EVIDENCE | CONTRADICTORY_EVIDENCE",
+      "rationale": "explanation of categorization and subclassification",
+      "evidence": "quote(s) from annotations or citations, if available"
     }
   ],
   "summary": "key findings summary"
 }
 """
-NEW_OUTPUT_FORMAT_JSON = """
-Provide a concise analysis in this exact JSON format:
-{
-  "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id provided in the prompt
-  "dominant_process": "pathway name (or comma-separated if multiple)",
-  "pathway_confidence": "High/Medium/Low",
-  "established_genes": ["GeneA", "GeneB"],
-  "uncharacterized_genes": [
-    {
-      "gene": "GeneC",
-      "class": "DARK_GENE",
-      "rationale": "explanation"
-      "evidence": "quote from annotations, and citations if present"
-    }
-  ],
-  "novel_role_genes": [
-    {
-      "gene": "GeneD",
-      "class": "NO_EVIDENCE",
-      "priority": 7,
-      "rationale": "explanation",
-      "evidence": "quote from annotations, and citations if present",
-    }
-  ],
-  "summary": "key findings summary"
-}
+
+# =============================================================================
+# CHAIN-OF-THOUGHT STEPS (modular building blocks for prompt_factory)
+# Each step is a standalone string that can be included/excluded/reordered.
+# Steps reference static prompts above to maintain consistency.
+# =============================================================================
+
+COT_SCREEN_CONTEXT = "Review the provided screen context:"
+
+COT_STEP_PATHWAY_HYPOTHESIS = f"""PATHWAY HYPOTHESIS (2-3 candidates):
+- Review gene annotations
+- List 2-3 candidate pathways with supporting genes
+- Note which annotations support each hypothesis"""
+
+COT_STEP_PATHWAY_SELECTION = f"""PATHWAY SELECTION:
+Once you have identified candidate pathway(s), evaluate how well EACH pathway explains the cluster using
+these stringent criteria based on what percentage of genes fit the proposed pathway: {PATHWAY_CONFIDENCE_CRITERIA}
+Now, select a dominant pathway based on:
+  * Number of established genes with direct roles
+  * Coherence of functional relationships
+  * Quality of supporting evidence """
+
+COT_STEP_GENE_CATEGORIZATION = f"""GENE CATEGORIZATION (cite evidence):
+For each gene, assign to exactly one category: ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED
+These are defined according to the following rules: {GENE_CATEGORIZATION_RULES}
 """
+
+COT_STEP_SUBCLASSIFICATION = f"""SUB-CLASSIFICATION:
+For NOVEL_ROLE genes, assign one sub-class: NO_EVIDENCE / INDIRECT_EVIDENCE / PARTIAL_EVIDENCE / CONTRADICTORY_EVIDENCE
+These are defined according to the following rules: {NOVEL_CLASSIFICATION_RULES}
+For UNCHARACTERIZED genes, assign one sub-class: DARK_GENE / NASCENT / ANNOTATED_ONLY / NON_HUMAN_CHARACTERIZED
+These are defined according to the following rules: {UNCHARACTERIZED_CLASSIFICATION_RULES}
+Cite specific annotations that inform each classification."""
+
+COT_STEP_VERIFICATION = """VERIFICATION:
+- Check for contradictions
+- Verify all genes are classified (no omissions)
+- Adjust confidence if evidence is weak or contradictory
+- Note any gaps in evidence that limit conclusions"""
+
+COT_STEP_OUTPUT = f"""FINAL JSON OUTPUT:
+- Compile structured JSON with all required fields
+- Ensure cluster_id matches input exactly
+- Include concise summary highlighting key findings and evidence quality
+According to {OUTPUT_FORMAT_JSON}"""
+
+# Default COT assembly - can be customized in prompt_factory
+# This construction allows us to permute as needed for testing
+COT_STEPS_DEFAULT = [
+    CLUSTER_ANALYSIS_TASK,
+    COT_SCREEN_CONTEXT,
+    COT_STEP_PATHWAY_HYPOTHESIS,
+    COT_STEP_PATHWAY_SELECTION,
+    COT_STEP_GENE_CATEGORIZATION,
+    COT_STEP_SUBCLASSIFICATION,
+    COT_STEP_VERIFICATION,
+    COT_STEP_OUTPUT,
+]
+
+
+def assemble_cot_instructions(
+    steps: list[str] | None = None,
+    screen_context: str | None = None,
+) -> str:
+    """Assemble COT instructions from modular steps.
+
+    Args:
+        steps: List of COT step strings. Defaults to COT_STEPS_DEFAULT.
+        screen_context: Optional screen context JSON string. If provided and
+            COT_SCREEN_CONTEXT is in steps, it will be replaced with the
+            context header + actual context.
+
+    Returns:
+        Formatted COT instructions with numbered steps.
+    """
+    if steps is None:
+        steps = COT_STEPS_DEFAULT
+
+    # Replace COT_SCREEN_CONTEXT placeholder with actual context if provided
+    if screen_context is not None:
+        steps = [
+            f"{COT_SCREEN_CONTEXT}\n{screen_context}" if step == COT_SCREEN_CONTEXT else step
+            for step in steps
+        ]
+
+    numbered = [f"STEP {i + 1} - {step}" for i, step in enumerate(steps)]
+    return "\n\n".join(numbered)
+
+
 # =============================================================================
 # PHENOTYPIC-STRENGTH-CONFIDENCE CROSS-CHECK (inserted by prompt_factory if phenotypic strength available)
 # =============================================================================
