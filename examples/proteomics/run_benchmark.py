@@ -49,7 +49,7 @@ function and classifying genes based on their known vs. novel roles in that proc
 
 def main():
     """Run the benchmark analysis."""
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Run Proteomics benchmark analysis")
     parser.add_argument(
         "--model",

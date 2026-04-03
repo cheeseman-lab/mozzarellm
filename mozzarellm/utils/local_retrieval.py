@@ -2,12 +2,11 @@
 Lightweight retrieval utilities for preliminary CoT-driven RAG.
 
 This module deliberately avoids heavy vector-store deps. It harvests evidence from:
-- Provided gene annotations (per-gene text)
-- Optional screen context
-- Optional local knowledge file under data/knowledge/ (txt, md) by simple keyword match
+- Optional local knowledge files under data/knowledge/ (txt, md) by simple keyword match
 
 Returned snippets include simple provenance fields so they can be logged downstream.
 """
+# TODO: add pdf parsing functionality
 
 from __future__ import annotations
 
@@ -103,68 +102,41 @@ def _search_file_for_terms(
     return snippets
 
 
-def retrieve_context(
-    cluster_genes: list[str],
-    gene_annotations: dict[str, str] | None = None,
-    screen_context: str | None = None,
+# called once per gene in cluster
+def local_knowledge_context_retriever(
+    keywords: list[str],
     knowledge_dir: str | None = None,
-    k: int = 10,
+    top_k: int = 10,
     min_relevance_score: int = 2,
 ) -> dict:
     """
-    Build a ranked set of evidence snippets for a cluster.
+    Build a ranked set of evidence snippets for a set of (gene relevant) keywords. Currently works best for gene-centric documents that contain gene names as keywords.
 
     Returns a dict with fields:
     - snippets: [{text, source, meta, relevance_score}] (sorted by relevance)
     - citations: [{source, path_or_id}]
     - retrieval_metadata: {knowledge_dir, k, genes_queried, total_retrieved}
     """
-    terms = [g for g in cluster_genes if isinstance(g, str) and g]
-    all_snippets: list[dict] = []
+    # validate keywords
+    if not keywords:
+        raise ValueError("Keywords must not be empty")
+    if not all(isinstance(k, str) for k in keywords):
+        raise ValueError("All keywords must be strings")
+
+    # validate knowledge_dir
+    if knowledge_dir and not os.path.isdir(knowledge_dir):
+        raise ValueError("Knowledge directory must exist")
+
+    # TODO: add gene aliases in addition to gene symbols after uniprot api proxy --> in uniprot api proxy, add aliases to annotations
     citations: list[dict] = []
+    all_snippets: list[dict] = []
 
-    # 1) From gene annotations (highest signal, per gene)
-    annotation_count = 0
-    genes_without_annotations = []
-    if gene_annotations:
-        for g in terms:
-            if g in gene_annotations:
-                txt = _normalize(str(gene_annotations[g]))
-                if txt and len(txt) > 10:  # Filter out very short annotations
-                    # High relevance score for direct gene annotations
-                    all_snippets.append(
-                        {
-                            "text": f"{g}: {txt}",
-                            "source": "annotations",
-                            "meta": {"gene": g},
-                            "relevance_score": 100,  # Highest priority
-                        }
-                    )
-                    annotation_count += 1
-                else:
-                    genes_without_annotations.append(g)
-            else:
-                genes_without_annotations.append(g)
-
-    # 2) From screen context (single snippet, medium priority)
-    if screen_context:
-        normalized_context = _normalize(screen_context)
-        if normalized_context and len(normalized_context) > 20:
-            all_snippets.append(
-                {
-                    "text": normalized_context,
-                    "source": "screen_context",
-                    "meta": {},
-                    "relevance_score": 50,  # Medium priority
-                }
-            )
-
-    # 3) From local knowledge (scored by relevance)
+    # Retrieve from local knowledge (scored by relevance)
     knowledge_count = 0
     if knowledge_dir:
         files = _iter_knowledge_files(knowledge_dir)
         for p in files:
-            hits = _search_file_for_terms(p, terms, max_hits=5, context_window=4)
+            hits = _search_file_for_terms(p, keywords, max_hits=5, context_window=4)
             for htext, score, line_num in hits:
                 if score >= min_relevance_score:
                     all_snippets.append(
@@ -172,7 +144,7 @@ def retrieve_context(
                             "text": htext,
                             "source": "knowledge_file",
                             "meta": {"path": os.path.basename(p), "score": score, "line": line_num},
-                            "relevance_score": min(score, 90),  # Cap below annotations
+                            "relevance_score": min(score, 90),
                         }
                     )
                     knowledge_count += 1
@@ -181,17 +153,12 @@ def retrieve_context(
     all_snippets.sort(key=lambda x: x["relevance_score"], reverse=True)
 
     # Take top k snippets
-    top_snippets = all_snippets[:k]
+    top_snippets = all_snippets[:top_k]
 
     # Build citations from selected snippets (deduplicated)
     seen_citations = set()
     for snip in top_snippets:
-        if snip["source"] == "annotations":
-            cit_key = ("annotations", snip["meta"]["gene"])
-        elif snip["source"] == "screen_context":
-            cit_key = ("screen_context", "inline")
-        else:
-            cit_key = ("knowledge_file", snip["meta"]["path"])
+        cit_key = ("knowledge_file", snip["meta"]["path"])
 
         if cit_key not in seen_citations:
             citations.append({"source": cit_key[0], "path_or_id": cit_key[1]})
@@ -200,13 +167,12 @@ def retrieve_context(
     return {
         "snippets": top_snippets,
         "citations": citations,
+        # the below fields are for debugging and logging purposes; should not be used in evidence bundle
         "retrieval_metadata": {
             "knowledge_dir": knowledge_dir,
-            "k": k,
-            "genes_queried": len(terms),
+            "k": top_k,
+            "keywords_queried": f"{', '.join(keywords)} ({len(keywords)})",
             "total_retrieved": len(all_snippets),
-            "annotations_found": annotation_count,
             "knowledge_snippets_found": knowledge_count,
-            "genes_without_annotations": genes_without_annotations,
         },
     }

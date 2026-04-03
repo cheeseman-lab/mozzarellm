@@ -1,243 +1,72 @@
-"""
-Utilities for reshaping and processing gene cluster data.
-
-This module provides functions to transform gene-level data into
-cluster-level format suitable for analysis.
-"""
-
-import os
-
 import pandas as pd
+from pathlib import Path
 
 
-def reshape_to_clusters(
-    input_file=None,
-    input_df=None,
-    input_sep=",",
-    gene_col="gene_symbol",
-    cluster_col="cluster",
-    gene_sep=";",
-    additional_cols=None,
-    output_file=None,
-    gene_features_output=None,
-    return_dataframes=True,
-    uniprot_col=None,
-    verbose=True,
-):
-    """
-    Reshape a gene-level table to a cluster-level table where each row is a cluster
-    and contains all genes belonging to that cluster.
-
-    Parameters:
-    -----------
-    # Input data options
-    input_file : str, optional
-        Path to input CSV/TSV file with gene-level data
-    input_df : pandas.DataFrame, optional
-        DataFrame containing gene-level data (alternative to input_file)
-    input_sep : str, default=","
-        Separator used in the input file
-
-    # Data structure parameters
-    gene_col : str, default="gene_symbol"
-        Column name containing gene identifiers
-    cluster_col : str, default="cluster"
-        Column name containing cluster assignments
-    gene_sep : str, default=";"
-        Separator to use between genes in the output file
-    additional_cols : list, optional
-        List of additional columns to include as cluster-level metadata
-
-    # Output options
-    output_file : str, optional
-        Path to save the output cluster-level file
-    gene_features_output : str, optional
-        Path to save gene features data
-    return_dataframes : bool, default=True
-        Whether to return DataFrames even when output files are specified
-
-    # Feature extraction options
-    uniprot_col : str, optional
-        Column name containing UniProt data for feature extraction
-
-    # Misc options
-    verbose : bool, default=True
-        Whether to print progress messages
+def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
+    """Chunk a gene-level table into smaller per-cluster DataFrames slices.
 
     Returns:
-    --------
-    If gene features are extracted and return_dataframes is True:
-        (cluster_df, gene_features_df) : tuple of DataFrames
-            - cluster_df: DataFrame with reshaped clusters
-            - gene_features_df: DataFrame with gene features
+        List of DataFrames, one for each cluster.
 
-    Otherwise if return_dataframes is True or no output_file specified:
-        cluster_df : pandas.DataFrame
-            DataFrame with reshaped clusters
+    Raises:
+        ValueError: If cluster_id_column is not found in DataFrame.
 
-    If output_file is specified and return_dataframes is False:
-        None
-
-    Notes:
-    ------
-    - Either input_file or input_df must be provided
-    - The reshaped cluster DataFrame will always have "cluster_id" and "genes" columns
-    - The "genes" column contains semicolon-separated gene lists for direct use in analyze_gene_clusters
+    Note:
+        Will handle both sorted and interleaved cluster IDs. Relative order of genes within each cluster is preserved from the original DataFrame.
     """
-    # Handle input - either from file or DataFrame
-    if input_df is not None:
-        df = input_df
-        if verbose:
-            print(f"Using provided DataFrame with {len(df)} rows")
-    elif input_file is not None:
-        if verbose:
-            print(f"Reading input file: {input_file}")
-        # Read the input file
-        if input_sep == "\\t":
-            input_sep = "\t"
-        df = pd.read_csv(input_file, sep=input_sep)
-    else:
-        raise ValueError("Either input_file or input_df must be provided")
+    if cluster_id_column not in df.columns:
+        raise ValueError(f"Cluster ID column '{cluster_id_column}' not found in DataFrame.")
+    # Single-pass split; sort=False preserves first-seen cluster order; row order within each chunk is preserved.
+    return [group for _cluster_id, group in df.groupby(cluster_id_column, sort=False)]
 
-    if verbose:
-        print(f"Found {len(df)} genes across {df[cluster_col].nunique()} clusters")
 
-    # Initialize gene_features for return value
-    gene_features = None
+def find_feature_overlaps(df: pd.DataFrame, feature_columns: list[str]) -> dict[str, str]:
+    """Find overlapping comma-separated features in specified columns.
 
-    # Handle gene features if UniProt column is specified
-    if uniprot_col is not None and uniprot_col in df.columns:
-        if verbose:
-            print(f"Extracting gene features from {uniprot_col} column")
+    Returns a mapping from column name to a comma-separated string of features that
+    appear in 2+ rows.
+    """
+    overlaps: dict[str, str] = {}
+    for col in feature_columns:
+        if col not in df.columns:
+            overlaps[col] = ""
+            continue
 
-        # Extract gene features (gene to UniProt mapping)
-        gene_features = df[[gene_col, uniprot_col]].drop_duplicates()
+        feature_counts: dict[str, int] = {}
+        for feature_str in df[col].dropna():
+            if not isinstance(feature_str, str) or not feature_str:
+                continue
+            features = [f.strip() for f in feature_str.split(",") if f.strip()]
+            for feature in features:
+                feature_counts[feature] = feature_counts.get(feature, 0) + 1
 
-        # Fill NaN values with empty string
-        gene_features.fillna("", inplace=True)
+        overlapping = [f for f, count in feature_counts.items() if count >= 2]
+        overlapping.sort(key=lambda f: (-feature_counts[f], f))
+        overlaps[col] = ",".join(overlapping) if overlapping else ""
 
-        # Save gene features if output path is provided
-        if gene_features_output:
-            if verbose:
-                print(f"Saving gene features to {gene_features_output}")
+    return overlaps
 
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(gene_features_output), exist_ok=True)
 
-            # Save gene features
-            gene_features.to_csv(gene_features_output, index=False)
+def build_cluster_id_to_bundle_path(
+    evidence_bundle_dir: Path,
+    screen_name: str,
+) -> dict[str, Path]:
+    """Construct a cluster-to-prompt map using the cluster ID column and the evidence bundle directory.
 
-    # Create a dictionary to store cluster information
-    clusters = {}
+    Greps the evidence bundle directory for all files with the name pattern {screen_name}__cluster_{#}__bundle.json and creates
+    a dictionary mapping cluster ID to bundle path."""
 
-    # Group genes by cluster
-    for cluster, group in df.groupby(cluster_col):
-        # Get list of genes in this cluster
-        genes = group[gene_col].tolist()
-        genes_text = gene_sep.join(genes)
+    pattern = f"{screen_name}__cluster_*__bundle.json"
 
-        # Start with just cluster ID and genes
-        cluster_info = {
-            "cluster_id": cluster,
-            "genes": genes_text,
-        }
+    bundle_files = list(evidence_bundle_dir.glob(pattern))
 
-        # Add additional cluster-level metadata if specified
-        if additional_cols:
-            # Add gene count if requested
-            if "gene_count" in additional_cols:
-                cluster_info["gene_count"] = len(genes)
+    cluster_id_to_bundle_path: dict[str, Path] = {}
+    for f in bundle_files:
+        name = f.name
+        if "__cluster_" not in name or not name.endswith("__bundle.json"):
+            continue
+        cluster_id = name.split("__cluster_", 1)[1].split("__bundle.json", 1)[0]
+        if cluster_id:
+            cluster_id_to_bundle_path[str(cluster_id)] = f
 
-            # Process other additional columns
-            for col in additional_cols:
-                if col != "gene_count" and col in df.columns:
-                    # Special handling for up_features and down_features: find overlapping features
-                    if col in ["up_features", "down_features"]:
-                        feature_counts = {}
-                        for feature_str in group[col].dropna():
-                            if feature_str and isinstance(feature_str, str):
-                                features = [f.strip() for f in feature_str.split(",") if f.strip()]
-                                for feature in features:
-                                    feature_counts[feature] = feature_counts.get(feature, 0) + 1
-
-                        # Keep only features that appear in 2+ genes (overlapping)
-                        overlapping = [f for f, count in feature_counts.items() if count >= 2]
-                        # Sort by frequency (descending), then alphabetically
-                        overlapping.sort(key=lambda f: (-feature_counts[f], f))
-                        cluster_info[col] = ",".join(overlapping) if overlapping else ""
-
-                    # Special handling for phenotypic_strength: average numerators, keep denominator
-                    elif col == "phenotypic_strength":
-                        strengths = group[col].dropna().tolist()
-                        if strengths:
-                            numerators = []
-                            denominator = None
-                            for strength in strengths:
-                                if isinstance(strength, str) and "/" in strength:
-                                    parts = strength.split("/")
-                                    try:
-                                        numerators.append(float(parts[0]))
-                                        if denominator is None:
-                                            denominator = parts[1]
-                                    except ValueError:
-                                        continue
-
-                            if numerators and denominator:
-                                avg_numerator = sum(numerators) / len(numerators)
-                                cluster_info[col] = f"{avg_numerator:.1f}/{denominator}"
-                            else:
-                                cluster_info[col] = ""
-                        else:
-                            cluster_info[col] = ""
-
-                    # Default handling for other columns
-                    else:
-                        # For columns like cluster_group that should be the same for all genes in a cluster
-                        # Take the first non-null value or the most common value
-                        values = group[col].dropna().tolist()
-                        if values:
-                            if len(set(values)) == 1:  # All values are the same
-                                cluster_info[col] = values[0]
-                            else:
-                                # Get the most common value
-                                most_common = pd.Series(values).value_counts().index[0]
-                                cluster_info[col] = most_common
-                        else:
-                            cluster_info[col] = None
-
-        clusters[cluster] = cluster_info
-
-    # Convert to DataFrame
-    cluster_df = pd.DataFrame.from_dict(clusters, orient="index").reset_index(drop=True)
-
-    # Sort by cluster_id
-    if "cluster_id" in cluster_df.columns:
-        try:
-            cluster_df["cluster_id"] = pd.to_numeric(cluster_df["cluster_id"])
-            cluster_df = cluster_df.sort_values("cluster_id")
-        except Exception as e:
-            # If conversion to numeric fails, sort as strings
-            if verbose:
-                print(f"Could not convert cluster_id to numeric: {e}. Sorting as strings.")
-            cluster_df = cluster_df.sort_values("cluster_id")
-
-    # Save to output file if provided
-    if output_file:
-        if verbose:
-            print(f"Writing {len(cluster_df)} clusters to output file: {output_file}")
-
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-
-        # Save cluster data
-        cluster_df.to_csv(output_file, index=False)
-        if verbose:
-            print(f"Saved clusters to {output_file}")
-
-    # Determine what to return based on parameters
-    if not output_file or return_dataframes:
-        if gene_features is not None:
-            return cluster_df, gene_features
-        else:
-            return cluster_df
-    return None
+    return cluster_id_to_bundle_path

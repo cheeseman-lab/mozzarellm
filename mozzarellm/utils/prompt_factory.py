@@ -3,136 +3,142 @@ Prompt construction utilities for gene cluster analysis.
 
 This module assembles prompts by concatenating modular components from prompts.py
 in a standardized order. Components are organized in prompts.py to match assembly order.
+
+Rules of thumb:
+stable policy + format requirements = system prompt
+cluster specific content = user prompt
+
+Main components of any given system prompt:
+  1. TASK SPECIFICATION (may be composed of multiple sub-tasks/prompt components)
+  2. CONTEXT (e.g. from screen_context.json, universal context like gene annotations)
+  3. OUTPUT FORMAT (response structure)
+
+Main components of any given user prompt:
+  1. CLUSTER SPECIFIC CONTENT (e.g. gene list + metadata, retrieved context)
 """
 
 import os
+import json
+from pathlib import Path
+from datetime import datetime
+from mozzarellm.utils.screen_context_utils import load_screen_context_json
+from mozzarellm.prompt_components import (
+    CLUSTER_ANALYSIS_TASK,
+    GENE_CATEGORIZATION_RULES,
+    PATHWAY_CONFIDENCE_CRITERIA,
+    NOVEL_CLASSIFICATION_RULES,
+    UNCHARACTERIZED_CLASSIFICATION_RULES,
+    OUTPUT_FORMAT_JSON,
+    COT_STEPS_DEFAULT,
+    assemble_cot_instructions,
+)
 
 
-def make_cluster_analysis_prompt(
-    cluster_id,
-    genes,
-    gene_annotations_dict=None,
-    screen_context=None,
-    template_path=None,
-    template_string=None,
-    retrieved_context=None,
-    cot_instructions=None,
+def make_cluster_analysis_system_prompt(
+    *,
+    screen_name: str,
+    screen_context_path: Path | None = None,
+    override_CoT_steps: list[str] | None = None,  # testing utility
+    override_screen_context: bool = False,  # testing utility
+    template_path: Path | None = None,
+    template_string: str | None = None,
+    CoT_mode: bool = False,
+    output_dir: Path | None = None,
 ):
     """
-    Create a prompt for gene cluster analysis by assembling modular components.
+    Creates a system prompt for gene cluster analysis by assembling modular components.
 
     Assembly order:
-    1. CLUSTER_ANALYSIS_TASK (discovery mission)
-    2. SCREEN CONTEXT (experimental setup - WHY genes cluster)
-    3. GENE_CLASSIFICATION_RULES (framework for analysis)
-    4. GENE ANNOTATIONS (the data - if provided)
-    5. RETRIEVED EVIDENCE (additional context - if RAG enabled)
-    6. PATHWAY_CONFIDENCE_CRITERIA (assessment criteria - comes AFTER data)
-    7. CoT INSTRUCTIONS (reasoning steps - if enabled)
-    8. OUTPUT_FORMAT_JSON (response structure)
+    - Standard mode: MAIN TASK + CONTEXT + RULES/CRITERIA + OUTPUT_FORMAT
+    - CoT mode: COT_INSTRUCTIONS (pre-assembled with all components) + CONTEXT
 
-    Rationale: Context before framework, data before assessment.
-    - Screen context establishes WHY genes cluster (phenotypic similarity)
-    - Classification framework makes sense after understanding the context
-    - All data (annotations + evidence) comes before assessment criteria
-    - Pathway confidence assessment comes AFTER seeing the data
-
-    Custom templates (escape hatch):
-    If template_path or template_string is provided, it completely replaces the
-    modular assembly. Use {cluster_id} and {gene_list} as placeholders.
+    COT_INSTRUCTIONS is built from modular steps via assemble_cot_instructions().
+    Use assemble_cot_instructions() with custom steps for prompt permutation testing.
 
     Args:
-        cluster_id: Identifier for the cluster
-        genes: List of gene identifiers in the cluster
-        gene_annotations_dict: Optional dict of gene functional annotations
-        screen_context: Optional benchmark-specific experimental context
+        screen_name: Name of the screen for output directory naming
+        screen_context_path: Path to screen_context.json file
+        override_screen_context: If True, use default context (testing utility)
         template_path: Path to custom template file (escape hatch - full control)
         template_string: Custom template string (escape hatch - full control)
-        retrieved_context: Optional dict with RAG evidence snippets
-        cot_instructions: Optional chain-of-thought instructions string
+        CoT_mode: If True, use chain-of-thought instructions
+        output_dir: Optional output directory for saving prompts
 
     Returns:
         prompt: Fully assembled prompt string
     """
-    gene_list = ", ".join(genes)
+    try:
+        screen_ctx_obj = load_screen_context_json(
+            screen_context_path, override=override_screen_context
+        )
+    except Exception as e:
+        raise ValueError(f"Failed to load screen context: {e}")
+
+    SCREEN_CONTEXT_TEXT = json.dumps(
+        screen_ctx_obj, ensure_ascii=False
+    )  # minify JSON; has no effect on readability for LLMs + saves tokens
 
     # =========================================================================
     # ESCAPE HATCH: Custom template overrides everything
     # =========================================================================
     if template_string or template_path:
         prompt = _load_custom_template(template_path, template_string)
-        prompt = prompt.format(cluster_id=str(cluster_id), gene_list=gene_list)
-
-        # Still add optional components if provided
-        if retrieved_context and isinstance(retrieved_context, dict):
-            prompt += _format_retrieved_evidence(retrieved_context)
-
-        if cot_instructions and isinstance(cot_instructions, str):
-            prompt += f"\n\nREASONING STEPS:\n{cot_instructions}\n"
-
-        if gene_annotations_dict:
-            prompt += _format_gene_annotations(gene_annotations_dict, genes)
-
-        return prompt
+        return (
+            prompt
+            + "\n\n The following experimental context is provided: "
+            + SCREEN_CONTEXT_TEXT
+            + "\n\n"
+        )
 
     # =========================================================================
-    # DEFAULT: Assemble from modular components
+    # DEFAULT PROMPT CONSTRUCTION
     # =========================================================================
-    from mozzarellm.prompts import (
-        CLUSTER_ANALYSIS_TASK,
-        DEFAULT_SCREEN_CONTEXT,
-        GENE_CLASSIFICATION_RULES,
-        OUTPUT_FORMAT_JSON,
-        PATHWAY_CONFIDENCE_CRITERIA,
-    )
-
-    # =========================================================================
-    # SECTION 1: Core task (discovery mission)
-    # =========================================================================
-    prompt = CLUSTER_ANALYSIS_TASK.format(cluster_id=str(cluster_id), gene_list=gene_list)
-
-    # =========================================================================
-    # SECTION 2: Screen context (experimental background - establishes WHY genes cluster)
-    # =========================================================================
-    if screen_context:
-        prompt += f"\n\nSCREEN INFORMATION:\n{screen_context}\n"
+    if CoT_mode and override_CoT_steps:
+        prompt = assemble_cot_instructions(override_CoT_steps, screen_context=SCREEN_CONTEXT_TEXT)
+    elif CoT_mode:
+        prompt = assemble_cot_instructions(COT_STEPS_DEFAULT, screen_context=SCREEN_CONTEXT_TEXT)
     else:
-        prompt += f"\n\nSCREEN INFORMATION:\n{DEFAULT_SCREEN_CONTEXT}\n"
-
-    # =========================================================================
-    # SECTION 3: Gene classification rules (framework makes sense after context)
-    # =========================================================================
-    prompt += "\n\n" + GENE_CLASSIFICATION_RULES
-
-    # =========================================================================
-    # SECTION 4: Gene annotations (the data - must come before assessment)
-    # =========================================================================
-    if gene_annotations_dict:
-        prompt += _format_gene_annotations(gene_annotations_dict, genes)
-
-    # =========================================================================
-    # SECTION 5: Retrieved evidence (additional context - must come before assessment)
-    # =========================================================================
-    if retrieved_context and isinstance(retrieved_context, dict):
-        prompt += _format_retrieved_evidence(retrieved_context)
-
-    # =========================================================================
-    # SECTION 6: Pathway confidence criteria (assess what you found - needs all data first)
-    # =========================================================================
-    prompt += "\n\n" + PATHWAY_CONFIDENCE_CRITERIA
-
-    # =========================================================================
-    # SECTION 7: Chain-of-thought instructions (reasoning process - comes after all context)
-    # =========================================================================
-    if cot_instructions and isinstance(cot_instructions, str):
-        prompt += f"\n\nREASONING STEPS (keep to brief bullet points; no long prose):\n{cot_instructions}\n"
-
-    # =========================================================================
-    # SECTION 8: Output format (always last)
-    # =========================================================================
-    prompt += "\n\n" + OUTPUT_FORMAT_JSON
-
+        prompt = (
+            CLUSTER_ANALYSIS_TASK
+            + "\n\nThe following experimental context is provided: "
+            + SCREEN_CONTEXT_TEXT
+            + "\n\n"
+            + GENE_CATEGORIZATION_RULES
+            + "\n\n"
+            + NOVEL_CLASSIFICATION_RULES
+            + "\n\n"
+            + UNCHARACTERIZED_CLASSIFICATION_RULES
+            + "\n\n"
+            + PATHWAY_CONFIDENCE_CRITERIA
+            + "\n\n"
+            + OUTPUT_FORMAT_JSON
+        )
+    if not output_dir:
+        output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
+    output_dir.mkdir(exist_ok=True)
+    # save system prompt to file with timestamp
+    with open(
+        output_dir
+        / f"cluster_analysis_phase1_system_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+        "w",
+        encoding="utf-8",
+    ) as f:
+        f.write(prompt)
     return prompt
+
+
+def make_single_cluster_analysis_user_prompt(cluster_id, screen_name, cluster_to_bundle_path_map):
+    BUNDLE_PATH = cluster_to_bundle_path_map[str(cluster_id)]
+
+    # Build a user prompt from the bundle JSON
+    bundle_obj = json.loads(Path(BUNDLE_PATH).read_text(encoding="utf-8"))
+    bundle_text = json.dumps(bundle_obj, ensure_ascii=False)
+
+    output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
+    output_dir.mkdir(exist_ok=True)
+    return (
+        f"Here is the evidence bundle JSON for cluster {cluster_id}:\n\n```json\n{bundle_text}\n```"
+    )
 
 
 # =============================================================================
@@ -146,14 +152,31 @@ def _load_custom_template(template_path=None, template_string=None):
         print("Using provided custom template string")
         return template_string
 
-    if template_path and os.path.exists(template_path):
-        print(f"Loading custom template from: {template_path}")
-        with open(template_path) as f:
-            return f.read()
+    if template_path:
+        try:
+            p = Path(template_path)
+        except Exception as e:
+            raise ValueError(f"Invalid custom template path: {template_path!r}. Error: {e}")
 
-    raise ValueError("Custom template path does not exist or template string not provided")
+        if not p.exists():
+            raise ValueError(f"Custom template path does not exist: {str(p)!r}")
+
+        allowed_suffixes = {".txt", ".md"}
+        if p.suffix.lower() not in allowed_suffixes:
+            raise ValueError(
+                f"Custom template file must be one of: {allowed_suffixes}. Got: {str(p)!r}"
+            )
+
+        print(f"Loading custom template from: {p}")
+        try:
+            return p.read_text(encoding="utf-8")
+        except Exception as e:
+            raise ValueError(f"Failed to read custom template file: {str(p)!r}. Error: {e}")
+
+    raise ValueError("Custom template path not provided and template string not provided")
 
 
+## from previous version; may be reindroduced later
 def _format_retrieved_evidence(retrieved_context):
     """Format retrieved evidence snippets for RAG mode."""
     snippets = retrieved_context.get("snippets", [])
@@ -171,12 +194,10 @@ def _format_retrieved_evidence(retrieved_context):
         relevance = sn.get("relevance_score", 0)
 
         # Format source tag based on source type
-        if src == "annotations":
-            src_tag = f"Gene:{meta.get('gene', '')}"
-        elif src == "knowledge_file":
+        if src == "knowledge_file":
             src_tag = f"File:{meta.get('path', '')} (score:{meta.get('score', 0)})"
         else:
-            src_tag = "Screen Context"
+            src_tag = str(src or "Unknown")
 
         evidence_text += f"[{i}] {src_tag} [relevance:{relevance}]: {txt}\n"
 
@@ -195,28 +216,3 @@ def _format_retrieved_evidence(retrieved_context):
             evidence_text += "These genes should be carefully evaluated based on pathway context and knowledge base evidence.\n"
 
     return evidence_text
-
-
-def _format_gene_annotations(gene_annotations_dict, genes):
-    """Format gene functional annotations."""
-    feature_text = "\nAdditional gene information:\n"
-    relevant_feature_count = 0
-
-    for gene in genes:
-        if gene in gene_annotations_dict:
-            feature_text += f"{gene}: {gene_annotations_dict[gene]}\n"
-            relevant_feature_count += 1
-
-    # Only add the feature section if we found relevant features
-    if relevant_feature_count > 0:
-        feature_explanation = """
-IMPORTANT: The additional gene information provided above should be used to:
-1. Better determine if genes are truly UNCHARACTERIZED
-2. Evaluate potential pathway connections for NOVEL_ROLE genes
-3. Identify ESTABLISHED genes for the dominant process
-"""
-        print(f"Added {relevant_feature_count} gene feature descriptions to prompt")
-        return feature_text + feature_explanation
-    else:
-        print("No relevant gene features found for this cluster")
-        return ""

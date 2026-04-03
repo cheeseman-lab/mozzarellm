@@ -5,8 +5,8 @@ mozzarellm: Gene cluster analysis using Large Language Models (LLMs)
 __version__ = "0.2.0"
 
 # New unified API
-from .analyzer import ClusterAnalyzer
-from .models import (
+from .pipeline.analyzer import ClusterAnalyzer
+from .schemas.analysis_output_schemas import (
     AnalysisResult,
     ClusterInput,
     ClusterResult,
@@ -15,25 +15,25 @@ from .models import (
 )
 
 # Prompt components (modular)
-from .prompts import (
+from .prompt_components import (
     CLUSTER_ANALYSIS_TASK,
-    CONCISE_COT_INSTRUCTIONS,
-    DEFAULT_SCREEN_CONTEXT,
-    ENHANCED_COT_INSTRUCTIONS,
-    GENE_CLASSIFICATION_RULES,
+    CLUSTER_ANALYSIS_TASK_MULTI,
+    COT_STEPS_DEFAULT,
+    GENE_CATEGORIZATION_RULES,
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,
+    assemble_cot_instructions,
 )
-from .providers import (
-    AnthropicProvider,
-    GeminiProvider,
-    LLMProvider,
-    OpenAIProvider,
-    create_provider,
+from .clients.llm_api_clients import (
+    AnthropicClient,
+    GeminiClient,
+    LLMClientBase,
+    OpenAIClient,
+    create_client,
 )
 
-# Utility functions (preserved)
-from .utils.cluster_utils import reshape_to_clusters
+# IO utils
+from .utils.io import load_table, write_bundle
 
 # Expose package-level API
 __all__ = [
@@ -46,19 +46,20 @@ __all__ = [
     "ClusterInput",
     "RetrievalContext",
     # Providers
-    "LLMProvider",
-    "OpenAIProvider",
-    "AnthropicProvider",
-    "GeminiProvider",
-    "create_provider",
+    "LLMClientBase",
+    "OpenAIClient",
+    "AnthropicClient",
+    "GeminiClient",
+    "create_client",
     # Prompt components
     "CLUSTER_ANALYSIS_TASK",
-    "GENE_CLASSIFICATION_RULES",
-    "DEFAULT_SCREEN_CONTEXT",
+    "CLUSTER_ANALYSIS_TASK_MULTI",
+    "GENE_CATEGORIZATION_RULES",
     "PATHWAY_CONFIDENCE_CRITERIA",
     "OUTPUT_FORMAT_JSON",
-    "ENHANCED_COT_INSTRUCTIONS",
-    "CONCISE_COT_INSTRUCTIONS",
-    # Utilities
-    "reshape_to_clusters",
+    "COT_STEPS_DEFAULT",
+    "assemble_cot_instructions",
+    # IO utils
+    "load_table",
+    "write_bundle",
 ]
