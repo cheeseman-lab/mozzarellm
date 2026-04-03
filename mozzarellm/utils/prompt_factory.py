@@ -24,10 +24,10 @@ from datetime import datetime
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 from mozzarellm.prompt_components import (
     CLUSTER_ANALYSIS_TASK,
-    GENE_CLASSIFICATION_RULES,
+    GENE_CATEGORIZATION_RULES,
     PATHWAY_CONFIDENCE_CRITERIA,
-    NOVEL_PRIORITIZATION_RULES,
-    UNCHARACTERIZED_PRIORITIZATION_RULES,
+    NOVEL_CLASSIFICATION_RULES,
+    UNCHARACTERIZED_CLASSIFICATION_RULES,
     OUTPUT_FORMAT_JSON,
     NEW_OUTPUT_FORMAT_JSON,
     COT_INSTRUCTIONS,
@@ -51,7 +51,7 @@ def make_cluster_analysis_system_prompt(
     1. CLUSTER_ANALYSIS_TASK (discovery mission)
     2. SCREEN CONTEXT (from screen_context.json)
     if not in CoT mode:
-        3. GENE_CLASSIFICATION_RULES (framework for analysis)
+        3. GENE_CATEGORIZATION_RULES (framework for analysis)
         4. PATHWAY_CONFIDENCE_CRITERIA (assessment criteria)
         5. OUTPUT_FORMAT_JSON (response structure)
     if in CoT mode:
@@ -110,11 +110,11 @@ def make_cluster_analysis_system_prompt(
         prompt = (
             CLUSTER_ANALYSIS_TASK
             + "\n\n"
-            + GENE_CLASSIFICATION_RULES
+            + GENE_CATEGORIZATION_RULES
             + "\n\n"
-            + NOVEL_PRIORITIZATION_RULES
+            + NOVEL_CLASSIFICATION_RULES
             + "\n\n"
-            + UNCHARACTERIZED_PRIORITIZATION_RULES
+            + UNCHARACTERIZED_CLASSIFICATION_RULES
             + "\n\n"
             + PATHWAY_CONFIDENCE_CRITERIA
             + "\n\nThe following experimental context is provided: "

@@ -13,56 +13,74 @@ prompt factory.
 CLUSTER_ANALYSIS_TASK = """
 MISSION: Functional genomics experiments cluster genes by phenotypic similarity. Your goal is to:
 1. Identify the dominant biological pathway that explains why these genes cluster together
-2. Classify ALL genes relative to this pathway (ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE)
+2. Categorize ALL genes relative to this pathway (ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE)
 3. Prioritize understudied genes (UNCHARACTERIZED and NOVEL_ROLE) for follow-up experiments
 
 The pathway is not the end goal - it's the lens for discovering which genes merit investigation.
 """
 
-# =============================================================================
-# GENE CLASSIFICATION & PRIORITIZATION RULES (framework for analysis)
-# =============================================================================
+CLUSTER_ANALYSIS_TASK_MULTI = """
+MISSION: Functional genomics experiments cluster genes by phenotypic similarity. Your goal is to:
+1. Identify 1-3 biological pathways that together explain why these genes cluster together
+2. Categorize ALL genes relative to their best-fit pathway (ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE)
+3. Prioritize understudied genes (UNCHARACTERIZED and NOVEL_ROLE) for follow-up experiments
 
-GENE_CLASSIFICATION_RULES = f"""
-When classifying and prioritizing genes, apply these specific criteria:
-
-1. ESTABLISHED PATHWAY GENES:
-   - Genes with well-documented roles in the identified pathway
-   - Supported by multiple publications demonstrating direct involvement
-   - Often serve as canonical members or markers of the pathway
-
-2. UNCHARACTERIZED GENES:
-   A gene is considered UNCHARACTERIZED only if MOST of these criteria are met:
-   - Limited or no experimental validation of function in any pathway
-   - Few (0-2) publications specifically focused on this gene
-   - Unknown molecular function or biological process
-   
-3. NOVEL_ROLE GENES:
-   These are genes with established functions in other pathways, but plausibly contribute to the identified pathway in a novel way.
-
-High scores should only be assigned if the novel connection is plausible but not already established. Genes with substantial evidence for the pathway should receive a lower priority, as they are not truly "novel."
-
-IMPORTANT CONSIDERATIONS:
-- Do NOT use mere presence in the cluster as evidence for prioritization
-- Be conservative when assigning genes to the "NOVEL ROLE" or "UNCHARACTERIZED" categories. Do so only when there is a meaningful deviation from known pathway biology or a lack of functional annotation, respectively
-- For any gene with substantial literature, it should NOT be classified as UNCHARACTERIZED
-- The goal is not to speculate but to flag only the most promising candidates for follow-up
+A pathway requires at least 3 genes to be reported. The pathways are not the end goal — they are the lens for discovering which genes merit investigation.
 """
-NOVEL_PRIORITIZATION_RULES = """   
-Priority scoring for NOVEL_ROLE genes:
-   - 8–10: Compelling rationale for a previously unrecognized role in this pathway; role would be surprising and high-impact; minimal existing literature makes this a major discovery risk
-   - 6–7: Some indirect or tangential evidence suggesting a new role; not previously linked to this pathway but fits plausibly
-   - 4–5: Functional overlap or localization hints at a novel connection, but likely already speculated or partially known
-   - 1–3: Existing data already supports involvement in this pathway; not a novel role — deprioritize
-   """
 
-UNCHARACTERIZED_PRIORITIZATION_RULES = """
-Priority scoring for UNCHARACTERIZED genes:
-   - 8–10: Virtually unstudied (0–1 publications); uncharacterized molecular function; potential for novel discovery
-   - 6–7: Extremely limited data; may have 1–2 preliminary findings but little known function
-   - 4–5: Some characterization exists, but function remains unclear or incomplete
-   - 1–3: Partial evidence for involvement in known pathways; not a strong candidate for novel discovery
-   """
+# =============================================================================
+# GENE CATEGORIZATION & CLASSIFICATION RULES (framework for analysis)
+# =============================================================================
+
+GENE_CATEGORIZATION_RULES = """
+STEP A — CATEGORIZE each gene into exactly one of three categories:
+
+1. ESTABLISHED:
+   At least one peer-reviewed paper directly demonstrates this gene's functional role
+   in the identified pathway (e.g., knockout/knockdown phenotype, biochemical interaction,
+   or mechanistic study within this pathway). Review articles or guilt-by-association
+   do not count — there must be direct experimental evidence in this specific pathway.
+
+2. NOVEL_ROLE:
+   At least one paper has studied this gene's molecular function, but that function is
+   in a DIFFERENT pathway. The gene is characterized — just not in this context.
+
+3. UNCHARACTERIZED:
+   No paper has focused on this gene's molecular function in any pathway in human cells.
+   This includes completely unstudied genes, genes with only domain/homology annotations,
+   and genes characterized only in non-human organisms.
+
+BOUNDARY RULES (apply in order):
+- Has any paper focused on this gene's molecular function? → No → UNCHARACTERIZED (stop)
+- Does that paper show a role in THIS specific pathway? → Yes → ESTABLISHED (stop)
+- Otherwise → NOVEL_ROLE
+
+STEP B — CLASSIFY: For NOVEL_ROLE and UNCHARACTERIZED genes, assign a sub-class
+(see classification rules below) and a priority score (1-10).
+"""
+NOVEL_CLASSIFICATION_RULES = """
+Sub-classes for NOVEL_ROLE genes (genes with established functions in OTHER pathways):
+
+  NO_EVIDENCE: No data linking this gene to the identified pathway.
+  INDIRECT_EVIDENCE: A logical connection exists based on shared biology (e.g., same organelle, upstream regulator) but no direct experimental link.
+  PARTIAL_EVIDENCE: Preliminary data (e.g., proteomics hit, co-expression) suggests a link to this pathway, but no focused mechanistic study. If a focused study exists, recategorize as ESTABLISHED.
+  CONTRADICTORY_EVIDENCE: The gene's known function is incompatible with this pathway.
+
+Assign exactly one sub-class per gene. Then assign a priority score (1-10) for follow-up,
+considering sub-class, evidence quality, pathway relevance, and experimental tractability.
+"""
+
+UNCHARACTERIZED_CLASSIFICATION_RULES = """
+Sub-classes for UNCHARACTERIZED genes (no focused study of molecular function in human cells):
+
+  DARK_GENE: No name, no functional characterization whatsoever.
+  NASCENT: No standard name, but some preliminary functional data exists.
+  ANNOTATED_ONLY: Has a gene name and domain/motif annotations, but no mechanistic study.
+  NON_HUMAN_CHARACTERIZED: Functionally studied in a non-human organism only.
+
+Assign exactly one sub-class per gene. Then assign a priority score (1-10) for follow-up,
+considering sub-class, evidence quality, pathway relevance, and experimental tractability.
+"""
 
 # =============================================================================
 # PATHWAY CONFIDENCE ASSESSMENT (comes AFTER data to enable assessment)
@@ -71,34 +89,31 @@ Priority scoring for UNCHARACTERIZED genes:
 PATHWAY_CONFIDENCE_CRITERIA = """
 ASSESSING PATHWAY CONFIDENCE:
 
-Once you have identified a candidate pathway, evaluate how well it explains the cluster using
-these stringent criteria based on what percentage of genes fit the proposed pathway:
+After identifying candidate pathway(s), evaluate how well they explain the cluster using
+these stringent criteria based on what percentage of genes fit the proposed pathway(s):
 
 HIGH CONFIDENCE:
-- >70% of genes in the cluster fit the proposed pathway
-- Multiple well-established genes with strong literature support in this specific pathway
-- Clear functional relationship between genes that explains the observed phenotypic clustering
-- Genes represent different aspects or components of the same biological process
+- >70% of genes in the cluster fit the proposed pathway(s)
+- Multiple well-established genes with strong literature support in the pathway(s)
+- Clear functional relationships between genes that explain the observed phenotypic clustering
 
 MEDIUM CONFIDENCE:
-- 50-70% of genes in the cluster fit the proposed pathway
-- Some established genes from the pathway, with additional plausible supporting genes
+- 50-70% of genes in the cluster fit the proposed pathway(s)
+- Some established genes from the pathway(s), with additional plausible supporting genes
 - Functional relationship is plausible but has some gaps or uncertainties
-- Some genes in the cluster have unclear relationship to the proposed pathway
 
 LOW CONFIDENCE:
-- 30-50% of genes in the cluster fit the proposed pathway
-- Few established pathway genes, but a plausible functional theme
+- 30-50% of genes in the cluster fit the proposed pathway(s)
+- Few established pathway genes; themes may be broad or general
 - Significant heterogeneity in gene functions within the cluster
-- The proposed pathway is very broad or general
 
 NO COHERENT PATHWAY:
-- <30% of genes in the cluster fit any single proposed pathway
-- Clusters where genes belong to many unrelated pathways
-- Clusters containing nontargeting control genes
-- Clusters where you cannot identify a dominant biological process
+- <30% of genes in the cluster fit any proposed pathway(s)
+- Genes belong to many unrelated pathways
+- Cluster contains nontargeting control genes
+- Cannot identify a dominant biological process
 
-For clusters with no coherent pathway, set:
+If there is no coherent pathway, set:
 - "pathway_confidence": "Low"
 - "dominant_process": "No coherent biological pathway"
 - And explain the reasoning clearly in the "summary" field
@@ -113,29 +128,30 @@ are understudied.
 # =============================================================================
 
 COT_INSTRUCTIONS = f"""
-STEP 1 - PATHWAY HYPOTHESIS (2-3 candidates):
+STEP 1 - PATHWAY HYPOTHESES (2-3 candidates):
 - Review gene annotations
 - List 2-3 candidate pathways with supporting genes
 - Note which annotations support each hypothesis
 
-STEP 2 - PATHWAY SELECTION:
-- Select dominant pathway based on:
+STEP 2 - PATHWAY ASSESSMENT:
+- For each candidate pathway, assess:
   * Number of established genes with direct roles
   * Coherence of functional relationships
   * Quality of supporting evidence (prioritize high-relevance snippets)
-- Assign confidence level using the following criteria: {PATHWAY_CONFIDENCE_CRITERIA}
+- Select the pathway(s) that best explain the cluster
+- Assign confidence using: {PATHWAY_CONFIDENCE_CRITERIA}
 
-STEP 3 - GENE CLASSIFICATION (cite evidence):
-For each gene, determine ONE category according to the following rules: {GENE_CLASSIFICATION_RULES}
+STEP 3 - GENE CATEGORIZATION (cite evidence):
+For each gene, assign it to its best-fit pathway(s), then categorize using: {GENE_CATEGORIZATION_RULES}
 
-STEP 4 - PRIORITIZATION (scores 1-10):
-- For NOVEL_ROLE genes: Score based on the following criteria: {NOVEL_PRIORITIZATION_RULES}
-- For UNCHARACTERIZED genes: Score based on the following criteria: {UNCHARACTERIZED_PRIORITIZATION_RULES}
-- Cite specific annotations that inform each priority score
+STEP 4 - SUB-CLASSIFICATION & PRIORITIZATION:
+- For NOVEL_ROLE genes: Assign a class and priority score using: {NOVEL_CLASSIFICATION_RULES}
+- For UNCHARACTERIZED genes: Assign a class and priority score using: {UNCHARACTERIZED_CLASSIFICATION_RULES}
+- Cite specific annotations that inform each class assignment and priority score
 
 STEP 5 - VERIFICATION:
 - Check for contradictions
-- Verify all genes are classified (no omissions)
+- Verify all genes are categorized (no omissions)
 - Adjust confidence if evidence is weak or contradictory
 - Note any gaps in evidence that limit conclusions
 
@@ -147,9 +163,10 @@ STEP 6 - FINAL JSON OUTPUT:
 
 CONCISE_COT_INSTRUCTIONS = """
 1) Identify 2-3 candidate pathways citing key genes and evidence snippets [numbers].
-2) Classify each gene as ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE with 1-line rationale.
-3) Assign priority scores (1-10) based on novelty and impact; cite supporting evidence.
-4) Note contradictions or gaps in evidence; adjust confidence accordingly.
+2) Select the pathway(s) that best explain the cluster. Assign each gene to its best-fit pathway.
+3) Categorize each gene as ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE with 1-line rationale.
+4) For NOVEL_ROLE and UNCHARACTERIZED genes, classify into a sub-class and assign a priority score (1-10); cite supporting evidence.
+5) Note contradictions or gaps in evidence; adjust confidence accordingly.
 """
 
 
@@ -162,12 +179,13 @@ OUTPUT_FORMAT_JSON = """
 Provide a concise analysis in this exact JSON format:
 {
   "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id provided in the prompt
-  "dominant_process": "specific pathway name",
+  "dominant_process": "pathway name (or comma-separated if multiple)",
   "pathway_confidence": "High/Medium/Low",
   "established_genes": ["GeneA", "GeneB"],
   "uncharacterized_genes": [
     {
       "gene": "GeneC",
+      "class": "DARK_GENE",
       "priority": 8,
       "rationale": "explanation",
     }
@@ -175,6 +193,7 @@ Provide a concise analysis in this exact JSON format:
   "novel_role_genes": [
     {
       "gene": "GeneD",
+      "class": "NO_EVIDENCE",
       "priority": 7,
       "rationale": "explanation",
     }
@@ -186,19 +205,21 @@ NEW_OUTPUT_FORMAT_JSON = """
 Provide a concise analysis in this exact JSON format:
 {
   "cluster_id": "[CLUSTER_ID]",  # IMPORTANT: Use the exact cluster_id provided in the prompt
-  "dominant_process": "specific pathway name",
+  "dominant_process": "pathway name (or comma-separated if multiple)",
   "pathway_confidence": "High/Medium/Low",
   "established_genes": ["GeneA", "GeneB"],
   "uncharacterized_genes": [
     {
       "gene": "GeneC",
-      "rationale": "explanation",
-      "evidence": "quote from annotations, and citations if present",
+      "class": "DARK_GENE",
+      "rationale": "explanation"
+      "evidence": "quote from annotations, and citations if present"
     }
   ],
   "novel_role_genes": [
     {
       "gene": "GeneD",
+      "class": "NO_EVIDENCE",
       "priority": 7,
       "rationale": "explanation",
       "evidence": "quote from annotations, and citations if present",
