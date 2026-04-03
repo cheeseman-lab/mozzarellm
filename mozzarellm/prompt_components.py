@@ -169,14 +169,14 @@ Provide a concise analysis in this exact JSON format:
     {
       "gene": "GeneC",
       "priority": 8,
-      "rationale": "explanation"
+      "rationale": "explanation",
     }
   ],
   "novel_role_genes": [
     {
       "gene": "GeneD",
       "priority": 7,
-      "rationale": "explanation"
+      "rationale": "explanation",
     }
   ],
   "summary": "key findings summary"
@@ -192,16 +192,16 @@ Provide a concise analysis in this exact JSON format:
   "uncharacterized_genes": [
     {
       "gene": "GeneC",
-      "rationale": "explanation"
-      "evidence": "quote from annotations, and citations if present"
+      "rationale": "explanation",
+      "evidence": "quote from annotations, and citations if present",
     }
   ],
   "novel_role_genes": [
     {
       "gene": "GeneD",
       "priority": 7,
-      "rationale": "explanation"
-      "evidence": "quote from annotations, and citations if present"
+      "rationale": "explanation",
+      "evidence": "quote from annotations, and citations if present",
     }
   ],
   "summary": "key findings summary"

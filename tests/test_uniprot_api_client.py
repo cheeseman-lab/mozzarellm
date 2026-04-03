@@ -122,12 +122,12 @@ def test_client_strips_trailing_slash_from_base_url(tmp_path):
     "env_vars,expected_suffix",
     [
         (
-            {"LOCALAPPDATA": "C:\\Users\\Test\\AppData\\Local"},
-            "C:\\Users\\Test\\AppData\\Local\\mozzarellm",
+            {"LOCALAPPDATA": os.path.join("C:", "Users", "Test", "AppData", "Local")},
+            os.path.join("C:", "Users", "Test", "AppData", "Local", "mozzarellm"),
         ),
         (
-            {"APPDATA": "C:\\Users\\Test\\AppData\\Roaming"},
-            "C:\\Users\\Test\\AppData\\Roaming\\mozzarellm",
+            {"APPDATA": os.path.join("C:", "Users", "Test", "AppData", "Roaming")},
+            os.path.join("C:", "Users", "Test", "AppData", "Roaming", "mozzarellm"),
         ),
     ],
 )

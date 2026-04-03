@@ -42,6 +42,7 @@ def make_cluster_analysis_system_prompt(
     template_path: Path | None = None,
     template_string: str | None = None,
     CoT_mode: bool = False,
+    output_dir: Path | None = None
 ):
     """
     Creates a system prompt for gene cluster analysis by assembling modular components.
@@ -121,8 +122,8 @@ def make_cluster_analysis_system_prompt(
             + "\n\n"
             + OUTPUT_FORMAT_JSON
         )
-
-    output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
+    if not output_dir:
+        output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
     output_dir.mkdir(exist_ok=True)
     # save system prompt to file with timestamp
     with open(

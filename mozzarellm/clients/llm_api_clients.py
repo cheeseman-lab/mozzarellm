@@ -108,7 +108,7 @@ class LLMClientBase(ABC):
             try:
                 if batch:
                     response = self._make_batch_api_call(
-                        cluster_to_prompt_map, screen_name, system_prompt
+                        cluster_to_prompt_map, screen_name, system_prompt,
                     )
                 else:
                     response = self._make_api_call(system_prompt, user_prompt)
@@ -179,7 +179,10 @@ class OpenAIClient(LLMClientBase):
         return response.choices[0].message.content
 
     def _make_batch_api_call(
-        self, cluster_to_prompt_map: dict[str, str], system_prompt: str, max_retries: int = 3
+        self,
+        cluster_to_prompt_map: dict[str, str],
+        screen_name: str,
+        system_prompt: str,
     ) -> list[str]:
         """
         Makes a batch of requests to the OpenAI chat API.
@@ -332,6 +335,7 @@ class AnthropicClient(LLMClientBase):
             print(f"Batch {batch_id} is still processing...")
             time.sleep(60)
         # Stream results file in memory-efficient chunks, processing one at a time
+        errored_requests = []
         for result in client.messages.batches.results(batch_id):
             match result.result.type:
                 case "succeeded":
@@ -339,19 +343,29 @@ class AnthropicClient(LLMClientBase):
                         f"output/{screen_name}_analysis/phase1_batch_cluster_LLM_analysis/{result.custom_id}_analysis_response.jsonl"
                     )
                     path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(result.result, encoding="utf-8")
+                    path.write_text(str(result.result.message.content), encoding="utf-8")
                     print(f"{result.custom_id} succeeded. Saving response to {path}")
                 case "errored":
-                    if result.result.error.type == "invalid_request":
-                        # Request body must be fixed before re-sending request
-                        print(f"Validation error {result.custom_id}: {result.result.error.type}")
+                    error_obj = result.result.error
+                    error_type = getattr(getattr(error_obj, "error", None), "type", "unknown")
+                    error_msg = getattr(getattr(error_obj, "error", None), "message", None)
+                    if error_type == "invalid_request_error":
+                        print(f"Validation error {result.custom_id}: {error_type} -- {error_msg}")
+                        
                     else:
-                        # Request can be retried directly
-                        print(f"Server error {result.custom_id}: {result.result.error.type}")
+                        print(f"Server error {result.custom_id}: {error_type} -- {error_msg}")
+                        errored_requests.append(result.custom_id)
+                    # print(str(error_obj)) # DEBUG: uncomment for full error object
                 case "expired":
                     print(f"Request expired {result.custom_id}")
+                    errored_requests.append(result.custom_id)
+        
+        if errored_requests:
+            print(f"\n{len(errored_requests)} request(s) failed: {errored_requests}")
         # TODO: log response metadata
 
+# Error object for reference: ErrorResponse(error=InvalidRequestError(message='max_tokens: must be greater than or equal to 1', 
+# type='invalid_request_error', details={'error_visibility': 'user_facing'}), request_id=None, type='error')
 
 class GeminiClient(LLMClientBase):
     """Google Gemini API provider"""
@@ -392,7 +406,10 @@ class GeminiClient(LLMClientBase):
         return response.text
 
     def _make_batch_api_call(
-        self, cluster_to_prompt_map: dict[str, str], system_prompt: str, max_retries: int = 3
+        self,
+        cluster_to_prompt_map: dict[str, str],
+        screen_name: str,
+        system_prompt: str,
     ) -> list[str]:
         """
         Makes a batch of requests to the Google Gemini API.
