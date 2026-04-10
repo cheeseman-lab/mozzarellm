@@ -127,6 +127,59 @@ def make_cluster_analysis_system_prompt(
     return prompt
 
 
+def make_cluster_analysis_prompt(
+    cluster_id: str,
+    genes: list[str],
+    gene_annotations_dict: dict[str, str] | None = None,
+    screen_context: str | None = None,
+    template_string: str | None = None,
+    retrieved_context=None,
+    cot_instructions: str | None = None,
+) -> str:
+    """Build the user prompt for a single cluster analysis.
+
+    Used by ClusterAnalyzer.analyze() when working from raw DataFrames
+    (as opposed to pre-built evidence bundles).
+
+    Args:
+        cluster_id: Cluster identifier.
+        genes: List of gene symbols.
+        gene_annotations_dict: Optional dict mapping gene symbol → annotation text.
+        screen_context: Optional experimental screen context string.
+        template_string: Optional full custom prompt (overrides all other args).
+        retrieved_context: Optional RAG context dict (not yet wired — reserved).
+        cot_instructions: Optional CoT instructions to prepend.
+
+    Returns:
+        Formatted user prompt string.
+    """
+    if template_string:
+        return template_string
+
+    parts = []
+
+    if cot_instructions:
+        parts.append(cot_instructions)
+
+    if screen_context:
+        parts.append(f"Experimental context:\n{screen_context.strip()}")
+
+    # Format genes with annotations
+    gene_lines = []
+    for gene in genes:
+        annotation = gene_annotations_dict.get(gene, "") if gene_annotations_dict else ""
+        if annotation:
+            gene_lines.append(f"- {gene}: {annotation}")
+        else:
+            gene_lines.append(f"- {gene}")
+
+    parts.append(
+        f"Analyze cluster {cluster_id} containing {len(genes)} genes:\n" + "\n".join(gene_lines)
+    )
+
+    return "\n\n".join(parts)
+
+
 def make_single_cluster_analysis_user_prompt(cluster_id, screen_name, cluster_to_bundle_path_map):
     BUNDLE_PATH = cluster_to_bundle_path_map[str(cluster_id)]
 

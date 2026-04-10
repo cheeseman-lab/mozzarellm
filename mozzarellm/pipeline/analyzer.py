@@ -7,14 +7,24 @@ interface for analyzing gene clusters using LLMs.
 
 import logging
 from datetime import datetime
+from typing import Literal
 
 import pandas as pd
 from tqdm import tqdm
 
-from ..schemas.analysis_output_schemas import AnalysisResult, ClusterResult
 from ..clients.llm_api_clients import create_client
+from ..schemas.analysis_output_schemas import AnalysisResult, ClusterResult
 from ..utils.llm_analysis_utils import process_cluster_response
 from ..utils.local_retrieval import local_knowledge_context_retriever
+from ..utils.prompt_factory import make_cluster_analysis_prompt
+from ..prompt_components import (
+    CLUSTER_ANALYSIS_TASK,
+    GENE_CATEGORIZATION_RULES,
+    NOVEL_CLASSIFICATION_RULES,
+    UNCHARACTERIZED_CLASSIFICATION_RULES,
+    PATHWAY_CONFIDENCE_CRITERIA,
+    OUTPUT_FORMAT_JSON,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +52,8 @@ class ClusterAnalyzer:
         cot_instructions: str | None = None,
         api_key: str | None = None,
         show_progress: bool = True,
+        validate_literature: bool = False,
+        literature_mode: Literal["mcp", "direct_api"] = "direct_api",
     ):
         """
         Initialize the ClusterAnalyzer.
@@ -71,6 +83,8 @@ class ClusterAnalyzer:
         self.knowledge_dir = knowledge_dir
         self.retriever_k = retriever_k
         self.cot_instructions = cot_instructions
+        self.validate_literature = validate_literature
+        self.literature_mode = literature_mode
 
         # Set system prompt
         self.system_prompt = system_prompt or self._get_default_system_prompt()
@@ -90,12 +104,14 @@ class ClusterAnalyzer:
 
     def _get_default_system_prompt(self) -> str:
         """Get default system prompt for genomics analysis."""
-        return (
-            "You are an AI assistant specializing in genomics and systems biology "
-            "with expertise in pathway analysis. Your task is to analyze gene clusters "
-            "to identify biological pathways and potential novel pathway members based "
-            "on published literature and gaps in knowledge of gene function."
-        )
+        return "\n\n".join([
+            CLUSTER_ANALYSIS_TASK,
+            GENE_CATEGORIZATION_RULES,
+            NOVEL_CLASSIFICATION_RULES,
+            UNCHARACTERIZED_CLASSIFICATION_RULES,
+            PATHWAY_CONFIDENCE_CRITERIA,
+            OUTPUT_FORMAT_JSON,
+        ])
 
     def analyze(
         self,
@@ -242,6 +258,25 @@ class ClusterAnalyzer:
 
         return warnings
 
+    def _run_literature_validation(self, parsed: dict) -> dict:
+        """Run Mode A (MCP) or Mode B (direct API) literature validation on a parsed cluster dict."""
+        if self.literature_mode == "mcp":
+            from mozzarellm.pipeline.literature_mcp import validate_and_amend_with_mcp
+
+            return validate_and_amend_with_mcp(parsed, model=self.model)
+        else:
+            from mozzarellm.clients.pmc_client import LiteratureClient
+            from mozzarellm.pipeline.literature_mcp import validate_and_amend_without_mcp
+
+            genes = [
+                g.get("gene") or g
+                for g in parsed.get("novel_role_genes", []) + parsed.get("uncharacterized_genes", [])
+                if isinstance(g, dict)
+            ]
+            pathway = parsed.get("dominant_process", "")
+            hits = LiteratureClient().search_gene_pathway_literature(genes, pathway)
+            return validate_and_amend_without_mcp(parsed, hits, model=self.model)
+
     def _analyze_single_cluster(
         self,
         cluster_id: str,
@@ -335,6 +370,10 @@ class ClusterAnalyzer:
                 classification_completeness=classification_completeness,
                 established_gene_ratio=established_ratio,
             )
+
+            # Optional literature validation pass
+            if self.validate_literature:
+                cluster_result.literature_validation = self._run_literature_validation(parsed)
 
             # Validate quality and log warnings
             warnings = self._validate_cluster_result(cluster_result)
