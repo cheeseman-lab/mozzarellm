@@ -38,8 +38,6 @@ from .pipeline.literature_mcp import (
     validate_and_amend_without_mcp,
 )
 from .schemas.mcp_schemas import ClusterValidationResult
-from .utils.cluster_utils import aggregate_genes_by_cluster
-
 # IO utils
 from .utils.io import load_table, write_bundle
 
@@ -71,7 +69,6 @@ __all__ = [
     "validate_and_amend_with_mcp",
     "validate_and_amend_without_mcp",
     "ClusterValidationResult",
-    "aggregate_genes_by_cluster",
     # IO utils
     "load_table",
     "write_bundle",

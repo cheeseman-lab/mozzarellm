@@ -2,43 +2,6 @@ import pandas as pd
 from pathlib import Path
 
 
-def aggregate_genes_by_cluster(
-    input_df: pd.DataFrame,
-    gene_col: str = "gene_symbol",
-    cluster_col: str = "cluster",
-    additional_cols: list[str] | None = None,
-    gene_sep: str = ";",
-) -> pd.DataFrame:
-    """Reshape a gene-level DataFrame into a cluster-level DataFrame.
-
-    Each row in the output represents one cluster, with genes joined by `gene_sep`.
-    Additional columns (e.g. feature columns) are also joined by `gene_sep`.
-
-    Args:
-        input_df: Gene-level DataFrame with one row per gene.
-        gene_col: Column containing gene symbols.
-        cluster_col: Column containing cluster IDs.
-        additional_cols: Extra columns to aggregate alongside genes.
-        gene_sep: Separator used when joining gene symbols (default: ";").
-
-    Returns:
-        Cluster-level DataFrame with columns: cluster_id, genes, [additional_cols...].
-    """
-    agg: dict[str, object] = {gene_col: lambda x: gene_sep.join(x.astype(str))}
-    if additional_cols:
-        for col in additional_cols:
-            if col in input_df.columns:
-                agg[col] = lambda x: gene_sep.join(x.astype(str))
-
-    cluster_df = (
-        input_df.groupby(cluster_col, sort=False)
-        .agg(agg)
-        .reset_index()
-        .rename(columns={cluster_col: "cluster_id", gene_col: "genes"})
-    )
-    return cluster_df
-
-
 def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
     """Chunk a gene-level table into smaller per-cluster DataFrames slices.
 
