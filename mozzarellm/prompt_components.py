@@ -1,13 +1,18 @@
 """
 Prompt templates and instructions for gene cluster analysis.
 
-This module contains modular prompt components organized in the order they appear
-in the final assembled prompt. Components are automatically concatenated by the
-prompt factory.
+Organized in assembly order: components appear in the file in the same order
+they are concatenated by the prompt factory.
+
+Standard mode: TASK → SCREEN_CONTEXT → GENE_CATEGORIZATION → NOVEL_RULES →
+               UNCHARACTERIZED_RULES → PATHWAY_CONFIDENCE → OUTPUT_FORMAT
+
+CoT mode:      TASK → SCREEN_CONTEXT → PATHWAY_HYPOTHESIS → GENE_CATEGORIZATION →
+               SUBCLASSIFICATION → PATHWAY_SELECTION → VERIFICATION → OUTPUT_FORMAT
 """
 
 # =============================================================================
-# CORE TASK (always first)
+# CORE TASK
 # =============================================================================
 
 CLUSTER_ANALYSIS_TASK = """
@@ -29,7 +34,7 @@ A pathway requires at least 3 genes to be reported. The pathways are not the end
 """
 
 # =============================================================================
-# GENE CATEGORIZATION & CLASSIFICATION RULES (framework for analysis)
+# GENE CATEGORIZATION & CLASSIFICATION RULES
 # =============================================================================
 
 GENE_CATEGORIZATION_RULES = """
@@ -58,6 +63,7 @@ BOUNDARY RULES (apply in order):
 STEP B — CLASSIFY: For NOVEL_ROLE and UNCHARACTERIZED genes, assign a sub-class
 (see classification rules below) and a priority score (1-10).
 """
+
 NOVEL_CLASSIFICATION_RULES = """
 Sub-classes for NOVEL_ROLE genes (genes with established functions in OTHER pathways):
 
@@ -83,7 +89,7 @@ considering sub-class, evidence quality, pathway relevance, and experimental tra
 """
 
 # =============================================================================
-# PATHWAY CONFIDENCE ASSESSMENT (comes AFTER data to enable assessment)
+# PATHWAY CONFIDENCE ASSESSMENT
 # =============================================================================
 
 PATHWAY_CONFIDENCE_CRITERIA = """
@@ -124,10 +130,9 @@ are understudied.
 """
 
 # =============================================================================
-# OUTPUT FORMAT (always last)
+# OUTPUT FORMAT
 # =============================================================================
 
-# NOTE: Listing all class options in template to not unintentionally bias the LLM.
 OUTPUT_FORMAT_JSON = """
 Provide a concise analysis in this exact JSON format:
 {
@@ -156,25 +161,98 @@ Provide a concise analysis in this exact JSON format:
 """
 
 # =============================================================================
-# CHAIN-OF-THOUGHT STEPS (modular building blocks for prompt_factory)
-# Each step is a standalone string that can be included/excluded/reordered.
-# Steps reference static prompts above to maintain consistency.
+# LITERATURE VALIDATION PROMPTS
+# Mode A (Structured MCP): CoT call → MCP Query Structurer → STRUCTURED_MCP_REFINEMENT_PROMPT
+# Mode B (Direct MCP): single call using DIRECT_MCP_VALIDATION_PROMPT
+# =============================================================================
+
+# MATTEO EDIT: review — confirm "suggested_subclass" covers the right subclass values for both
+# NOVEL_ROLE (NO_EVIDENCE/INDIRECT_EVIDENCE/PARTIAL_EVIDENCE/CONTRADICTORY_EVIDENCE) and
+# UNCHARACTERIZED (DARK_GENE/NASCENT/ANNOTATED_ONLY/NON_HUMAN_CHARACTERIZED)
+LITERATURE_VALIDATION_OUTPUT_FORMAT = """
+The "literature_validation" field per gene should contain:
+- "literature_support": "none" | "weak" | "moderate" | "strong"
+- "relevant_papers": up to 3 entries, each {"title": "...", "year": "...", "source": "pubmed|biorxiv", "key_finding": "..."}
+- "pathway_connection": one sentence — how this gene is implicated in the pathway based on literature (null if none found)
+- "suggested_reclassification": null | "ESTABLISHED" | "NOVEL_ROLE" | "UNCHARACTERIZED"
+- "suggested_subclass": null | updated subclass if literature changes the evidence picture
+- "rationale": one sentence — why reclassification/subclass update is or isn't warranted
+"""
+
+# Placeholders: {flagged_genes_json}, {pathway}, {literature_validation_output_format}
+DIRECT_MCP_VALIDATION_PROMPT = """
+I need to validate gene-pathway associations from a functional genomics screen and produce an amended classification.
+
+## Pathway context
+Pathway: "{pathway}"
+
+## Genes to validate
+The following genes were classified as NOVEL_ROLE or UNCHARACTERIZED relative to this pathway:
+
+{flagged_genes_json}
+
+## Task
+For each gene above, search PubMed and bioRxiv using the query:
+  "<GENE_SYMBOL> {pathway}"
+
+Use this exact query structure — do not search for the gene's function broadly.
+Retrieve at most 3 papers per gene. Only papers with direct relevance to "{pathway}" count.
+
+Based on what you find, produce an amended version of the gene entries:
+- Add a "literature_validation" field to each entry
+- If literature strongly supports a role in "{pathway}", suggest reclassification to ESTABLISHED
+- If literature refines the evidence picture (e.g., NO_EVIDENCE → INDIRECT_EVIDENCE), update the subclass
+- If no relevant hits, record literature_support: "none"
+
+Return ONLY the amended gene entries as a JSON object with "novel_role_genes" and
+"uncharacterized_genes" lists, preserving the original schema.
+{literature_validation_output_format}
+"""
+
+# Placeholders: {cluster_id}, {pathway}, {pathway_confidence}, {call_1_summary}, {flagged_genes_json},
+#               {literature_validation_output_format}
+STRUCTURED_MCP_REFINEMENT_PROMPT = """
+You are performing a targeted literature search to refine a gene cluster analysis.
+
+## Cluster context (from initial analysis)
+Cluster: {cluster_id}
+Pathway: "{pathway}" (confidence: {pathway_confidence})
+Initial analysis summary: {call_1_summary}
+
+## Genes requiring literature review
+The following genes were flagged as NOVEL_ROLE or UNCHARACTERIZED relative to "{pathway}":
+
+{flagged_genes_json}
+
+## Task
+For each gene above, search PubMed and bioRxiv using the query:
+  "<GENE_SYMBOL> {pathway}"
+
+Use this exact query structure — do not search for the gene's function broadly.
+Retrieve at most 3 papers per gene per source. Only papers with direct relevance to
+"{pathway}" count — ignore hits about the gene's function in unrelated contexts.
+
+Based on what you find:
+- NOVEL_ROLE gene with direct pathway evidence → suggest reclassification to ESTABLISHED
+- Evidence that refines the subclass (e.g., NO_EVIDENCE → INDIRECT_EVIDENCE) → update subclass
+- UNCHARACTERIZED gene with new characterization data in this pathway → update subclass
+- No relevant hits → record literature_support: "none"
+
+Return ONLY a JSON object with "novel_role_genes" and "uncharacterized_genes" lists,
+preserving the original schema.
+{literature_validation_output_format}
+"""
+
+# =============================================================================
+# CHAIN-OF-THOUGHT STEPS
 # =============================================================================
 
 COT_SCREEN_CONTEXT = "Review the provided screen context:"
 
-COT_STEP_PATHWAY_HYPOTHESIS = f"""PATHWAY HYPOTHESIS (2-3 candidates):
+COT_STEP_PATHWAY_HYPOTHESIS = """PATHWAY HYPOTHESIS (2-3 candidates):
 - Review gene annotations
 - List 2-3 candidate pathways with supporting genes
 - Note which annotations support each hypothesis"""
-
-COT_STEP_PATHWAY_SELECTION = f"""PATHWAY SELECTION:
-Once you have identified candidate pathway(s), evaluate how well EACH pathway explains the cluster using
-these stringent criteria based on what percentage of genes fit the proposed pathway: {PATHWAY_CONFIDENCE_CRITERIA}
-Now, select a dominant pathway based on:
-  * Number of established genes with direct roles
-  * Coherence of functional relationships
-  * Quality of supporting evidence """
 
 COT_STEP_GENE_CATEGORIZATION = f"""GENE CATEGORIZATION (cite evidence):
 For each gene, assign to exactly one category: ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED
@@ -188,6 +266,14 @@ For UNCHARACTERIZED genes, assign one sub-class: DARK_GENE / NASCENT / ANNOTATED
 These are defined according to the following rules: {UNCHARACTERIZED_CLASSIFICATION_RULES}
 Cite specific annotations that inform each classification."""
 
+COT_STEP_PATHWAY_SELECTION = f"""PATHWAY SELECTION:
+Once you have identified candidate pathway(s), evaluate how well EACH pathway explains the cluster using
+these stringent criteria based on what percentage of genes fit the proposed pathway: {PATHWAY_CONFIDENCE_CRITERIA}
+Now, select a dominant pathway based on:
+  * Number of established genes with direct roles
+  * Coherence of functional relationships
+  * Quality of supporting evidence"""
+
 COT_STEP_VERIFICATION = """VERIFICATION:
 - Check for contradictions
 - Verify all genes are classified (no omissions)
@@ -200,15 +286,13 @@ COT_STEP_OUTPUT = f"""FINAL JSON OUTPUT:
 - Include concise summary highlighting key findings and evidence quality
 According to {OUTPUT_FORMAT_JSON}"""
 
-# Default COT assembly - can be customized in prompt_factory
-# This construction allows us to permute as needed for testing
 COT_STEPS_DEFAULT = [
     CLUSTER_ANALYSIS_TASK,
     COT_SCREEN_CONTEXT,
     COT_STEP_PATHWAY_HYPOTHESIS,
-    COT_STEP_PATHWAY_SELECTION,
     COT_STEP_GENE_CATEGORIZATION,
     COT_STEP_SUBCLASSIFICATION,
+    COT_STEP_PATHWAY_SELECTION,
     COT_STEP_VERIFICATION,
     COT_STEP_OUTPUT,
 ]
@@ -232,7 +316,6 @@ def assemble_cot_instructions(
     if steps is None:
         steps = COT_STEPS_DEFAULT
 
-    # Replace COT_SCREEN_CONTEXT placeholder with actual context if provided
     if screen_context is not None:
         steps = [
             f"{COT_SCREEN_CONTEXT}\n{screen_context}" if step == COT_SCREEN_CONTEXT else step

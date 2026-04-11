@@ -43,6 +43,9 @@ htmlcov/
 logs/
 debug/
 
+# Docs (internal working documents)
+docs/
+
 # Results and data (optional, comment out if you want to track these)
 results/
 output/
