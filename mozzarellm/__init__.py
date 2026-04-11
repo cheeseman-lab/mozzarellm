@@ -4,8 +4,6 @@ mozzarellm: Gene cluster analysis using Large Language Models (LLMs)
 
 __version__ = "0.2.0"
 
-# New unified API
-from .pipeline.analyzer import ClusterAnalyzer
 from .schemas.analysis_output_schemas import (
     AnalysisResult,
     ClusterInput,
@@ -43,8 +41,6 @@ from .utils.io import load_table, write_bundle
 
 # Expose package-level API
 __all__ = [
-    # Main API
-    "ClusterAnalyzer",
     # Models
     "ClusterResult",
     "AnalysisResult",
