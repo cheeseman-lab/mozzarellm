@@ -1,0 +1,32 @@
+{
+  "assay_type": "Optical Pooled Screen (OPS)",
+  "target_phenotype": "Morphological cell phenotype — cell and nuclear shape, texture, and intensity features across multiple channels",
+  "organism": "Homo sapiens",
+  "cell_line_or_system": "HeLa cells (human cervical cancer cells)",
+  "perturbation": {
+    "type": "CRISPR-Cas9 knockout",
+    "library_or_reagent": "Essential-wide sgRNA library (Funk et al. 2022)"
+  },
+  "readout": {
+    "measurement": "High-content fluorescence imaging of fixed cells",
+    "instrument_or_platform": "Optical pooled screening (in situ sequencing + imaging)",
+    "primary_metric": "Morphological feature vectors — cells are clustered by similarity of phenotypic profiles across imaging channels"
+  },
+  "clustering": {
+    "method": "Phenotypic similarity clustering of per-gene morphological profiles",
+    "parameters": {
+      "resolution": "Leiden algorithm on nearest-neighbor graph",
+      "k_neighbors": "12"
+    }
+  },
+  "controls": {
+    "negative_controls": "Non-targeting sgRNAs",
+    "positive_controls": "Known pathway members used to validate cluster assignments"
+  },
+  "provenance": {
+    "dataset_name": "Funk 2022 OPS genome-wide screen",
+    "citation": "Funk et al. (2022) Nat Methods. Optical pooled screens in human cells.",
+    "data_source": "funk_2022.csv — gene-level phenotypic cluster assignments from the Funk et al. 2022 dataset"
+  },
+  "notes": "Clusters represent sets of genes with similar morphological phenotypes. Genes in the same cluster likely perturb the same biological process or pathway"
+}

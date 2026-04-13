@@ -135,7 +135,7 @@ def make_single_cluster_analysis_user_prompt(cluster_id, screen_name, cluster_to
     bundle_text = json.dumps(bundle_obj, ensure_ascii=False)
 
     output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     return (
         f"Here is the evidence bundle JSON for cluster {cluster_id}:\n\n```json\n{bundle_text}\n```"
     )

@@ -76,3 +76,4 @@ Thumbs.db
 # Development artifacts
 dev/
 screen_context.json
+!examples/*/screen_context.json

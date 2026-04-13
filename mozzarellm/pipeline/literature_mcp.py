@@ -20,11 +20,12 @@ from typing import Any
 from ..prompt_components import DIRECT_MCP_VALIDATION_PROMPT, LITERATURE_VALIDATION_OUTPUT_FORMAT
 
 # MCP server URLs
-# pubmed (pubmed.mcp.claude.com) — Anthropic-hosted, requires authorization_token=ANTHROPIC_API_KEY
-# biorxiv (mcp.deepsense.ai) — NO keyword search, date/category only — not useful for gene queries
+# pubmed.mcp.claude.com — Anthropic-hosted, requires authorization_token=ANTHROPIC_API_KEY.
+# Known limitation: second MCP call in the same Python process returns 504 (proxy session teardown).
+# Single-cluster runs work reliably. Multi-cluster MCP requires ~2-3min between calls.
+# Tracked via request IDs: req_011CZvZdTc8KTg5PmXru8D4f, req_011CZvbyJv2x4eZ2pQx5AScb, req_011CZzbW4HUWLdMPyqgUfztc
 MCP_SERVERS = {
     "pubmed": "https://pubmed.mcp.claude.com/mcp",
-    # biorxiv (mcp.deepsense.ai) excluded — server returns 500; no keyword search capability anyway
 }
 
 
