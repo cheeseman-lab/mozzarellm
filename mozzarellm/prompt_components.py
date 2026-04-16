@@ -162,77 +162,62 @@ Provide a concise analysis in this exact JSON format:
 
 # =============================================================================
 # LITERATURE VALIDATION PROMPT
-# Single call using MCP_VALIDATION_PROMPT, constrained to 2 MCP tool calls.
+# Single LLM call constrained to exactly 2 MCP tool calls (search + metadata).
 # =============================================================================
 
-# MATTEO EDIT: review — confirm "suggested_subclass" covers the right subclass values for both
-# NOVEL_ROLE (NO_EVIDENCE/INDIRECT_EVIDENCE/PARTIAL_EVIDENCE/CONTRADICTORY_EVIDENCE) and
-# UNCHARACTERIZED (DARK_GENE/NASCENT/ANNOTATED_ONLY/NON_HUMAN_CHARACTERIZED)
 LITERATURE_VALIDATION_OUTPUT_FORMAT = """
-The "literature_validation" field per gene should contain:
+The "literature_validation" field per gene must contain:
 - "literature_support": "none" | "weak" | "moderate" | "strong"
-- "relevant_papers": up to 3 entries, each {"title": "...", "year": "...", "source": "pubmed|biorxiv", "key_finding": "..."}
+- "relevant_papers": up to 3 entries, each {"pmid": "...", "title": "...", "year": "...", "key_finding": "..."}
 - "pathway_connection": one sentence — how this gene is implicated in the pathway based on literature (null if none found)
 - "suggested_reclassification": null | "ESTABLISHED" | "NOVEL_ROLE" | "UNCHARACTERIZED"
-- "suggested_subclass": null | updated subclass if literature changes the evidence picture
+- "suggested_subclass": null | one of the valid subclass values for the gene's (possibly reclassified) category:
+    NOVEL_ROLE: NO_EVIDENCE | INDIRECT_EVIDENCE | PARTIAL_EVIDENCE | CONTRADICTORY_EVIDENCE
+    UNCHARACTERIZED: DARK_GENE | NASCENT | ANNOTATED_ONLY | NON_HUMAN_CHARACTERIZED
+    ESTABLISHED: null (no subclasses)
 - "rationale": one sentence — why reclassification/subclass update is or isn't warranted
 """
 
 # Placeholders: {flagged_genes_json}, {pathway}, {literature_validation_output_format}
 MCP_VALIDATION_PROMPT = """
-I need to validate gene-pathway associations from a functional genomics screen and produce an amended classification.
+Validate gene-pathway associations from a functional genomics screen and produce an amended classification.
 
 ## Pathway context
 Full cluster annotation: "{pathway}"
 
 ## Genes to validate
-The following genes were classified as NOVEL_ROLE or UNCHARACTERIZED relative to this pathway:
+These genes were classified as NOVEL_ROLE or UNCHARACTERIZED relative to the pathway above:
 
 {flagged_genes_json}
 
-## Task — follow these steps EXACTLY
+## Procedure — follow EXACTLY
 
 ### Step 1: Extract a search keyword
-From the full cluster annotation above, derive the SIMPLEST 2-3 word PubMed keyword that captures the broad pathway. Examples:
-- "Ribosome biogenesis — 40S small subunit (SSU) processome and pre-rRNA processing; translation initiation (eIF3 complex)" → `ribosome biogenesis`
+Reduce the full cluster annotation to a SIMPLEST 2-3 word PubMed keyword. Examples:
+- "Ribosome biogenesis — 40S small subunit (SSU) processome and pre-rRNA processing" → `ribosome biogenesis`
 - "DNA damage response and double-strand break repair via homologous recombination" → `DNA damage repair`
 - "mTOR signaling and lysosomal biogenesis" → `mTOR signaling`
 
 Keep it short and broad — this is the recall step.
 
-### Step 2: Make ONE search call
-Call `search_articles` exactly ONCE with this query structure:
-  `(GENE1[tiab] OR GENE2[tiab] OR ... OR GENEN[tiab]) AND <keyword from Step 1>`
+### Step 2: ONE `search_articles` call
+Query: `(GENE1[tiab] OR GENE2[tiab] OR ... OR GENEN[tiab]) AND <keyword from Step 1>`
+- The [tiab] tag on EVERY gene symbol is mandatory — it restricts matching to title/abstract and prevents noise from common-word symbols like "RAN".
+- max_results=30
 
-Use [tiab] field tags on EVERY gene symbol to restrict matches to title/abstract (this prevents noise from common-word gene names like "RAN").
+### Step 3: ONE `get_article_metadata` call
+Pass all PMIDs returned by Step 2.
 
-Set `max_results=30`.
+### Step 4: Validate against the FULL annotation (not the keyword)
+For each gene and each paper, judge whether the paper addresses the SPECIFIC subprocess in the full annotation. A paper about "ribosome biogenesis in mitochondria" is peripheral to a "40S SSU processome" cluster — flag accordingly.
 
-### Step 3: Make ONE metadata call
-Call `get_article_metadata` exactly ONCE with all the PMIDs from Step 2.
-
-### Step 4: Validate using the FULL cluster annotation
-For each gene, examine the returned papers and decide:
-- Does this paper actually address the SPECIFIC subprocess in the full annotation (not just the broad keyword)?
-- A paper about "ribosome biogenesis in mitochondria" may be peripheral to a cluster about the "40S SSU processome" — flag accordingly.
-
-Use the full annotation, not the search keyword, to make this judgment.
-
-## CRITICAL constraints
-- Make EXACTLY 2 tool calls total (1 search + 1 metadata)
-- Do NOT search per-gene
-- Do NOT call any tool more than once
-- Do NOT call any other tools (no related_articles, no full_text, no biorxiv)
+## Hard constraints
+- EXACTLY 2 tool calls total (1 search + 1 metadata). Do not call any tool more than once.
+- Do NOT search per-gene. Do NOT call any other tools.
 
 ## Output
-Produce an amended version of the gene entries:
-- Add a "literature_validation" field to each entry
-- If literature strongly supports a role in the full pathway annotation, suggest reclassification to ESTABLISHED
-- If literature refines the evidence picture (e.g., NO_EVIDENCE → INDIRECT_EVIDENCE), update the subclass
-- If no relevant hits, record literature_support: "none"
+Return ONLY a JSON object with "novel_role_genes" and "uncharacterized_genes" lists, preserving the original schema. For each entry, add a `literature_validation` field per the schema below. If no relevant papers were found for a gene, set `literature_support: "none"` and leave reclassification/subclass null.
 
-Return ONLY the amended gene entries as a JSON object with "novel_role_genes" and
-"uncharacterized_genes" lists, preserving the original schema.
 {literature_validation_output_format}
 """
 
