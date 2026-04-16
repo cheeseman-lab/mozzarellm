@@ -21,8 +21,14 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from mozzarellm.clients.llm_api_clients import create_client
-from mozzarellm.pipeline.bundle_builder import build_evidence_bundles, get_or_append_stable_accession
-from mozzarellm.pipeline.literature_mcp import get_available_mcp_servers, validate_and_amend_with_mcp
+from mozzarellm.pipeline.bundle_builder import (
+    build_evidence_bundles,
+    get_or_append_stable_accession,
+)
+from mozzarellm.pipeline.literature_mcp import (
+    get_available_mcp_servers,
+    validate_and_amend_with_mcp,
+)
 from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
 from mozzarellm.utils.llm_analysis_utils import process_cluster_response
 from mozzarellm.utils.prompt_factory import (
@@ -276,13 +282,20 @@ def run_dataset(
                 amended = validate_and_amend_with_mcp(parsed, model=model)
                 elapsed = time.time() - t0
                 reclassified = amended.get("reclassifications", [])
-                print(f"OK ({elapsed:.1f}s | {len(reclassified)} reclassifications)")
+                mcp_meta = amended.get("_validation_metadata", {})
+                tool_calls = mcp_meta.get("tool_calls", 0)
+                print(f"OK ({elapsed:.1f}s | {tool_calls} tool calls | ${mcp_meta.get('cost_usd', 0):.4f} | {len(reclassified)} reclassifications)")
                 if reclassified:
                     for r in reclassified:
                         print(f"    {r['gene']} → {r['new_category']}")
                 results[cluster_id] = amended
                 cluster_metrics[cluster_id]["mcp_elapsed_s"] = round(elapsed, 1)
                 cluster_metrics[cluster_id]["mcp_reclassifications"] = len(reclassified)
+                mcp_meta = amended.get("_validation_metadata", {})
+                if "input_tokens" in mcp_meta:
+                    cluster_metrics[cluster_id]["mcp_input_tokens"] = mcp_meta["input_tokens"]
+                    cluster_metrics[cluster_id]["mcp_output_tokens"] = mcp_meta["output_tokens"]
+                    cluster_metrics[cluster_id]["mcp_cost_usd"] = mcp_meta["cost_usd"]
             except Exception as e:
                 elapsed = time.time() - t0
                 print(f"FAILED ({elapsed:.1f}s): {e}")
@@ -308,9 +321,16 @@ def run_dataset(
     total_time = sum(m.get("elapsed_s", 0) for m in cluster_metrics.values())
     total_in = sum(m.get("input_tokens", 0) for m in cluster_metrics.values())
     total_out = sum(m.get("output_tokens", 0) for m in cluster_metrics.values())
+    total_mcp_cost = sum(m.get("mcp_cost_usd", 0) for m in cluster_metrics.values())
+    total_mcp_time = sum(m.get("mcp_elapsed_s", 0) for m in cluster_metrics.values())
+    cost_line = f"${total_cost:.4f}"
+    if total_mcp_cost > 0:
+        cost_line += f" + ${total_mcp_cost:.4f} MCP = ${total_cost + total_mcp_cost:.4f} total"
     print(
-        f"\n  Totals: {total_time:.1f}s | {total_in}in/{total_out}out | ${total_cost:.4f}"
+        f"\n  Totals: {total_time:.1f}s | {total_in}in/{total_out}out | {cost_line}"
     )
+    if total_mcp_time > 0:
+        print(f"  MCP:    {total_mcp_time:.1f}s")
 
     # Save per-dataset results
     dataset_out = run_dir / f"{dataset_name}_results.json"
@@ -334,6 +354,8 @@ def run_dataset(
             "input_tokens": total_in,
             "output_tokens": total_out,
             "cost_usd": round(total_cost, 4),
+            "mcp_cost_usd": round(total_mcp_cost, 4),
+            "mcp_elapsed_s": round(total_mcp_time, 1),
         },
     }
 
@@ -370,9 +392,16 @@ def print_summary(all_summaries: list[dict], run_dir: Path):
 
     # Overall cost/time
     grand_cost = sum(s["totals"]["cost_usd"] for s in all_summaries)
+    grand_mcp_cost = sum(s["totals"].get("mcp_cost_usd", 0) for s in all_summaries)
     grand_time = sum(s["totals"]["elapsed_s"] for s in all_summaries)
-    print(f"Total cost:          ${grand_cost:.4f}")
-    print(f"Total time:          {grand_time:.1f}s")
+    grand_mcp_time = sum(s["totals"].get("mcp_elapsed_s", 0) for s in all_summaries)
+    print(f"Phase 1 cost:        ${grand_cost:.4f}")
+    if grand_mcp_cost > 0:
+        print(f"Phase 2 (MCP) cost:  ${grand_mcp_cost:.4f}")
+    print(f"Total cost:          ${grand_cost + grand_mcp_cost:.4f}")
+    print(f"Phase 1 time:        {grand_time:.1f}s")
+    if grand_mcp_time > 0:
+        print(f"Phase 2 (MCP) time:  {grand_mcp_time:.1f}s")
 
     print(f"\n{'Cluster':<12} {'Dataset':<12} {'Func':>5} {'Conf':>5} {'Time(s)':>8} {'Cost($)':>8}  Predicted function")
     print("-" * 90)
@@ -391,8 +420,11 @@ def print_summary(all_summaries: list[dict], run_dir: Path):
         "function_matches": f"{func_matches}/{total}",
         "confidence_matches": f"{conf_matches}/{len(conf_checks)}" if conf_checks else "N/A",
         "gene_validation": f"{gene_validated}/{gene_total}" if gene_total else "N/A",
-        "total_cost_usd": round(grand_cost, 4),
-        "total_time_s": round(grand_time, 1),
+        "phase1_cost_usd": round(grand_cost, 4),
+        "mcp_cost_usd": round(grand_mcp_cost, 4),
+        "total_cost_usd": round(grand_cost + grand_mcp_cost, 4),
+        "phase1_time_s": round(grand_time, 1),
+        "mcp_time_s": round(grand_mcp_time, 1),
         "per_dataset": all_summaries,
     }, indent=2))
     print(f"\nSummary saved: {summary_path}")
@@ -420,7 +452,7 @@ def main():
         if "pubmed" not in available:
             print("ERROR: PubMed MCP server is unavailable. Run without --mcp or try later.")
             raise SystemExit(1)
-        print(f"MCP preflight: PubMed available ✓")
+        print("MCP preflight: PubMed available ✓")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     cot_tag = "_cot" if args.cot else ""

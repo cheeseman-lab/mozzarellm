@@ -1,13 +1,9 @@
 """
 Literature validation for MozzareLLM gene classifications.
 
-Two modes:
-- Mode B (Direct MCP): One LLM call with PubMed/bioRxiv MCP connectors. Unguided search.
-- Mode A (Structured MCP): Two calls — Call 1 is standard CoT analysis, Call 2 is targeted
-  MCP refinement on the flagged gene subset. See STRUCTURED_MCP_REFINEMENT_PROMPT.
-
-Both modes take a per-cluster classification JSON and return an amended JSON
-with a literature_validation field per gene.
+Single LLM call constrained to exactly 2 MCP tool calls (search + metadata fetch).
+Takes a per-cluster classification JSON and returns an amended JSON with a
+literature_validation field per gene.
 """
 
 from __future__ import annotations
@@ -17,17 +13,19 @@ import os
 import time
 from typing import Any
 
-from ..prompt_components import DIRECT_MCP_VALIDATION_PROMPT, LITERATURE_VALIDATION_OUTPUT_FORMAT
+import anthropic
+
+from ..prompt_components import LITERATURE_VALIDATION_OUTPUT_FORMAT, MCP_VALIDATION_PROMPT
 
 # MCP server URLs
 # pubmed.mcp.claude.com — Anthropic-hosted, requires authorization_token=ANTHROPIC_API_KEY.
-# Known limitation: second MCP call in the same Python process returns 504 (proxy session teardown).
-# Single-cluster runs work reliably. Multi-cluster MCP requires ~2-3min between calls.
-# Tracked via request IDs: req_011CZvZdTc8KTg5PmXru8D4f, req_011CZvbyJv2x4eZ2pQx5AScb, req_011CZzbW4HUWLdMPyqgUfztc
 MCP_SERVERS = {
     "pubmed": "https://pubmed.mcp.claude.com/mcp",
 }
 
+# Anthropic-hosted MCP servers require an authorization_token (the API key);
+# third-party servers do not.
+ANTHROPIC_HOSTED_MCP = {"pubmed.mcp.claude.com"}
 
 ANTHROPIC_STATUS_URL = "https://status.anthropic.com"
 
@@ -125,17 +123,20 @@ def _extract_genes_to_validate(cluster_json: dict[str, Any]) -> list[str]:
 def _build_validation_prompt(
     pathway: str,
     cluster_json: dict[str, Any],
+    novel_role_subset: list[dict] | None = None,
+    uncharacterized_subset: list[dict] | None = None,
 ) -> str:
     """Build the Direct MCP validation prompt from the named template.
 
     Passes only novel_role_genes and uncharacterized_genes — established genes
-    are excluded to avoid unnecessary token burn.
+    are excluded to avoid unnecessary token burn. If subsets are provided, uses
+    those instead of the full lists (for batching).
     """
     flagged_genes = {
-        "novel_role_genes": cluster_json.get("novel_role_genes", []),
-        "uncharacterized_genes": cluster_json.get("uncharacterized_genes", []),
+        "novel_role_genes": novel_role_subset if novel_role_subset is not None else cluster_json.get("novel_role_genes", []),
+        "uncharacterized_genes": uncharacterized_subset if uncharacterized_subset is not None else cluster_json.get("uncharacterized_genes", []),
     }
-    return DIRECT_MCP_VALIDATION_PROMPT.format(
+    return MCP_VALIDATION_PROMPT.format(
         flagged_genes_json=json.dumps(flagged_genes, indent=2),
         pathway=pathway,
         literature_validation_output_format=LITERATURE_VALIDATION_OUTPUT_FORMAT,
@@ -145,13 +146,16 @@ def _build_validation_prompt(
 def validate_and_amend_with_mcp(
     cluster_json: dict[str, Any],
     model: str = "claude-sonnet-4-5",
-    max_tokens: int = 8000,
+    max_tokens: int = 16000,
     max_retries: int = 3,
 ) -> dict[str, Any]:
-    """Mode A: Validate and amend classifications using LLM + MCP connectors.
+    """Validate and amend classifications using LLM + MCP connectors.
 
-    One LLM call that searches PubMed/bioRxiv via MCP tools and produces
-    the amended classification JSON.
+    Single API call constrained to exactly 2 MCP tool calls:
+    - search_articles with one OR query covering all genes
+    - get_article_metadata for the resulting PMIDs
+
+    The model then validates relevance using the full cluster annotation.
 
     Args:
         cluster_json: Per-cluster classification result (must have dominant_process,
@@ -163,8 +167,6 @@ def validate_and_amend_with_mcp(
     Returns:
         Amended cluster JSON with literature_validation per gene, plus metadata.
     """
-    import anthropic
-
     genes = _extract_genes_to_validate(cluster_json)
     if not genes:
         return {**cluster_json, "_validation_metadata": {"mode": "mcp", "skipped": "no genes to validate"}}
@@ -174,10 +176,8 @@ def validate_and_amend_with_mcp(
 
     client = anthropic.Anthropic()
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    # authorization_token is only needed for Anthropic-hosted MCP servers (pubmed.mcp.claude.com)
-    ANTHROPIC_HOSTED = {"pubmed.mcp.claude.com"}
     mcp_servers = [
-        {"type": "url", "url": url, "name": name, **({"authorization_token": api_key} if any(h in url for h in ANTHROPIC_HOSTED) else {})}
+        {"type": "url", "url": url, "name": name, **({"authorization_token": api_key} if any(h in url for h in ANTHROPIC_HOSTED_MCP) else {})}
         for name, url in MCP_SERVERS.items()
     ]
     tools = [{"type": "mcp_toolset", "mcp_server_name": name} for name in MCP_SERVERS]
@@ -199,11 +199,10 @@ def validate_and_amend_with_mcp(
             msg = str(e).lower()
             retryable = any(kw in msg for kw in ("timed out", "504", "502", "503", "500", "connection error", "internal server"))
             if attempt < max_retries - 1 and retryable:
-                time.sleep(15)
+                time.sleep(60)
             else:
                 raise
 
-    # Extract text output
     output_text = ""
     tool_call_count = 0
     for block in response.content:
@@ -212,127 +211,43 @@ def validate_and_amend_with_mcp(
         elif block.type == "mcp_tool_use":
             tool_call_count += 1
 
-    # Parse JSON from response
     amended_json = _parse_json_from_text(output_text)
-
-    # Estimate cost (Sonnet: $3/M input, $15/M output)
     cost = (response.usage.input_tokens * 3 + response.usage.output_tokens * 15) / 1_000_000
 
-    if amended_json:
-        amended_json["_validation_metadata"] = {
-            "mode": "mcp",
-            "model": model,
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-            "cost_usd": round(cost, 4),
-            "time_seconds": round(elapsed, 1),
-            "tool_calls": tool_call_count,
-            "genes_validated": genes,
-        }
-        return amended_json
-
-    # Fallback: return original with metadata
-    return {
-        **cluster_json,
-        "_validation_metadata": {
-            "mode": "mcp",
-            "error": "failed to parse amended JSON from LLM response",
-            "raw_output": output_text[:500],
-        },
+    meta = {
+        "mode": "mcp",
+        "model": model,
+        "input_tokens": response.usage.input_tokens,
+        "output_tokens": response.usage.output_tokens,
+        "cost_usd": round(cost, 4),
+        "time_seconds": round(elapsed, 1),
+        "tool_calls": tool_call_count,
+        "genes_validated": genes,
     }
 
-
-def validate_and_amend_without_mcp(
-    cluster_json: dict[str, Any],
-    literature_hits: list[dict[str, Any]],
-    model: str = "claude-sonnet-4-5",
-    max_tokens: int = 8000,
-) -> dict[str, Any]:
-    """Mode B: Amend classifications using pre-fetched literature search results.
-
-    Takes raw Europe PMC search hits and uses an LLM call (no MCP) to
-    interpret relevance and produce amended classifications.
-
-    Args:
-        cluster_json: Per-cluster classification result.
-        literature_hits: Raw search results from LiteratureClient.search_gene_pathway_literature().
-        model: Anthropic model to use.
-        max_tokens: Max output tokens.
-
-    Returns:
-        Amended cluster JSON with literature_validation per gene.
-    """
-    import anthropic
-
-    genes = _extract_genes_to_validate(cluster_json)
-    if not genes:
-        return {**cluster_json, "_validation_metadata": {"mode": "direct_api", "skipped": "no genes to validate"}}
-
-    pathway = cluster_json.get("dominant_process", "")
-
-    # Filter hits to only those mentioning our genes
-    relevant_hits = [h for h in literature_hits if h.get("genes_mentioned")]
-
-    prompt = f"""I need to validate gene-pathway associations based on literature search results and produce an amended classification.
-
-## Original Classification
-{json.dumps(cluster_json, indent=2)}
-
-## Literature Search Results
-The following papers were found by searching for the genes ({', '.join(genes)}) in relation to "{pathway}":
-
-{json.dumps(relevant_hits, indent=2)}
-
-## Task
-Based on these search results, produce an amended version of the original classification JSON:
-- Add a "literature_validation" field to each novel_role and uncharacterized gene entry
-- If a paper directly demonstrates a gene's role in the pathway, suggest reclassification
-- Keep the same JSON schema as the input
-
-Return ONLY the amended JSON. The "literature_validation" field per gene should have:
-- "literature_support": "none" | "weak" | "moderate" | "strong"
-- "relevant_papers": [{{"title": "...", "year": "...", "key_finding": "..."}}]
-- "suggested_reclassification": null or "established" or "novel_role"
-- "rationale": "why reclassification is or isn't warranted"
-"""
-
-    client = anthropic.Anthropic()
-
-    start = time.time()
-    response = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    elapsed = time.time() - start
-
-    output_text = response.content[0].text if response.content else ""
-    amended_json = _parse_json_from_text(output_text)
-
-    cost = (response.usage.input_tokens * 3 + response.usage.output_tokens * 15) / 1_000_000
-
-    if amended_json:
-        amended_json["_validation_metadata"] = {
-            "mode": "direct_api",
-            "model": model,
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-            "cost_usd": round(cost, 4),
-            "time_seconds": round(elapsed, 1),
-            "literature_hits_total": len(literature_hits),
-            "literature_hits_relevant": len(relevant_hits),
-            "genes_validated": genes,
+    if not amended_json:
+        return {
+            **cluster_json,
+            "_validation_metadata": {**meta, "error": "failed to parse amended JSON", "raw_output": output_text[:500]},
         }
-        return amended_json
 
-    return {
+    amended = {
         **cluster_json,
-        "_validation_metadata": {
-            "mode": "direct_api",
-            "error": "failed to parse amended JSON from LLM response",
-            "raw_output": output_text[:500],
-        },
+        "novel_role_genes": amended_json.get("novel_role_genes", cluster_json.get("novel_role_genes", [])),
+        "uncharacterized_genes": amended_json.get("uncharacterized_genes", cluster_json.get("uncharacterized_genes", [])),
+        "_validation_metadata": meta,
     }
+
+    # Count reclassifications
+    reclassifications = []
+    for g in amended["novel_role_genes"] + amended["uncharacterized_genes"]:
+        lit = g.get("literature_validation", {})
+        if lit.get("suggested_reclassification"):
+            reclassifications.append({"gene": g["gene"], "new_category": lit["suggested_reclassification"]})
+    if reclassifications:
+        amended["reclassifications"] = reclassifications
+
+    return amended
 
 
 def _parse_json_from_text(text: str) -> dict[str, Any] | None:

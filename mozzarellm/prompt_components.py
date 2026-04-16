@@ -161,9 +161,8 @@ Provide a concise analysis in this exact JSON format:
 """
 
 # =============================================================================
-# LITERATURE VALIDATION PROMPTS
-# Mode A (Structured MCP): CoT call → MCP Query Structurer → STRUCTURED_MCP_REFINEMENT_PROMPT
-# Mode B (Direct MCP): single call using DIRECT_MCP_VALIDATION_PROMPT
+# LITERATURE VALIDATION PROMPT
+# Single call using MCP_VALIDATION_PROMPT, constrained to 2 MCP tool calls.
 # =============================================================================
 
 # MATTEO EDIT: review — confirm "suggested_subclass" covers the right subclass values for both
@@ -180,66 +179,60 @@ The "literature_validation" field per gene should contain:
 """
 
 # Placeholders: {flagged_genes_json}, {pathway}, {literature_validation_output_format}
-DIRECT_MCP_VALIDATION_PROMPT = """
+MCP_VALIDATION_PROMPT = """
 I need to validate gene-pathway associations from a functional genomics screen and produce an amended classification.
 
 ## Pathway context
-Pathway: "{pathway}"
+Full cluster annotation: "{pathway}"
 
 ## Genes to validate
 The following genes were classified as NOVEL_ROLE or UNCHARACTERIZED relative to this pathway:
 
 {flagged_genes_json}
 
-## Task
-For each gene above, search PubMed and bioRxiv using the query:
-  "<GENE_SYMBOL> {pathway}"
+## Task — follow these steps EXACTLY
 
-Use this exact query structure — do not search for the gene's function broadly.
-Retrieve at most 3 papers per gene. Only papers with direct relevance to "{pathway}" count.
+### Step 1: Extract a search keyword
+From the full cluster annotation above, derive the SIMPLEST 2-3 word PubMed keyword that captures the broad pathway. Examples:
+- "Ribosome biogenesis — 40S small subunit (SSU) processome and pre-rRNA processing; translation initiation (eIF3 complex)" → `ribosome biogenesis`
+- "DNA damage response and double-strand break repair via homologous recombination" → `DNA damage repair`
+- "mTOR signaling and lysosomal biogenesis" → `mTOR signaling`
 
-Based on what you find, produce an amended version of the gene entries:
+Keep it short and broad — this is the recall step.
+
+### Step 2: Make ONE search call
+Call `search_articles` exactly ONCE with this query structure:
+  `(GENE1[tiab] OR GENE2[tiab] OR ... OR GENEN[tiab]) AND <keyword from Step 1>`
+
+Use [tiab] field tags on EVERY gene symbol to restrict matches to title/abstract (this prevents noise from common-word gene names like "RAN").
+
+Set `max_results=30`.
+
+### Step 3: Make ONE metadata call
+Call `get_article_metadata` exactly ONCE with all the PMIDs from Step 2.
+
+### Step 4: Validate using the FULL cluster annotation
+For each gene, examine the returned papers and decide:
+- Does this paper actually address the SPECIFIC subprocess in the full annotation (not just the broad keyword)?
+- A paper about "ribosome biogenesis in mitochondria" may be peripheral to a cluster about the "40S SSU processome" — flag accordingly.
+
+Use the full annotation, not the search keyword, to make this judgment.
+
+## CRITICAL constraints
+- Make EXACTLY 2 tool calls total (1 search + 1 metadata)
+- Do NOT search per-gene
+- Do NOT call any tool more than once
+- Do NOT call any other tools (no related_articles, no full_text, no biorxiv)
+
+## Output
+Produce an amended version of the gene entries:
 - Add a "literature_validation" field to each entry
-- If literature strongly supports a role in "{pathway}", suggest reclassification to ESTABLISHED
+- If literature strongly supports a role in the full pathway annotation, suggest reclassification to ESTABLISHED
 - If literature refines the evidence picture (e.g., NO_EVIDENCE → INDIRECT_EVIDENCE), update the subclass
 - If no relevant hits, record literature_support: "none"
 
 Return ONLY the amended gene entries as a JSON object with "novel_role_genes" and
 "uncharacterized_genes" lists, preserving the original schema.
-{literature_validation_output_format}
-"""
-
-# Placeholders: {cluster_id}, {pathway}, {pathway_confidence}, {call_1_summary}, {flagged_genes_json},
-#               {literature_validation_output_format}
-STRUCTURED_MCP_REFINEMENT_PROMPT = """
-You are performing a targeted literature search to refine a gene cluster analysis.
-
-## Cluster context (from initial analysis)
-Cluster: {cluster_id}
-Pathway: "{pathway}" (confidence: {pathway_confidence})
-Initial analysis summary: {call_1_summary}
-
-## Genes requiring literature review
-The following genes were flagged as NOVEL_ROLE or UNCHARACTERIZED relative to "{pathway}":
-
-{flagged_genes_json}
-
-## Task
-For each gene above, search PubMed and bioRxiv using the query:
-  "<GENE_SYMBOL> {pathway}"
-
-Use this exact query structure — do not search for the gene's function broadly.
-Retrieve at most 3 papers per gene per source. Only papers with direct relevance to
-"{pathway}" count — ignore hits about the gene's function in unrelated contexts.
-
-Based on what you find:
-- NOVEL_ROLE gene with direct pathway evidence → suggest reclassification to ESTABLISHED
-- Evidence that refines the subclass (e.g., NO_EVIDENCE → INDIRECT_EVIDENCE) → update subclass
-- UNCHARACTERIZED gene with new characterization data in this pathway → update subclass
-- No relevant hits → record literature_support: "none"
-
-Return ONLY a JSON object with "novel_role_genes" and "uncharacterized_genes" lists,
-preserving the original schema.
 {literature_validation_output_format}
 """
 
