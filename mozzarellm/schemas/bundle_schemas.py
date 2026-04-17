@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal, Annotated
 
-from pydantic import BaseModel, Field, BeforeValidator, ConfigDict
+from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, model_validator
 
 
 # Validation functions
@@ -57,9 +57,21 @@ class Controls(SemiFlexModel):
 
 
 class Provenance(SemiFlexModel):
-    dataset_name: RequiredStr
+    dataset_name: RequiredStr 
     citation: RequiredStr
     data_source: RequiredStr
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_aliases(cls, values: dict) -> dict:
+        """Accept 'lab' as alias for 'citation', 'screen_name' as alias for 'dataset_name'."""
+        if not isinstance(values, dict):
+            return values
+        if not values.get("citation") and values.get("lab"):
+            values["citation"] = values["lab"]
+        if not values.get("dataset_name") and values.get("screen_name"):
+            values["dataset_name"] = values["screen_name"]
+        return values
 
 
 class ScreenContext(SemiFlexModel):
