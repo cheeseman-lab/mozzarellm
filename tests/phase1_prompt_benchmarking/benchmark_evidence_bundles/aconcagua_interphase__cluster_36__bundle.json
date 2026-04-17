@@ -1,0 +1,206 @@
+{
+  "screen_name": "aconcagua_interphase",
+  "cluster_id": "36",
+  "cluster_genes": [
+    {
+      "gene_symbol": "ANAPC2",
+      "UniProt_functional_annotation": "Together with the RING-H2 protein ANAPC11, constitutes the catalytic component of the anaphase promoting complex/cyclosome (APC/C), a cell cycle-regulated E3 ubiquitin ligase that controls progression through mitosis and the G1 phase of the cell cycle (PubMed:11739784, PubMed:18485873). The APC/C complex acts by mediating ubiquitination and subsequent degradation of target proteins: it mainly mediates the formation of 'Lys-11'-linked polyubiquitin chains and, to a lower extent, the formation of 'Lys-48'- and 'Lys-63'-linked polyubiquitin chains (PubMed:11739784, PubMed:18485873). The APC/C complex catalyzes assembly of branched 'Lys-11'-/'Lys-48'-linked branched ubiquitin chains on target proteins (PubMed:29033132). The CDC20-APC/C complex positively regulates the formation of synaptic vesicle clustering at active zone to the presynaptic membrane in postmitotic neurons (By similarity). CDC20-APC/C-induced degradation of NEUROD2 drives presynaptic differentiation (By similarity)",
+      "accession": "Q9UJX6"
+    },
+    {
+      "gene_symbol": "EIF3A",
+      "UniProt_functional_annotation": "RNA-binding component of the eukaryotic translation initiation factor 3 (eIF-3) complex, which is required for several steps in the initiation of protein synthesis (PubMed:17581632, PubMed:25849773). The eIF-3 complex associates with the 40S ribosome and facilitates the recruitment of eIF-1, eIF-1A, eIF-2:GTP:methionyl-tRNAi and eIF-5 to form the 43S pre-initiation complex (43S PIC). The eIF-3 complex stimulates mRNA recruitment to the 43S PIC and scanning of the mRNA for AUG recognition. The eIF-3 complex is also required for disassembly and recycling of post-termination ribosomal complexes and subsequently prevents premature joining of the 40S and 60S ribosomal subunits prior to initiation (PubMed:11169732, PubMed:17581632). The eIF-3 complex specifically targets and initiates translation of a subset of mRNAs involved in cell proliferation, including cell cycling, differentiation and apoptosis, and uses different modes of RNA stem-loop binding to exert either translational activation or repression (PubMed:25849773, PubMed:27462815)\n(Microbial infection) Essential for the initiation of translation on type-1 viral ribosomal entry sites (IRESs), like for HCV, PV, EV71 or BEV translation (PubMed:23766293, PubMed:24357634)\n(Microbial infection) In case of FCV infection, plays a role in the ribosomal termination-reinitiation event leading to the translation of VP2 (PubMed:18056426)",
+      "accession": "Q14152"
+    },
+    {
+      "gene_symbol": "EIF3B",
+      "UniProt_functional_annotation": "RNA-binding component of the eukaryotic translation initiation factor 3 (eIF-3) complex, which is required for several steps in the initiation of protein synthesis (PubMed:17581632, PubMed:25849773, PubMed:27462815, PubMed:9388245). The eIF-3 complex associates with the 40S ribosome and facilitates the recruitment of eIF-1, eIF-1A, eIF-2:GTP:methionyl-tRNAi and eIF-5 to form the 43S pre-initiation complex (43S PIC). The eIF-3 complex stimulates mRNA recruitment to the 43S PIC and scanning of the mRNA for AUG recognition. The eIF-3 complex is also required for disassembly and recycling of post-termination ribosomal complexes and subsequently prevents premature joining of the 40S and 60S ribosomal subunits prior to initiation (PubMed:17581632, PubMed:9388245). The eIF-3 complex specifically targets and initiates translation of a subset of mRNAs involved in cell proliferation, including cell cycling, differentiation and apoptosis, and uses different modes of RNA stem-loop binding to exert either translational activation or repression (PubMed:25849773)\n(Microbial infection) In case of FCV infection, plays a role in the ribosomal termination-reinitiation event leading to the translation of VP2 (PubMed:18056426)",
+      "accession": "P55884"
+    },
+    {
+      "gene_symbol": "EIF3C",
+      "UniProt_functional_annotation": "Component of the eukaryotic translation initiation factor 3 (eIF-3) complex, which is required for several steps in the initiation of protein synthesis (PubMed:17581632, PubMed:25849773, PubMed:27462815). The eIF-3 complex associates with the 40S ribosome and facilitates the recruitment of eIF-1, eIF-1A, eIF-2:GTP:methionyl-tRNAi and eIF-5 to form the 43S pre-initiation complex (43S PIC). The eIF-3 complex stimulates mRNA recruitment to the 43S PIC and scanning of the mRNA for AUG recognition. The eIF-3 complex is also required for disassembly and recycling of post-termination ribosomal complexes and subsequently prevents premature joining of the 40S and 60S ribosomal subunits prior to initiation (PubMed:17581632). The eIF-3 complex specifically targets and initiates translation of a subset of mRNAs involved in cell proliferation, including cell cycling, differentiation and apoptosis, and uses different modes of RNA stem-loop binding to exert either translational activation or repression (PubMed:25849773)",
+      "accession": "Q99613"
+    },
+    {
+      "gene_symbol": "EIF3CL",
+      "UniProt_functional_annotation": "Component of the eukaryotic translation initiation factor 3 (eIF-3) complex, which is required for several steps in the initiation of protein synthesis. The eIF-3 complex associates with the 40S ribosome and facilitates the recruitment of eIF-1, eIF-1A, eIF-2:GTP:methionyl-tRNAi and eIF-5 to form the 43S pre-initiation complex (43S PIC). The eIF-3 complex stimulates mRNA recruitment to the 43S PIC and scanning of the mRNA for AUG recognition. The eIF-3 complex is also required for disassembly and recycling of post-termination ribosomal complexes and subsequently prevents premature joining of the 40S and 60S ribosomal subunits prior to initiation. The eIF-3 complex specifically targets and initiates translation of a subset of mRNAs involved in cell proliferation, including cell cycling, differentiation and apoptosis, and uses different modes of RNA stem-loop binding to exert either translational activation or repression",
+      "accession": "B5ME19"
+    },
+    {
+      "gene_symbol": "EIF3G",
+      "UniProt_functional_annotation": "RNA-binding component of the eukaryotic translation initiation factor 3 (eIF-3) complex, which is required for several steps in the initiation of protein synthesis (PubMed:17581632, PubMed:25849773, PubMed:27462815). The eIF-3 complex associates with the 40S ribosome and facilitates the recruitment of eIF-1, eIF-1A, eIF-2:GTP:methionyl-tRNAi and eIF-5 to form the 43S pre-initiation complex (43S PIC). The eIF-3 complex stimulates mRNA recruitment to the 43S PIC and scanning of the mRNA for AUG recognition. The eIF-3 complex is also required for disassembly and recycling of post-termination ribosomal complexes and subsequently prevents premature joining of the 40S and 60S ribosomal subunits prior to initiation (PubMed:17581632). The eIF-3 complex specifically targets and initiates translation of a subset of mRNAs involved in cell proliferation, including cell cycling, differentiation and apoptosis, and uses different modes of RNA stem-loop binding to exert either translational activation or repression (PubMed:25849773). This subunit can bind 18S rRNA\n(Microbial infection) In case of FCV infection, plays a role in the ribosomal termination-reinitiation event leading to the translation of VP2 (PubMed:18056426)",
+      "accession": "O75821"
+    },
+    {
+      "gene_symbol": "EIF3I",
+      "UniProt_functional_annotation": "Component of the eukaryotic translation initiation factor 3 (eIF-3) complex, which is required for several steps in the initiation of protein synthesis (PubMed:17581632, PubMed:25849773, PubMed:27462815). The eIF-3 complex associates with the 40S ribosome and facilitates the recruitment of eIF-1, eIF-1A, eIF-2:GTP:methionyl-tRNAi and eIF-5 to form the 43S pre-initiation complex (43S PIC). The eIF-3 complex stimulates mRNA recruitment to the 43S PIC and scanning of the mRNA for AUG recognition. The eIF-3 complex is also required for disassembly and recycling of post-termination ribosomal complexes and subsequently prevents premature joining of the 40S and 60S ribosomal subunits prior to initiation (PubMed:17581632). The eIF-3 complex specifically targets and initiates translation of a subset of mRNAs involved in cell proliferation, including cell cycling, differentiation and apoptosis, and uses different modes of RNA stem-loop binding to exert either translational activation or repression (PubMed:25849773)",
+      "accession": "Q13347"
+    },
+    {
+      "gene_symbol": "EIF4G1",
+      "UniProt_functional_annotation": "Component of the protein complex eIF4F, which is involved in the recognition of the mRNA cap, ATP-dependent unwinding of 5'-terminal secondary structure and recruitment of mRNA to the ribosome (PubMed:29987188). Exists in two complexes, either with EIF1 or with EIF4E (mutually exclusive) (PubMed:29987188). Together with EIF1, is required for leaky scanning, in particular for avoiding cap-proximal start codon (PubMed:29987188). Together with EIF4E, antagonizes the scanning promoted by EIF1-EIF4G1 and locates the start codon (through a TISU element) without scanning (PubMed:29987188). As a member of the eIF4F complex, required for endoplasmic reticulum stress-induced ATF4 mRNA translation (PubMed:29062139)",
+      "accession": "Q04637"
+    },
+    {
+      "gene_symbol": "FAU",
+      "UniProt_functional_annotation": "May have pro-apoptotic activity\nComponent of the 40S subunit of the ribosome. Contributes to the assembly and function of 40S ribosomal subunits",
+      "accession": "P62861"
+    },
+    {
+      "gene_symbol": "PNO1",
+      "UniProt_functional_annotation": "Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). Positively regulates dimethylation of two adjacent adenosines in the loop of a conserved hairpin near the 3'-end of 18S rRNA (PubMed:25851604)",
+      "accession": "Q9NRX1"
+    },
+    {
+      "gene_symbol": "RPS10",
+      "UniProt_functional_annotation": "Component of the 40S ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399)",
+      "accession": "P46783"
+    },
+    {
+      "gene_symbol": "RPS11",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62280"
+    },
+    {
+      "gene_symbol": "RPS12",
+      "UniProt_functional_annotation": "Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). Subunit of the 40S ribosomal complex (By similarity)",
+      "accession": "P25398"
+    },
+    {
+      "gene_symbol": "RPS13",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62277"
+    },
+    {
+      "gene_symbol": "RPS14",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62263"
+    },
+    {
+      "gene_symbol": "RPS15",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399)",
+      "accession": "P62841"
+    },
+    {
+      "gene_symbol": "RPS15A",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). Required for proper erythropoiesis (PubMed:27909223)",
+      "accession": "P62244"
+    },
+    {
+      "gene_symbol": "RPS16",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62249"
+    },
+    {
+      "gene_symbol": "RPS17",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P08708"
+    },
+    {
+      "gene_symbol": "RPS18",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P62269"
+    },
+    {
+      "gene_symbol": "RPS19",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Required for pre-rRNA processing and maturation of 40S ribosomal subunits (PubMed:16990592). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P39019"
+    },
+    {
+      "gene_symbol": "RPS2",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules (PubMed:23636399). The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain (PubMed:23636399). The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel (PubMed:23636399). Plays a role in the assembly and function of the 40S ribosomal subunit (By similarity). Mutations in this protein affects the control of translational fidelity (By similarity). Involved in nucleolar processing of pre-18S ribosomal RNA and ribosome assembly (By similarity)",
+      "accession": "P15880"
+    },
+    {
+      "gene_symbol": "RPS20",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399)",
+      "accession": "P60866"
+    },
+    {
+      "gene_symbol": "RPS23",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:28257692). The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules (PubMed:23636399, PubMed:25901680, PubMed:25957688). The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain (PubMed:23636399, PubMed:25901680, PubMed:25957688). The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel (PubMed:23636399, PubMed:25901680, PubMed:25957688). Plays an important role in translational accuracy (PubMed:28257692). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62266"
+    },
+    {
+      "gene_symbol": "RPS24",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Required for processing of pre-rRNA and maturation of 40S ribosomal subunits (PubMed:18230666). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62847"
+    },
+    {
+      "gene_symbol": "RPS25",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399)",
+      "accession": "P62851"
+    },
+    {
+      "gene_symbol": "RPS26",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:25901680, PubMed:25957688). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:25901680, PubMed:25957688)",
+      "accession": "P62854"
+    },
+    {
+      "gene_symbol": "RPS27",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:8706699). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Required for proper rRNA processing and maturation of 18S rRNAs (PubMed:25424902). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P42677"
+    },
+    {
+      "gene_symbol": "RPS27A",
+      "UniProt_functional_annotation": "Exists either covalently attached to another protein, or free (unanchored). When covalently bound, it is conjugated to target proteins via an isopeptide bond either as a monomer (monoubiquitin), a polymer linked via different Lys residues of the ubiquitin (polyubiquitin chains) or a linear polymer linked via the initiator Met of the ubiquitin (linear polyubiquitin chains). Polyubiquitin chains, when attached to a target protein, have different functions depending on the Lys residue of the ubiquitin that is linked: Lys-6-linked may be involved in DNA repair; Lys-11-linked is involved in ERAD (endoplasmic reticulum-associated degradation) and in cell-cycle regulation; Lys-29-linked is involved in proteotoxic stress response and cell cycle; Lys-33-linked is involved in kinase modification; Lys-48-linked is involved in protein degradation via the proteasome; Lys-63-linked is involved in endocytosis, DNA-damage responses as well as in signaling processes leading to activation of the transcription factor NF-kappa-B. Linear polymer chains formed via attachment by the initiator Met lead to cell signaling. Ubiquitin is usually conjugated to Lys residues of target proteins, however, in rare cases, conjugation to Cys or Ser residues has been observed. When polyubiquitin is free (unanchored-polyubiquitin), it also has distinct roles, such as in activation of protein kinases, and in signaling\nComponent of the 40S subunit of the ribosome (PubMed:23636399, PubMed:9582194). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:23636399, PubMed:34516797)",
+      "accession": "P62979"
+    },
+    {
+      "gene_symbol": "RPS28",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:25901680, PubMed:25957688). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:25901680, PubMed:25957688). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62857"
+    },
+    {
+      "gene_symbol": "RPS29",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:25901680, PubMed:25957688). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:25901680, PubMed:25957688)",
+      "accession": "P62273"
+    },
+    {
+      "gene_symbol": "RPS3",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:8706699). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:8706699). Has endonuclease activity and plays a role in repair of damaged DNA (PubMed:7775413). Cleaves phosphodiester bonds of DNAs containing altered bases with broad specificity and cleaves supercoiled DNA more efficiently than relaxed DNA (PubMed:15707971). Displays high binding affinity for 7,8-dihydro-8-oxoguanine (8-oxoG), a common DNA lesion caused by reactive oxygen species (ROS) (PubMed:14706345). Has also been shown to bind with similar affinity to intact and damaged DNA (PubMed:18610840). Stimulates the N-glycosylase activity of the base excision protein OGG1 (PubMed:15518571). Enhances the uracil excision activity of UNG1 (PubMed:18973764). Also stimulates the cleavage of the phosphodiester backbone by APEX1 (PubMed:18973764). When located in the mitochondrion, reduces cellular ROS levels and mitochondrial DNA damage (PubMed:23911537). Has also been shown to negatively regulate DNA repair in cells exposed to hydrogen peroxide (PubMed:17049931). Plays a role in regulating transcription as part of the NF-kappa-B p65-p50 complex where it binds to the RELA/p65 subunit, enhances binding of the complex to DNA and promotes transcription of target genes (PubMed:18045535). Represses its own translation by binding to its cognate mRNA (PubMed:20217897). Binds to and protects TP53/p53 from MDM2-mediated ubiquitination (PubMed:19656744). Involved in spindle formation and chromosome movement during mitosis by regulating microtubule polymerization (PubMed:23131551). Involved in induction of apoptosis through its role in activation of CASP8 (PubMed:14988002). Induces neuronal apoptosis by interacting with the E2F1 transcription factor and acting synergistically with it to up-regulate pro-apoptotic proteins BCL2L11/BIM and HRK/Dp5 (PubMed:20605787). Interacts with TRADD following exposure to UV radiation and induces apoptosis by caspase-dependent JNK activation (PubMed:22510408)",
+      "accession": "P23396"
+    },
+    {
+      "gene_symbol": "RPS3A",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). May play a role during erythropoiesis through regulation of transcription factor DDIT3 (By similarity)",
+      "accession": "P61247"
+    },
+    {
+      "gene_symbol": "RPS4X",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62701"
+    },
+    {
+      "gene_symbol": "RPS5",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P46782"
+    },
+    {
+      "gene_symbol": "RPS6",
+      "UniProt_functional_annotation": "Component of the 40S small ribosomal subunit (PubMed:23636399, PubMed:8706699). Plays an important role in controlling cell growth and proliferation through the selective translation of particular classes of mRNA (PubMed:17220279). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62753"
+    },
+    {
+      "gene_symbol": "RPS7",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Required for rRNA maturation (PubMed:19061985). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62081"
+    },
+    {
+      "gene_symbol": "RPS8",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62241"
+    },
+    {
+      "gene_symbol": "RPS9",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P46781"
+    },
+    {
+      "gene_symbol": "RPSA",
+      "UniProt_functional_annotation": "Required for the assembly and/or stability of the 40S ribosomal subunit. Required for the processing of the 20S rRNA-precursor to mature 18S rRNA in a late step of the maturation of 40S ribosomal subunits. Also functions as a cell surface receptor for laminin. Plays a role in cell adhesion to the basement membrane and in the consequent activation of signaling transduction pathways. May play a role in cell fate determination and tissue morphogenesis. Acts as a PPP1R16B-dependent substrate of PPP1CA\n(Microbial infection) Acts as a receptor for the Adeno-associated viruses 2,3,8 and 9\n(Microbial infection) Acts as a receptor for the Dengue virus\n(Microbial infection) Acts as a receptor for the Sindbis virus\n(Microbial infection) Acts as a receptor for the Venezuelan equine encephalitis virus\n(Microbial infection) Acts as a receptor for the pathogenic prion protein\n(Microbial infection) Acts as a receptor for bacteria",
+      "accession": "P08865"
+    }
+  ]
+}

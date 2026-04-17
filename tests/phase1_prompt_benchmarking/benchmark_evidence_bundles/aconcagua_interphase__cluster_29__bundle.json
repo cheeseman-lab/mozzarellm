@@ -1,0 +1,216 @@
+{
+  "screen_name": "aconcagua_interphase",
+  "cluster_id": "29",
+  "cluster_genes": [
+    {
+      "gene_symbol": "AAMP",
+      "UniProt_functional_annotation": "Plays a role in angiogenesis and cell migration. In smooth muscle cell migration, may act through the RhoA pathway",
+      "accession": "Q13685"
+    },
+    {
+      "gene_symbol": "RPL10",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:26290468). Plays a role in the formation of actively translating ribosomes (PubMed:26290468). May play a role in the embryonic brain development (PubMed:25316788)",
+      "accession": "P27635"
+    },
+    {
+      "gene_symbol": "RPL10A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P62906"
+    },
+    {
+      "gene_symbol": "RPL11",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:19191325, PubMed:32669547). The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules (PubMed:19191325, PubMed:32669547). The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain (PubMed:19191325, PubMed:32669547). The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel (PubMed:19191325, PubMed:32669547). As part of the 5S RNP/5S ribonucleoprotein particle it is an essential component of the LSU, required for its formation and the maturation of rRNAs (PubMed:12962325, PubMed:19061985, PubMed:24120868). It also couples ribosome biogenesis to p53/TP53 activation. As part of the 5S RNP it accumulates in the nucleoplasm and inhibits MDM2, when ribosome biogenesis is perturbed, mediating the stabilization and the activation of TP53 (PubMed:24120868). Promotes nucleolar location of PML (By similarity)",
+      "accession": "P62913"
+    },
+    {
+      "gene_symbol": "RPL13",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:31630789, PubMed:32669547). The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules (Probable). The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain (Probable). The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel (Probable). As part of the LSU, it is probably required for its formation and the maturation of rRNAs (PubMed:31630789). Plays a role in bone development (PubMed:31630789)",
+      "accession": "P26373"
+    },
+    {
+      "gene_symbol": "RPL13A",
+      "UniProt_functional_annotation": "Associated with ribosomes but is not required for canonical ribosome function and has extra-ribosomal functions (PubMed:14567916, PubMed:17218275, PubMed:23636399, PubMed:32669547). Component of the GAIT (gamma interferon-activated inhibitor of translation) complex which mediates interferon-gamma-induced transcript-selective translation inhibition in inflammation processes (PubMed:23071094). Upon interferon-gamma activation and subsequent phosphorylation dissociates from the ribosome and assembles into the GAIT complex which binds to stem loop-containing GAIT elements in the 3'-UTR of diverse inflammatory mRNAs (such as ceruplasmin) and suppresses their translation (PubMed:23071094). In the GAIT complex interacts with m7G cap-bound eIF4G at or near the eIF3-binding site and blocks the recruitment of the 43S ribosomal complex (PubMed:23071094). Involved in methylation of rRNA (PubMed:17921318)",
+      "accession": "P40429"
+    },
+    {
+      "gene_symbol": "RPL14",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P50914"
+    },
+    {
+      "gene_symbol": "RPL15",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P61313"
+    },
+    {
+      "gene_symbol": "RPL17",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P18621"
+    },
+    {
+      "gene_symbol": "RPL17-C18orf32",
+      "UniProt_functional_annotation": "",
+      "accession": "A0A0A0MRF8"
+    },
+    {
+      "gene_symbol": "RPL18",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547)",
+      "accession": "Q07020"
+    },
+    {
+      "gene_symbol": "RPL18A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "Q02543"
+    },
+    {
+      "gene_symbol": "RPL19",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P84098"
+    },
+    {
+      "gene_symbol": "RPL23",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P62829"
+    },
+    {
+      "gene_symbol": "RPL23A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547). Binds a specific region on the 26S rRNA (PubMed:23636399, PubMed:32669547). May promote p53/TP53 degradation possibly through the stimulation of MDM2-mediated TP53 polyubiquitination (PubMed:26203195)",
+      "accession": "P62750"
+    },
+    {
+      "gene_symbol": "RPL24",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P83731"
+    },
+    {
+      "gene_symbol": "RPL26",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:26100019, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:26100019, PubMed:32669547)",
+      "accession": "P61254"
+    },
+    {
+      "gene_symbol": "RPL27",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547). Required for proper rRNA processing and maturation of 28S and 5.8S rRNAs (PubMed:25424902)",
+      "accession": "P61353"
+    },
+    {
+      "gene_symbol": "RPL27A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P46776"
+    },
+    {
+      "gene_symbol": "RPL3",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547, PubMed:35674491). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P39023"
+    },
+    {
+      "gene_symbol": "RPL30",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P62888"
+    },
+    {
+      "gene_symbol": "RPL31",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P62899"
+    },
+    {
+      "gene_symbol": "RPL32",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P62910"
+    },
+    {
+      "gene_symbol": "RPL34",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547)",
+      "accession": "P49207"
+    },
+    {
+      "gene_symbol": "RPL35",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P42766"
+    },
+    {
+      "gene_symbol": "RPL35A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547). Required for the proliferation and viability of hematopoietic cells (PubMed:18535205)",
+      "accession": "P18077"
+    },
+    {
+      "gene_symbol": "RPL36",
+      "UniProt_functional_annotation": "Inhibits C2CD2L/TMEM24-dependent transport of phosphatidylinositol, the precursor of phosphatidylinositol 4,5-bisphosphate (PI(4,5)P2), from its site of synthesis in the endoplasmic reticulum to the cell membrane (PubMed:33479206). This leads to down-regulation of the PI3K-AKT-mTOR signaling pathway (PubMed:33479206)",
+      "accession": "C0HME6"
+    },
+    {
+      "gene_symbol": "RPL37",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P61927"
+    },
+    {
+      "gene_symbol": "RPL37A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P61513"
+    },
+    {
+      "gene_symbol": "RPL38",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P63173"
+    },
+    {
+      "gene_symbol": "RPL39",
+      "UniProt_functional_annotation": "RNA-binding component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P62891"
+    },
+    {
+      "gene_symbol": "RPL4",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P36578"
+    },
+    {
+      "gene_symbol": "RPL5",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules. The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain. The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel. As part of the 5S RNP/5S ribonucleoprotein particle it is an essential component of the LSU, required for its formation and the maturation of rRNAs (PubMed:12962325, PubMed:19061985, PubMed:23636399, PubMed:24120868). It also couples ribosome biogenesis to p53/TP53 activation. As part of the 5S RNP it accumulates in the nucleoplasm and inhibits MDM2, when ribosome biogenesis is perturbed, mediating the stabilization and the activation of TP53 (PubMed:24120868)",
+      "accession": "P46777"
+    },
+    {
+      "gene_symbol": "RPL6",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547)\n(Microbial infection) Specifically binds to domain C of the Tax-responsive enhancer element in the long terminal repeat of HTLV-I (PubMed:8457378)",
+      "accession": "Q02878"
+    },
+    {
+      "gene_symbol": "RPL7",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547). Binds to G-rich structures in 28S rRNA and in mRNAs (PubMed:12962325). Plays a regulatory role in the translation apparatus; inhibits cell-free translation of mRNAs (PubMed:12962325)",
+      "accession": "P18124"
+    },
+    {
+      "gene_symbol": "RPL7A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P62424"
+    },
+    {
+      "gene_symbol": "RPL8",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P62917"
+    },
+    {
+      "gene_symbol": "RPL9",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P32969"
+    },
+    {
+      "gene_symbol": "RPLP0",
+      "UniProt_functional_annotation": "Ribosomal protein P0 is the functional equivalent of E.coli protein L10",
+      "accession": "P05388"
+    },
+    {
+      "gene_symbol": "RPLP1",
+      "UniProt_functional_annotation": "Plays an important role in the elongation step of protein synthesis",
+      "accession": "P05386"
+    },
+    {
+      "gene_symbol": "RPLP2",
+      "UniProt_functional_annotation": "Plays an important role in the elongation step of protein synthesis",
+      "accession": "P05387"
+    },
+    {
+      "gene_symbol": "UBA52",
+      "UniProt_functional_annotation": "Exists either covalently attached to another protein, or free (unanchored). When covalently bound, it is conjugated to target proteins via an isopeptide bond either as a monomer (monoubiquitin), a polymer linked via different Lys residues of the ubiquitin (polyubiquitin chains) or a linear polymer linked via the initiator Met of the ubiquitin (linear polyubiquitin chains). Polyubiquitin chains, when attached to a target protein, have different functions depending on the Lys residue of the ubiquitin that is linked: Lys-6-linked may be involved in DNA repair; Lys-11-linked is involved in ERAD (endoplasmic reticulum-associated degradation) and in cell-cycle regulation; Lys-29-linked is involved in proteotoxic stress response and cell cycle; Lys-33-linked is involved in kinase modification; Lys-48-linked is involved in protein degradation via the proteasome; Lys-63-linked is involved in endocytosis, DNA-damage responses as well as in signaling processes leading to activation of the transcription factor NF-kappa-B. Linear polymer chains formed via attachment by the initiator Met lead to cell signaling. Ubiquitin is usually conjugated to Lys residues of target proteins, however, in rare cases, conjugation to Cys or Ser residues has been observed. When polyubiquitin is free (unanchored-polyubiquitin), it also has distinct roles, such as in activation of protein kinases, and in signaling\nComponent of the 60S subunit of the ribosome (PubMed:23169626, PubMed:23636399, PubMed:32669547, PubMed:39048817, PubMed:39103523). Ribosomal protein L40 is essential for translation of a subset of cellular transcripts, and especially for cap-dependent translation of vesicular stomatitis virus mRNAs (PubMed:23169626, PubMed:23636399, PubMed:32669547, PubMed:39048817, PubMed:39103523)",
+      "accession": "P62987"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "screen_name": "whitney",
+  "cluster_id": "137",
+  "cluster_genes": [
+    {
+      "gene_symbol": "B3GNT2",
+      "accession": "Q9NY97"
+    },
+    {
+      "gene_symbol": "DNAH14",
+      "accession": "Q0VDD8"
+    },
+    {
+      "gene_symbol": "DNAJC22",
+      "accession": "Q8N4W6"
+    },
+    {
+      "gene_symbol": "ENSG00000288591",
+      "accession": ""
+    },
+    {
+      "gene_symbol": "LOC124901069",
+      "accession": ""
+    },
+    {
+      "gene_symbol": "PPEF1",
+      "accession": "O14829"
+    },
+    {
+      "gene_symbol": "PRKAG3",
+      "accession": "Q9UGI9"
+    },
+    {
+      "gene_symbol": "PSG7",
+      "accession": "Q13046"
+    },
+    {
+      "gene_symbol": "TEKT5",
+      "accession": "Q96M29"
+    },
+    {
+      "gene_symbol": "TMEM217B",
+      "accession": "A0A494BZU4"
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_CTACGCAGACAG",
+      "accession": "NON_TARGETING_CONTROL"
+    }
+  ]
+}

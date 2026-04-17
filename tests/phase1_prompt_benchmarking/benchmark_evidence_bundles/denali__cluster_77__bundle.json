@@ -1,0 +1,76 @@
+{
+  "screen_name": "denali",
+  "cluster_id": "77",
+  "cluster_genes": [
+    {
+      "gene_symbol": "FANCG",
+      "UniProt_functional_annotation": "DNA repair protein that may operate in a postreplication repair or a cell cycle checkpoint function. May be implicated in interstrand DNA cross-link repair and in the maintenance of normal chromosome stability. Candidate tumor suppressor gene",
+      "accession": "O15287"
+    },
+    {
+      "gene_symbol": "GCLC",
+      "UniProt_functional_annotation": "Catalyzes the ATP-dependent ligation of L-glutamate and L-cysteine and participates in the first and rate-limiting step in glutathione biosynthesis",
+      "accession": "P48506"
+    },
+    {
+      "gene_symbol": "LIG1",
+      "UniProt_functional_annotation": "Acts as a feedback negative regulator of signaling by receptor tyrosine kinases, through a mechanism that involves enhancement of receptor ubiquitination and accelerated intracellular degradation",
+      "accession": "Q96JA1"
+    },
+    {
+      "gene_symbol": "UCHL5",
+      "UniProt_functional_annotation": "Protease that specifically cleaves 'Lys-48'-linked polyubiquitin chains. Deubiquitinating enzyme associated with the 19S regulatory subunit of the 26S proteasome. Putative regulatory component of the INO80 complex; however is inactive in the INO80 complex and is activated by a transient interaction of the INO80 complex with the proteasome via ADRM1",
+      "accession": "Q9Y5K5"
+    },
+    {
+      "gene_symbol": "CCNL2",
+      "UniProt_functional_annotation": "Regulatory component of the cyclin-L-CDK11 complex that regulates transcription and pre-mRNA splicing (PubMed:14684736, PubMed:18216018, PubMed:36104565, PubMed:38059508). May induce cell death, possibly by acting on the transcription and RNA processing of apoptosis-related factors (PubMed:14684736)",
+      "accession": "Q96S94"
+    },
+    {
+      "gene_symbol": "CLPX",
+      "UniProt_functional_annotation": "ATP-dependent chaperone that functions as an unfoldase. As part of the ClpXP protease complex, it recognizes specific protein substrates, unfolds them using energy derived from ATP hydrolysis, and then translocates them to the proteolytic subunit (CLPP) of the ClpXP complex for degradation (PubMed:11923310, PubMed:22710082, PubMed:28874591). Thanks to its chaperone activity, it also functions in the incorporation of the pyridoxal phosphate cofactor into 5-aminolevulinate synthase, thereby activating 5-aminolevulinate (ALA) synthesis, the first step in heme biosynthesis (PubMed:28874591). This chaperone is also involved in the control of mtDNA nucleoid distribution, by regulating mitochondrial transcription factor A (TFAM) activity (PubMed:22841477)",
+      "accession": "O76031"
+    },
+    {
+      "gene_symbol": "EAPP",
+      "UniProt_functional_annotation": "May play an important role in the fine-tuning of both major E2F1 activities, the regulation of the cell-cycle and the induction of apoptosis. Promotes S-phase entry, and inhibits p14(ARP) expression",
+      "accession": "Q56P03"
+    },
+    {
+      "gene_symbol": "FBXW9",
+      "UniProt_functional_annotation": "Substrate-recognition component of the SCF (SKP1-CUL1-F-box protein)-type E3 ubiquitin ligase complex",
+      "accession": "Q5XUX1"
+    },
+    {
+      "gene_symbol": "HNRNPUL2",
+      "UniProt_functional_annotation": "",
+      "accession": "Q1KMD3"
+    },
+    {
+      "gene_symbol": "KDM8",
+      "UniProt_functional_annotation": "Bifunctional enzyme that acts both as an endopeptidase and 2-oxoglutarate-dependent monooxygenase (PubMed:28847961, PubMed:28982940, PubMed:29459673, PubMed:29563586). Endopeptidase that cleaves histones N-terminal tails at the carboxyl side of methylated arginine or lysine residues, to generate 'tailless nucleosomes', which may trigger transcription elongation (PubMed:28847961, PubMed:28982940, PubMed:29459673). Preferentially recognizes and cleaves monomethylated and dimethylated arginine residues of histones H2, H3 and H4. After initial cleavage, continues to digest histones tails via its aminopeptidase activity (PubMed:28847961, PubMed:29459673). Upon DNA damage, cleaves the N-terminal tail of histone H3 at monomethylated lysine residues, preferably at monomethylated 'Lys-9' (H3K9me1). The histone variant H3F3A is the major target for cleavage (PubMed:28982940). Additionally, acts as a Fe(2+) and 2-oxoglutarate-dependent monooxygenase, catalyzing (R)-stereospecific hydroxylation at C-3 of 'Arg-137' of RPS6 and 'Arg-141' of RCCD1, but the biological significance of this activity remains to be established (PubMed:29563586). Regulates mitosis through different mechanisms: Plays a role in transcriptional repression of satellite repeats, possibly by regulating H3K36 methylation levels in centromeric regions together with RCCD1. Possibly together with RCCD1, is involved in proper mitotic spindle organization and chromosome segregation (PubMed:24981860). Negatively regulates cell cycle repressor CDKN1A/p21, which controls G1/S phase transition (PubMed:24740926). Required for G2/M phase cell cycle progression. Regulates expression of CCNA1/cyclin-A1, leading to cancer cell proliferation (PubMed:20457893). Also, plays a role in regulating alpha-tubulin acetylation and cytoskeletal microtubule stability involved in epithelial to mesenchymal transition (PubMed:28455245). Regulates the circadian gene expression in the liver (By similarity). Represses the transcriptional activator activity of the CLOCK-BMAL1 heterodimer in a catalytically-independent manner (PubMed:30500822). Negatively regulates the protein stability and function of CRY1; required for AMPK-FBXL3-induced CRY1 degradation (PubMed:30500822)",
+      "accession": "Q8N371"
+    },
+    {
+      "gene_symbol": "PI4KA",
+      "UniProt_functional_annotation": "Acts on phosphatidylinositol (PtdIns) in the first committed step in the production of the second messenger inositol-1,4,5,-trisphosphate",
+      "accession": "P42356"
+    },
+    {
+      "gene_symbol": "PNRC2",
+      "UniProt_functional_annotation": "Involved in nonsense-mediated mRNA decay (NMD) by acting as a bridge between the mRNA decapping complex and the NMD machinery (PubMed:19150429). May act by targeting the NMD machinery to the P-body and recruiting the decapping machinery to aberrant mRNAs (PubMed:19150429). Required for UPF1/RENT1 localization to the P-body (PubMed:19150429). Plays a role in glucocorticoid receptor-mediated mRNA degradation by interacting with the glucocorticoid receptor NR3C1 in a ligand-dependent manner when it is bound to the 5' UTR of target mRNAs and recruiting the RNA helicase UPF1 and the mRNA-decapping enzyme DCP1A, leading to RNA decay (PubMed:25775514). Also acts as a nuclear receptor coactivator (PubMed:11574675). May play a role in controlling the energy balance between energy storage and energy expenditure (By similarity)",
+      "accession": "Q9NPJ4"
+    },
+    {
+      "gene_symbol": "TECR",
+      "UniProt_functional_annotation": "Involved in both the production of very long-chain fatty acids for sphingolipid synthesis and the degradation of the sphingosine moiety in sphingolipids through the sphingosine 1-phosphate metabolic pathway (PubMed:25049234). Catalyzes the last of the four reactions of the long-chain fatty acids elongation cycle (PubMed:12482854). This endoplasmic reticulum-bound enzymatic process, allows the addition of 2 carbons to the chain of long- and very long-chain fatty acids/VLCFAs per cycle (PubMed:12482854). This enzyme reduces the trans-2,3-enoyl-CoA fatty acid intermediate to an acyl-CoA that can be further elongated by entering a new cycle of elongation (PubMed:12482854). Thereby, it participates in the production of VLCFAs of different chain lengths that are involved in multiple biological processes as precursors of membrane lipids and lipid mediators (PubMed:12482854). Catalyzes the saturation step of the sphingosine 1-phosphate metabolic pathway, the conversion of trans-2-hexadecenoyl-CoA to palmitoyl-CoA (PubMed:25049234)",
+      "accession": "Q9NZ01"
+    },
+    {
+      "gene_symbol": "C1orf127",
+      "UniProt_functional_annotation": "Plays a role in left-right patterning process",
+      "accession": "Q8N9H9"
+    }
+  ]
+}

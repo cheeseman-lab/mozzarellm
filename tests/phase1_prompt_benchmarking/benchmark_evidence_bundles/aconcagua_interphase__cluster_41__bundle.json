@@ -1,0 +1,186 @@
+{
+  "screen_name": "aconcagua_interphase",
+  "cluster_id": "41",
+  "cluster_genes": [
+    {
+      "gene_symbol": "AHCTF1",
+      "UniProt_functional_annotation": "Required for the assembly of a functional nuclear pore complex (NPC) on the surface of chromosomes as nuclei form at the end of mitosis. May initiate NPC assembly by binding to chromatin and recruiting the Nup107-160 subcomplex of the NPC. Also required for the localization of the Nup107-160 subcomplex of the NPC to the kinetochore during mitosis and for the completion of cytokinesis",
+      "accession": "Q8WYP5"
+    },
+    {
+      "gene_symbol": "ATL2",
+      "UniProt_functional_annotation": "Atlastin-2 (ATL2) is a membrane-anchored GTPase that mediates the GTP-dependent fusion of endoplasmic reticulum (ER) membranes, maintaining the continuous ER network. It facilitates the formation of three-way junctions where ER tubules intersect (PubMed:18270207, PubMed:19665976, PubMed:22065636, PubMed:27619977, PubMed:34817557). Two atlastin-2 on neighboring ER tubules bind GTP and form loose homodimers through the GB1/RHD3-type G domains and 3HB regions. Upon GTP hydrolysis, the 3HB regions tighten, pulling the membranes together to drive their fusion. After fusion, the homodimer disassembles upon release of inorganic phosphate (Pi). Subsequently, GDP dissociates, resetting the monomers to a conformation ready for a new fusion cycle (By similarity)",
+      "accession": "Q8NHH9"
+    },
+    {
+      "gene_symbol": "CDCA3",
+      "UniProt_functional_annotation": "F-box-like protein which is required for entry into mitosis. Acts by participating in E3 ligase complexes that mediate the ubiquitination and degradation of WEE1 kinase at G2/M phase (By similarity)",
+      "accession": "Q99618"
+    },
+    {
+      "gene_symbol": "CHP1",
+      "UniProt_functional_annotation": "Calcium-binding protein involved in different processes such as regulation of vesicular trafficking, plasma membrane Na(+)/H(+) exchanger and gene transcription. Involved in the constitutive exocytic membrane traffic. Mediates the association between microtubules and membrane-bound organelles of the endoplasmic reticulum and Golgi apparatus and is also required for the targeting and fusion of transcytotic vesicles (TCV) with the plasma membrane. Functions as an integral cofactor in cell pH regulation by controlling plasma membrane-type Na(+)/H(+) exchange activity. Affects the pH sensitivity of SLC9A1/NHE1 by increasing its sensitivity at acidic pH. Required for the stabilization and localization of SLC9A1/NHE1 at the plasma membrane. Inhibits serum- and GTPase-stimulated Na(+)/H(+) exchange. Plays a role as an inhibitor of ribosomal RNA transcription by repressing the nucleolar UBF1 transcriptional activity. May sequester UBF1 in the nucleoplasm and limit its translocation to the nucleolus. Associates to the ribosomal gene promoter. Acts as a negative regulator of the calcineurin/NFAT signaling pathway. Inhibits NFAT nuclear translocation and transcriptional activity by suppressing the calcium-dependent calcineurin phosphatase activity. Also negatively regulates the kinase activity of the apoptosis-induced kinase STK17B. Inhibits both STK17B auto- and substrate-phosphorylations in a calcium-dependent manner",
+      "accession": "Q99653"
+    },
+    {
+      "gene_symbol": "CKAP2L",
+      "UniProt_functional_annotation": "Microtubule-associated protein required for mitotic spindle formation and cell-cycle progression in neural progenitor cells",
+      "accession": "Q8IYA6"
+    },
+    {
+      "gene_symbol": "CSDE1",
+      "UniProt_functional_annotation": "RNA-binding protein involved in translationally coupled mRNA turnover (PubMed:11051545, PubMed:15314026). Implicated with other RNA-binding proteins in the cytoplasmic deadenylation/translational and decay interplay of the FOS mRNA mediated by the major coding-region determinant of instability (mCRD) domain (PubMed:11051545, PubMed:15314026). Required for efficient formation of stress granules (PubMed:29395067)\n(Microbial infection) Required for internal initiation of translation of human rhinovirus RNA",
+      "accession": "O75534"
+    },
+    {
+      "gene_symbol": "DPH7",
+      "UniProt_functional_annotation": "Catalyzes the demethylation of diphthine methyl ester to form diphthine, an intermediate diphthamide biosynthesis, a post-translational modification of histidine which occurs in translation elongation factor 2 (EEF2) which can be ADP-ribosylated by diphtheria toxin and by Pseudomonas exotoxin A (Eta)",
+      "accession": "Q9BTV6"
+    },
+    {
+      "gene_symbol": "KDM4A",
+      "UniProt_functional_annotation": "Histone demethylase that specifically demethylates 'Lys-9' and 'Lys-36' residues of histone H3, thereby playing a central role in histone code (PubMed:16603238, PubMed:26741168, PubMed:21768309). Does not demethylate histone H3 'Lys-4', H3 'Lys-27' nor H4 'Lys-20' (PubMed:16603238, PubMed:26741168, PubMed:21768309). Demethylates trimethylated H3 'Lys-9' and H3 'Lys-36' residue, while it has no activity on mono- and dimethylated residues (PubMed:16603238, PubMed:26741168, PubMed:21768309). Demethylation of Lys residue generates formaldehyde and succinate (PubMed:16603238). Also able to demethylate histone H1-4 methylated at 'Lys-26' (H1.4K26me1, H1.4K26me2 and H1.4K26me3) (PubMed:19144645, PubMed:30156264). Participates in transcriptional repression of ASCL2 and E2F-responsive promoters via the recruitment of histone deacetylases and NCOR1, respectively (PubMed:16024779)\nCrucial for muscle differentiation, promotes transcriptional activation of the Myog gene by directing the removal of repressive chromatin marks at its promoter. Lacks the N-terminal demethylase domain",
+      "accession": "O75164"
+    },
+    {
+      "gene_symbol": "KPNA6",
+      "UniProt_functional_annotation": "Functions in nuclear protein import as an adapter protein for nuclear receptor KPNB1. Binds specifically and directly to substrates containing either a simple or bipartite NLS motif. Docking of the importin/substrate complex to the nuclear pore complex (NPC) is mediated by KPNB1 through binding to nucleoporin FxFG repeats and the complex is subsequently translocated through the pore by an energy requiring, Ran-dependent mechanism. At the nucleoplasmic side of the NPC, Ran binds to importin-beta and the three components separate and importin-alpha and -beta are re-exported from the nucleus to the cytoplasm where GTP hydrolysis releases Ran from importin. The directionality of nuclear import is thought to be conferred by an asymmetric distribution of the GTP- and GDP-bound forms of Ran between the cytoplasm and nucleus",
+      "accession": "O60684"
+    },
+    {
+      "gene_symbol": "LMNB1",
+      "UniProt_functional_annotation": "Lamins are intermediate filament proteins that assemble into a filamentous meshwork, and which constitute the major components of the nuclear lamina, a fibrous layer on the nucleoplasmic side of the inner nuclear membrane (PubMed:28716252, PubMed:32910914). Lamins provide a framework for the nuclear envelope, bridging the nuclear envelope and chromatin, thereby playing an important role in nuclear assembly, chromatin organization, nuclear membrane and telomere dynamics (PubMed:28716252, PubMed:32910914). The structural integrity of the lamina is strictly controlled by the cell cycle, as seen by the disintegration and formation of the nuclear envelope in prophase and telophase, respectively (PubMed:28716252, PubMed:32910914)",
+      "accession": "P20700"
+    },
+    {
+      "gene_symbol": "LMNB2",
+      "UniProt_functional_annotation": "Lamins are intermediate filament proteins that assemble into a filamentous meshwork, and which constitute the major components of the nuclear lamina, a fibrous layer on the nucleoplasmic side of the inner nuclear membrane (PubMed:33033404). Lamins provide a framework for the nuclear envelope, bridging the nuclear envelope and chromatin, thereby playing an important role in nuclear assembly, chromatin organization, nuclear membrane and telomere dynamics (PubMed:33033404). The structural integrity of the lamina is strictly controlled by the cell cycle, as seen by the disintegration and formation of the nuclear envelope in prophase and telophase, respectively (PubMed:33033404)",
+      "accession": "Q03252"
+    },
+    {
+      "gene_symbol": "NUP107",
+      "UniProt_functional_annotation": "Plays a role in the nuclear pore complex (NPC) assembly and/or maintenance (PubMed:12552102, PubMed:15229283, PubMed:30179222). Required for the assembly of peripheral proteins into the NPC (PubMed:12552102, PubMed:15229283). May anchor NUP62 to the NPC (PubMed:15229283). Involved in nephrogenesis (PubMed:30179222)",
+      "accession": "P57740"
+    },
+    {
+      "gene_symbol": "NUP133",
+      "UniProt_functional_annotation": "Involved in poly(A)+ RNA transport. Involved in nephrogenesis (PubMed:30179222)",
+      "accession": "Q8WUM0"
+    },
+    {
+      "gene_symbol": "NUP153",
+      "UniProt_functional_annotation": "Component of the nuclear pore complex (NPC), a complex required for the trafficking across the nuclear envelope. Functions as a scaffolding element in the nuclear phase of the NPC essential for normal nucleocytoplasmic transport of proteins and mRNAs. Involved in the quality control and retention of unspliced mRNAs in the nucleus; in association with TPR, regulates the nuclear export of unspliced mRNA species bearing constitutive transport element (CTE) in a NXF1- and KHDRBS1-independent manner. Mediates TPR anchoring to the nuclear membrane at NPC. The repeat-containing domain may be involved in anchoring other components of the NPC to the pore membrane. Possible DNA-binding subunit of the nuclear pore complex (NPC)\n(Microbial infection) Interacts with HIV-1 capsid protein P24 and thereby promotes the integration of the virus in the nucleus of non-dividing cells (in vitro)\n(Microbial infection) Binds HIV-2 protein vpx and thereby promotes the nuclear translocation of the lentiviral genome (in vitro)",
+      "accession": "P49790"
+    },
+    {
+      "gene_symbol": "NUP160",
+      "UniProt_functional_annotation": "Functions as a component of the nuclear pore complex (NPC) (PubMed:11564755, PubMed:11684705). Involved in poly(A)+ RNA transport",
+      "accession": "Q12769"
+    },
+    {
+      "gene_symbol": "NUP37",
+      "UniProt_functional_annotation": "Component of the Nup107-160 subcomplex of the nuclear pore complex (NPC). The Nup107-160 subcomplex is required for the assembly of a functional NPC. The Nup107-160 subcomplex is also required for normal kinetochore microtubule attachment, mitotic progression and chromosome segregation",
+      "accession": "Q8NFH4"
+    },
+    {
+      "gene_symbol": "NUP43",
+      "UniProt_functional_annotation": "Component of the Nup107-160 subcomplex of the nuclear pore complex (NPC). The Nup107-160 subcomplex is required for the assembly of a functional NPC. The Nup107-160 subcomplex is also required for normal kinetochore microtubule attachment, mitotic progression and chromosome segregation",
+      "accession": "Q8NFH3"
+    },
+    {
+      "gene_symbol": "NUP85",
+      "UniProt_functional_annotation": "Essential component of the nuclear pore complex (NPC) that seems to be required for NPC assembly and maintenance (PubMed:12718872). As part of the NPC Nup107-160 subcomplex plays a role in RNA export and in tethering NUP96/Nup98 and NUP153 to the nucleus (PubMed:12718872). The Nup107-160 complex seems to be required for spindle assembly during mitosis (PubMed:16807356). NUP85 is required for membrane clustering of CCL2-activated CCR2 (PubMed:15995708). Seems to be involved in CCR2-mediated chemotaxis of monocytes and may link activated CCR2 to the phosphatidyl-inositol 3-kinase-Rac-lammellipodium protrusion cascade (PubMed:15995708). Involved in nephrogenesis (PubMed:30179222)",
+      "accession": "Q9BW27"
+    },
+    {
+      "gene_symbol": "NUP98",
+      "UniProt_functional_annotation": "Plays a role in the nuclear pore complex (NPC) assembly and/or maintenance. NUP98 and NUP96 are involved in the bidirectional transport across the NPC (PubMed:33097660). May anchor NUP153 and TPR to the NPC. In cooperation with DHX9, plays a role in transcription and alternative splicing activation of a subset of genes (PubMed:28221134). Involved in the localization of DHX9 in discrete intranuclear foci (GLFG-body) (PubMed:28221134)\n(Microbial infection) Interacts with HIV-1 capsid protein P24 and nucleocapsid protein P7 and may thereby promote the integration of the virus in the host nucleus (in vitro) (PubMed:23523133). Binding affinity to HIV-1 CA-NC complexes bearing the capsid change Asn-74-Asp is reduced (in vitro) (PubMed:23523133)",
+      "accession": "P52948"
+    },
+    {
+      "gene_symbol": "OSTC",
+      "UniProt_functional_annotation": "Subunit of STT3A-containing oligosaccharyl transferase (OST-A) complex that catalyzes the initial transfer of a defined glycan (Glc(3)Man(9)GlcNAc(2) in eukaryotes) from the lipid carrier dolichol-pyrophosphate to an asparagine residue within an Asn-X-Ser/Thr consensus motif in nascent polypeptide chains, the first step in protein N-glycosylation (PubMed:28860277, PubMed:31831667, PubMed:39509507). N-glycosylation occurs cotranslationally and the complex associates with the Sec61 complex at the channel-forming translocon complex that mediates protein translocation across the endoplasmic reticulum (ER) (PubMed:28860277, PubMed:31831667, PubMed:39509507). Within the OST-A complex, acts as an adapter that anchors the OST-A complex to the Sec61 complex (PubMed:28860277). May be involved in N-glycosylation of APP (amyloid-beta precursor protein) (PubMed:21768116). Can modulate gamma-secretase cleavage of APP by enhancing endoprotelysis of PSEN1 (PubMed:21768116)",
+      "accession": "Q9NRP0"
+    },
+    {
+      "gene_symbol": "PCYT1A",
+      "UniProt_functional_annotation": "Catalyzes the key rate-limiting step in the CDP-choline pathway for phosphatidylcholine biosynthesis",
+      "accession": "P49585"
+    },
+    {
+      "gene_symbol": "RAMAC",
+      "UniProt_functional_annotation": "Regulatory subunit of the mRNA-capping methyltransferase RNMT:RAMAC complex that methylates the N7 position of the added guanosine to the 5'-cap structure of mRNAs (PubMed:22099306, PubMed:27422871). Promotes the recruitment of the methyl donor, S-adenosyl-L-methionine, to RNMT (PubMed:27422871). Regulates RNMT expression by a post-transcriptional stabilizing mechanism (PubMed:22099306). Binds RNA (PubMed:22099306)",
+      "accession": "Q9BTL3"
+    },
+    {
+      "gene_symbol": "RANBP1",
+      "UniProt_functional_annotation": "Plays a role in RAN-dependent nucleocytoplasmic transport. Alleviates the TNPO1-dependent inhibition of RAN GTPase activity and mediates the dissociation of RAN from proteins involved in transport into the nucleus (By similarity). Induces a conformation change in the complex formed by XPO1 and RAN that triggers the release of the nuclear export signal of cargo proteins (PubMed:20485264). Promotes the disassembly of the complex formed by RAN and importin beta. Promotes dissociation of RAN from a complex with KPNA2 and CSE1L (By similarity). Required for normal mitotic spindle assembly and normal progress through mitosis via its effect on RAN (PubMed:17671426). Does not increase the RAN GTPase activity by itself, but increases GTP hydrolysis mediated by RANGAP1 (PubMed:7882974). Inhibits RCC1-dependent exchange of RAN-bound GDP by GTP (PubMed:7616957, PubMed:7882974)",
+      "accession": "P43487"
+    },
+    {
+      "gene_symbol": "SCAF8",
+      "UniProt_functional_annotation": "Anti-terminator protein required to prevent early mRNA termination during transcription (PubMed:31104839). Together with SCAF4, acts by suppressing the use of early, alternative poly(A) sites, thereby preventing the accumulation of non-functional truncated proteins (PubMed:31104839). Mechanistically, associates with the phosphorylated C-terminal heptapeptide repeat domain (CTD) of the largest RNA polymerase II subunit (POLR2A), and subsequently binds nascent RNA upstream of early polyadenylation sites to prevent premature mRNA transcript cleavage and polyadenylation (PubMed:31104839). Independently of SCAF4, also acts as a positive regulator of transcript elongation (PubMed:31104839)",
+      "accession": "Q9UPN6"
+    },
+    {
+      "gene_symbol": "SCAP",
+      "UniProt_functional_annotation": "Could be a T-cell-specific adapter protein involved in the control of T-cell activation. May play a role in the CD4-p56-LCK-dependent signal transduction pathway. Could also play an important role in normal and pathological angiogenesis. Could be an adapter protein that facilitates and regulates interaction of KDR with effector proteins important to endothelial cell survival and proliferation",
+      "accession": "Q9NP31"
+    },
+    {
+      "gene_symbol": "SEC13",
+      "UniProt_functional_annotation": "Functions as a component of the nuclear pore complex (NPC) and the COPII coat (PubMed:8972206). At the endoplasmic reticulum, SEC13 is involved in the biogenesis of COPII-coated vesicles (PubMed:8972206). Required for the exit of adipsin (CFD/ADN), an adipocyte-secreted protein from the endoplasmic reticulum (By similarity)\nAs a component of the GATOR2 complex, functions as an activator of the amino acid-sensing branch of the mTORC1 signaling pathway (PubMed:23723238, PubMed:25457612, PubMed:27487210, PubMed:35831510, PubMed:36528027). The GATOR2 complex indirectly activates mTORC1 through the inhibition of the GATOR1 subcomplex (PubMed:23723238, PubMed:27487210, PubMed:35831510, PubMed:36528027). GATOR2 probably acts as an E3 ubiquitin-protein ligase toward GATOR1 (PubMed:36528027). In the presence of abundant amino acids, the GATOR2 complex mediates ubiquitination of the NPRL2 core component of the GATOR1 complex, leading to GATOR1 inactivation (PubMed:36528027). In the absence of amino acids, GATOR2 is inhibited, activating the GATOR1 complex (PubMed:25457612, PubMed:26972053, PubMed:27487210). Within the GATOR2 complex, SEC13 and SEH1L are required to stabilize the complex (PubMed:35831510)",
+      "accession": "P55735"
+    },
+    {
+      "gene_symbol": "STRAP",
+      "UniProt_functional_annotation": "The SMN complex catalyzes the assembly of small nuclear ribonucleoproteins (snRNPs), the building blocks of the spliceosome, and thereby plays an important role in the splicing of cellular pre-mRNAs. Most spliceosomal snRNPs contain a common set of Sm proteins SNRPB, SNRPD1, SNRPD2, SNRPD3, SNRPE, SNRPF and SNRPG that assemble in a heptameric protein ring on the Sm site of the small nuclear RNA to form the core snRNP (Sm core). In the cytosol, the Sm proteins SNRPD1, SNRPD2, SNRPE, SNRPF and SNRPG are trapped in an inactive 6S pICln-Sm complex by the chaperone CLNS1A that controls the assembly of the core snRNP. To assemble core snRNPs, the SMN complex accepts the trapped 5Sm proteins from CLNS1A forming an intermediate. Binding of snRNA inside 5Sm triggers eviction of the SMN complex, thereby allowing binding of SNRPD3 and SNRPB to complete assembly of the core snRNP. STRAP plays a role in the cellular distribution of the SMN complex. Negatively regulates TGF-beta signaling but positively regulates the PDPK1 kinase activity by enhancing its autophosphorylation and by significantly reducing the association of PDPK1 with 14-3-3 protein",
+      "accession": "Q9Y3F4"
+    },
+    {
+      "gene_symbol": "TCEAL4",
+      "UniProt_functional_annotation": "May be involved in transcriptional regulation",
+      "accession": "Q96EI5"
+    },
+    {
+      "gene_symbol": "THAP11",
+      "UniProt_functional_annotation": "Transcription factor, which has both transcriptional activation and repression activities (PubMed:31905202). Also modulates chromatin accessibility (PubMed:38361031). In complex with HCFC1 and ZNF143, regulates the expression of several genes, including AP2S1, ESCO2, OPHN1, RBL1, UBXN8 and ZNF32 (PubMed:26416877). May regulate the expression of genes that encode both cytoplasmic and mitochondrial ribosomal proteins (By similarity). Required for normal mitochondrial development and function. Regulates mitochondrial gene expression, including that of components of the electron transport chain (By similarity). Involved in the maintainance of pluripotency in early embryonic cells, possibly through its action on mitochondrial maturation which is required to meet high energy demands of these cells (By similarity). Required for early development of retina, preventing premature exit of retinal progenitor cells from the cell cycle. This effect may also be mediated by its action on mitochondria (By similarity). Through the regulation of MMACHC gene expression, controls cobalamin metabolism (PubMed:28449119, PubMed:31905202). Required for normal brain development and neural precursor differentiation (By similarity). Involved in cell growth (PubMed:31905202)",
+      "accession": "Q96EK4"
+    },
+    {
+      "gene_symbol": "TIAL1",
+      "UniProt_functional_annotation": "RNA-binding protein involved in alternative pre-RNA splicing and in cytoplasmic stress granules formation (PubMed:10613902, PubMed:1326761, PubMed:17488725, PubMed:8576255). Shows a preference for uridine-rich RNAs (PubMed:8576255). Activates splicing of alternative exons with weak 5' splice sites followed by a U-rich stretch on its own pre-mRNA and on TIA1 mRNA (By similarity). Promotes the inclusion of TIA1 exon 5 to give rise to the long isoform (isoform a) of TIA1 (PubMed:17488725). Acts downstream of the stress-induced phosphorylation of EIF2S1/EIF2A to promote the recruitment of untranslated mRNAs to cytoplasmic stress granules (SG) (PubMed:10613902). Possesses nucleolytic activity against cytotoxic lymphocyte target cells (PubMed:1326761). May be involved in apoptosis (PubMed:1326761)",
+      "accession": "Q01085"
+    },
+    {
+      "gene_symbol": "UFL1",
+      "UniProt_functional_annotation": "E3 protein ligase that mediates ufmylation, the covalent attachment of the ubiquitin-like modifier UFM1 to lysine residues on target proteins, and which plays a key role in various processes, such as ribosome recycling, response to DNA damage, interferon response or reticulophagy (also called ER-phagy) (PubMed:20018847, PubMed:20164180, PubMed:20228063, PubMed:25219498, PubMed:27351204, PubMed:30626644, PubMed:30783677, PubMed:32160526, PubMed:32807901, PubMed:35394863, PubMed:36121123, PubMed:36543799, PubMed:36893266, PubMed:37036982, PubMed:37311461, PubMed:37595036, PubMed:37795761, PubMed:38377992, PubMed:38383785, PubMed:38383789). Catalyzes ufmylation of many protein, such as CD274/PD-L1, CDK5RAP3, CYB5R3, DDRGK1, EIF6, histone H4, MRE11, P4HB, PDCD1/PD-1, TRIP4, RPN1, RPS20/uS10, RPL10/uL16, RPL26/uL24, SYVN1/HRD1 and TP53/p53 (PubMed:20018847, PubMed:20531390, PubMed:25219498, PubMed:30783677, PubMed:30886146, PubMed:32160526, PubMed:35753586, PubMed:36543799, PubMed:36893266, PubMed:37036982, PubMed:37595036, PubMed:37795761, PubMed:38383785, PubMed:38383789). As part of the UREL complex, plays a key role in ribosome recycling by catalyzing mono-ufmylation of RPL26/uL24 subunit of the 60S ribosome (PubMed:38383785, PubMed:38383789). Ufmylation of RPL26/uL24 occurs on free 60S ribosomes following ribosome dissociation: it weakens the junction between post-termination 60S subunits and SEC61 translocons, promoting release and recycling of the large ribosomal subunit from the endoplasmic reticulum membrane (PubMed:38383785, PubMed:38383789). Ufmylation of RPL26/uL24 and subsequent 60S ribosome recycling either take place after normal termination of translation or after ribosome stalling during cotranslational translocation at the endoplasmic reticulum (PubMed:37036982, PubMed:37595036, PubMed:38383785, PubMed:38383789). Involved in reticulophagy in response to endoplasmic reticulum stress by mediating ufmylation of proteins such as CYB5R3 and RPN1, thereby promoting lysosomal degradation of ufmylated proteins (PubMed:23152784, PubMed:32160526, PubMed:36543799). Ufmylation in response to endoplasmic reticulum stress is essential for processes such as hematopoiesis, blood vessel morphogenesis or inflammatory response (PubMed:32050156). Mediates ufmylation of DDRGK1 and CDK5RAP3; the role of these modifications is however unclear: as both DDRGK1 and CDK5RAP3 act as substrate adapters for ufmylation, it is uncertain whether ufmylation of these proteins is, a collateral effect or is required for ufmylation (PubMed:20018847, PubMed:20531390). Acts as a negative regulator of T-cell activation by mediating ufmylation and stabilization of PDCD1/PD-1 (PubMed:38377992). Also involved in the response to DNA damage: recruited to double-strand break sites following DNA damage and mediates monoufmylation of histone H4 and ufmylation of MRE11 (PubMed:30783677, PubMed:30886146). Mediates ufmylation of TP53/p53, promoting its stability (PubMed:32807901). Catalyzes ufmylation of TRIP4, thereby playing a role in nuclear receptor-mediated transcription (PubMed:25219498). Required for hematopoietic stem cell function and hematopoiesis (By similarity)",
+      "accession": "O94874"
+    },
+    {
+      "gene_symbol": "VKORC1L1",
+      "UniProt_functional_annotation": "Involved in vitamin K metabolism. Can reduce inactive vitamin K 2,3-epoxide to active vitamin K, and may contribute to vitamin K-mediated protection against oxidative stress. Plays a role in vitamin K-dependent gamma-carboxylation of Glu residues in target proteins",
+      "accession": "Q8N0U8"
+    },
+    {
+      "gene_symbol": "XPO5",
+      "UniProt_functional_annotation": "Mediates the nuclear export of proteins bearing a double-stranded RNA binding domain (dsRBD) and double-stranded RNAs (cargos). XPO5 in the nucleus binds cooperatively to the RNA and to the GTPase Ran in its active GTP-bound form. Proteins containing dsRBDs can associate with this trimeric complex through the RNA. Docking of this complex to the nuclear pore complex (NPC) is mediated through binding to nucleoporins. Upon transit of a nuclear export complex into the cytoplasm, hydrolysis of Ran-GTP to Ran-GDP (induced by RANBP1 and RANGAP1, respectively) cause disassembly of the complex and release of the cargo from the export receptor. XPO5 then returns to the nuclear compartment by diffusion through the nuclear pore complex, to mediate another round of transport. The directionality of nuclear export is thought to be conferred by an asymmetric distribution of the GTP- and GDP-bound forms of Ran between the cytoplasm and nucleus. Overexpression may in some circumstances enhance RNA-mediated gene silencing (RNAi). Mediates nuclear export of isoform 5 of ADAR/ADAR1 in a RanGTP-dependent manner\nMediates the nuclear export of micro-RNA precursors, which form short hairpins (PubMed:14631048, PubMed:14681208, PubMed:15613540). Also mediates the nuclear export of synthetic short hairpin RNAs used for RNA interference. In some circumstances can also mediate the nuclear export of deacylated and aminoacylated tRNAs. Specifically recognizes dsRNAs that lack a 5'-overhang in a sequence-independent manner, have only a short 3'-overhang, and that have a double-stranded length of at least 15 base-pairs (PubMed:19965479). Binding is dependent on Ran-GTP (PubMed:19965479)\n(Microbial infection) Mediates the nuclear export of adenovirus VA1 dsRNA",
+      "accession": "Q9HAV4"
+    },
+    {
+      "gene_symbol": "YEATS4",
+      "UniProt_functional_annotation": "Chromatin reader component of the NuA4 histone acetyltransferase (HAT) complex, a complex involved in transcriptional activation of select genes principally by acetylation of nucleosomal histones H4 and H2A (PubMed:12963728, PubMed:14966270). Specifically recognizes and binds acylated histone H3, with a preference for histone H3 diacetylated at 'Lys-18' and 'Lys-27' (H3K18ac and H3K27ac) or histone H3 diacetylated at 'Lys-14' and 'Lys-27' (H3K14ac and H3K27ac) (PubMed:29437725, PubMed:29900004, PubMed:30071723). Also able to recognize and bind crotonylated histone H3 (PubMed:30071723). May also recognize and bind histone H3 succinylated at 'Lys-122' (H3K122succ); additional evidences are however required to confirm this result in vivo (PubMed:29463709). Plays a key role in histone variant H2AZ1/H2A.Z deposition into specific chromatin regions: recognizes and binds H3K14ac and H3K27ac on the promoters of actively transcribed genes and recruits NuA4-related complex to deposit H2AZ1/H2A.Z (PubMed:29437725). H2AZ1/H2A.Z deposition is required for maintenance of embryonic stem cell (By similarity)",
+      "accession": "O95619"
+    },
+    {
+      "gene_symbol": "ZNF367",
+      "UniProt_functional_annotation": "Transcriptional activator. Isoform 1 may be involved in transcriptional activation of erythroid genes",
+      "accession": "Q7RTV3"
+    },
+    {
+      "gene_symbol": "ZWINT",
+      "UniProt_functional_annotation": "Acts as a component of the outer kinetochore KNL1 complex that serves as a docking point for spindle assembly checkpoint components and mediates microtubule-kinetochore interactions (PubMed:15094189, PubMed:15485811, PubMed:15824131, PubMed:16732327, PubMed:24530301, PubMed:27881301, PubMed:38459127, PubMed:38459128). Kinetochores, consisting of a centromere-associated inner segment and a microtubule-contacting outer segment, play a crucial role in chromosome segregation by mediating the physical connection between centromeric DNA and spindle microtubules (PubMed:15094189, PubMed:15485811, PubMed:16732327). The outer kinetochore is made up of the ten-subunit KMN network, comprising the MIS12, NDC80 and KNL1 complexes, and auxiliary microtubule-associated components; together they connect the outer kinetochore with the inner kinetochore, bind microtubules, and mediate interactions with mitotic checkpoint proteins that delay anaphase until chromosomes are bioriented on the spindle (PubMed:15094189, PubMed:15485811, PubMed:15824131, PubMed:16732327, PubMed:24530301, PubMed:38459127, PubMed:38459128). Targets the RZZ complex to the kinetochore at prometaphase (PubMed:15485811). Recruits MAD2L1 to the kinetochore, but is not required for BUB1B localization (By similarity). In addition to orienting mitotic chromosomes, it is also essential for alignment of homologous chromosomes during meiotic metaphase I (By similarity). In meiosis I, required to activate the spindle assembly checkpoint at unattached kinetochores to correct erroneous kinetochore-microtubule attachments (PubMed:15485811)",
+      "accession": "O95229"
+    }
+  ]
+}
