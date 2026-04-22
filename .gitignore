@@ -29,25 +29,21 @@ venv/
 env/
 ENV/
 .venv/
-.mozzvenv/
 
 # Testing
 .coverage
 htmlcov/
 .pytest_cache/
 .ruff_cache/
+.claude/
 
 # Logs
 *.log
 logs/
 debug/
 
-# Docs (internal working documents)
-docs/
-
 # Results and data (optional, comment out if you want to track these)
 results/
-output/
 
 # Benchmark results in examples/
 examples/ops/results/
