@@ -300,10 +300,15 @@ class AnthropicClient(LLMClientBase):
 
         response = client.messages.create(**kwargs)
 
-        # Log token usage
+        # Store usage for cost tracking by callers
         if hasattr(response, "usage"):
-            tokens = response.usage.input_tokens + response.usage.output_tokens
-            logger.info(f"Anthropic tokens used: {tokens}")
+            self.last_usage = {
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
+            }
+            logger.info(f"Anthropic tokens used: {response.usage.input_tokens + response.usage.output_tokens}")
+        else:
+            self.last_usage = {}
 
         return response.content[0].text
 

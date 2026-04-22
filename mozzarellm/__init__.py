@@ -4,14 +4,12 @@ mozzarellm: Gene cluster analysis using Large Language Models (LLMs)
 
 __version__ = "0.2.0"
 
-# New unified API
-from .pipeline.analyzer import ClusterAnalyzer
-from .schemas.analysis_output_schemas import (
-    AnalysisResult,
-    ClusterInput,
-    ClusterResult,
-    GeneClassification,
-    RetrievalContext,
+from .clients.llm_api_clients import (
+    AnthropicClient,
+    GeminiClient,
+    LLMClientBase,
+    OpenAIClient,
+    create_client,
 )
 
 # Prompt components (modular)
@@ -24,21 +22,20 @@ from .prompt_components import (
     PATHWAY_CONFIDENCE_CRITERIA,
     assemble_cot_instructions,
 )
-from .clients.llm_api_clients import (
-    AnthropicClient,
-    GeminiClient,
-    LLMClientBase,
-    OpenAIClient,
-    create_client,
+from .schemas.analysis_output_schemas import (
+    AnalysisResult,
+    ClusterInput,
+    ClusterResult,
+    GeneClassification,
+    RetrievalContext,
 )
+from .schemas.mcp_schemas import ClusterValidationResult
 
 # IO utils
 from .utils.io import load_table, write_bundle
 
 # Expose package-level API
 __all__ = [
-    # Main API
-    "ClusterAnalyzer",
     # Models
     "ClusterResult",
     "AnalysisResult",
@@ -59,6 +56,8 @@ __all__ = [
     "OUTPUT_FORMAT_JSON",
     "COT_STEPS_DEFAULT",
     "assemble_cot_instructions",
+    # Literature validation
+    "ClusterValidationResult",
     # IO utils
     "load_table",
     "write_bundle",

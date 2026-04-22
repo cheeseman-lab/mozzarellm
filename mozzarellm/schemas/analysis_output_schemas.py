@@ -11,11 +11,11 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class GeneClassification(BaseModel):
-    """Classification of a single gene with priority and rationale."""
+    """Classification of a single gene with rationale and optional subclass."""
 
     gene: str = Field(..., description="Gene symbol")
-    priority: int = Field(..., ge=1, le=10, description="Priority score (1-10)")
-    rationale: str = Field(..., description="Explanation for classification and priority")
+    rationale: str = Field(..., description="Explanation for classification and subclassification")
+    priority: int | None = Field(None, ge=1, le=10, description="Priority score (1-10), if provided")
 
     @field_validator("gene")
     @classmethod
@@ -65,6 +65,10 @@ class ClusterResult(BaseModel):
         le=1.0,
         description="Ratio of established genes to total genes (0.0-1.0)",
     )
+    literature_validation: dict[str, Any] | None = Field(
+        default=None,
+        description="Amended cluster dict with per-gene literature evidence, if validation was run.",
+    )
 
     @field_validator("cluster_id")
     @classmethod
@@ -79,7 +83,7 @@ class ClusterResult(BaseModel):
 
     def get_high_priority_genes(self, threshold: int = 8) -> list[GeneClassification]:
         """Return genes with priority >= threshold."""
-        return [gene for gene in self.get_all_flagged_genes() if gene.priority >= threshold]
+        return [gene for gene in self.get_all_flagged_genes() if gene.priority is not None and gene.priority >= threshold]
 
     def get_quality_summary(self) -> dict[str, Any]:
         """
