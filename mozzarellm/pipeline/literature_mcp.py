@@ -250,6 +250,88 @@ def validate_and_amend_with_mcp(
     return amended
 
 
+def analyze_and_validate_unified(
+    system_prompt: str,
+    user_prompt: str,
+    model: str = "claude-sonnet-4-5",
+    max_tokens: int = 16000,
+    max_retries: int = 3,
+) -> dict[str, Any]:
+    """Single LLM call that performs CoT analysis AND constrained MCP literature validation.
+
+    The system_prompt should be assembled with COT_STEPS_UNIFIED_MCP (which inserts
+    the literature validation step between VERIFICATION and OUTPUT).
+
+    Args:
+        system_prompt: Full CoT system prompt including the literature validation step.
+        user_prompt: Cluster bundle content.
+        model: Anthropic model to use.
+        max_tokens: Max output tokens (must accommodate CoT reasoning + final JSON).
+        max_retries: Retry count for MCP timeout errors.
+
+    Returns:
+        Dict with parsed cluster result + _validation_metadata.
+    """
+    client = anthropic.Anthropic()
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    mcp_servers = [
+        {"type": "url", "url": url, "name": name, **({"authorization_token": api_key} if any(h in url for h in ANTHROPIC_HOSTED_MCP) else {})}
+        for name, url in MCP_SERVERS.items()
+    ]
+    tools = [{"type": "mcp_toolset", "mcp_server_name": name} for name in MCP_SERVERS]
+
+    for attempt in range(max_retries):
+        try:
+            start = time.time()
+            response = client.beta.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                mcp_servers=mcp_servers,
+                tools=tools,
+                betas=["mcp-client-2025-11-20"],
+            )
+            elapsed = time.time() - start
+            break
+        except (anthropic.BadRequestError, anthropic.InternalServerError) as e:
+            msg = str(e).lower()
+            retryable = any(kw in msg for kw in ("timed out", "504", "502", "503", "500", "connection error", "internal server"))
+            if attempt < max_retries - 1 and retryable:
+                time.sleep(60)
+            else:
+                raise
+
+    output_text = ""
+    tool_call_count = 0
+    for block in response.content:
+        if block.type == "text":
+            output_text += block.text
+        elif block.type == "mcp_tool_use":
+            tool_call_count += 1
+
+    parsed = _parse_json_from_text(output_text)
+    cost = (response.usage.input_tokens * 3 + response.usage.output_tokens * 15) / 1_000_000
+
+    meta = {
+        "mode": "unified_mcp",
+        "model": model,
+        "input_tokens": response.usage.input_tokens,
+        "output_tokens": response.usage.output_tokens,
+        "cost_usd": round(cost, 4),
+        "time_seconds": round(elapsed, 1),
+        "tool_calls": tool_call_count,
+    }
+
+    if not parsed:
+        return {
+            "_validation_metadata": {**meta, "error": "failed to parse JSON", "raw_output": output_text[:1000]},
+        }
+
+    parsed["_validation_metadata"] = meta
+    return parsed
+
+
 def _parse_json_from_text(text: str) -> dict[str, Any] | None:
     """Extract JSON from LLM response text, handling markdown code blocks."""
     # Try extracting from ```json ... ``` block

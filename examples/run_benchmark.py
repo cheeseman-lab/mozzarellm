@@ -7,6 +7,8 @@ Usage:
     python run_benchmark.py --dataset ops --model claude-sonnet-4-6
     python run_benchmark.py --dataset ops --model claude-sonnet-4-6 --cot
     python run_benchmark.py --dataset all --model claude-sonnet-4-6 --cot
+    python run_benchmark.py --dataset all --cot --mcp                      # unified (default)
+    python run_benchmark.py --dataset all --cot --mcp --two-phase          # separate Phase 2 call
     python run_benchmark.py --dataset ops --clusters 21 37 --model claude-sonnet-4-6
 """
 
@@ -146,6 +148,7 @@ def run_dataset(
     model: str,
     cot: bool,
     mcp: bool,
+    unified: bool,
     clusters: list[str] | None,
     run_dir: Path,
     bundle_cache_dir: Path,
@@ -196,16 +199,20 @@ def run_dataset(
     cluster_to_bundle = build_cluster_id_to_bundle_path(bundle_dir, screen_name=screen_name)
     print(f"Bundles ready for: {sorted(cluster_to_bundle.keys())}")
 
-    # Build system prompt
-    system_prompt = make_cluster_analysis_system_prompt(
-        screen_name=screen_name,
-        screen_context_path=cfg["screen_context"],
-        CoT_mode=cot,
-        output_dir=run_dir / "prompts_used",
-    )
+    # Build system prompt — for unified mode, inject the literature validation step
+    system_prompt_kwargs = {
+        "screen_name": screen_name,
+        "screen_context_path": cfg["screen_context"],
+        "CoT_mode": cot,
+        "output_dir": run_dir / "prompts_used",
+    }
+    if unified:
+        from mozzarellm.prompt_components import COT_STEPS_UNIFIED_MCP
+        system_prompt_kwargs["override_CoT_steps"] = COT_STEPS_UNIFIED_MCP
+    system_prompt = make_cluster_analysis_system_prompt(**system_prompt_kwargs)
 
-    # Init LLM client
-    client = create_client(model=model, api_key=os.getenv("ANTHROPIC_API_KEY"))
+    # Init LLM client (only used for non-unified path)
+    client = create_client(model=model, api_key=os.getenv("ANTHROPIC_API_KEY")) if not unified else None
 
     # Phase 1: query each benchmark cluster
     results = {}
@@ -216,12 +223,66 @@ def run_dataset(
             print(f"  [SKIP] Cluster {cluster_id}: no bundle found")
             continue
 
-        print(f"  Querying cluster {cluster_id}...", end=" ", flush=True)
+        label = "Querying+validating" if unified else "Querying"
+        print(f"  {label} cluster {cluster_id}...", end=" ", flush=True)
         t0 = time.time()
 
         user_prompt = make_single_cluster_analysis_user_prompt(
             cluster_id, screen_name, cluster_to_bundle
         )
+
+        if unified:
+            from mozzarellm.pipeline.literature_mcp import analyze_and_validate_unified
+            try:
+                parsed = analyze_and_validate_unified(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    model=model,
+                )
+                elapsed = time.time() - t0
+                meta = parsed.get("_validation_metadata", {})
+                if "error" in meta and "input_tokens" not in meta:
+                    print(f"ERROR ({elapsed:.1f}s): {meta.get('error')}")
+                    results[str(cluster_id)] = {"error": meta.get("error")}
+                    cluster_metrics[str(cluster_id)] = {"elapsed_s": round(elapsed, 1), "error": meta.get("error")}
+                    continue
+                results[str(cluster_id)] = parsed
+                in_tok = meta.get("input_tokens", 0)
+                out_tok = meta.get("output_tokens", 0)
+                cost = meta.get("cost_usd", 0)
+                tool_calls = meta.get("tool_calls", 0)
+                pathway_rev = parsed.get("literature_informed_pathway_revision", {})
+                cluster_metrics[str(cluster_id)] = {
+                    "elapsed_s": round(elapsed, 1),
+                    "input_tokens": in_tok,
+                    "output_tokens": out_tok,
+                    "cost_usd": cost,
+                    "tool_calls": tool_calls,
+                    "pathway_changed": pathway_rev.get("pathway_changed", False),
+                    "pre_literature_pathway": pathway_rev.get("pre_literature_pathway"),
+                    "post_literature_pathway": pathway_rev.get("post_literature_pathway"),
+                }
+                reclassified = parsed.get("literature_informed_reclassifications", [])
+                print(f"OK ({elapsed:.1f}s | {tool_calls} tool calls | {in_tok}in/{out_tok}out | ${cost:.4f} | {len(reclassified)} lit-reclassifications)")
+                for r in reclassified:
+                    print(f"    {r.get('gene', '?')}: {r.get('initial_category', '?')} → {r.get('final_category', '?')} (PMIDs: {','.join(r.get('driving_pmids', []))})")
+                if pathway_rev.get("pathway_changed"):
+                    print(f"    PATHWAY REVISED: {pathway_rev.get('pre_literature_pathway', '?')} → {pathway_rev.get('post_literature_pathway', '?')}")
+                    print(f"      Reason: {pathway_rev.get('rationale', '?')}")
+                print(
+                    f"    {parsed.get('dominant_process', '?')} "
+                    f"[{parsed.get('pathway_confidence', '?')}]  "
+                    f"est={len(parsed.get('established_genes', []))} "
+                    f"nov={len(parsed.get('novel_role_genes', []))} "
+                    f"unc={len(parsed.get('uncharacterized_genes', []))}"
+                )
+            except Exception as e:
+                elapsed = time.time() - t0
+                print(f"ERROR ({elapsed:.1f}s): {e}")
+                results[str(cluster_id)] = {"error": str(e)}
+                cluster_metrics[str(cluster_id)] = {"elapsed_s": round(elapsed, 1), "error": str(e)}
+            continue
+
         response_text, error = client.query(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -384,11 +445,14 @@ def print_summary(all_summaries: list[dict], run_dir: Path):
     gene_total = sum(len(r["gene_results"]) for r in all_rows)
     gene_validated = sum(sum(g["validated"] for g in r["gene_results"]) for r in all_rows)
 
+    pathway_revisions = sum(1 for r in all_rows if r["metrics"].get("pathway_changed"))
+
     print(f"Function matches:    {func_matches}/{total} ({100*func_matches/total:.0f}%)")
     if conf_checks:
         print(f"Confidence matches:  {conf_matches}/{len(conf_checks)} ({100*conf_matches/len(conf_checks):.0f}%)")
     if gene_total:
         print(f"Gene validation:     {gene_validated}/{gene_total} ({100*gene_validated/gene_total:.0f}%)")
+    print(f"Pathway revisions:   {pathway_revisions}/{total}")
 
     # Overall cost/time
     grand_cost = sum(s["totals"]["cost_usd"] for s in all_summaries)
@@ -403,15 +467,18 @@ def print_summary(all_summaries: list[dict], run_dir: Path):
     if grand_mcp_time > 0:
         print(f"Phase 2 (MCP) time:  {grand_mcp_time:.1f}s")
 
-    print(f"\n{'Cluster':<12} {'Dataset':<12} {'Func':>5} {'Conf':>5} {'Time(s)':>8} {'Cost($)':>8}  Predicted function")
-    print("-" * 90)
+    print(f"\n{'Cluster':<12} {'Dataset':<12} {'Func':>5} {'Conf':>5} {'PthRev':>6} {'Time(s)':>8} {'Cost($)':>8}  Predicted function")
+    print("-" * 95)
     for row in all_rows:
         func_mark = "✓" if row["function_match"] else "✗"
         conf_mark = "✓" if row["confidence_match"] else "✗"
+        pth_mark = "✓" if row["metrics"].get("pathway_changed") else "·"
         predicted = row["predicted_function"][:38]
         t = row["metrics"].get("elapsed_s", "-")
         c = row["metrics"].get("cost_usd", "-")
-        print(f"{row['cluster_id']:<12} {row['dataset']:<12} {func_mark:>5} {conf_mark:>5} {t:>8} {c:>8}  {predicted}")
+        print(f"{row['cluster_id']:<12} {row['dataset']:<12} {func_mark:>5} {conf_mark:>5} {pth_mark:>6} {t:>8} {c:>8}  {predicted}")
+        if row["metrics"].get("pathway_changed"):
+            print(f"{'':>12} {'':>12} {'':>5} {'':>5} {'':>6} {'':>8} {'':>8}  was: {row['metrics'].get('pre_literature_pathway', '?')}")
 
     # Save summary JSON
     summary_path = run_dir / "summary.json"
@@ -420,6 +487,7 @@ def print_summary(all_summaries: list[dict], run_dir: Path):
         "function_matches": f"{func_matches}/{total}",
         "confidence_matches": f"{conf_matches}/{len(conf_checks)}" if conf_checks else "N/A",
         "gene_validation": f"{gene_validated}/{gene_total}" if gene_total else "N/A",
+        "pathway_revisions": f"{pathway_revisions}/{total}",
         "phase1_cost_usd": round(grand_cost, 4),
         "mcp_cost_usd": round(grand_mcp_cost, 4),
         "total_cost_usd": round(grand_cost + grand_mcp_cost, 4),
@@ -435,7 +503,8 @@ def main():
     parser.add_argument("--dataset", choices=["ops", "depmap", "proteomics", "all"], default="ops")
     parser.add_argument("--model", default="claude-sonnet-4-6")
     parser.add_argument("--cot", action="store_true", help="Enable chain-of-thought mode")
-    parser.add_argument("--mcp", action="store_true", help="Enable Phase 2 MCP literature validation")
+    parser.add_argument("--mcp", action="store_true", help="Enable MCP literature validation (unified single-call by default, requires --cot)")
+    parser.add_argument("--two-phase", action="store_true", dest="two_phase", help="Use two-phase MCP: separate LLM call after Phase 1 instead of unified single-call (requires --mcp)")
     parser.add_argument("--clusters", nargs="+", help="Specific cluster IDs to test")
     parser.add_argument(
         "--bundle-cache-dir",
@@ -446,17 +515,28 @@ def main():
     parser.add_argument("--rebuild-bundles", action="store_true", help="Force rebuild evidence bundles")
     args = parser.parse_args()
 
+    # Mode validation
+    if args.mcp and not args.cot:
+        print("ERROR: --mcp requires --cot.")
+        raise SystemExit(1)
+    if args.two_phase and not args.mcp:
+        print("ERROR: --two-phase requires --mcp.")
+        raise SystemExit(1)
+
+    # Derive unified flag: --mcp without --two-phase means unified
+    unified = args.mcp and not args.two_phase
+
     # MCP preflight check
     if args.mcp:
         available = get_available_mcp_servers()
         if "pubmed" not in available:
             print("ERROR: PubMed MCP server is unavailable. Run without --mcp or try later.")
             raise SystemExit(1)
-        print("MCP preflight: PubMed available ✓")
+        print(f"MCP preflight: PubMed available ✓ ({'unified' if unified else 'two-phase'} mode)")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     cot_tag = "_cot" if args.cot else ""
-    mcp_tag = "_mcp" if args.mcp else ""
+    mcp_tag = "_mcp_twophase" if (args.mcp and args.two_phase) else ("_mcp" if args.mcp else "")
     run_dir = EXAMPLES_DIR / "benchmark_results" / f"run_{timestamp}_{args.dataset}_{args.model.replace('/', '_')}{cot_tag}{mcp_tag}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -470,7 +550,8 @@ def main():
             dataset_name=ds,
             model=args.model,
             cot=args.cot,
-            mcp=args.mcp,
+            mcp=args.mcp and args.two_phase,
+            unified=unified,
             clusters=[str(c) for c in args.clusters] if args.clusters else None,
             run_dir=run_dir,
             bundle_cache_dir=args.bundle_cache_dir,
