@@ -29,6 +29,7 @@ venv/
 env/
 ENV/
 .venv/
+.mozzvenv/
 
 # Testing
 .coverage
