@@ -93,7 +93,7 @@ def make_cluster_analysis_system_prompt(
     # =========================================================================
     # DEFAULT PROMPT CONSTRUCTION
     # =========================================================================
-    if CoT_mode and override_CoT_steps:
+    if override_CoT_steps:
         prompt = assemble_cot_instructions(override_CoT_steps, screen_context=SCREEN_CONTEXT_TEXT)
     elif CoT_mode:
         prompt = assemble_cot_instructions(COT_STEPS_DEFAULT, screen_context=SCREEN_CONTEXT_TEXT)

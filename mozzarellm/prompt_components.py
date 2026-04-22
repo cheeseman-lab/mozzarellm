@@ -178,44 +178,6 @@ The "literature_validation" field per gene must contain:
 - "rationale": one sentence — why reclassification/subclass update is or isn't warranted
 """
 
-# Placeholders: {flagged_genes_json}, {pathway}, {literature_validation_output_format}
-MCP_VALIDATION_PROMPT = """
-Validate gene-pathway associations from a functional genomics screen and produce an amended classification.
-
-## Pathway context
-Full cluster annotation: "{pathway}"
-
-## Genes to validate
-These genes were classified as NOVEL_ROLE or UNCHARACTERIZED relative to the pathway above:
-
-{flagged_genes_json}
-
-## Procedure — follow EXACTLY
-
-### Step 1: Extract a search keyword
-Reduce the full cluster annotation to a 2-3 word PubMed keyword that names the broad pathway. Strip out specific subprocess descriptors, complex names, parenthetical qualifiers, and em-dash extensions — keep only the core process. The keyword is for recall (broad capture), not precision; precision comes from Step 4.
-
-### Step 2: ONE `search_articles` call
-Query: `(GENE1[tiab] OR GENE2[tiab] OR ... OR GENEN[tiab]) AND <keyword from Step 1>`
-- The [tiab] tag on EVERY gene symbol is mandatory — it restricts matching to title/abstract and prevents noise from common-word symbols like "RAN".
-- max_results=30
-
-### Step 3: ONE `get_article_metadata` call
-Pass all PMIDs returned by Step 2.
-
-### Step 4: Validate against the FULL annotation (not the keyword)
-For each gene and each paper, judge whether the paper addresses the SPECIFIC subprocess in the full annotation. A paper about "ribosome biogenesis in mitochondria" is peripheral to a "40S SSU processome" cluster — flag accordingly.
-
-## Hard constraints
-- EXACTLY 2 tool calls total (1 search + 1 metadata). Do not call any tool more than once.
-- Do NOT search per-gene. Do NOT call any other tools.
-
-## Output
-Return ONLY a JSON object with "novel_role_genes" and "uncharacterized_genes" lists, preserving the original schema. For each entry, add a `literature_validation` field per the schema below. If no relevant papers were found for a gene, set `literature_support: "none"` and leave reclassification/subclass null.
-
-{literature_validation_output_format}
-"""
-
 # =============================================================================
 # CHAIN-OF-THOUGHT STEPS
 # =============================================================================

@@ -12,9 +12,6 @@ from .clients.llm_api_clients import (
     create_client,
 )
 
-# Literature validation
-from .pipeline.literature_mcp import validate_and_amend_with_mcp
-
 # Prompt components (modular)
 from .prompt_components import (
     CLUSTER_ANALYSIS_TASK,
@@ -60,7 +57,6 @@ __all__ = [
     "COT_STEPS_DEFAULT",
     "assemble_cot_instructions",
     # Literature validation
-    "validate_and_amend_with_mcp",
     "ClusterValidationResult",
     # IO utils
     "load_table",

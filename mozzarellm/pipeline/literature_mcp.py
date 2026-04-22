@@ -1,9 +1,8 @@
 """
 Literature validation for MozzareLLM gene classifications.
 
-Single LLM call constrained to exactly 2 MCP tool calls (search + metadata fetch).
-Takes a per-cluster classification JSON and returns an amended JSON with a
-literature_validation field per gene.
+Single unified LLM call that performs CoT analysis and constrained MCP literature
+validation (search + metadata fetch) in one shot.
 """
 
 from __future__ import annotations
@@ -14,8 +13,6 @@ import time
 from typing import Any
 
 import anthropic
-
-from ..prompt_components import LITERATURE_VALIDATION_OUTPUT_FORMAT, MCP_VALIDATION_PROMPT
 
 # MCP server URLs
 # pubmed.mcp.claude.com — Anthropic-hosted, requires authorization_token=ANTHROPIC_API_KEY.
@@ -106,150 +103,6 @@ def get_available_mcp_servers(timeout: int = 5, verbose: bool = True) -> list[st
     return [name for name, status in mcp_statuses.items() if status.startswith("up")]
 
 
-def _extract_genes_to_validate(cluster_json: dict[str, Any]) -> list[str]:
-    """Extract novel_role and uncharacterized gene symbols from a cluster result."""
-    genes = []
-    for g in cluster_json.get("novel_role_genes", []):
-        gene = g.get("gene") or g
-        if isinstance(gene, str):
-            genes.append(gene)
-    for g in cluster_json.get("uncharacterized_genes", []):
-        gene = g.get("gene") or g
-        if isinstance(gene, str):
-            genes.append(gene)
-    return genes
-
-
-def _build_validation_prompt(
-    pathway: str,
-    cluster_json: dict[str, Any],
-    novel_role_subset: list[dict] | None = None,
-    uncharacterized_subset: list[dict] | None = None,
-) -> str:
-    """Build the Direct MCP validation prompt from the named template.
-
-    Passes only novel_role_genes and uncharacterized_genes — established genes
-    are excluded to avoid unnecessary token burn. If subsets are provided, uses
-    those instead of the full lists (for batching).
-    """
-    flagged_genes = {
-        "novel_role_genes": novel_role_subset if novel_role_subset is not None else cluster_json.get("novel_role_genes", []),
-        "uncharacterized_genes": uncharacterized_subset if uncharacterized_subset is not None else cluster_json.get("uncharacterized_genes", []),
-    }
-    return MCP_VALIDATION_PROMPT.format(
-        flagged_genes_json=json.dumps(flagged_genes, indent=2),
-        pathway=pathway,
-        literature_validation_output_format=LITERATURE_VALIDATION_OUTPUT_FORMAT,
-    )
-
-
-def validate_and_amend_with_mcp(
-    cluster_json: dict[str, Any],
-    model: str = "claude-sonnet-4-5",
-    max_tokens: int = 16000,
-    max_retries: int = 3,
-) -> dict[str, Any]:
-    """Validate and amend classifications using LLM + MCP connectors.
-
-    Single API call constrained to exactly 2 MCP tool calls:
-    - search_articles with one OR query covering all genes
-    - get_article_metadata for the resulting PMIDs
-
-    The model then validates relevance using the full cluster annotation.
-
-    Args:
-        cluster_json: Per-cluster classification result (must have dominant_process,
-                      novel_role_genes, uncharacterized_genes).
-        model: Anthropic model to use.
-        max_tokens: Max output tokens.
-        max_retries: Retry count for MCP timeout errors.
-
-    Returns:
-        Amended cluster JSON with literature_validation per gene, plus metadata.
-    """
-    genes = _extract_genes_to_validate(cluster_json)
-    if not genes:
-        return {**cluster_json, "_validation_metadata": {"mode": "mcp", "skipped": "no genes to validate"}}
-
-    pathway = cluster_json.get("dominant_process", "")
-    prompt = _build_validation_prompt(pathway, cluster_json)
-
-    client = anthropic.Anthropic()
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    mcp_servers = [
-        {"type": "url", "url": url, "name": name, **({"authorization_token": api_key} if any(h in url for h in ANTHROPIC_HOSTED_MCP) else {})}
-        for name, url in MCP_SERVERS.items()
-    ]
-    tools = [{"type": "mcp_toolset", "mcp_server_name": name} for name in MCP_SERVERS]
-
-    for attempt in range(max_retries):
-        try:
-            start = time.time()
-            response = client.beta.messages.create(
-                model=model,
-                max_tokens=max_tokens,
-                messages=[{"role": "user", "content": prompt}],
-                mcp_servers=mcp_servers,
-                tools=tools,
-                betas=["mcp-client-2025-11-20"],
-            )
-            elapsed = time.time() - start
-            break
-        except (anthropic.BadRequestError, anthropic.InternalServerError) as e:
-            msg = str(e).lower()
-            retryable = any(kw in msg for kw in ("timed out", "504", "502", "503", "500", "connection error", "internal server"))
-            if attempt < max_retries - 1 and retryable:
-                time.sleep(60)
-            else:
-                raise
-
-    output_text = ""
-    tool_call_count = 0
-    for block in response.content:
-        if block.type == "text":
-            output_text += block.text
-        elif block.type == "mcp_tool_use":
-            tool_call_count += 1
-
-    amended_json = _parse_json_from_text(output_text)
-    cost = (response.usage.input_tokens * 3 + response.usage.output_tokens * 15) / 1_000_000
-
-    meta = {
-        "mode": "mcp",
-        "model": model,
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
-        "cost_usd": round(cost, 4),
-        "time_seconds": round(elapsed, 1),
-        "tool_calls": tool_call_count,
-        "genes_validated": genes,
-    }
-
-    if not amended_json:
-        return {
-            **cluster_json,
-            "_validation_metadata": {**meta, "error": "failed to parse amended JSON", "raw_output": output_text[:500]},
-        }
-
-    amended = {
-        **cluster_json,
-        "novel_role_genes": amended_json.get("novel_role_genes", cluster_json.get("novel_role_genes", [])),
-        "uncharacterized_genes": amended_json.get("uncharacterized_genes", cluster_json.get("uncharacterized_genes", [])),
-        "_validation_metadata": meta,
-    }
-
-    # Count reclassifications
-    reclassifications = []
-    for g in amended["novel_role_genes"] + amended["uncharacterized_genes"]:
-        lit = g.get("literature_validation", {})
-        if lit.get("suggested_reclassification"):
-            reclassifications.append({"gene": g["gene"], "new_category": lit["suggested_reclassification"]})
-    if reclassifications:
-        amended["reclassifications"] = reclassifications
-
-    return amended
-
-
 def analyze_and_validate_unified(
     system_prompt: str,
     user_prompt: str,
@@ -275,7 +128,16 @@ def analyze_and_validate_unified(
     client = anthropic.Anthropic()
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     mcp_servers = [
-        {"type": "url", "url": url, "name": name, **({"authorization_token": api_key} if any(h in url for h in ANTHROPIC_HOSTED_MCP) else {})}
+        {
+            "type": "url",
+            "url": url,
+            "name": name,
+            **(
+                {"authorization_token": api_key}
+                if any(h in url for h in ANTHROPIC_HOSTED_MCP)
+                else {}
+            ),
+        }
         for name, url in MCP_SERVERS.items()
     ]
     tools = [{"type": "mcp_toolset", "mcp_server_name": name} for name in MCP_SERVERS]
@@ -296,7 +158,18 @@ def analyze_and_validate_unified(
             break
         except (anthropic.BadRequestError, anthropic.InternalServerError) as e:
             msg = str(e).lower()
-            retryable = any(kw in msg for kw in ("timed out", "504", "502", "503", "500", "connection error", "internal server"))
+            retryable = any(
+                kw in msg
+                for kw in (
+                    "timed out",
+                    "504",
+                    "502",
+                    "503",
+                    "500",
+                    "connection error",
+                    "internal server",
+                )
+            )
             if attempt < max_retries - 1 and retryable:
                 time.sleep(60)
             else:
@@ -325,7 +198,11 @@ def analyze_and_validate_unified(
 
     if not parsed:
         return {
-            "_validation_metadata": {**meta, "error": "failed to parse JSON", "raw_output": output_text[:1000]},
+            "_validation_metadata": {
+                **meta,
+                "error": "failed to parse JSON",
+                "raw_output": output_text[:1000],
+            },
         }
 
     parsed["_validation_metadata"] = meta
