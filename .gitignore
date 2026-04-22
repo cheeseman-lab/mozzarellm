@@ -36,7 +36,6 @@ ENV/
 htmlcov/
 .pytest_cache/
 .ruff_cache/
-.claude/
 
 # Logs
 *.log
@@ -72,8 +71,3 @@ examples/old/
 # OS files
 .DS_Store
 Thumbs.db
-
-# Development artifacts
-dev/
-screen_context.json
-!examples/*/screen_context.json
