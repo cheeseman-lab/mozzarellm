@@ -221,6 +221,101 @@ COT_STEP_OUTPUT = f"""FINAL JSON OUTPUT:
 - Include concise summary highlighting key findings and evidence quality
 According to {OUTPUT_FORMAT_JSON}"""
 
+# =============================================================================
+# PHENOTYPE INTERPRETATION (feature-interp mode)
+# =============================================================================
+
+PHENOTYPE_INTERPRETATION_BLOCK = """
+PHENOTYPE INTERPRETATION:
+
+Each evidence bundle includes a `feature_overlaps` field listing morphological / phenotypic
+features that are up- or down-regulated for the genes in this cluster. The goal of this step
+is to hypothesize a SINGLE GLOBAL PHENOTYPE for the cluster, grounded in feature themes (not
+in individual feature claims), and to comment on whether that phenotype helps interpret the
+gene-based pathway call.
+
+Procedure:
+
+1. Group features into 1-4 biological themes (e.g., nuclear morphology, mitochondrial state,
+   cytoskeleton organization, cell-cycle arrest, membrane traffic). Themes must be composed
+   of features actually present in `feature_overlaps`.
+
+2. From those THEMES (not from individual features), hypothesize ONE global cluster phenotype
+   in `phenotype_narrative.summary` — a concise description of the implied cellular state.
+   Do not make per-feature mechanistic claims; reason at the theme level.
+
+3. State how the global phenotype relates to `dominant_process`:
+     - "supports": the phenotype is consistent with the gene-based pathway call.
+     - "refines":  the phenotype narrows the call to a more specific subprocess or branch
+                   (e.g., "40S maturation specifically" rather than "ribosome biogenesis broadly").
+     - "contradicts": the phenotype is inconsistent with the gene-based call.
+     - "no_signal": the features do not cohere into an interpretable phenotype.
+
+4. Optional confidence revision: if the phenotype materially strengthens or weakens
+   confidence in the pathway call, you MAY suggest a revision in
+   `phenotype_pathway_link.confidence_revision`. The justification must reference the
+   THEMES, not individual features. Otherwise leave `confidence_revision` null.
+
+Hard guardrails:
+- Cite ONLY features that appear in `feature_overlaps`. Do not invent feature names.
+- DO NOT modify `dominant_process` based on the phenotype. Pathway names are set by the
+  gene-based analysis; phenotype interpretation can refine or revise confidence in that call,
+  not replace it.
+- Off-ramp: if `feature_overlaps` is empty/absent, or features are too sparse or incoherent
+  to support a hypothesis, set `phenotype_narrative.discernible` to false, leave `themes` empty,
+  and set `phenotype_pathway_link.relationship` to "no_signal". Do not fabricate a phenotype.
+"""
+
+OUTPUT_FORMAT_JSON_FEATURE_INTERP = """
+Provide a concise analysis in this exact JSON format:
+{
+  "cluster_id": "[CLUSTER_ID]",  // IMPORTANT: Use the exact cluster_id provided in the prompt
+  "dominant_process": "pathway name (or comma-separated if multiple)",
+  "pathway_confidence": "High/Medium/Low",
+  "established_genes": ["GeneA", "GeneB"],
+  "uncharacterized_genes": [
+    {
+      "gene": "GeneC",
+      "class": "DARK_GENE | NASCENT | ANNOTATED_ONLY | NON_HUMAN_CHARACTERIZED",
+      "rationale": "explanation of categorization and subclassification",
+      "evidence": "quote(s) from annotations or citations, if available"
+    }
+  ],
+  "novel_role_genes": [
+    {
+      "gene": "GeneD",
+      "class": "NO_EVIDENCE | INDIRECT_EVIDENCE | PARTIAL_EVIDENCE | CONTRADICTORY_EVIDENCE",
+      "rationale": "explanation of categorization and subclassification",
+      "evidence": "quote(s) from annotations or citations, if available"
+    }
+  ],
+  "phenotype_narrative": {
+    "discernible": true,  // false if features are absent / too sparse / incoherent
+    "themes": [           // empty when discernible is false
+      {
+        "theme_name": "e.g., nuclear morphology",
+        "up_features": ["feature names from feature_overlaps"],
+        "down_features": ["feature names from feature_overlaps"]
+      }
+    ],
+    "summary": "one or two sentences describing the global cluster phenotype implied by the themes (null when discernible is false)"
+  },
+  "phenotype_pathway_link": {
+    "relationship": "supports | refines | contradicts | no_signal",
+    "rationale": "one or two sentences linking the global phenotype to dominant_process (or stating why no signal is discernible)",
+    "confidence_revision": null  // or {"revised_confidence": "High|Medium|Low", "justification": "must reference themes, not individual features"}
+  },
+  "summary": "key findings summary"
+}
+"""
+
+COT_STEP_OUTPUT_FEATURE_INTERP = f"""FINAL JSON OUTPUT:
+- Compile structured JSON with all required fields
+- Ensure cluster_id matches input exactly
+- Include concise summary highlighting key findings and evidence quality
+- Populate `phenotype_narrative` and `phenotype_pathway_link` from feature_overlaps
+According to {OUTPUT_FORMAT_JSON_FEATURE_INTERP}"""
+
 COT_STEP_LITERATURE_VALIDATION = f"""LITERATURE VALIDATION (constrained MCP):
 Using your tentative gene categorizations and sub-classifications from the previous steps, validate NOVEL_ROLE and UNCHARACTERIZED genes against PubMed.
 
@@ -297,134 +392,6 @@ def assemble_cot_instructions(
 
     numbered = [f"STEP {i + 1} - {step}" for i, step in enumerate(steps)]
     return "\n\n".join(numbered)
-
-
-# =============================================================================
-# PHENOTYPIC-STRENGTH-CONFIDENCE CROSS-CHECK (inserted by prompt_factory if phenotypic strength available)
-# =============================================================================
-# PLACEHOLDER: To be implemented
-#
-# Purpose: Cross-validate pathway confidence against phenotypic strength to identify edge cases
-# Timing: AFTER establishing pathway confidence in Section 5
-#
-# This section should:
-# - Present the phenotypic strength for the cluster (e.g., "8.5/10" or "strong"/"weak")
-# - Cross-check against the confidence level just assigned
-# - Identify and flag four scenarios:
-#   * HIGH confidence + HIGH strength → Affirm: "Well-supported, strong signal - ideal case"
-#   * LOW confidence + LOW strength → Affirm: "Weak signal - appropriately uncertain"
-#   * HIGH confidence + LOW strength → FLAG: "Reconsider - is the pathway too broad/generic? Are you overcalling confidence?"
-#   * LOW confidence + HIGH strength → FLAG: "Deep dive needed - strong effect suggests important biology. You may be missing the true pathway or this could be novel."
-# - For mismatched cases, prompt re-examination of the pathway hypothesis
-# - Request updated reasoning in the summary if confidence should be adjusted
-#
-# Example structure:
-# """
-# PHENOTYPIC-STRENGTH-CONFIDENCE CROSS-CHECK:
-# Your pathway assignment: {confidence_level} confidence
-# Phenotypic strength: {strength_level} (score: {strength_value})
-#
-# Evaluate the alignment:
-# - ALIGNED (High/High or Low/Low): Your assessment is consistent with effect strength
-# - MISMATCH (High confidence + Low strength): Are you overcalling confidence? Is the pathway too generic?
-# - MISMATCH (Low confidence + High strength): Strong phenotype suggests important biology - dig deeper for the true pathway. This could be a discovery opportunity.
-#
-# If mismatched, revisit your pathway hypothesis and explain your reasoning in the summary.
-# """
-
-PHENOTYPIC_STRENGTH_CONFIDENCE_EVALUATION = None  # Placeholder for future implementation
-
-
-# =============================================================================
-# MECHANISTIC HYPOTHESIS FROM FEATURE DIRECTIONALITY (inserted by prompt_factory if features available)
-# =============================================================================
-# PLACEHOLDER: To be implemented
-#
-# Purpose: Generate mechanistic hypotheses based on which features are up/down regulated
-# Timing: AFTER confidence assessment and phenotypic strength check - uses pathway context to interpret directionality
-#
-# This section should:
-# - Present up-regulated vs down-regulated features/genes/imaging features
-# - Guide hypothesis generation about WHAT IS HAPPENING mechanistically in this cluster
-# - Connect directional changes to specific pathway components or processes
-# - For perturbation screens (Perturb-seq): suggest which pathway branch/component is being affected
-# - For imaging screens (OPS): suggest which cellular processes are altered based on feature changes
-# - Frame as hypothesis generation to guide experiments, NOT as validation/refinement of the pathway
-# - Create a bridge between pathway identification and experimental design
-#
-# Example structure:
-# """
-# MECHANISTIC HYPOTHESIS (based on feature directionality):
-# The following features show consistent directional changes across genes in this cluster:
-#
-# UP-REGULATED: {up_features}
-# DOWN-REGULATED: {down_features}
-#
-# Given the {pathway_name} pathway you identified, generate mechanistic hypotheses:
-# - What might be happening at the molecular/cellular level? (e.g., "Upregulation of X with downregulation of Y suggests activation of the upstream regulatory branch")
-# - Which specific components or branches of the pathway are likely affected?
-# - Are these changes consistent with activation, inhibition, feedback, or compensation within the pathway?
-# - What cellular process is being altered to produce these specific directional changes?
-# - Does this suggest a particular mechanistic model within the broader pathway?
-#
-# Frame your mechanistic hypothesis to set up follow-up experimental validation.
-# """
-
-FEATURE_DIRECTIONALITY_HYPOTHESIS = None  # Placeholder for future implementation
-
-
-# =============================================================================
-# FOLLOW-UP EXPERIMENT SUGGESTIONS (inserted by prompt_factory if enabled)
-# =============================================================================
-# PLACEHOLDER: To be implemented
-#
-# Purpose: Suggest specific, actionable experiments to validate pathway assignment and test mechanistic hypotheses
-# Timing: FINAL analytical section - after pathway, confidence, phenotypic strength, and mechanistic hypothesis
-#
-# This section should:
-# - Suggest 2-4 concrete, specific follow-up experiments
-# - Target three goals:
-#   1. Validate the pathway assignment (confirm pathway involvement)
-#   2. Test high-priority genes (validate UNCHARACTERIZED and NOVEL_ROLE genes)
-#   3. Test mechanistic hypotheses (if feature directionality data available)
-# - Be specific: name genes to test, specific assays/techniques, expected readouts
-# - Consider the experimental modality (genetic perturbations, biochemical assays, imaging, epistasis, etc.)
-# - Tailor suggestions to confidence level and phenotypic strength:
-#   * High confidence + high strength: focus on mechanism and novel genes
-#   * Mismatched cases: suggest experiments to resolve the discrepancy
-# - Prioritize experiments that test high-priority (score ≥8) genes
-# - Be actionable and implementable in a real lab setting
-#
-# Example structure:
-# """
-# SUGGESTED FOLLOW-UP EXPERIMENTS:
-# Based on your analysis (pathway: {pathway_name}, confidence: {confidence}, phenotypic strength: {strength}, mechanism: {hypothesis}), suggest 2-4 specific experiments:
-#
-# 1. VALIDATE PATHWAY ASSIGNMENT:
-#    - Experiment: [specific assay/technique]
-#    - Genes to test: [which established genes as positive controls]
-#    - Expected outcome: [what would confirm pathway involvement]
-#
-# 2. TEST HIGH-PRIORITY GENES:
-#    - For UNCHARACTERIZED genes: [specific experiment to test pathway role]
-#    - For NOVEL_ROLE genes: [specific experiment to test proposed new function]
-#    - Focus on priority ≥8 genes: [list specific genes]
-#    - Expected outcomes: [what would validate their roles]
-#
-# 3. TEST MECHANISTIC HYPOTHESIS (if directionality available):
-#    - Experiment: [assay to test your mechanistic model]
-#    - Readouts: [what measurements distinguish between mechanisms]
-#    - Expected outcomes: [results that support/refute hypothesis]
-#
-# 4. RESOLVE AMBIGUITY (if applicable):
-#    - For low confidence: [experiment to increase confidence in pathway]
-#    - For strength mismatch: [experiment to explain the discrepancy]
-#    - For heterogeneous clusters: [experiment to identify subclusters or alternative pathways]
-#
-# Be specific and actionable: name genes, assays, techniques, and expected results.
-# """
-
-FOLLOW_UP_EXPERIMENT_SUGGESTIONS = None  # Placeholder for future implementation
 
 
 # =============================================================================

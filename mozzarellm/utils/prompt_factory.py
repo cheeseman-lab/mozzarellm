@@ -29,7 +29,11 @@ from mozzarellm.prompt_components import (
     NOVEL_CLASSIFICATION_RULES,
     UNCHARACTERIZED_CLASSIFICATION_RULES,
     OUTPUT_FORMAT_JSON,
+    OUTPUT_FORMAT_JSON_FEATURE_INTERP,
+    PHENOTYPE_INTERPRETATION_BLOCK,
     COT_STEPS_DEFAULT,
+    COT_STEP_OUTPUT,
+    COT_STEP_OUTPUT_FEATURE_INTERP,
     assemble_cot_instructions,
 )
 
@@ -43,6 +47,7 @@ def make_cluster_analysis_system_prompt(
     template_path: Path | None = None,
     template_string: str | None = None,
     CoT_mode: bool = False,
+    feature_interpretation: bool = False,
     output_dir: Path | None = None,
 ):
     """
@@ -94,32 +99,48 @@ def make_cluster_analysis_system_prompt(
     # DEFAULT PROMPT CONSTRUCTION
     # =========================================================================
     if override_CoT_steps:
-        prompt = assemble_cot_instructions(override_CoT_steps, screen_context=SCREEN_CONTEXT_TEXT)
+        steps = override_CoT_steps
     elif CoT_mode:
-        prompt = assemble_cot_instructions(COT_STEPS_DEFAULT, screen_context=SCREEN_CONTEXT_TEXT)
+        steps = COT_STEPS_DEFAULT
     else:
-        prompt = (
-            CLUSTER_ANALYSIS_TASK
-            + "\n\nThe following experimental context is provided: "
-            + SCREEN_CONTEXT_TEXT
-            + "\n\n"
-            + GENE_CATEGORIZATION_RULES
-            + "\n\n"
-            + NOVEL_CLASSIFICATION_RULES
-            + "\n\n"
-            + UNCHARACTERIZED_CLASSIFICATION_RULES
-            + "\n\n"
-            + PATHWAY_CONFIDENCE_CRITERIA
-            + "\n\n"
-            + OUTPUT_FORMAT_JSON
-        )
+        steps = None
+
+    if steps is not None:
+        if feature_interpretation:
+            steps = [
+                COT_STEP_OUTPUT_FEATURE_INTERP if s == COT_STEP_OUTPUT else s for s in steps
+            ]
+            # Inject phenotype interpretation block as its own step before final output
+            output_idx = next(
+                (i for i, s in enumerate(steps) if s == COT_STEP_OUTPUT_FEATURE_INTERP), len(steps)
+            )
+            steps = steps[:output_idx] + [PHENOTYPE_INTERPRETATION_BLOCK] + steps[output_idx:]
+        prompt = assemble_cot_instructions(steps, screen_context=SCREEN_CONTEXT_TEXT)
+    else:
+        output_format = OUTPUT_FORMAT_JSON_FEATURE_INTERP if feature_interpretation else OUTPUT_FORMAT_JSON
+        sections = [
+            CLUSTER_ANALYSIS_TASK,
+            "\n\nThe following experimental context is provided: " + SCREEN_CONTEXT_TEXT + "\n\n",
+            GENE_CATEGORIZATION_RULES,
+            "\n\n",
+            NOVEL_CLASSIFICATION_RULES,
+            "\n\n",
+            UNCHARACTERIZED_CLASSIFICATION_RULES,
+            "\n\n",
+            PATHWAY_CONFIDENCE_CRITERIA,
+        ]
+        if feature_interpretation:
+            sections += ["\n\n", PHENOTYPE_INTERPRETATION_BLOCK]
+        sections += ["\n\n", output_format]
+        prompt = "".join(sections)
     if not output_dir:
         output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     # save system prompt to file with timestamp
+    feat_tag = "_feat" if feature_interpretation else ""
     with open(
         output_dir
-        / f"cluster_analysis_phase1_system_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+        / f"cluster_analysis_phase1_system_prompt{feat_tag}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
         "w",
         encoding="utf-8",
     ) as f:

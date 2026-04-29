@@ -149,6 +149,7 @@ def run_dataset(
     model: str,
     cot: bool,
     mcp: bool,
+    feature_interp: bool,
     clusters: list[str] | None,
     run_dir: Path,
     bundle_cache_dir: Path,
@@ -159,8 +160,14 @@ def run_dataset(
     validation = VALIDATION_DATA[dataset_name]
     screen_name = f"benchmark_{dataset_name}"
 
+    if feature_interp and not cfg.get("feature_columns"):
+        raise ValueError(
+            f"--feature-interp requires the dataset to have feature_columns; "
+            f"'{dataset_name}' has none. Currently only 'ops' is supported."
+        )
+
     print(f"\n{'=' * 60}")
-    print(f"Dataset: {dataset_name.upper()}  |  Model: {model}  |  CoT: {cot}")
+    print(f"Dataset: {dataset_name.upper()}  |  Model: {model}  |  CoT: {cot}  |  FeatInterp: {feature_interp}")
     print(f"{'=' * 60}")
 
     # Load gene-wise data and filter to benchmark clusters
@@ -204,6 +211,7 @@ def run_dataset(
         "screen_name": screen_name,
         "screen_context_path": cfg["screen_context"],
         "CoT_mode": cot,
+        "feature_interpretation": feature_interp,
         "output_dir": run_dir / "prompts_used",
     }
     if mcp:
@@ -373,6 +381,7 @@ def run_dataset(
                 "model": model,
                 "cot": cot,
                 "mcp": mcp,
+                "feature_interp": feature_interp,
                 "cluster_metrics": cluster_metrics,
                 "results": results,
             },
@@ -490,6 +499,11 @@ def main():
         action="store_true",
         help="Enable unified MCP literature validation (single LLM call with CoT + PubMed tool use)",
     )
+    parser.add_argument(
+        "--feature-interp",
+        action="store_true",
+        help="Enable phenotype interpretation: LLM groups feature_overlaps into themes and links them to the dominant pathway. Requires dataset with feature_columns (currently ops only).",
+    )
     parser.add_argument("--clusters", nargs="+", help="Specific cluster IDs to test")
     parser.add_argument(
         "--bundle-cache-dir",
@@ -513,10 +527,11 @@ def main():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     cot_tag = "_cot" if args.cot else ""
     mcp_tag = "_mcp" if args.mcp else ""
+    feat_tag = "_feat" if args.feature_interp else ""
     run_dir = (
         EXAMPLES_DIR
         / "benchmark_results"
-        / f"run_{timestamp}_{args.dataset}_{args.model.replace('/', '_')}{cot_tag}{mcp_tag}"
+        / f"run_{timestamp}_{args.dataset}_{args.model.replace('/', '_')}{cot_tag}{mcp_tag}{feat_tag}"
     )
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -531,6 +546,7 @@ def main():
             model=args.model,
             cot=args.cot,
             mcp=args.mcp,
+            feature_interp=args.feature_interp,
             clusters=[str(c) for c in args.clusters] if args.clusters else None,
             run_dir=run_dir,
             bundle_cache_dir=args.bundle_cache_dir,
