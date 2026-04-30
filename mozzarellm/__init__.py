@@ -23,7 +23,11 @@ from .prompt_components import (
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,
     assemble_cot_instructions,
+    COMPONENT_REGISTRY,
+    CANONICAL_ZERO_SHOT_ORDER,
+    CANONICAL_COT_ORDER,
 )
+from .utils.prompt_factory import assemble_from_component_order
 from .clients.llm_api_clients import (
     AnthropicClient,
     GeminiClient,
@@ -59,6 +63,10 @@ __all__ = [
     "OUTPUT_FORMAT_JSON",
     "COT_STEPS_DEFAULT",
     "assemble_cot_instructions",
+    "COMPONENT_REGISTRY",
+    "CANONICAL_ZERO_SHOT_ORDER",
+    "CANONICAL_COT_ORDER",
+    "assemble_from_component_order",
     # IO utils
     "load_table",
     "write_bundle",

@@ -214,6 +214,51 @@ COT_STEPS_DEFAULT = [
 ]
 
 
+# =============================================================================
+# COMPONENT REGISTRY & CANONICAL ORDERS
+# =============================================================================
+# Shorthand keys for each prompt component, used by prompt_factory when
+# assembling prompts in an arbitrary order (e.g. for benchmarking).
+#
+# Baseline components:
+#   CAT  = Cluster Analysis Task  (always present)
+#   SC   = Screen Context         (always present, injected per-case — NOT in registry)
+#   GCR  = Gene Categorization Rules
+#   NPR  = Novel Prioritization Rules
+#   UPR  = Uncharacterized Prioritization Rules
+#   PCC  = Pathway Confidence Criteria
+#   O    = Output format (JSON)
+#
+# CoT-specific components:
+#   cPH  = Pathway Hypothesis step
+#   cPSC = Pathway Selection & Confidence step (references PCC)
+#   cGCR = Gene Categorization step            (references GCR)
+#   cPri = Sub-classification / Prioritization (references NPR & UPR)
+#   cVer = Verification step
+#   cO   = Final JSON Output step              (references O)
+#
+# NOTE: "SC" is not in the registry because screen context is dynamic
+# (varies per case). It is handled specially during assembly.
+
+COMPONENT_REGISTRY = {
+    "CAT": CLUSTER_ANALYSIS_TASK,
+    "GCR": GENE_CATEGORIZATION_RULES,
+    "NPR": NOVEL_CLASSIFICATION_RULES,
+    "UPR": UNCHARACTERIZED_CLASSIFICATION_RULES,
+    "PCC": PATHWAY_CONFIDENCE_CRITERIA,
+    "O":   OUTPUT_FORMAT_JSON,
+    "cPH":  COT_STEP_PATHWAY_HYPOTHESIS,
+    "cPSC": COT_STEP_PATHWAY_SELECTION,
+    "cGCR": COT_STEP_GENE_CATEGORIZATION,
+    "cPri": COT_STEP_SUBCLASSIFICATION,
+    "cVer": COT_STEP_VERIFICATION,
+    "cO":   COT_STEP_OUTPUT,
+}
+
+CANONICAL_ZERO_SHOT_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]
+CANONICAL_COT_ORDER = ["CAT", "SC", "cPH", "cPSC", "cGCR", "cPri", "cVer", "cO"]
+
+
 def assemble_cot_instructions(
     steps: list[str] | None = None,
     screen_context: str | None = None,

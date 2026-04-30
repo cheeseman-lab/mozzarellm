@@ -31,13 +31,66 @@ from mozzarellm.prompt_components import (
     OUTPUT_FORMAT_JSON,
     COT_STEPS_DEFAULT,
     assemble_cot_instructions,
+    COMPONENT_REGISTRY,
 )
+
+
+def assemble_from_component_order(
+    component_order: list[str],
+    screen_context_text: str,
+    cot_mode: bool = False,
+    component_overrides: dict[str, str] | None = None,
+) -> str:
+    """
+    Assemble a system prompt from an ordered list of component shorthand keys.
+
+    This is the flexible assembly entry point used by benchmarking and any caller
+    that needs arbitrary component ordering or wording overrides.
+
+    Args:
+        component_order: Ordered list of component keys (e.g. ["CAT", "SC", "GCR", ...]).
+            "SC" is handled specially: the screen_context_text is injected at that position.
+            All other keys must exist in COMPONENT_REGISTRY (or component_overrides).
+        screen_context_text: Minified JSON string of the screen context.
+        cot_mode: If True, format components as numbered STEPs.
+        component_overrides: Optional dict mapping component keys to replacement text.
+            Allows swapping individual component wordings without modifying the registry.
+
+    Returns:
+        Assembled system prompt string.
+    """
+    registry = dict(COMPONENT_REGISTRY)
+    if component_overrides:
+        registry.update(component_overrides)
+
+    parts = []
+    for key in component_order:
+        if key == "SC":
+            parts.append(
+                "The following experimental context is provided: "
+                + screen_context_text
+            )
+        else:
+            if key not in registry:
+                raise ValueError(
+                    f"Unknown component key: {key!r}. "
+                    f"Valid keys: {sorted(registry.keys())} + 'SC'"
+                )
+            parts.append(registry[key])
+
+    if cot_mode:
+        numbered = [f"STEP {i + 1} - {part}" for i, part in enumerate(parts)]
+        return "\n\n".join(numbered)
+    else:
+        return "\n\n".join(parts)
 
 
 def make_cluster_analysis_system_prompt(
     *,
     screen_name: str,
     screen_context_path: Path | None = None,
+    component_order: list[str] | None = None,
+    component_overrides: dict[str, str] | None = None,
     override_CoT_steps: list[str] | None = None,  # testing utility
     override_screen_context: bool = False,  # testing utility
     template_path: Path | None = None,
@@ -58,6 +111,13 @@ def make_cluster_analysis_system_prompt(
     Args:
         screen_name: Name of the screen for output directory naming
         screen_context_path: Path to screen_context.json file
+        component_order: Optional ordered list of component shorthand keys
+            (e.g. ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]).
+            When provided, assembles the prompt in this order instead of the
+            hardcoded default. Supports both zero-shot and CoT keys.
+        component_overrides: Optional dict mapping component keys to replacement
+            text. Use this to swap individual component wordings.
+        override_CoT_steps: List of CoT step text strings (testing utility)
         override_screen_context: If True, use default context (testing utility)
         template_path: Path to custom template file (escape hatch - full control)
         template_string: Custom template string (escape hatch - full control)
@@ -91,9 +151,19 @@ def make_cluster_analysis_system_prompt(
         )
 
     # =========================================================================
-    # DEFAULT PROMPT CONSTRUCTION
+    # FLEXIBLE COMPONENT-ORDER ASSEMBLY
     # =========================================================================
-    if CoT_mode and override_CoT_steps:
+    if component_order is not None:
+        prompt = assemble_from_component_order(
+            component_order,
+            SCREEN_CONTEXT_TEXT,
+            cot_mode=CoT_mode,
+            component_overrides=component_overrides,
+        )
+    # =========================================================================
+    # DEFAULT PROMPT CONSTRUCTION (legacy — used when component_order is None)
+    # =========================================================================
+    elif CoT_mode and override_CoT_steps:
         prompt = assemble_cot_instructions(override_CoT_steps, screen_context=SCREEN_CONTEXT_TEXT)
     elif CoT_mode:
         prompt = assemble_cot_instructions(COT_STEPS_DEFAULT, screen_context=SCREEN_CONTEXT_TEXT)
