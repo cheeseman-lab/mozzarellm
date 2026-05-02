@@ -3,13 +3,22 @@
 Analyzes benchmark clusters from OPS, DepMap, and Proteomics datasets using the
 bundle-based pipeline (accession lookup → evidence bundles → LLM Phase 1).
 
+Modes (`--mode`) are orthogonal to `--mcp`:
+
+    single    one API call, base prompt → JSON
+    cot       one API call, CoT chain in system prompt → JSON
+    stepwise  N API calls, multi-turn handoff per CoT step (partial trace on failure)
+
+`--mcp` attaches PubMed tools. In `cot --mcp` the literature-validation step is
+inserted into the chain. In `stepwise --mcp` only that step's call gets tools.
+In `single --mcp` tools are attached and the model decides whether to use them.
+
 Usage:
     python run_benchmark.py --dataset ops --model claude-sonnet-4-6
-    python run_benchmark.py --dataset ops --model claude-sonnet-4-6 --cot
-    python run_benchmark.py --dataset all --model claude-sonnet-4-6 --cot
-    python run_benchmark.py --dataset all --cot --mcp                      # unified MCP literature validation
-    python run_benchmark.py --dataset all --mcp                            # MCP without explicit CoT
-    python run_benchmark.py --dataset ops --clusters 21 37 --model claude-sonnet-4-6
+    python run_benchmark.py --dataset ops --mode cot
+    python run_benchmark.py --dataset all --mode cot --mcp
+    python run_benchmark.py --dataset all --mode single --mcp
+    python run_benchmark.py --dataset ops --mode stepwise --mcp --clusters 21
 """
 
 import argparse
@@ -29,11 +38,11 @@ from mozzarellm.pipeline.bundle_builder import (
 )
 from mozzarellm.pipeline.literature_mcp import get_available_mcp_servers
 from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
-from mozzarellm.utils.llm_analysis_utils import process_cluster_response
 from mozzarellm.utils.prompt_factory import (
     make_cluster_analysis_system_prompt,
     make_single_cluster_analysis_user_prompt,
 )
+from mozzarellm.utils.trace import save_trace
 
 load_dotenv()
 
@@ -144,10 +153,14 @@ def _validate_cluster(
     }
 
 
+def _mode_tag(mode: str, mcp: bool) -> str:
+    return f"{mode}_mcp" if mcp else mode
+
+
 def run_dataset(
     dataset_name: str,
     model: str,
-    cot: bool,
+    mode: str,
     mcp: bool,
     clusters: list[str] | None,
     run_dir: Path,
@@ -160,7 +173,7 @@ def run_dataset(
     screen_name = f"benchmark_{dataset_name}"
 
     print(f"\n{'=' * 60}")
-    print(f"Dataset: {dataset_name.upper()}  |  Model: {model}  |  CoT: {cot}")
+    print(f"Dataset: {dataset_name.upper()}  |  Model: {model}  |  Mode: {mode}  |  MCP: {mcp}")
     print(f"{'=' * 60}")
 
     # Load gene-wise data and filter to benchmark clusters
@@ -199,23 +212,17 @@ def run_dataset(
     cluster_to_bundle = build_cluster_id_to_bundle_path(bundle_dir, screen_name=screen_name)
     print(f"Bundles ready for: {sorted(cluster_to_bundle.keys())}")
 
-    # Build system prompt — for MCP, inject the literature validation CoT step
-    system_prompt_kwargs = {
-        "screen_name": screen_name,
-        "screen_context_path": cfg["screen_context"],
-        "CoT_mode": cot,
-        "output_dir": run_dir / "prompts_used",
-    }
-    if mcp:
-        from mozzarellm.prompt_components import COT_STEPS_UNIFIED_MCP
+    # Build system prompt for the chosen mode.
+    system_prompt = make_cluster_analysis_system_prompt(
+        screen_name=screen_name,
+        screen_context_path=cfg["screen_context"],
+        mode=mode,
+        mcp=mcp,
+        output_dir=run_dir / "prompts_used",
+    )
 
-        system_prompt_kwargs["override_CoT_steps"] = COT_STEPS_UNIFIED_MCP
-    system_prompt = make_cluster_analysis_system_prompt(**system_prompt_kwargs)
+    client = create_client(model=model, api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-    # Init LLM client (not used on the unified MCP path)
-    client = create_client(model=model, api_key=os.getenv("ANTHROPIC_API_KEY")) if not mcp else None
-
-    # Phase 1: query each benchmark cluster
     results = {}
     cluster_metrics = {}
 
@@ -224,125 +231,113 @@ def run_dataset(
             print(f"  [SKIP] Cluster {cluster_id}: no bundle found")
             continue
 
-        label = "Querying+validating" if mcp else "Querying"
-        print(f"  {label} cluster {cluster_id}...", end=" ", flush=True)
+        print(f"  Querying cluster {cluster_id} [{_mode_tag(mode, mcp)}]...", end=" ", flush=True)
         t0 = time.time()
-
         user_prompt = make_single_cluster_analysis_user_prompt(
             cluster_id, screen_name, cluster_to_bundle
         )
 
-        if mcp:
-            from mozzarellm.pipeline.literature_mcp import analyze_and_validate_unified
-
-            try:
-                parsed = analyze_and_validate_unified(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    model=model,
-                )
-                elapsed = time.time() - t0
-                meta = parsed.get("_validation_metadata", {})
-                if "error" in meta and "input_tokens" not in meta:
-                    print(f"ERROR ({elapsed:.1f}s): {meta.get('error')}")
-                    results[str(cluster_id)] = {"error": meta.get("error")}
-                    cluster_metrics[str(cluster_id)] = {
-                        "elapsed_s": round(elapsed, 1),
-                        "error": meta.get("error"),
-                    }
-                    continue
-                results[str(cluster_id)] = parsed
-                in_tok = meta.get("input_tokens", 0)
-                out_tok = meta.get("output_tokens", 0)
-                cost = meta.get("cost_usd", 0)
-                tool_calls = meta.get("tool_calls", 0)
-                pathway_rev = parsed.get("literature_informed_pathway_revision", {})
-                cluster_metrics[str(cluster_id)] = {
-                    "elapsed_s": round(elapsed, 1),
-                    "input_tokens": in_tok,
-                    "output_tokens": out_tok,
-                    "cost_usd": cost,
-                    "tool_calls": tool_calls,
-                    "pathway_changed": pathway_rev.get("pathway_changed", False),
-                    "pre_literature_pathway": pathway_rev.get("pre_literature_pathway"),
-                    "post_literature_pathway": pathway_rev.get("post_literature_pathway"),
-                }
-                reclassified = parsed.get("literature_informed_reclassifications", [])
-                print(
-                    f"OK ({elapsed:.1f}s | {tool_calls} tool calls | {in_tok}in/{out_tok}out | ${cost:.4f} | {len(reclassified)} lit-reclassifications)"
-                )
-                for r in reclassified:
-                    print(
-                        f"    {r.get('gene', '?')}: {r.get('initial_category', '?')} → {r.get('final_category', '?')} (PMIDs: {','.join(r.get('driving_pmids', []))})"
-                    )
-                if pathway_rev.get("pathway_changed"):
-                    print(
-                        f"    PATHWAY REVISED: {pathway_rev.get('pre_literature_pathway', '?')} → {pathway_rev.get('post_literature_pathway', '?')}"
-                    )
-                    print(f"      Reason: {pathway_rev.get('rationale', '?')}")
-                print(
-                    f"    {parsed.get('dominant_process', '?')} "
-                    f"[{parsed.get('pathway_confidence', '?')}]  "
-                    f"est={len(parsed.get('established_genes', []))} "
-                    f"nov={len(parsed.get('novel_role_genes', []))} "
-                    f"unc={len(parsed.get('uncharacterized_genes', []))}"
-                )
-            except Exception as e:
-                elapsed = time.time() - t0
-                print(f"ERROR ({elapsed:.1f}s): {e}")
-                results[str(cluster_id)] = {"error": str(e)}
-                cluster_metrics[str(cluster_id)] = {"elapsed_s": round(elapsed, 1), "error": str(e)}
-            continue
-
-        response_text, error = client.query(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            max_retries=3,
-        )
-
-        elapsed = time.time() - t0
-        usage = getattr(client, "last_usage", {})
-
-        if error:
-            print(f"ERROR ({elapsed:.1f}s)")
-            print(f"    {error}")
-            results[str(cluster_id)] = {"error": error}
-            cluster_metrics[str(cluster_id)] = {"elapsed_s": round(elapsed, 1), "error": error}
-            continue
-
         try:
-            parsed = process_cluster_response(response_text)
-            results[str(cluster_id)] = parsed
-
-            in_tok = usage.get("input_tokens", 0)
-            out_tok = usage.get("output_tokens", 0)
-            # sonnet-4-6 pricing: $3/M in, $15/M out
-            cost = (in_tok * 3 + out_tok * 15) / 1_000_000
-
-            cluster_metrics[str(cluster_id)] = {
-                "elapsed_s": round(elapsed, 1),
-                "input_tokens": in_tok,
-                "output_tokens": out_tok,
-                "cost_usd": round(cost, 4),
-            }
-            print(f"OK ({elapsed:.1f}s | {in_tok}in/{out_tok}out | ${cost:.4f})")
-            print(
-                f"    {parsed.get('dominant_process', '?')} "
-                f"[{parsed.get('pathway_confidence', '?')}]  "
-                f"est={len(parsed.get('established_genes', []))} "
-                f"nov={len(parsed.get('novel_role_genes', []))} "
-                f"unc={len(parsed.get('uncharacterized_genes', []))}"
+            parsed, raw_outputs = client.analyze(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                mode=mode,
+                mcp=mcp,
             )
         except Exception as e:
-            print(f"PARSE ERROR ({elapsed:.1f}s)")
-            print(f"    {e}")
-            results[str(cluster_id)] = {"error": str(e), "raw": response_text}
+            elapsed = time.time() - t0
+            print(f"ERROR ({elapsed:.1f}s): {e}")
+            results[str(cluster_id)] = {"error": str(e)}
+            cluster_metrics[str(cluster_id)] = {"elapsed_s": round(elapsed, 1), "error": str(e)}
+            save_trace(
+                run_dir,
+                str(cluster_id),
+                model=model,
+                mode=_mode_tag(mode, mcp),
+                raw_response="",
+                elapsed_s=elapsed,
+                error=str(e),
+            )
+            continue
+
+        elapsed = raw_outputs.get("elapsed_s") or (time.time() - t0)
+        save_trace(
+            run_dir,
+            str(cluster_id),
+            model=model,
+            mode=_mode_tag(mode, mcp),
+            raw_response=raw_outputs.get("response_text", ""),
+            tool_calls=raw_outputs.get("tool_calls", []),
+            elapsed_s=elapsed,
+            input_tokens=raw_outputs.get("input_tokens"),
+            output_tokens=raw_outputs.get("output_tokens"),
+            cost_usd=raw_outputs.get("cost_usd"),
+            pricing_warning=raw_outputs.get("pricing_warning"),
+            schema_warnings=raw_outputs.get("schema_warnings"),
+            error=raw_outputs.get("error"),
+            steps=raw_outputs.get("steps"),
+        )
+
+        err = raw_outputs.get("error")
+        if err or parsed is None or "_validation_metadata" not in (parsed or {}):
+            print(f"ERROR ({elapsed:.1f}s): {err or 'no parsed output'}")
+            results[str(cluster_id)] = {"error": err or "no parsed output"}
             cluster_metrics[str(cluster_id)] = {
                 "elapsed_s": round(elapsed, 1),
-                "parse_error": str(e),
+                "error": err or "no parsed output",
+                "input_tokens": raw_outputs.get("input_tokens"),
+                "output_tokens": raw_outputs.get("output_tokens"),
+                "cost_usd": raw_outputs.get("cost_usd"),
             }
+            continue
 
-    # Validate
+        results[str(cluster_id)] = parsed
+        meta = parsed.get("_validation_metadata", {})
+        in_tok = meta.get("input_tokens", 0)
+        out_tok = meta.get("output_tokens", 0)
+        cost = meta.get("cost_usd", 0) or 0
+        tool_calls = meta.get("tool_calls", 0)
+        pathway_rev = parsed.get("literature_informed_pathway_revision") or {}
+
+        metrics_row = {
+            "elapsed_s": round(elapsed, 1),
+            "input_tokens": in_tok,
+            "output_tokens": out_tok,
+            "cost_usd": cost,
+        }
+        if mcp:
+            metrics_row["tool_calls"] = tool_calls
+            metrics_row["pathway_changed"] = pathway_rev.get("pathway_changed", False)
+            metrics_row["pre_literature_pathway"] = pathway_rev.get("pre_literature_pathway")
+            metrics_row["post_literature_pathway"] = pathway_rev.get("post_literature_pathway")
+        if mode == "stepwise":
+            metrics_row["n_steps"] = meta.get("n_steps")
+        if meta.get("pricing_warning"):
+            metrics_row["pricing_warning"] = meta["pricing_warning"]
+        cluster_metrics[str(cluster_id)] = metrics_row
+
+        reclassified = parsed.get("literature_informed_reclassifications", []) or []
+        extra = f" | {tool_calls} tool calls | {len(reclassified)} lit-reclass" if mcp else ""
+        if mode == "stepwise":
+            extra += f" | {meta.get('n_steps', '?')} steps"
+        print(f"OK ({elapsed:.1f}s | {in_tok}in/{out_tok}out | ${cost:.4f}{extra})")
+        for r in reclassified:
+            print(
+                f"    {r.get('gene', '?')}: {r.get('initial_category', '?')} → {r.get('final_category', '?')} (PMIDs: {','.join(r.get('driving_pmids', []))})"
+            )
+        if pathway_rev.get("pathway_changed"):
+            print(
+                f"    PATHWAY REVISED: {pathway_rev.get('pre_literature_pathway', '?')} → {pathway_rev.get('post_literature_pathway', '?')}"
+            )
+            print(f"      Reason: {pathway_rev.get('rationale', '?')}")
+        print(
+            f"    {parsed.get('dominant_process', '?')} "
+            f"[{parsed.get('pathway_confidence', '?')}]  "
+            f"est={len(parsed.get('established_genes', []))} "
+            f"nov={len(parsed.get('novel_role_genes', []))} "
+            f"unc={len(parsed.get('uncharacterized_genes', []))}"
+        )
+
     validation_rows = []
     for cluster_id in target_clusters:
         expected = validation.get(str(cluster_id))
@@ -352,7 +347,7 @@ def run_dataset(
         row = _validate_cluster(str(cluster_id), parsed, expected, cfg["check_confidence"])
         row["dataset"] = dataset_name
         row["model"] = model
-        row["cot"] = cot
+        row["mode"] = mode
         row["mcp"] = mcp
         row["metrics"] = cluster_metrics.get(str(cluster_id), {})
         validation_rows.append(row)
@@ -371,7 +366,7 @@ def run_dataset(
             {
                 "dataset": dataset_name,
                 "model": model,
-                "cot": cot,
+                "mode": mode,
                 "mcp": mcp,
                 "cluster_metrics": cluster_metrics,
                 "results": results,
@@ -384,7 +379,8 @@ def run_dataset(
     return {
         "dataset": dataset_name,
         "model": model,
-        "cot": cot,
+        "mode": mode,
+        "mcp": mcp,
         "validation": validation_rows,
         "totals": {
             "elapsed_s": round(total_time, 1),
@@ -484,11 +480,16 @@ def main():
     parser = argparse.ArgumentParser(description="Run benchmark using the evidence bundle pipeline")
     parser.add_argument("--dataset", choices=["ops", "depmap", "proteomics", "all"], default="ops")
     parser.add_argument("--model", default="claude-sonnet-4-6")
-    parser.add_argument("--cot", action="store_true", help="Enable chain-of-thought mode")
+    parser.add_argument(
+        "--mode",
+        choices=["single", "cot", "stepwise"],
+        default="single",
+        help="Execution mode: single (one call), cot (chain in system prompt), stepwise (multi-turn per CoT step)",
+    )
     parser.add_argument(
         "--mcp",
         action="store_true",
-        help="Enable unified MCP literature validation (single LLM call with CoT + PubMed tool use)",
+        help="Attach PubMed MCP tools. Orthogonal to --mode (each combination has distinct behavior).",
     )
     parser.add_argument("--clusters", nargs="+", help="Specific cluster IDs to test")
     parser.add_argument(
@@ -511,12 +512,12 @@ def main():
         print("MCP preflight: PubMed available ✓")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    cot_tag = "_cot" if args.cot else ""
+    mode_tag = f"_{args.mode}"
     mcp_tag = "_mcp" if args.mcp else ""
     run_dir = (
         EXAMPLES_DIR
         / "benchmark_results"
-        / f"run_{timestamp}_{args.dataset}_{args.model.replace('/', '_')}{cot_tag}{mcp_tag}"
+        / f"run_{timestamp}_{args.dataset}_{args.model.replace('/', '_')}{mode_tag}{mcp_tag}"
     )
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -529,7 +530,7 @@ def main():
         summary = run_dataset(
             dataset_name=ds,
             model=args.model,
-            cot=args.cot,
+            mode=args.mode,
             mcp=args.mcp,
             clusters=[str(c) for c in args.clusters] if args.clusters else None,
             run_dir=run_dir,

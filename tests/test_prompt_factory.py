@@ -62,7 +62,7 @@ def test_cot_mode_uses_steps(tmp_path):
     result = make_cluster_analysis_system_prompt(
         screen_name="test_screen",
         override_screen_context=True,
-        CoT_mode=True,
+        mode="cot",
         output_dir=tmp_path,
     )
     step_headers = re.findall(r"^STEP \d+ - ", result, re.MULTILINE)
@@ -74,7 +74,7 @@ def test_cot_mode_includes_task_as_step1(tmp_path):
     result = make_cluster_analysis_system_prompt(
         screen_name="test_screen",
         override_screen_context=True,
-        CoT_mode=True,
+        mode="cot",
         output_dir=tmp_path,
     )
     assert "STEP 1 -" in result
@@ -90,7 +90,7 @@ def test_override_cot_steps_custom_order(tmp_path):
     result = make_cluster_analysis_system_prompt(
         screen_name="test_screen",
         override_screen_context=True,
-        CoT_mode=True,
+        mode="cot",
         override_CoT_steps=custom_steps,
         output_dir=tmp_path,
     )
@@ -107,7 +107,7 @@ def test_override_cot_steps_permutation(tmp_path):
     pathway_first = make_cluster_analysis_system_prompt(
         screen_name="test_screen",
         override_screen_context=True,
-        CoT_mode=True,
+        mode="cot",
         override_CoT_steps=[
             COT_STEP_PATHWAY_HYPOTHESIS,
             COT_STEP_GENE_CATEGORIZATION,
@@ -118,7 +118,7 @@ def test_override_cot_steps_permutation(tmp_path):
     gene_first = make_cluster_analysis_system_prompt(
         screen_name="test_screen",
         override_screen_context=True,
-        CoT_mode=True,
+        mode="cot",
         override_CoT_steps=[
             COT_STEP_GENE_CATEGORIZATION,
             COT_STEP_PATHWAY_HYPOTHESIS,
@@ -160,4 +160,4 @@ def test_includes_screen_context(tmp_path):
         override_screen_context=True,
         output_dir=tmp_path,
     )
-    assert "experimental context" in result.lower()
+    assert "screen context" in result.lower()

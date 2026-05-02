@@ -1,8 +1,10 @@
 """
-Literature validation for MozzareLLM gene classifications.
+Literature validation utilities for MozzareLLM gene classifications.
 
-Single unified LLM call that performs CoT analysis and constrained MCP literature
-validation (search + metadata fetch) in one shot.
+Provides the low-level Anthropic beta MCP call (`call_mcp`), MCP server
+preflight (`get_available_mcp_servers`), and helpers for parsing/validating
+MCP responses. Orchestration (one-shot, multi-turn stepwise) lives on
+`AnthropicClient` in `mozzarellm.clients.llm_api_clients`.
 """
 
 from __future__ import annotations
@@ -13,6 +15,13 @@ import time
 from typing import Any
 
 import anthropic
+from pydantic import ValidationError
+
+from mozzarellm.schemas.mcp_schemas import (
+    LiteraturePathwayRevision,
+    LiteratureReclassification,
+    LiteratureValidation,
+)
 
 # MCP server URLs
 # pubmed.mcp.claude.com — Anthropic-hosted, requires authorization_token=ANTHROPIC_API_KEY.
@@ -103,29 +112,8 @@ def get_available_mcp_servers(timeout: int = 5, verbose: bool = True) -> list[st
     return [name for name, status in mcp_statuses.items() if status.startswith("up")]
 
 
-def analyze_and_validate_unified(
-    system_prompt: str,
-    user_prompt: str,
-    model: str = "claude-sonnet-4-5",
-    max_tokens: int = 16000,
-    max_retries: int = 3,
-) -> dict[str, Any]:
-    """Single LLM call that performs CoT analysis AND constrained MCP literature validation.
-
-    The system_prompt should be assembled with COT_STEPS_UNIFIED_MCP (which inserts
-    the literature validation step between VERIFICATION and OUTPUT).
-
-    Args:
-        system_prompt: Full CoT system prompt including the literature validation step.
-        user_prompt: Cluster bundle content.
-        model: Anthropic model to use.
-        max_tokens: Max output tokens (must accommodate CoT reasoning + final JSON).
-        max_retries: Retry count for MCP timeout errors.
-
-    Returns:
-        Dict with parsed cluster result + _validation_metadata.
-    """
-    client = anthropic.Anthropic()
+def _build_mcp_servers_and_tools() -> tuple[list[dict], list[dict]]:
+    """Construct mcp_servers + tools payloads for the Anthropic beta API."""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     mcp_servers = [
         {
@@ -141,6 +129,55 @@ def analyze_and_validate_unified(
         for name, url in MCP_SERVERS.items()
     ]
     tools = [{"type": "mcp_toolset", "mcp_server_name": name} for name in MCP_SERVERS]
+    return mcp_servers, tools
+
+
+RETRYABLE_API_EXCEPTIONS: tuple = (
+    anthropic.BadRequestError,
+    anthropic.InternalServerError,
+    anthropic.APITimeoutError,
+    anthropic.APIConnectionError,
+)
+
+# Hard ceiling per call. Without this, the SDK falls back to a 600s default that
+# combined with retries can run an MCP-spamming model for ~25 minutes per cluster.
+PER_CALL_TIMEOUT_S = 300
+
+
+def _is_retryable_api_error(exc: Exception) -> bool:
+    if isinstance(exc, (anthropic.APITimeoutError, anthropic.APIConnectionError)):
+        return True
+    msg = str(exc).lower()
+    return any(
+        kw in msg
+        for kw in (
+            "timed out",
+            "504",
+            "502",
+            "503",
+            "500",
+            "connection error",
+            "internal server",
+        )
+    )
+
+
+def call_mcp(
+    *,
+    system_prompt: str,
+    messages: list[dict[str, Any]],
+    model: str,
+    max_tokens: int = 16000,
+    max_retries: int = 3,
+) -> tuple[Any, float]:
+    """ONE place that talks to the Anthropic beta MCP endpoint. Returns (response, elapsed_s).
+
+    All three execution modes (single+mcp, cot+mcp, stepwise+mcp at the literature step)
+    funnel through here. Caller is responsible for shaping `messages` and parsing the
+    response.
+    """
+    client = anthropic.Anthropic()
+    mcp_servers, tools = _build_mcp_servers_and_tools()
 
     for attempt in range(max_retries):
         try:
@@ -149,64 +186,50 @@ def analyze_and_validate_unified(
                 model=model,
                 max_tokens=max_tokens,
                 system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
+                messages=messages,
                 mcp_servers=mcp_servers,
                 tools=tools,
                 betas=["mcp-client-2025-11-20"],
+                timeout=PER_CALL_TIMEOUT_S,
             )
-            elapsed = time.time() - start
-            break
-        except (anthropic.BadRequestError, anthropic.InternalServerError) as e:
-            msg = str(e).lower()
-            retryable = any(
-                kw in msg
-                for kw in (
-                    "timed out",
-                    "504",
-                    "502",
-                    "503",
-                    "500",
-                    "connection error",
-                    "internal server",
-                )
-            )
-            if attempt < max_retries - 1 and retryable:
+            return response, time.time() - start
+        except RETRYABLE_API_EXCEPTIONS as e:
+            if attempt < max_retries - 1 and _is_retryable_api_error(e):
                 time.sleep(60)
-            else:
-                raise
+                continue
+            raise
 
-    output_text = ""
-    tool_call_count = 0
-    for block in response.content:
-        if block.type == "text":
-            output_text += block.text
-        elif block.type == "mcp_tool_use":
-            tool_call_count += 1
 
-    parsed = _parse_json_from_text(output_text)
-    cost = (response.usage.input_tokens * 3 + response.usage.output_tokens * 15) / 1_000_000
+def _validate_literature_blocks(parsed: dict[str, Any]) -> list[str]:
+    """Soft-validate literature-specific structures. Never raises."""
+    warnings: list[str] = []
 
-    meta = {
-        "mode": "unified_mcp",
-        "model": model,
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
-        "cost_usd": round(cost, 4),
-        "time_seconds": round(elapsed, 1),
-        "tool_calls": tool_call_count,
-    }
+    rev = parsed.get("literature_informed_pathway_revision")
+    if isinstance(rev, dict):
+        try:
+            LiteraturePathwayRevision.model_validate(rev)
+        except ValidationError as e:
+            warnings.append(f"pathway_revision: {e.errors()[0]['msg']}")
 
-    if not parsed:
-        return {
-            "_validation_metadata": {
-                **meta,
-                "error": "failed to parse JSON",
-                "raw_output": output_text[:1000],
-            },
-        }
+    for i, r in enumerate(parsed.get("literature_informed_reclassifications") or []):
+        try:
+            LiteratureReclassification.model_validate(r)
+        except ValidationError as e:
+            gene = r.get("gene", "?") if isinstance(r, dict) else "?"
+            warnings.append(f"reclassification[{i}/{gene}]: {e.errors()[0]['msg']}")
 
-    parsed["_validation_metadata"] = meta
-    return parsed
+    for category in ("novel_role_genes", "uncharacterized_genes"):
+        for g in parsed.get(category) or []:
+            lv = g.get("literature_validation") if isinstance(g, dict) else None
+            if lv is None:
+                continue
+            try:
+                LiteratureValidation.model_validate(lv)
+            except ValidationError as e:
+                gene = g.get("gene", "?")
+                warnings.append(f"{category}/{gene}.literature_validation: {e.errors()[0]['msg']}")
+
+    return warnings
 
 
 def _parse_json_from_text(text: str) -> dict[str, Any] | None:

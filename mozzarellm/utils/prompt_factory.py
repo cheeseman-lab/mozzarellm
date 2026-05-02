@@ -17,56 +17,76 @@ Main components of any given user prompt:
   1. CLUSTER SPECIFIC CONTENT (e.g. gene list + metadata, retrieved context)
 """
 
-import os
 import json
-from pathlib import Path
 from datetime import datetime
-from mozzarellm.utils.screen_context_utils import load_screen_context_json
+from pathlib import Path
+
 from mozzarellm.prompt_components import (
-    CLUSTER_ANALYSIS_TASK,
-    GENE_CATEGORIZATION_RULES,
-    PATHWAY_CONFIDENCE_CRITERIA,
-    NOVEL_CLASSIFICATION_RULES,
-    UNCHARACTERIZED_CLASSIFICATION_RULES,
-    OUTPUT_FORMAT_JSON,
+    COT_SCREEN_CONTEXT,
     COT_STEPS_DEFAULT,
-    assemble_cot_instructions,
+    COT_STEPS_UNIFIED_MCP,
 )
+from mozzarellm.utils.screen_context_utils import load_screen_context_json
+
+VALID_MODES = ("single", "cot", "stepwise")
+
+
+def compose_cot_steps(mcp: bool) -> list[str]:
+    """The single canonical step list. mcp=True inserts the literature-validation step.
+
+    All three execution modes (single / cot / stepwise) derive their prompt content
+    from this list — only the *delivery* differs (squashed / numbered / per-turn).
+    """
+    return COT_STEPS_UNIFIED_MCP if mcp else COT_STEPS_DEFAULT
+
+
+def _inject_screen_context(steps: list[str], screen_context: str) -> list[str]:
+    """Substitute the SCREEN_CONTEXT placeholder with the actual JSON context."""
+    return [
+        f"{COT_SCREEN_CONTEXT}\n{screen_context}" if step == COT_SCREEN_CONTEXT else step
+        for step in steps
+    ]
 
 
 def make_cluster_analysis_system_prompt(
     *,
     screen_name: str,
     screen_context_path: Path | None = None,
-    override_CoT_steps: list[str] | None = None,  # testing utility
+    mode: str = "single",
+    mcp: bool = False,
+    override_CoT_steps: list[str]
+    | None = None,  # testing utility for prompt-permutation experiments
     override_screen_context: bool = False,  # testing utility
     template_path: Path | None = None,
     template_string: str | None = None,
-    CoT_mode: bool = False,
     output_dir: Path | None = None,
 ):
     """
-    Creates a system prompt for gene cluster analysis by assembling modular components.
+    Creates a system prompt for gene cluster analysis.
 
-    Assembly order:
-    - Standard mode: MAIN TASK + CONTEXT + RULES/CRITERIA + OUTPUT_FORMAT
-    - CoT mode: COT_INSTRUCTIONS (pre-assembled with all components) + CONTEXT
-
-    COT_INSTRUCTIONS is built from modular steps via assemble_cot_instructions().
-    Use assemble_cot_instructions() with custom steps for prompt permutation testing.
+    All three modes share one canonical step list (`compose_cot_steps(mcp)`); they
+    differ only in delivery:
+      - single: steps squashed into one prompt
+      - cot:    steps numbered with STEP N - prefixes
+      - stepwise: system prompt holds TASK + screen context; the runner walks
+                  the remaining reasoning steps as user turns
 
     Args:
-        screen_name: Name of the screen for output directory naming
-        screen_context_path: Path to screen_context.json file
-        override_screen_context: If True, use default context (testing utility)
-        template_path: Path to custom template file (escape hatch - full control)
-        template_string: Custom template string (escape hatch - full control)
-        CoT_mode: If True, use chain-of-thought instructions
-        output_dir: Optional output directory for saving prompts
+        screen_name: Used for output directory naming.
+        screen_context_path: Path to screen_context.json.
+        mode: One of "single" / "cot" / "stepwise".
+        mcp: When True, include the literature-validation step in the canonical list.
+        override_CoT_steps: Custom step list for permutation testing.
+        override_screen_context: Use default placeholder context (testing utility).
+        template_path / template_string: Escape hatch — bypass step assembly.
+        output_dir: Where to save the assembled prompt for inspection.
 
     Returns:
-        prompt: Fully assembled prompt string
+        Fully assembled system prompt string.
     """
+    if mode not in VALID_MODES:
+        raise ValueError(f"mode must be one of {VALID_MODES}, got {mode!r}")
+
     try:
         screen_ctx_obj = load_screen_context_json(
             screen_context_path, override=override_screen_context
@@ -90,29 +110,17 @@ def make_cluster_analysis_system_prompt(
             + "\n\n"
         )
 
-    # =========================================================================
-    # DEFAULT PROMPT CONSTRUCTION
-    # =========================================================================
-    if override_CoT_steps:
-        prompt = assemble_cot_instructions(override_CoT_steps, screen_context=SCREEN_CONTEXT_TEXT)
-    elif CoT_mode:
-        prompt = assemble_cot_instructions(COT_STEPS_DEFAULT, screen_context=SCREEN_CONTEXT_TEXT)
-    else:
-        prompt = (
-            CLUSTER_ANALYSIS_TASK
-            + "\n\nThe following experimental context is provided: "
-            + SCREEN_CONTEXT_TEXT
-            + "\n\n"
-            + GENE_CATEGORIZATION_RULES
-            + "\n\n"
-            + NOVEL_CLASSIFICATION_RULES
-            + "\n\n"
-            + UNCHARACTERIZED_CLASSIFICATION_RULES
-            + "\n\n"
-            + PATHWAY_CONFIDENCE_CRITERIA
-            + "\n\n"
-            + OUTPUT_FORMAT_JSON
-        )
+    # All three modes derive from the same canonical step list. Only the
+    # DELIVERY differs: single squashes, cot numbers, stepwise sends per-turn.
+    steps = override_CoT_steps or compose_cot_steps(mcp)
+    steps = _inject_screen_context(steps, SCREEN_CONTEXT_TEXT)
+
+    if mode == "single":
+        prompt = "\n\n".join(steps)
+    elif mode == "cot":
+        prompt = "\n\n".join(f"STEP {i + 1} - {s}" for i, s in enumerate(steps))
+    else:  # stepwise — system holds task + context only; runner delivers reasoning steps
+        prompt = "\n\n".join(steps[:2])
     if not output_dir:
         output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
     output_dir.mkdir(exist_ok=True)

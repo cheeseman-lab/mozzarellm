@@ -101,20 +101,16 @@ def process_cluster_response(analysis_text):
     """
     Process single cluster analysis output from an LLM.
 
+    Raw response text is persisted by the caller via
+    `mozzarellm.utils.trace.save_trace()` — this function returns only the
+    parsed/standardized structure.
+
     Args:
         analysis_text: Raw text response from LLM
 
     Returns:
         Dictionary with structured analysis for a single cluster
     """
-    # Save the raw response for debugging
-    debug_dir = "debug"
-    if not os.path.exists(debug_dir):
-        os.makedirs(debug_dir)
-    debug_filename = os.path.join(debug_dir, f"debug_response_{int(time.time())}.txt")
-    with open(debug_filename, "w", encoding="utf-8") as f:
-        f.write(analysis_text)
-
     # Default structure for a single cluster
     default_structure = {
         "cluster_id": None,
@@ -124,7 +120,6 @@ def process_cluster_response(analysis_text):
         "uncharacterized_genes": [],
         "novel_role_genes": [],
         "summary": "",
-        "raw_text": analysis_text,
     }
 
     # First, extract JSON from markdown code blocks if present
@@ -222,7 +217,6 @@ def _standardize_cluster_format(cluster_data, raw_text):
         "uncharacterized_genes": [],
         "novel_role_genes": [],
         "summary": "",
-        "raw_text": raw_text,
     }
 
     # Update with provided data

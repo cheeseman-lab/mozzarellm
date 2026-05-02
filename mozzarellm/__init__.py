@@ -22,26 +22,19 @@ from .prompt_components import (
     PATHWAY_CONFIDENCE_CRITERIA,
     assemble_cot_instructions,
 )
-from .schemas.analysis_output_schemas import (
-    AnalysisResult,
-    ClusterInput,
-    ClusterResult,
-    GeneClassification,
-    RetrievalContext,
+from .schemas.mcp_schemas import (
+    LiteraturePathwayRevision,
+    LiteratureReclassification,
+    LiteratureValidation,
+    RelevantPaper,
+    ValidationMetadata,
 )
-from .schemas.mcp_schemas import ClusterValidationResult
 
 # IO utils
 from .utils.io import load_table, write_bundle
 
 # Expose package-level API
 __all__ = [
-    # Models
-    "ClusterResult",
-    "AnalysisResult",
-    "GeneClassification",
-    "ClusterInput",
-    "RetrievalContext",
     # Providers
     "LLMClientBase",
     "OpenAIClient",
@@ -56,8 +49,12 @@ __all__ = [
     "OUTPUT_FORMAT_JSON",
     "COT_STEPS_DEFAULT",
     "assemble_cot_instructions",
-    # Literature validation
-    "ClusterValidationResult",
+    # Literature validation schemas
+    "RelevantPaper",
+    "LiteratureValidation",
+    "LiteratureReclassification",
+    "LiteraturePathwayRevision",
+    "ValidationMetadata",
     # IO utils
     "load_table",
     "write_bundle",
