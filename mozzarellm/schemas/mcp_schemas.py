@@ -1,7 +1,7 @@
 """Pydantic schemas for MCP literature-validation output.
 
 These mirror the structures requested by `LITERATURE_VALIDATION_OUTPUT_FORMAT`
-and `COT_STEP_LITERATURE_VALIDATION` in `mozzarellm.prompt_components`. They
+and `STEP_LITERATURE_VALIDATION` in `mozzarellm.prompt_components`. They
 validate the literature-specific portions of the cluster JSON returned by
 `analyze_and_validate_unified()`; gene categorization fields are validated by
 the existing parser in `llm_analysis_utils`.

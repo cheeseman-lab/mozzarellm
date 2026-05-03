@@ -161,8 +161,8 @@ Provide a concise analysis in this exact JSON format:
 """
 
 # =============================================================================
-# LITERATURE VALIDATION PROMPT
-# Single LLM call constrained to exactly 2 MCP tool calls (search + metadata).
+# LITERATURE VALIDATION (mode-agnostic MCP step)
+# Used in single_mcp / cot_mcp / stepwise_mcp — exactly 2 MCP tool calls.
 # =============================================================================
 
 LITERATURE_VALIDATION_OUTPUT_FORMAT = """
@@ -177,6 +177,30 @@ The "literature_validation" field per gene must contain:
     ESTABLISHED: null (no subclasses)
 - "rationale": one sentence — why reclassification/subclass update is or isn't warranted
 """
+
+STEP_LITERATURE_VALIDATION = f"""LITERATURE VALIDATION (constrained MCP):
+Validate NOVEL_ROLE and UNCHARACTERIZED genes against PubMed using the attached PubMed MCP tools.
+
+Procedure (follow EXACTLY):
+1. Extract a 2-3 word PubMed keyword from the dominant pathway you identify. Strip subprocess descriptors, complex names, parenthetical qualifiers, and em-dash extensions — keep only the core process name.
+2. ONE `search_articles` call with: `(GENE1[tiab] OR GENE2[tiab] OR ... OR GENEN[tiab]) AND <keyword>`, max_results=30. The [tiab] tag on EVERY gene symbol is mandatory.
+3. ONE `get_article_metadata` call with all returned PMIDs.
+4. For each paper, judge relevance against your FULL pathway annotation (not just the keyword). A paper about "ribosome biogenesis in mitochondria" is peripheral to a "40S SSU processome" cluster.
+
+Hard constraints:
+- EXACTLY 2 tool calls total (1 search + 1 metadata). Do not call any tool more than once.
+- Do NOT search per-gene. Do NOT call any other tools.
+- Use the tools to validate gene categorizations against the literature; do NOT use them to brainstorm pathways.
+
+Update categorizations where warranted (e.g., genes with direct pathway evidence → ESTABLISHED). The updated categorizations should be reflected in your final pathway selection and confidence assessment.
+
+Also note whether the literature changes your pathway hypothesis itself — e.g., literature reveals a more specific subprocess, a different dominant pathway, or merges/splits your candidates. Record this as a pathway revision.
+
+In the final output, include:
+- A `literature_validation` field on each NOVEL_ROLE and UNCHARACTERIZED gene in the final classification, per the schema:
+{LITERATURE_VALIDATION_OUTPUT_FORMAT}
+- A top-level `literature_informed_reclassifications` array listing every gene whose category changed from your pre-literature categorization to post-validation. Each entry: {{"gene": "...", "initial_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "final_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "driving_pmids": ["..."], "rationale": "one sentence — what literature justified the move"}}. If nothing changed, use an empty array.
+- A top-level `literature_informed_pathway_revision` object: {{"pre_literature_pathway": "your tentative pathway BEFORE literature validation", "post_literature_pathway": "your final pathway AFTER literature validation (may be the same)", "pathway_changed": true/false, "rationale": "one sentence — what literature drove the change, or why it stayed the same"}}."""
 
 # =============================================================================
 # CHAIN-OF-THOUGHT STEPS
@@ -221,30 +245,6 @@ COT_STEP_OUTPUT = f"""FINAL JSON OUTPUT:
 - Include concise summary highlighting key findings and evidence quality
 According to {OUTPUT_FORMAT_JSON}"""
 
-COT_STEP_LITERATURE_VALIDATION = f"""LITERATURE VALIDATION (constrained MCP):
-Validate NOVEL_ROLE and UNCHARACTERIZED genes against PubMed using the attached PubMed MCP tools.
-
-Procedure (follow EXACTLY):
-1. Extract a 2-3 word PubMed keyword from the dominant pathway you identify. Strip subprocess descriptors, complex names, parenthetical qualifiers, and em-dash extensions — keep only the core process name.
-2. ONE `search_articles` call with: `(GENE1[tiab] OR GENE2[tiab] OR ... OR GENEN[tiab]) AND <keyword>`, max_results=30. The [tiab] tag on EVERY gene symbol is mandatory.
-3. ONE `get_article_metadata` call with all returned PMIDs.
-4. For each paper, judge relevance against your FULL pathway annotation (not just the keyword). A paper about "ribosome biogenesis in mitochondria" is peripheral to a "40S SSU processome" cluster.
-
-Hard constraints:
-- EXACTLY 2 tool calls total (1 search + 1 metadata). Do not call any tool more than once.
-- Do NOT search per-gene. Do NOT call any other tools.
-- Use the tools to validate gene categorizations against the literature; do NOT use them to brainstorm pathways.
-
-Update categorizations where warranted (e.g., genes with direct pathway evidence → ESTABLISHED). The updated categorizations should be reflected in your final pathway selection and confidence assessment.
-
-Also note whether the literature changes your pathway hypothesis itself — e.g., literature reveals a more specific subprocess, a different dominant pathway, or merges/splits your candidates. Record this as a pathway revision.
-
-In the final output, include:
-- A `literature_validation` field on each NOVEL_ROLE and UNCHARACTERIZED gene in the final classification, per the schema:
-{LITERATURE_VALIDATION_OUTPUT_FORMAT}
-- A top-level `literature_informed_reclassifications` array listing every gene whose category changed from your pre-literature categorization to post-validation. Each entry: {{"gene": "...", "initial_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "final_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "driving_pmids": ["..."], "rationale": "one sentence — what literature justified the move"}}. If nothing changed, use an empty array.
-- A top-level `literature_informed_pathway_revision` object: {{"pre_literature_pathway": "your tentative pathway BEFORE literature validation", "post_literature_pathway": "your final pathway AFTER literature validation (may be the same)", "pathway_changed": true/false, "rationale": "one sentence — what literature drove the change, or why it stayed the same"}}."""
-
 COT_STEPS_DEFAULT = [
     CLUSTER_ANALYSIS_TASK,
     COT_SCREEN_CONTEXT,
@@ -265,7 +265,7 @@ COT_STEPS_UNIFIED_MCP = [
     COT_STEP_PATHWAY_HYPOTHESIS,
     COT_STEP_GENE_CATEGORIZATION,
     COT_STEP_SUBCLASSIFICATION,
-    COT_STEP_LITERATURE_VALIDATION,
+    STEP_LITERATURE_VALIDATION,
     COT_STEP_PATHWAY_SELECTION,
     COT_STEP_VERIFICATION,
     COT_STEP_OUTPUT,
@@ -278,7 +278,7 @@ def get_mcp_step_indices(steps: list[str]) -> set[int]:
     Currently only the literature-validation step uses MCP. Returns an empty
     set if the step list contains no MCP-bearing steps.
     """
-    return {i for i, s in enumerate(steps) if s == COT_STEP_LITERATURE_VALIDATION}
+    return {i for i, s in enumerate(steps) if s == STEP_LITERATURE_VALIDATION}
 
 
 def assemble_cot_instructions(

@@ -392,17 +392,17 @@ class AnthropicClient(LLMClientBase):
 
         Routes on (mode, mcp, batch) — always returns (parsed, raw_outputs):
 
-          mode in {single, cot}, mcp=False  -> _analyze_plain
-          mode in {single, cot}, mcp=True   -> _analyze_mcp
-          mode == "stepwise", mcp=any       -> _analyze_stepwise
-          batch=True                        -> _analyze_batch (mcp/stepwise rejected)
+          mode in {standard, cot}, mcp=False  -> _analyze_plain
+          mode in {standard, cot}, mcp=True   -> _analyze_mcp
+          mode == "stepwise", mcp=any         -> _analyze_stepwise
+          batch=True                          -> _analyze_batch (mcp/stepwise rejected)
 
         For batch, parsed is None (results write to disk during retrieval);
         raw_outputs carries batch_id and any errored custom_ids. raw_outputs has
         the uniform shape consumed by `mozzarellm.utils.trace.save_trace()`.
         """
-        if mode not in ("single", "cot", "stepwise"):
-            raise ValueError(f"mode must be one of 'single', 'cot', 'stepwise'; got {mode!r}")
+        if mode not in ("standard", "cot", "stepwise"):
+            raise ValueError(f"mode must be one of 'standard', 'cot', 'stepwise'; got {mode!r}")
         if batch and (mcp or mode == "stepwise"):
             raise ValueError(
                 "batch=True is incompatible with mcp=True or mode='stepwise' "
@@ -526,7 +526,7 @@ class AnthropicClient(LLMClientBase):
         max_tokens: int = 16000,
     ) -> tuple[dict | None, dict]:
         """One-shot cluster analysis with PubMed MCP tools attached. Used by both
-        (mode=single, mcp=True) and (mode=cot, mcp=True) — they differ only in the
+        (mode=standard, mcp=True) and (mode=cot, mcp=True) — they differ only in the
         system prompt's delivery format (squashed vs. STEP-numbered)."""
         from mozzarellm.pipeline.literature_mcp import (
             _parse_json_from_text,

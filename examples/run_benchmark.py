@@ -5,19 +5,20 @@ bundle-based pipeline (accession lookup → evidence bundles → LLM Phase 1).
 
 Modes (`--mode`) are orthogonal to `--mcp`:
 
-    single    one API call, base prompt → JSON
-    cot       one API call, CoT chain in system prompt → JSON
+    standard  one API call, flat rules-based prompt → JSON (historical default)
+    cot       one API call, numbered CoT chain in system prompt → JSON
     stepwise  N API calls, multi-turn handoff per CoT step (partial trace on failure)
 
-`--mcp` attaches PubMed tools. In `cot --mcp` the literature-validation step is
-inserted into the chain. In `stepwise --mcp` only that step's call gets tools.
-In `single --mcp` tools are attached and the model decides whether to use them.
+`--mcp` attaches PubMed tools. In `cot --mcp` and `stepwise --mcp` the
+literature-validation step is part of the canonical chain. In `standard --mcp`
+the lit-validation block is appended to the rules-based prompt before the
+output format spec, and tools are attached to the single API call.
 
 Usage:
     python run_benchmark.py --dataset ops --model claude-sonnet-4-6
     python run_benchmark.py --dataset ops --mode cot
     python run_benchmark.py --dataset all --mode cot --mcp
-    python run_benchmark.py --dataset all --mode single --mcp
+    python run_benchmark.py --dataset all --mode standard --mcp
     python run_benchmark.py --dataset ops --mode stepwise --mcp --clusters 21
 """
 
@@ -482,9 +483,9 @@ def main():
     parser.add_argument("--model", default="claude-sonnet-4-6")
     parser.add_argument(
         "--mode",
-        choices=["single", "cot", "stepwise"],
-        default="single",
-        help="Execution mode: single (one call), cot (chain in system prompt), stepwise (multi-turn per CoT step)",
+        choices=["standard", "cot", "stepwise"],
+        default="standard",
+        help="Execution mode: standard (rules-based prompt, one call), cot (numbered chain in system prompt, one call), stepwise (multi-turn — one API call per CoT step)",
     )
     parser.add_argument(
         "--mcp",

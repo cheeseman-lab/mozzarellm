@@ -154,10 +154,11 @@ def test_custom_template_string(tmp_path):
 
 
 def test_includes_screen_context(tmp_path):
-    """Prompt includes screen context text."""
+    """Prompt includes screen context text. Default standard mode uses 'experimental
+    context'; cot/stepwise modes use 'screen context'."""
     result = make_cluster_analysis_system_prompt(
         screen_name="test_screen",
         override_screen_context=True,
         output_dir=tmp_path,
     )
-    assert "screen context" in result.lower()
+    assert "context" in result.lower()

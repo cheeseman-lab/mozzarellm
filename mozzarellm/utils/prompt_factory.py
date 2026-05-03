@@ -22,20 +22,29 @@ from datetime import datetime
 from pathlib import Path
 
 from mozzarellm.prompt_components import (
+    CLUSTER_ANALYSIS_TASK,
     COT_SCREEN_CONTEXT,
     COT_STEPS_DEFAULT,
     COT_STEPS_UNIFIED_MCP,
+    GENE_CATEGORIZATION_RULES,
+    NOVEL_CLASSIFICATION_RULES,
+    OUTPUT_FORMAT_JSON,
+    PATHWAY_CONFIDENCE_CRITERIA,
+    STEP_LITERATURE_VALIDATION,
+    UNCHARACTERIZED_CLASSIFICATION_RULES,
 )
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
-VALID_MODES = ("single", "cot", "stepwise")
+VALID_MODES = ("standard", "cot", "stepwise")
 
 
 def compose_cot_steps(mcp: bool) -> list[str]:
-    """The single canonical step list. mcp=True inserts the literature-validation step.
+    """Canonical CoT step list. mcp=True inserts the literature-validation step.
 
-    All three execution modes (single / cot / stepwise) derive their prompt content
-    from this list — only the *delivery* differs (squashed / numbered / per-turn).
+    Used by `mode="cot"` (squashed into a numbered chain in one API call) and
+    `mode="stepwise"` (each step delivered as a separate user turn).
+    `mode="standard"` does NOT use this list — it assembles a flat rules-based
+    prompt from `CLUSTER_ANALYSIS_TASK` + `*_RULES` + `OUTPUT_FORMAT_JSON`.
     """
     return COT_STEPS_UNIFIED_MCP if mcp else COT_STEPS_DEFAULT
 
@@ -52,7 +61,7 @@ def make_cluster_analysis_system_prompt(
     *,
     screen_name: str,
     screen_context_path: Path | None = None,
-    mode: str = "single",
+    mode: str = "standard",
     mcp: bool = False,
     override_CoT_steps: list[str]
     | None = None,  # testing utility for prompt-permutation experiments
@@ -64,19 +73,28 @@ def make_cluster_analysis_system_prompt(
     """
     Creates a system prompt for gene cluster analysis.
 
-    All three modes share one canonical step list (`compose_cot_steps(mcp)`); they
-    differ only in delivery:
-      - single: steps squashed into one prompt
-      - cot:    steps numbered with STEP N - prefixes
-      - stepwise: system prompt holds TASK + screen context; the runner walks
-                  the remaining reasoning steps as user turns
+    Three modes, each producing a structurally distinct prompt:
+
+      - standard: flat rules-based prompt — TASK + SCREEN_CONTEXT + GENE_CATEGORIZATION_RULES
+                  + NOVEL_CLASSIFICATION_RULES + UNCHARACTERIZED_CLASSIFICATION_RULES
+                  + PATHWAY_CONFIDENCE_CRITERIA + OUTPUT_FORMAT_JSON. No step structure.
+                  This is the historical default. With mcp=True, the literature-validation
+                  step is inserted before OUTPUT_FORMAT_JSON.
+
+      - cot:      numbered chain-of-thought — `STEP 1 - ..., STEP 2 - ...` from
+                  `compose_cot_steps(mcp)`. Single API call.
+
+      - stepwise: same canonical step list as cot, but delivered as separate API turns.
+                  System prompt holds only TASK + SCREEN_CONTEXT; the runner walks the
+                  remaining reasoning steps as user turns (multi-turn conversation).
 
     Args:
         screen_name: Used for output directory naming.
         screen_context_path: Path to screen_context.json.
-        mode: One of "single" / "cot" / "stepwise".
-        mcp: When True, include the literature-validation step in the canonical list.
-        override_CoT_steps: Custom step list for permutation testing.
+        mode: One of "standard" / "cot" / "stepwise". Default "standard".
+        mcp: When True, attach the literature-validation step (cot+stepwise insert it
+             into the canonical list; standard appends it before OUTPUT_FORMAT_JSON).
+        override_CoT_steps: Custom step list for permutation testing (cot/stepwise only).
         override_screen_context: Use default placeholder context (testing utility).
         template_path / template_string: Escape hatch — bypass step assembly.
         output_dir: Where to save the assembled prompt for inspection.
@@ -110,16 +128,28 @@ def make_cluster_analysis_system_prompt(
             + "\n\n"
         )
 
-    # All three modes derive from the same canonical step list. Only the
-    # DELIVERY differs: single squashes, cot numbers, stepwise sends per-turn.
-    steps = override_CoT_steps or compose_cot_steps(mcp)
-    steps = _inject_screen_context(steps, SCREEN_CONTEXT_TEXT)
-
-    if mode == "single":
-        prompt = "\n\n".join(steps)
+    if mode == "standard":
+        # Historical default: flat rules-based prompt. No step structure.
+        components = [
+            CLUSTER_ANALYSIS_TASK,
+            f"The following experimental context is provided: {SCREEN_CONTEXT_TEXT}",
+            GENE_CATEGORIZATION_RULES,
+            NOVEL_CLASSIFICATION_RULES,
+            UNCHARACTERIZED_CLASSIFICATION_RULES,
+            PATHWAY_CONFIDENCE_CRITERIA,
+        ]
+        if mcp:
+            components.append(STEP_LITERATURE_VALIDATION)
+        components.append(OUTPUT_FORMAT_JSON)
+        prompt = "\n\n".join(components)
     elif mode == "cot":
+        # Numbered chain-of-thought; one API call.
+        steps = override_CoT_steps or compose_cot_steps(mcp)
+        steps = _inject_screen_context(steps, SCREEN_CONTEXT_TEXT)
         prompt = "\n\n".join(f"STEP {i + 1} - {s}" for i, s in enumerate(steps))
-    else:  # stepwise — system holds task + context only; runner delivers reasoning steps
+    else:  # stepwise — system holds task + context only; runner delivers reasoning steps as separate API calls
+        steps = override_CoT_steps or compose_cot_steps(mcp)
+        steps = _inject_screen_context(steps, SCREEN_CONTEXT_TEXT)
         prompt = "\n\n".join(steps[:2])
     if not output_dir:
         output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
