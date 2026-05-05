@@ -16,11 +16,11 @@ from .clients.llm_api_clients import (
 from .prompt_components import (
     CLUSTER_ANALYSIS_TASK,
     CLUSTER_ANALYSIS_TASK_MULTI,
-    COT_STEPS_DEFAULT,
     GENE_CATEGORIZATION_RULES,
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,
-    assemble_cot_instructions,
+    STEPS_DEFAULT,
+    STEPS_DEFAULT_MCP,
 )
 from .schemas.mcp_schemas import (
     LiteraturePathwayRevision,
@@ -47,8 +47,8 @@ __all__ = [
     "GENE_CATEGORIZATION_RULES",
     "PATHWAY_CONFIDENCE_CRITERIA",
     "OUTPUT_FORMAT_JSON",
-    "COT_STEPS_DEFAULT",
-    "assemble_cot_instructions",
+    "STEPS_DEFAULT",
+    "STEPS_DEFAULT_MCP",
     # Literature validation schemas
     "RelevantPaper",
     "LiteratureValidation",

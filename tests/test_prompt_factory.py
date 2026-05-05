@@ -9,7 +9,7 @@ from mozzarellm.prompt_components import (
     COT_STEP_GENE_CATEGORIZATION,
     COT_STEP_VERIFICATION,
     COT_STEP_OUTPUT,
-    COT_STEPS_DEFAULT,
+    STEPS_DEFAULT,
 )
 
 
@@ -66,7 +66,7 @@ def test_cot_mode_uses_steps(tmp_path):
         output_dir=tmp_path,
     )
     step_headers = re.findall(r"^STEP \d+ - ", result, re.MULTILINE)
-    assert len(step_headers) == len(COT_STEPS_DEFAULT)
+    assert len(step_headers) == len(STEPS_DEFAULT)
 
 
 def test_cot_mode_includes_task_as_step1(tmp_path):

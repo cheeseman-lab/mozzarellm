@@ -24,13 +24,13 @@ from pathlib import Path
 from mozzarellm.prompt_components import (
     CLUSTER_ANALYSIS_TASK,
     COT_SCREEN_CONTEXT,
-    COT_STEPS_DEFAULT,
-    COT_STEPS_UNIFIED_MCP,
     GENE_CATEGORIZATION_RULES,
     NOVEL_CLASSIFICATION_RULES,
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,
     STEP_LITERATURE_VALIDATION,
+    STEPS_DEFAULT,
+    STEPS_DEFAULT_MCP,
     UNCHARACTERIZED_CLASSIFICATION_RULES,
 )
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
@@ -38,22 +38,38 @@ from mozzarellm.utils.screen_context_utils import load_screen_context_json
 VALID_MODES = ("standard", "cot", "stepwise")
 
 
-def compose_cot_steps(mcp: bool) -> list[str]:
-    """Canonical CoT step list. mcp=True inserts the literature-validation step.
+def _resolve_screen_context(screen_context_path: Path | None, override: bool) -> str:
+    """Load and minify the screen-context JSON for inclusion in prompts."""
+    try:
+        ctx_obj = load_screen_context_json(screen_context_path, override=override)
+    except Exception as e:
+        raise ValueError(f"Failed to load screen context: {e}") from e
+    return json.dumps(ctx_obj, ensure_ascii=False)
 
-    Used by `mode="cot"` (squashed into a numbered chain in one API call) and
-    `mode="stepwise"` (each step delivered as a separate user turn).
-    `mode="standard"` does NOT use this list — it assembles a flat rules-based
-    prompt from `CLUSTER_ANALYSIS_TASK` + `*_RULES` + `OUTPUT_FORMAT_JSON`.
+
+def _substitute_screen_context(step: str, screen_context: str) -> str:
+    """Replace the screen-context placeholder in a single step text with the actual JSON."""
+    return f"{COT_SCREEN_CONTEXT}\n{screen_context}" if step == COT_SCREEN_CONTEXT else step
+
+
+def compose_stepwise_user_turns(mcp: bool) -> list[dict]:
+    """Per-turn user content for stepwise mode.
+
+    The first two canonical steps (TASK + screen context) live in the system
+    prompt; this returns the remaining reasoning steps formatted as `STEP N - ...`,
+    plus a flag for which turns should attach MCP tools.
+
+    Returns a list of `{"content": str, "mcp": bool}`. The client walks these
+    sequentially, prepending the cluster bundle to turn 0's content.
     """
-    return COT_STEPS_UNIFIED_MCP if mcp else COT_STEPS_DEFAULT
-
-
-def _inject_screen_context(steps: list[str], screen_context: str) -> list[str]:
-    """Substitute the SCREEN_CONTEXT placeholder with the actual JSON context."""
+    canonical = STEPS_DEFAULT_MCP if mcp else STEPS_DEFAULT
+    runner_steps = canonical[2:]  # skip TASK + screen-context (system-prompt content)
     return [
-        f"{COT_SCREEN_CONTEXT}\n{screen_context}" if step == COT_SCREEN_CONTEXT else step
-        for step in steps
+        {
+            "content": f"STEP {i + 1} - {step}",
+            "mcp": (mcp and step == STEP_LITERATURE_VALIDATION),
+        }
+        for i, step in enumerate(runner_steps)
     ]
 
 
@@ -82,7 +98,8 @@ def make_cluster_analysis_system_prompt(
                   step is inserted before OUTPUT_FORMAT_JSON.
 
       - cot:      numbered chain-of-thought — `STEP 1 - ..., STEP 2 - ...` from
-                  `compose_cot_steps(mcp)`. Single API call.
+                  the canonical `STEPS_DEFAULT` (or `STEPS_DEFAULT_MCP` when mcp=True).
+                  Single API call.
 
       - stepwise: same canonical step list as cot, but delivered as separate API turns.
                   System prompt holds only TASK + SCREEN_CONTEXT; the runner walks the
@@ -105,16 +122,7 @@ def make_cluster_analysis_system_prompt(
     if mode not in VALID_MODES:
         raise ValueError(f"mode must be one of {VALID_MODES}, got {mode!r}")
 
-    try:
-        screen_ctx_obj = load_screen_context_json(
-            screen_context_path, override=override_screen_context
-        )
-    except Exception as e:
-        raise ValueError(f"Failed to load screen context: {e}")
-
-    SCREEN_CONTEXT_TEXT = json.dumps(
-        screen_ctx_obj, ensure_ascii=False
-    )  # minify JSON; has no effect on readability for LLMs + saves tokens
+    SCREEN_CONTEXT_TEXT = _resolve_screen_context(screen_context_path, override_screen_context)
 
     # =========================================================================
     # ESCAPE HATCH: Custom template overrides everything
@@ -144,12 +152,12 @@ def make_cluster_analysis_system_prompt(
         prompt = "\n\n".join(components)
     elif mode == "cot":
         # Numbered chain-of-thought; one API call.
-        steps = override_CoT_steps or compose_cot_steps(mcp)
-        steps = _inject_screen_context(steps, SCREEN_CONTEXT_TEXT)
+        steps = override_CoT_steps or (STEPS_DEFAULT_MCP if mcp else STEPS_DEFAULT)
+        steps = [_substitute_screen_context(s, SCREEN_CONTEXT_TEXT) for s in steps]
         prompt = "\n\n".join(f"STEP {i + 1} - {s}" for i, s in enumerate(steps))
-    else:  # stepwise — system holds task + context only; runner delivers reasoning steps as separate API calls
-        steps = override_CoT_steps or compose_cot_steps(mcp)
-        steps = _inject_screen_context(steps, SCREEN_CONTEXT_TEXT)
+    else:  # stepwise — system prompt holds TASK + screen context only; runner walks the rest as user turns
+        steps = override_CoT_steps or (STEPS_DEFAULT_MCP if mcp else STEPS_DEFAULT)
+        steps = [_substitute_screen_context(s, SCREEN_CONTEXT_TEXT) for s in steps]
         prompt = "\n\n".join(steps[:2])
     if not output_dir:
         output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")

@@ -647,16 +647,12 @@ class AnthropicClient(LLMClientBase):
             _validate_literature_blocks,
             call_mcp,
         )
-        from mozzarellm.prompt_components import get_mcp_step_indices
         from mozzarellm.utils.pricing import compute_cost
-        from mozzarellm.utils.prompt_factory import compose_cot_steps
+        from mozzarellm.utils.prompt_factory import compose_stepwise_user_turns
         from mozzarellm.utils.trace import extract_mcp_tool_calls
 
-        # System prompt holds TASK + screen context; runner walks reasoning steps
-        # (everything after those first two entries in the canonical step list).
-        all_steps = compose_cot_steps(mcp)
-        steps = all_steps[2:]
-        mcp_step_indices = get_mcp_step_indices(steps) if mcp else set()
+        # Per-turn user content + MCP routing decided by prompt_factory.
+        turns = compose_stepwise_user_turns(mcp)
 
         messages: list[dict] = []
         step_records: list[dict] = []
@@ -666,14 +662,11 @@ class AnthropicClient(LLMClientBase):
         total_elapsed = 0.0
         pricing_warnings: list[str] = []
 
-        for i, step_text in enumerate(steps):
-            user_content = (
-                f"{user_prompt}\n\nSTEP 1 - {step_text}"
-                if i == 0
-                else f"STEP {i + 1} - {step_text}"
-            )
+        for i, turn in enumerate(turns):
+            # Prepend the cluster bundle (per-cluster content) to the first turn only.
+            user_content = f"{user_prompt}\n\n{turn['content']}" if i == 0 else turn["content"]
             messages.append({"role": "user", "content": user_content})
-            use_mcp = i in mcp_step_indices
+            use_mcp = turn["mcp"]
 
             try:
                 if use_mcp:
