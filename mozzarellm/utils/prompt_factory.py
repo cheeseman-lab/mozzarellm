@@ -161,7 +161,7 @@ def make_cluster_analysis_system_prompt(
         prompt = "\n\n".join(steps[:2])
     if not output_dir:
         output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     # save system prompt to file with timestamp
     with open(
         output_dir

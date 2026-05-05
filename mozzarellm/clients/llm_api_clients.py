@@ -29,7 +29,7 @@ class LLMClientBase(ABC):
         self,
         model: str,
         temperature: float = 0.0,
-        max_tokens: int = 8000,
+        max_tokens: int = 16000,
         top_p: float | None = None,
         top_k: int | None = None,
         stop_sequences: list[str] | None = None,
@@ -631,7 +631,7 @@ class AnthropicClient(LLMClientBase):
         user_prompt: str,
         mcp: bool,
         max_retries: int,
-        max_tokens: int = 8000,
+        max_tokens: int = 16000,
     ) -> tuple[dict | None, dict]:
         """Run the canonical CoT chain as N sequential, multi-turn API calls.
 
@@ -889,7 +889,7 @@ class GeminiClient(LLMClientBase):
 def create_client(
     model: str,
     temperature: float = 0.0,
-    max_tokens: int = 8000,
+    max_tokens: int = 16000,
     top_p: float | None = None,
     top_k: int | None = None,
     stop_sequences: list[str] | None = None,
