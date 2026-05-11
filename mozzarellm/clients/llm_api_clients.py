@@ -542,6 +542,7 @@ class AnthropicClient(LLMClientBase):
             model=self.model,
             max_tokens=max_tokens,
             max_retries=max_retries,
+            client=anthropic.Anthropic(api_key=self.api_key),
         )
 
         output_text = "".join(
@@ -620,7 +621,8 @@ class AnthropicClient(LLMClientBase):
                 return response, time.time() - start
             except RETRYABLE_API_EXCEPTIONS as e:
                 if attempt < max_retries - 1 and _is_retryable_api_error(e):
-                    time.sleep(60)
+                    backoff = min(30 * (2 ** attempt), 120)
+                    time.sleep(backoff)
                     continue
                 raise
 
@@ -676,6 +678,7 @@ class AnthropicClient(LLMClientBase):
                         model=self.model,
                         max_tokens=max_tokens,
                         max_retries=max_retries,
+                        client=anthropic.Anthropic(api_key=self.api_key),
                     )
                 else:
                     response, elapsed = self._call_messages_endpoint(

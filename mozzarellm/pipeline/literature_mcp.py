@@ -133,7 +133,6 @@ def _build_mcp_servers_and_tools() -> tuple[list[dict], list[dict]]:
 
 
 RETRYABLE_API_EXCEPTIONS: tuple = (
-    anthropic.BadRequestError,
     anthropic.InternalServerError,
     anthropic.APITimeoutError,
     anthropic.APIConnectionError,
@@ -169,14 +168,20 @@ def call_mcp(
     model: str,
     max_tokens: int = 16000,
     max_retries: int = 3,
+    client: anthropic.Anthropic | None = None,
 ) -> tuple[Any, float]:
     """ONE place that talks to the Anthropic beta MCP endpoint. Returns (response, elapsed_s).
 
     All three execution modes (single+mcp, cot+mcp, stepwise+mcp at the literature step)
     funnel through here. Caller is responsible for shaping `messages` and parsing the
     response.
+
+    Args:
+        client: Optional pre-existing Anthropic client to reuse. If None, a new
+                client is created (reads ANTHROPIC_API_KEY from env).
     """
-    client = anthropic.Anthropic()
+    if client is None:
+        client = anthropic.Anthropic()
     mcp_servers, tools = _build_mcp_servers_and_tools()
 
     for attempt in range(max_retries):
@@ -195,7 +200,8 @@ def call_mcp(
             return response, time.time() - start
         except RETRYABLE_API_EXCEPTIONS as e:
             if attempt < max_retries - 1 and _is_retryable_api_error(e):
-                time.sleep(60)
+                backoff = min(30 * (2 ** attempt), 120)
+                time.sleep(backoff)
                 continue
             raise
 
@@ -209,14 +215,16 @@ def _validate_literature_blocks(parsed: dict[str, Any]) -> list[str]:
         try:
             LiteraturePathwayRevision.model_validate(rev)
         except ValidationError as e:
-            warnings.append(f"pathway_revision: {e.errors()[0]['msg']}")
+            for err in e.errors():
+                warnings.append(f"pathway_revision: {err['msg']}")
 
     for i, r in enumerate(parsed.get("literature_informed_reclassifications") or []):
         try:
             LiteratureReclassification.model_validate(r)
         except ValidationError as e:
             gene = r.get("gene", "?") if isinstance(r, dict) else "?"
-            warnings.append(f"reclassification[{i}/{gene}]: {e.errors()[0]['msg']}")
+            for err in e.errors():
+                warnings.append(f"reclassification[{i}/{gene}]: {err['msg']}")
 
     for category in ("novel_role_genes", "uncharacterized_genes"):
         for g in parsed.get(category) or []:
@@ -227,7 +235,8 @@ def _validate_literature_blocks(parsed: dict[str, Any]) -> list[str]:
                 LiteratureValidation.model_validate(lv)
             except ValidationError as e:
                 gene = g.get("gene", "?")
-                warnings.append(f"{category}/{gene}.literature_validation: {e.errors()[0]['msg']}")
+                for err in e.errors():
+                    warnings.append(f"{category}/{gene}.literature_validation: {err['msg']}")
 
     return warnings
 
