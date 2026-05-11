@@ -1,0 +1,111 @@
+{
+  "screen_name": "aconcagua_interphase",
+  "cluster_id": "94",
+  "cluster_genes": [
+    {
+      "gene_symbol": "AQR",
+      "UniProt_functional_annotation": "Involved in pre-mRNA splicing as component of the spliceosome (PubMed:11991638, PubMed:25599396, PubMed:28076346, PubMed:28502770). Intron-binding spliceosomal protein required to link pre-mRNA splicing and snoRNP (small nucleolar ribonucleoprotein) biogenesis (PubMed:16949364). Plays a key role in position-dependent assembly of intron-encoded box C/D small snoRNP, splicing being required for snoRNP assembly (PubMed:16949364). May act by helping the folding of the snoRNA sequence. Binds to intron of pre-mRNAs in a sequence-independent manner, contacting the region between snoRNA and the branchpoint of introns (40 nucleotides upstream of the branchpoint) during the late stages of splicing (PubMed:16949364). Has ATP-dependent RNA helicase activity and can unwind double-stranded RNA molecules with a 3' overhang (in vitro) (PubMed:25599396)",
+      "accession": "O60306"
+    },
+    {
+      "gene_symbol": "BUD31",
+      "UniProt_functional_annotation": "Involved in the pre-mRNA splicing process (PubMed:28076346, PubMed:28502770). May play a role as regulator of AR transcriptional activity; may increase AR transcriptional activity (PubMed:25091737)",
+      "accession": "P41223"
+    },
+    {
+      "gene_symbol": "CDC40",
+      "UniProt_functional_annotation": "Required for pre-mRNA splicing as component of the activated spliceosome (PubMed:33220177). Plays an important role in embryonic brain development; this function does not require proline isomerization (PubMed:33220177)",
+      "accession": "O60508"
+    },
+    {
+      "gene_symbol": "CRNKL1",
+      "UniProt_functional_annotation": "Involved in pre-mRNA splicing process (PubMed:11991638, PubMed:12084575, PubMed:28076346, PubMed:28502770). As a component of the minor spliceosome, involved in the splicing of U12-type introns in pre-mRNAs (Probable)",
+      "accession": "Q9BZJ0"
+    },
+    {
+      "gene_symbol": "CWC22",
+      "UniProt_functional_annotation": "Required for pre-mRNA splicing as component of the spliceosome (PubMed:11991638, PubMed:12226669, PubMed:22961380, PubMed:28076346, PubMed:28502770, PubMed:29301961, PubMed:29360106). As a component of the minor spliceosome, involved in the splicing of U12-type introns in pre-mRNAs (Probable). Promotes exon-junction complex (EJC) assembly (PubMed:22959432, PubMed:22961380). Hinders EIF4A3 from non-specifically binding RNA and escorts it to the splicing machinery to promote EJC assembly on mature mRNAs. Through its role in EJC assembly, required for nonsense-mediated mRNA decay",
+      "accession": "Q9HCG8"
+    },
+    {
+      "gene_symbol": "DHX8",
+      "UniProt_functional_annotation": "Involved in pre-mRNA splicing as component of the spliceosome (PubMed:11991638, PubMed:28076346, PubMed:28502770). Facilitates nuclear export of spliced mRNA by releasing the RNA from the spliceosome (PubMed:8608946)",
+      "accession": "Q14562"
+    },
+    {
+      "gene_symbol": "ISY1",
+      "UniProt_functional_annotation": "Component of the spliceosome C complex required for the selective processing of microRNAs during embryonic stem cell differentiation (By similarity). Required for the biogenesis of all miRNAs from the pri-miR-17-92 primary transcript except miR-92a (By similarity). Only required for the biogenesis of miR-290 and miR-96 from the pri-miR-290-295 and pri-miR-96-183 primary transcripts, respectively (By similarity). Required during the transition of embryonic stem cells (ESCs) from the naive to primed state (By similarity). By enhancing miRNA biogenesis, promotes exit of ESCs from the naive state to an intermediate state of poised pluripotency, which precedes transition to the primed state (By similarity). Involved in pre-mRNA splicing as component of the spliceosome",
+      "accession": "Q9ULR0"
+    },
+    {
+      "gene_symbol": "ISY1-RAB43",
+      "UniProt_functional_annotation": "",
+      "accession": "H9XFA1"
+    },
+    {
+      "gene_symbol": "PLRG1",
+      "UniProt_functional_annotation": "Involved in pre-mRNA splicing as component of the spliceosome (PubMed:28076346, PubMed:28502770). Component of the PRP19-CDC5L complex that forms an integral part of the spliceosome and is required for activating pre-mRNA splicing (PubMed:11101529, PubMed:11544257). As a component of the minor spliceosome, involved in the splicing of U12-type introns in pre-mRNAs (Probable)",
+      "accession": "O43660"
+    },
+    {
+      "gene_symbol": "RBM22",
+      "UniProt_functional_annotation": "Required for pre-mRNA splicing as component of the activated spliceosome (PubMed:28076346, PubMed:28502770, PubMed:29301961, PubMed:29360106, PubMed:29361316, PubMed:30705154). Involved in the first step of pre-mRNA splicing. Binds directly to the internal stem-loop (ISL) domain of the U6 snRNA and to the pre-mRNA intron near the 5' splice site during the activation and catalytic phases of the spliceosome cycle. Involved in both translocations of the nuclear SLU7 to the cytoplasm and the cytosolic calcium-binding protein PDCD6 to the nucleus upon cellular stress responses",
+      "accession": "Q9NW64"
+    },
+    {
+      "gene_symbol": "SF3A1",
+      "UniProt_functional_annotation": "Component of the 17S U2 SnRNP complex of the spliceosome, a large ribonucleoprotein complex that removes introns from transcribed pre-mRNAs (PubMed:10882114, PubMed:11533230, PubMed:32494006). The 17S U2 SnRNP complex (1) directly participates in early spliceosome assembly and (2) mediates recognition of the intron branch site during pre-mRNA splicing by promoting the selection of the pre-mRNA branch-site adenosine, the nucleophile for the first step of splicing (PubMed:10882114, PubMed:11533230, PubMed:32494006). Within the 17S U2 SnRNP complex, SF3A1 is part of the SF3A subcomplex that contributes to the assembly of the 17S U2 snRNP, and the subsequent assembly of the pre-spliceosome 'E' complex and the pre-catalytic spliceosome 'A' complex (PubMed:10882114, PubMed:11533230). Involved in pre-mRNA splicing as a component of pre-catalytic spliceosome 'B' complexes (PubMed:29360106, PubMed:30315277)",
+      "accession": "Q15459"
+    },
+    {
+      "gene_symbol": "SF3A3",
+      "UniProt_functional_annotation": "Component of the 17S U2 SnRNP complex of the spliceosome, a large ribonucleoprotein complex that removes introns from transcribed pre-mRNAs (PubMed:10882114, PubMed:11533230, PubMed:32494006, PubMed:34822310, PubMed:8022796). The 17S U2 SnRNP complex (1) directly participates in early spliceosome assembly and (2) mediates recognition of the intron branch site during pre-mRNA splicing by promoting the selection of the pre-mRNA branch-site adenosine, the nucleophile for the first step of splicing (PubMed:10882114, PubMed:11533230, PubMed:32494006, PubMed:34822310). Within the 17S U2 SnRNP complex, SF3A3 is part of the SF3A subcomplex that contributes to the assembly of the 17S U2 snRNP, and the subsequent assembly of the pre-spliceosome 'E' complex and the pre-catalytic spliceosome 'A' complex (PubMed:10882114, PubMed:11533230). Involved in pre-mRNA splicing as a component of pre-catalytic spliceosome 'B' complexes (PubMed:29360106, PubMed:30315277)",
+      "accession": "Q12874"
+    },
+    {
+      "gene_symbol": "SF3B1",
+      "UniProt_functional_annotation": "Component of the 17S U2 SnRNP complex of the spliceosome, a large ribonucleoprotein complex that removes introns from transcribed pre-mRNAs (PubMed:12234937, PubMed:27720643, PubMed:32494006, PubMed:34822310, PubMed:36104565). The 17S U2 SnRNP complex (1) directly participates in early spliceosome assembly and (2) mediates recognition of the intron branch site during pre-mRNA splicing by promoting the selection of the pre-mRNA branch-site adenosine, the nucleophile for the first step of splicing (PubMed:32494006, PubMed:34822310, PubMed:36104565). Within the 17S U2 SnRNP complex, SF3B1 is part of the SF3B subcomplex, which is required for 'A' complex assembly formed by the stable binding of U2 snRNP to the branchpoint sequence in pre-mRNA (PubMed:12234937, PubMed:36104565). Sequence independent binding of SF3A and SF3B subcomplexes upstream of the branch site is essential, it may anchor U2 snRNP to the pre-mRNA (PubMed:12234937). May also be involved in the assembly of the 'E' complex (PubMed:10882114). Also acts as a component of the minor spliceosome, which is involved in the splicing of U12-type introns in pre-mRNAs (PubMed:15146077, PubMed:33509932). Together with other U2 snRNP complex components may also play a role in the selective processing of microRNAs (miRNAs) from the long primary miRNA transcript, pri-miR-17-92 (By similarity)",
+      "accession": "O75533"
+    },
+    {
+      "gene_symbol": "SF3B2",
+      "UniProt_functional_annotation": "Component of the 17S U2 SnRNP complex of the spliceosome, a large ribonucleoprotein complex that removes introns from transcribed pre-mRNAs (PubMed:12234937, PubMed:32494006, PubMed:34822310). The 17S U2 SnRNP complex (1) directly participates in early spliceosome assembly and (2) mediates recognition of the intron branch site during pre-mRNA splicing by promoting the selection of the pre-mRNA branch-site adenosine, the nucleophile for the first step of splicing (PubMed:12234937, PubMed:32494006, PubMed:34822310). Within the 17S U2 SnRNP complex, SF3B2 is part of the SF3B subcomplex, which is required for 'A' complex assembly formed by the stable binding of U2 snRNP to the branchpoint sequence in pre-mRNA (PubMed:12234937, PubMed:27720643). Sequence independent binding of SF3A and SF3B subcomplexes upstream of the branch site is essential, it may anchor U2 snRNP to the pre-mRNA (PubMed:12234937). May also be involved in the assembly of the 'E' complex (PubMed:10882114). Also acts as a component of the minor spliceosome, which is involved in the splicing of U12-type introns in pre-mRNAs (PubMed:15146077, PubMed:33509932)",
+      "accession": "Q13435"
+    },
+    {
+      "gene_symbol": "SF3B3",
+      "UniProt_functional_annotation": "Component of the 17S U2 SnRNP complex of the spliceosome, a large ribonucleoprotein complex that removes introns from transcribed pre-mRNAs (PubMed:10490618, PubMed:10882114, PubMed:12234937, PubMed:27720643, PubMed:28781166, PubMed:32494006, PubMed:34822310). The 17S U2 SnRNP complex (1) directly participates in early spliceosome assembly and (2) mediates recognition of the intron branch site during pre-mRNA splicing by promoting the selection of the pre-mRNA branch-site adenosine, the nucleophile for the first step of splicing (PubMed:12234937, PubMed:32494006, PubMed:34822310). Within the 17S U2 SnRNP complex, SF3B3 is part of the SF3B subcomplex, which is required for 'A' complex assembly formed by the stable binding of U2 snRNP to the branchpoint sequence in pre-mRNA (PubMed:12234937, PubMed:27720643). Sequence independent binding of SF3A and SF3B subcomplexes upstream of the branch site is essential, it may anchor U2 snRNP to the pre-mRNA (PubMed:12234937). May also be involved in the assembly of the 'E' complex (PubMed:10882114). Also acts as a component of the minor spliceosome, which is involved in the splicing of U12-type introns in pre-mRNAs (PubMed:15146077, PubMed:33509932)",
+      "accession": "Q15393"
+    },
+    {
+      "gene_symbol": "SF3B5",
+      "UniProt_functional_annotation": "Component of the 17S U2 SnRNP complex of the spliceosome, a large ribonucleoprotein complex that removes introns from transcribed pre-mRNAs (PubMed:12234937, PubMed:27720643, PubMed:28781166, PubMed:32494006, PubMed:34822310). The 17S U2 SnRNP complex (1) directly participates in early spliceosome assembly and (2) mediates recognition of the intron branch site during pre-mRNA splicing by promoting the selection of the pre-mRNA branch-site adenosine, the nucleophile for the first step of splicing (PubMed:12234937, PubMed:32494006, PubMed:34822310). Within the 17S U2 SnRNP complex, SF3B4 is part of the SF3B subcomplex, which is required for 'A' complex assembly formed by the stable binding of U2 snRNP to the branchpoint sequence in pre-mRNA (PubMed:12234937, PubMed:27720643). Sequence independent binding of SF3A and SF3B subcomplexes upstream of the branch site is essential, it may anchor U2 snRNP to the pre-mRNA (PubMed:12234937). Also acts as a component of the minor spliceosome, which is involved in the splicing of U12-type introns in pre-mRNAs (PubMed:15146077, PubMed:33509932)",
+      "accession": "Q9BWJ5"
+    },
+    {
+      "gene_symbol": "SLU7",
+      "UniProt_functional_annotation": "Required for pre-mRNA splicing as component of the spliceosome (PubMed:10197984, PubMed:28502770, PubMed:30705154). Participates in the second catalytic step of pre-mRNA splicing, when the free hydroxyl group of exon I attacks the 3'-splice site to generate spliced mRNA and the excised lariat intron. Required for holding exon 1 properly in the spliceosome and for correct AG identification when more than one possible AG exists in 3'-splicing site region. May be involved in the activation of proximal AG. Probably also involved in alternative splicing regulation",
+      "accession": "O95391"
+    },
+    {
+      "gene_symbol": "SMU1",
+      "UniProt_functional_annotation": "Involved in pre-mRNA splicing as a component of the spliceosome (PubMed:28781166). Regulates alternative splicing of the HSPG2 pre-mRNA (By similarity). Required for normal accumulation of IK (PubMed:24945353). Required for normal mitotic spindle assembly and normal progress through mitosis (By similarity)\n(Microbial infection) Required, together with IK, for normal splicing of influenza A virus NS1 pre-mRNA, which is required for the production of the exportin NS2 and for the production of influenza A virus particles. Not required for the production of VSV virus particles",
+      "accession": "Q2TAY7"
+    },
+    {
+      "gene_symbol": "SNRPA1",
+      "UniProt_functional_annotation": "Involved in pre-mRNA splicing as component of the spliceosome (PubMed:11991638, PubMed:27035939, PubMed:28076346, PubMed:28502770, PubMed:28781166, PubMed:32494006). Associated with sn-RNP U2, where it contributes to the binding of stem loop IV of U2 snRNA (PubMed:27035939, PubMed:32494006, PubMed:9716128)",
+      "accession": "P09661"
+    },
+    {
+      "gene_symbol": "SNU13",
+      "UniProt_functional_annotation": "Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). Involved in pre-mRNA splicing as component of the spliceosome (PubMed:28781166). Binds to the 5'-stem-loop of U4 snRNA and thereby contributes to spliceosome assembly (PubMed:10545122, PubMed:17412961). The protein undergoes a conformational change upon RNA-binding (PubMed:10545122, PubMed:17412961, PubMed:28781166). Core component of box C/D small nucleolar ribonucleoprotein (snoRNP) complexes that function in methylation of multiple sites on ribosomal RNAs (rRNAs) and messenger RNAs (mRNAs) (PubMed:39570315)",
+      "accession": "P55769"
+    },
+    {
+      "gene_symbol": "XAB2",
+      "UniProt_functional_annotation": "Involved in pre-mRNA splicing as component of the spliceosome (PubMed:11991638, PubMed:28076346, PubMed:28502770). Involved in transcription-coupled repair (TCR), transcription and pre-mRNA splicing (PubMed:10944529, PubMed:17981804)",
+      "accession": "Q9HCS7"
+    }
+  ]
+}

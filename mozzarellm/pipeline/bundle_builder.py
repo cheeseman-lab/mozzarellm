@@ -204,12 +204,10 @@ def build_evidence_bundles(
     top_k: int = 10,
     uniprot_client: UniProtClient | None = None,  # Inject dependency
     output_dir: Path | str | None = None,
+    flat_output: bool = False,
 ):
     if uniprot_client is None:
         uniprot_client = UniProtClient()  # Create once
-    OUTPUT_DIR = (
-        Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
-    )
     # validate required columns in cluster table
     if cluster_id_column not in acc_cluster_df.columns:
         raise ValueError(f"Missing column '{cluster_id_column}' in cluster table")
@@ -217,8 +215,15 @@ def build_evidence_bundles(
         raise ValueError(f"Missing column '{gene_column}' in cluster table")
     print(f"Using gene column: {gene_column}")
 
-    # defense: make or assert that output dir exists
-    OUTPUT_DIR = Path(OUTPUT_DIR / f"{screen_name}_evidence_bundles")
+    # resolve bundle output directory
+    if flat_output:
+        OUTPUT_DIR = Path(output_dir if output_dir is not None else "output")
+    else:
+        OUTPUT_DIR = (
+            Path(output_dir if output_dir is not None else "output")
+            / f"{screen_name}_analysis"
+            / f"{screen_name}_evidence_bundles"
+        )
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # chunk cluster df

@@ -1,0 +1,101 @@
+{
+  "screen_name": "aconcagua_interphase",
+  "cluster_id": "109",
+  "cluster_genes": [
+    {
+      "gene_symbol": "AKIRIN2",
+      "UniProt_functional_annotation": "Molecular adapter that acts as a bridge between a variety of multiprotein complexes, and which is involved in embryonic development, immunity, myogenesis and brain development (PubMed:34711951). Plays a key role in nuclear protein degradation by promoting import of proteasomes into the nucleus: directly binds to fully assembled 20S proteasomes at one end and to nuclear import receptor IPO9 at the other end, bridging them together and mediating the import of pre-assembled proteasome complexes through the nuclear pore (PubMed:34711951). Involved in innate immunity by regulating the production of interleukin-6 (IL6) downstream of Toll-like receptor (TLR): acts by bridging the NF-kappa-B inhibitor NFKBIZ and the SWI/SNF complex, leading to promote induction of IL6 (By similarity). Also involved in adaptive immunity by promoting B-cell activation (By similarity). Involved in brain development: required for the survival and proliferation of cerebral cortical progenitor cells (By similarity). Involved in myogenesis: required for skeletal muscle formation and skeletal development, possibly by regulating expression of muscle differentiation factors (By similarity). Also plays a role in facilitating interdigital tissue regression during limb development (By similarity)",
+      "accession": "Q53H80"
+    },
+    {
+      "gene_symbol": "ORC3",
+      "UniProt_functional_annotation": "Component of the origin recognition complex (ORC) that binds origins of replication. DNA-binding is ATP-dependent. The specific DNA sequences that define origins of replication have not been identified yet. ORC is required to assemble the pre-replication complex necessary to initiate DNA replication. Binds histone H3 and H4 trimethylation marks H3K9me3, H3K27me3 and H4K20me3",
+      "accession": "Q9UBD5"
+    },
+    {
+      "gene_symbol": "POMP",
+      "UniProt_functional_annotation": "Molecular chaperone essential for the assembly of standard proteasomes and immunoproteasomes. Degraded after completion of proteasome maturation. Mediates the association of 20S preproteasome with the endoplasmic reticulum",
+      "accession": "Q9Y244"
+    },
+    {
+      "gene_symbol": "PPIH",
+      "UniProt_functional_annotation": "PPIase that catalyzes the cis-trans isomerization of proline imidic peptide bonds in oligopeptides and may therefore assist protein folding (PubMed:20676357). Participates in pre-mRNA splicing. May play a role in the assembly of the U4/U5/U6 tri-snRNP complex, one of the building blocks of the spliceosome. May act as a chaperone",
+      "accession": "O43447"
+    },
+    {
+      "gene_symbol": "PSMA1",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P25786"
+    },
+    {
+      "gene_symbol": "PSMA2",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P25787"
+    },
+    {
+      "gene_symbol": "PSMA3",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex). Binds to the C-terminus of CDKN1A and thereby mediates its degradation. Negatively regulates the membrane trafficking of the cell-surface thromboxane A2 receptor (TBXA2R) isoform 2",
+      "accession": "P25788"
+    },
+    {
+      "gene_symbol": "PSMA4",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P25789"
+    },
+    {
+      "gene_symbol": "PSMA5",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P28066"
+    },
+    {
+      "gene_symbol": "PSMA6",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P60900"
+    },
+    {
+      "gene_symbol": "PSMA7",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex). Inhibits the transactivation function of HIF-1A under both normoxic and hypoxia-mimicking conditions. The interaction with EMAP2 increases the proteasome-mediated HIF-1A degradation under the hypoxic conditions. Plays a role in hepatitis C virus internal ribosome entry site-mediated translation. Mediates nuclear translocation of the androgen receptor (AR) and thereby enhances androgen-mediated transactivation. Promotes MAVS degradation and thereby negatively regulates MAVS-mediated innate immune response",
+      "accession": "O14818"
+    },
+    {
+      "gene_symbol": "PSMB1",
+      "UniProt_functional_annotation": "Non-catalytic component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P20618"
+    },
+    {
+      "gene_symbol": "PSMB2",
+      "UniProt_functional_annotation": "Non-catalytic component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P49721"
+    },
+    {
+      "gene_symbol": "PSMB3",
+      "UniProt_functional_annotation": "Non-catalytic component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P49720"
+    },
+    {
+      "gene_symbol": "PSMB4",
+      "UniProt_functional_annotation": "Non-catalytic component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex). SMAD1/OAZ1/PSMB4 complex mediates the degradation of the CREBBP/EP300 repressor SNIP1",
+      "accession": "P28070"
+    },
+    {
+      "gene_symbol": "PSMB5",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex). Within the 20S core complex, PSMB5 displays a chymotrypsin-like activity",
+      "accession": "P28074"
+    },
+    {
+      "gene_symbol": "PSMB6",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex). Within the 20S core complex, PSMB6 displays a peptidylglutamyl-hydrolizing activity also termed postacidic or caspase-like activity, meaning that the peptides bond hydrolysis occurs directly after acidic residues",
+      "accession": "P28072"
+    },
+    {
+      "gene_symbol": "PSMB7",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex). Within the 20S core complex, PSMB7 displays a trypsin-like activity",
+      "accession": "Q99436"
+    },
+    {
+      "gene_symbol": "PSMG3",
+      "UniProt_functional_annotation": "Chaperone protein which promotes assembly of the 20S proteasome. May cooperate with PSMG1-PSMG2 heterodimers to orchestrate the correct assembly of proteasomes",
+      "accession": "Q9BT73"
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "screen_name": "whitney",
+  "cluster_id": "6",
+  "cluster_genes": [
+    {
+      "gene_symbol": "AKIRIN2",
+      "accession": "Q53H80"
+    },
+    {
+      "gene_symbol": "ENSG00000256206",
+      "accession": ""
+    },
+    {
+      "gene_symbol": "ENSG00000256646",
+      "accession": ""
+    },
+    {
+      "gene_symbol": "FNBP4",
+      "accession": "Q8N3X1"
+    },
+    {
+      "gene_symbol": "FOXN3",
+      "accession": "O00409"
+    },
+    {
+      "gene_symbol": "NAE1",
+      "accession": "Q13564"
+    },
+    {
+      "gene_symbol": "NEDD8",
+      "accession": "Q15843"
+    },
+    {
+      "gene_symbol": "NEDD8-MDP1",
+      "accession": "E9PL57"
+    },
+    {
+      "gene_symbol": "PSMA1",
+      "accession": "P25786"
+    },
+    {
+      "gene_symbol": "PSMA4",
+      "accession": "P25789"
+    },
+    {
+      "gene_symbol": "PSMA7",
+      "accession": "O14818"
+    },
+    {
+      "gene_symbol": "PSMB1",
+      "accession": "P20618"
+    },
+    {
+      "gene_symbol": "PSMB3",
+      "accession": "P49720"
+    },
+    {
+      "gene_symbol": "PSMB4",
+      "accession": "P28070"
+    },
+    {
+      "gene_symbol": "PSMB7",
+      "accession": "Q99436"
+    },
+    {
+      "gene_symbol": "PSMC1",
+      "accession": "P62191"
+    },
+    {
+      "gene_symbol": "PSMC2",
+      "accession": "P35998"
+    },
+    {
+      "gene_symbol": "PSMC3",
+      "accession": "P17980"
+    },
+    {
+      "gene_symbol": "PSMC4",
+      "accession": "P43686"
+    },
+    {
+      "gene_symbol": "PSMC5",
+      "accession": "P62195"
+    },
+    {
+      "gene_symbol": "PSMC6",
+      "accession": "P62333"
+    },
+    {
+      "gene_symbol": "PSMD2",
+      "accession": "Q13200"
+    },
+    {
+      "gene_symbol": "PSMD7",
+      "accession": "P51665"
+    },
+    {
+      "gene_symbol": "SNRNP27",
+      "accession": "Q8WVK2"
+    },
+    {
+      "gene_symbol": "SNRPE",
+      "accession": "P62304"
+    }
+  ]
+}

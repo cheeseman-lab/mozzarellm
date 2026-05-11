@@ -1,0 +1,3 @@
+[submodule "interface/output"]
+	path = interface/output
+	url = https://github.com/cheeseman-lab/MLLM-Interface-Outputs.git
