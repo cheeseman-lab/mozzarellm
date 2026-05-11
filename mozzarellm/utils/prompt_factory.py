@@ -32,7 +32,6 @@ from mozzarellm.prompt_components import (
     STEPS_DEFAULT,
     STEPS_DEFAULT_MCP,
     UNCHARACTERIZED_CLASSIFICATION_RULES,
-    COT_STEPS_DEFAULT,
     assemble_cot_instructions,
     COMPONENT_REGISTRY,
 )

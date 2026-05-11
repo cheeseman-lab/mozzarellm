@@ -323,7 +323,7 @@ def assemble_cot_instructions(
     """Assemble COT instructions from modular steps.
 
     Args:
-        steps: List of COT step strings. Defaults to COT_STEPS_DEFAULT.
+        steps: List of COT step strings. Defaults to STEPS_DEFAULT.
         screen_context: Optional screen context JSON string. If provided and
             COT_SCREEN_CONTEXT is in steps, it will be replaced with the
             context header + actual context.
@@ -332,7 +332,7 @@ def assemble_cot_instructions(
         Formatted COT instructions with numbered steps.
     """
     if steps is None:
-        steps = COT_STEPS_DEFAULT
+        steps = STEPS_DEFAULT
 
     # Replace COT_SCREEN_CONTEXT placeholder with actual context if provided
     if screen_context is not None:

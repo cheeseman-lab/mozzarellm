@@ -16,7 +16,6 @@ from .clients.llm_api_clients import (
 from .prompt_components import (
     CLUSTER_ANALYSIS_TASK,
     CLUSTER_ANALYSIS_TASK_MULTI,
-    COT_STEPS_DEFAULT,
     GENE_CATEGORIZATION_RULES,
     OUTPUT_FORMAT_JSON,
     PATHWAY_CONFIDENCE_CRITERIA,
@@ -55,7 +54,6 @@ __all__ = [
     "OUTPUT_FORMAT_JSON",
     "STEPS_DEFAULT",
     "STEPS_DEFAULT_MCP",
-    "COT_STEPS_DEFAULT",
     "assemble_cot_instructions",
     "COMPONENT_REGISTRY",
     "CANONICAL_ZERO_SHOT_ORDER",
