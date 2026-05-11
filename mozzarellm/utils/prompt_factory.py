@@ -32,6 +32,8 @@ from mozzarellm.prompt_components import (
     STEPS_DEFAULT,
     STEPS_DEFAULT_MCP,
     UNCHARACTERIZED_CLASSIFICATION_RULES,
+    assemble_cot_instructions,
+    COMPONENT_REGISTRY,
 )
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
@@ -73,14 +75,65 @@ def compose_stepwise_user_turns(mcp: bool) -> list[dict]:
     ]
 
 
+def assemble_from_component_order(
+    component_order: list[str],
+    screen_context_text: str,
+    cot_mode: bool = False,
+    component_overrides: dict[str, str] | None = None,
+) -> str:
+    """
+    Assemble a system prompt from an ordered list of component shorthand keys.
+
+    This is the flexible assembly entry point used by benchmarking and any caller
+    that needs arbitrary component ordering or wording overrides.
+
+    Args:
+        component_order: Ordered list of component keys (e.g. ["CAT", "SC", "GCR", ...]).
+            "SC" is handled specially: the screen_context_text is injected at that position.
+            All other keys must exist in COMPONENT_REGISTRY (or component_overrides).
+        screen_context_text: Minified JSON string of the screen context.
+        cot_mode: If True, format components as numbered STEPs.
+        component_overrides: Optional dict mapping component keys to replacement text.
+            Allows swapping individual component wordings without modifying the registry.
+
+    Returns:
+        Assembled system prompt string.
+    """
+    registry = dict(COMPONENT_REGISTRY)
+    if component_overrides:
+        registry.update(component_overrides)
+
+    parts = []
+    for key in component_order:
+        if key == "SC":
+            parts.append(
+                "The following experimental context is provided: "
+                + screen_context_text
+            )
+        else:
+            if key not in registry:
+                raise ValueError(
+                    f"Unknown component key: {key!r}. "
+                    f"Valid keys: {sorted(registry.keys())} + 'SC'"
+                )
+            parts.append(registry[key])
+
+    if cot_mode:
+        numbered = [f"STEP {i + 1} - {part}" for i, part in enumerate(parts)]
+        return "\n\n".join(numbered)
+    else:
+        return "\n\n".join(parts)
+
+
 def make_cluster_analysis_system_prompt(
     *,
     screen_name: str,
     screen_context_path: Path | None = None,
     mode: str = "standard",
     mcp: bool = False,
-    override_CoT_steps: list[str]
-    | None = None,  # testing utility for prompt-permutation experiments
+    component_order: list[str] | None = None,
+    component_overrides: dict[str, str] | None = None,
+    override_CoT_steps: list[str] | None = None,  # testing utility for prompt-permutation experiments
     override_screen_context: bool = False,  # testing utility
     template_path: Path | None = None,
     template_string: str | None = None,
@@ -111,6 +164,12 @@ def make_cluster_analysis_system_prompt(
         mode: One of "standard" / "cot" / "stepwise". Default "standard".
         mcp: When True, attach the literature-validation step (cot+stepwise insert it
              into the canonical list; standard appends it before OUTPUT_FORMAT_JSON).
+        component_order: Optional ordered list of component shorthand keys
+            (e.g. ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]).
+            When provided, assembles the prompt in this order instead of the
+            mode-based default. Supports both zero-shot and CoT keys.
+        component_overrides: Optional dict mapping component keys to replacement
+            text. Use this to swap individual component wordings.
         override_CoT_steps: Custom step list for permutation testing (cot/stepwise only).
         override_screen_context: Use default placeholder context (testing utility).
         template_path / template_string: Escape hatch — bypass step assembly.
@@ -136,7 +195,20 @@ def make_cluster_analysis_system_prompt(
             + "\n\n"
         )
 
-    if mode == "standard":
+    # =========================================================================
+    # FLEXIBLE COMPONENT-ORDER ASSEMBLY (benchmarking path)
+    # =========================================================================
+    if component_order is not None:
+        prompt = assemble_from_component_order(
+            component_order,
+            SCREEN_CONTEXT_TEXT,
+            cot_mode=(mode in ("cot", "stepwise")),
+            component_overrides=component_overrides,
+        )
+    # =========================================================================
+    # MODE-BASED PROMPT CONSTRUCTION (default path)
+    # =========================================================================
+    elif mode == "standard":
         # Historical default: flat rules-based prompt. No step structure.
         components = [
             CLUSTER_ANALYSIS_TASK,

@@ -21,7 +21,12 @@ from .prompt_components import (
     PATHWAY_CONFIDENCE_CRITERIA,
     STEPS_DEFAULT,
     STEPS_DEFAULT_MCP,
+    assemble_cot_instructions,
+    COMPONENT_REGISTRY,
+    CANONICAL_ZERO_SHOT_ORDER,
+    CANONICAL_COT_ORDER,
 )
+from .utils.prompt_factory import assemble_from_component_order
 from .schemas.mcp_schemas import (
     LiteraturePathwayRevision,
     LiteratureReclassification,
@@ -49,6 +54,11 @@ __all__ = [
     "OUTPUT_FORMAT_JSON",
     "STEPS_DEFAULT",
     "STEPS_DEFAULT_MCP",
+    "assemble_cot_instructions",
+    "COMPONENT_REGISTRY",
+    "CANONICAL_ZERO_SHOT_ORDER",
+    "CANONICAL_COT_ORDER",
+    "assemble_from_component_order",
     # Literature validation schemas
     "RelevantPaper",
     "LiteratureValidation",

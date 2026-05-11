@@ -1,0 +1,35 @@
+{
+  "assay_type": "Optical Pooled Screen (OPS)",
+  "target_phenotype": "Morphological cell phenotype — cell and nuclear shape, texture, and intensity features across 2 imaging channels (DNA, centromere)",
+  "organism": "Homo sapiens",
+  "cell_line_or_system": "HeLa",
+  "perturbation": {
+    "type": "CRISPR-Cas9 knockout",
+    "library_or_reagent": "Essential-wide sgRNA library (~5,300 genes)"
+  },
+  "readout": {
+    "measurement": "High-content fluorescence imaging of fixed cells",
+    "instrument_or_platform": "Optical pooled screening (in situ sequencing + imaging)",
+    "imaging_channels": ["DAPI (DNA)", "CENPA (centromere)"],
+    "primary_metric": "Morphological feature vectors — genes are clustered by similarity of phenotypic profiles across imaging channels"
+  },
+  "clustering": {
+    "method": "Leiden clustering on PHATE-embedded phenotypic profiles",
+    "parameters": {
+      "cell_cycle_phase": "Interphase",
+      "resolution": 15,
+      "n_clusters": 414,
+      "n_genes": 5299
+    }
+  },
+  "controls": {
+    "negative_controls": "Non-targeting sgRNAs",
+    "positive_controls": "N/A"
+  },
+  "provenance": {
+    "screen_name": "denali",
+    "lab": "Cheeseman Lab, Whitehead Institute",
+    "data_source": "phate_leiden_clustering.tsv"
+  },
+  "notes": "Interphase-gated cells only. 2-channel screen focused on DNA and centromere morphology (CENPA). At resolution k=15, this produces a high number of clusters (414), many of which may be small or noisy. Clusters represent sets of genes whose knockout produces similar morphological phenotypes."
+}

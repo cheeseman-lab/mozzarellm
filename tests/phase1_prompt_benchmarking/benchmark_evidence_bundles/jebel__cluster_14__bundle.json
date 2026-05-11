@@ -1,0 +1,161 @@
+{
+  "screen_name": "jebel",
+  "cluster_id": "14",
+  "cluster_genes": [
+    {
+      "gene_symbol": "ACTR5",
+      "UniProt_functional_annotation": "Proposed core component of the chromatin remodeling INO80 complex which is involved in transcriptional regulation, DNA replication and probably DNA repair. Involved in DNA double-strand break repair and UV-damage excision repair",
+      "accession": "Q9H9F9"
+    },
+    {
+      "gene_symbol": "BECN1",
+      "UniProt_functional_annotation": "Plays a central role in autophagy (PubMed:18570871, PubMed:21358617, PubMed:23184933, PubMed:23974797, PubMed:25484083, PubMed:28445460, PubMed:37776275). Acts as a core subunit of the PI3K complex that mediates formation of phosphatidylinositol 3-phosphate; different complex forms are believed to play a role in multiple membrane trafficking pathways: PI3KC3-C1 is involved in initiation of autophagosomes and PI3KC3-C2 in maturation of autophagosomes and endocytosis. Involved in regulation of degradative endocytic trafficking and required for the abscission step in cytokinesis, probably in the context of PI3KC3-C2 (PubMed:20208530, PubMed:20643123, PubMed:23974797, PubMed:26783301). Essential for the formation of PI3KC3-C2 but not PI3KC3-C1 PI3K complex forms. Involved in endocytosis (PubMed:25275521). May play a role in antiviral host defense\nBeclin-1-C 35 kDa localized to mitochondria can promote apoptosis; it induces the mitochondrial translocation of BAX and the release of proapoptotic factors\n(Microbial infection) Protects against infection by a neurovirulent strain of Sindbis virus",
+      "accession": "Q14457"
+    },
+    {
+      "gene_symbol": "CCND1",
+      "UniProt_functional_annotation": "Regulatory component of the cyclin D1-CDK4 (DC) complex that phosphorylates and inhibits members of the retinoblastoma (RB) protein family including RB1 and regulates the cell-cycle during G(1)/S transition (PubMed:1827756, PubMed:1833066, PubMed:19412162, PubMed:33854235, PubMed:8114739, PubMed:8302605). Phosphorylation of RB1 allows dissociation of the transcription factor E2F from the RB/E2F complex and the subsequent transcription of E2F target genes which are responsible for the progression through the G(1) phase (PubMed:1827756, PubMed:1833066, PubMed:19412162, PubMed:8114739, PubMed:8302605). Hypophosphorylates RB1 in early G(1) phase (PubMed:1827756, PubMed:1833066, PubMed:19412162, PubMed:8114739, PubMed:8302605). Cyclin D-CDK4 complexes are major integrators of various mitogenenic and antimitogenic signals (PubMed:1827756, PubMed:1833066, PubMed:19412162, PubMed:8302605). Also a substrate for SMAD3, phosphorylating SMAD3 in a cell-cycle-dependent manner and repressing its transcriptional activity (PubMed:15241418). Component of the ternary complex, cyclin D1/CDK4/CDKN1B, required for nuclear translocation and activity of the cyclin D-CDK4 complex (PubMed:9106657). Exhibits transcriptional corepressor activity with INSM1 on the NEUROD1 and INS promoters in a cell cycle-independent manner (PubMed:16569215, PubMed:18417529)",
+      "accession": "P24385"
+    },
+    {
+      "gene_symbol": "CDK10",
+      "UniProt_functional_annotation": "Cyclin-dependent kinase that phosphorylates the transcription factor ETS2 (in vitro) and positively controls its proteasomal degradation (in cells) (PubMed:24218572). Involved in the regulation of actin cytoskeleton organization through the phosphorylation of actin dynamics regulators such as PKN2. Is a negative regulator of ciliogenesis through phosphorylation of PKN2 and promotion of RhoA signaling (PubMed:27104747)",
+      "accession": "Q15131"
+    },
+    {
+      "gene_symbol": "CDK4",
+      "UniProt_functional_annotation": "Ser/Thr-kinase component of cyclin D-CDK4 (DC) complexes that phosphorylate and inhibit members of the retinoblastoma (RB) protein family including RB1 and regulate the cell-cycle during G(1)/S transition. Phosphorylation of RB1 allows dissociation of the transcription factor E2F from the RB/E2F complexes and the subsequent transcription of E2F target genes which are responsible for the progression through the G(1) phase. Hypophosphorylates RB1 in early G(1) phase. Cyclin D-CDK4 complexes are major integrators of various mitogenenic and antimitogenic signals. Also phosphorylates SMAD3 in a cell-cycle-dependent manner and represses its transcriptional activity. Component of the ternary complex, cyclin D/CDK4/CDKN1B, required for nuclear translocation and activity of the cyclin D-CDK4 complex",
+      "accession": "P11802"
+    },
+    {
+      "gene_symbol": "CWF19L1",
+      "UniProt_functional_annotation": "",
+      "accession": "Q69YN2"
+    },
+    {
+      "gene_symbol": "CYCS",
+      "UniProt_functional_annotation": "Electron carrier protein. The oxidized form of the cytochrome c heme group can accept an electron from the heme group of the cytochrome c1 subunit of cytochrome reductase. Cytochrome c then transfers this electron to the cytochrome oxidase complex, the final protein carrier in the mitochondrial electron-transport chain\nPlays a role in apoptosis. Suppression of the anti-apoptotic members or activation of the pro-apoptotic members of the Bcl-2 family leads to altered mitochondrial membrane permeability resulting in release of cytochrome c into the cytosol. Binding of cytochrome c to Apaf-1 triggers the activation of caspase-9, which then accelerates apoptosis by activating other caspases",
+      "accession": "P99999"
+    },
+    {
+      "gene_symbol": "DDX52",
+      "UniProt_functional_annotation": "Required for efficient ribosome biogenesis (By similarity). May control cell cycle progression by regulating translation of mRNAs that contain a terminal oligo pyrimidine (TOP) motif in their 5' UTRs, such as GTPBP4 (By similarity)",
+      "accession": "Q9Y2R4"
+    },
+    {
+      "gene_symbol": "DUX4",
+      "UniProt_functional_annotation": "Transcription factor that is selectively and transiently expressed in cleavage-stage embryos (PubMed:28459457). Binds to double-stranded DNA elements with the consensus sequence 5'-TAATCTAATCA-3' (PubMed:28459454, PubMed:28459457, PubMed:29572508, PubMed:30315230, PubMed:30540931). Binds to chromatin containing histone H3 acetylated at 'Lys-27' (H3K27ac) and promotes deacetylation of H3K27ac. In parallel, binds to chromatin that lacks histone H3 acetylation at 'Lys-27' (H3K27ac) and recruits EP300 and CREBBP to promote acetylation of histone H3 at 'Lys-27' at new sites (PubMed:26951377). Involved in transcriptional regulation of numerous genes, primarily as transcriptional activator, but also mediates repression of a set of target genes (PubMed:17984056, PubMed:26951377, PubMed:27378237, PubMed:28459454, PubMed:28459457, PubMed:29572508, PubMed:29618456, PubMed:30540931). Promotes expression of ZSCAN4 and KDM4E, two proteins with essential roles during early embryogenesis (PubMed:26951377, PubMed:27378237, PubMed:28459457, PubMed:29618456). Promotes nuclear translocation of CTNNB1/beta-catenin and its subsequent activation of target genes (PubMed:36158201). Heterologous expression in cultured embryonic stem cells mediates transcription of HERVL retrotransposons and transcripts derived from ACRO1 and HSATII satellite repeats (PubMed:28459457). May activate expression of PITX1 (PubMed:17984056). May regulate microRNA (miRNA) expression (PubMed:24145033). Inappropriate expression can inhibit myogenesis and promote apoptosis (PubMed:26951377, PubMed:28935672, PubMed:29618456)\nProbably inactive as a transcriptional activator, due to the absence of the C-terminal region that is important for transcriptional activation. Can inhibit transcriptional activation mediated by isoform 1. Heterologous expression of isoform 2 has no deleterious effect on cell survival",
+      "accession": "Q9UBX2"
+    },
+    {
+      "gene_symbol": "GGN",
+      "UniProt_functional_annotation": "May be involved in spermatogenesis",
+      "accession": "Q86UU5"
+    },
+    {
+      "gene_symbol": "GTF2H1",
+      "UniProt_functional_annotation": "Component of the general transcription and DNA repair factor IIH (TFIIH) core complex, which is involved in general and transcription-coupled nucleotide excision repair (NER) of damaged DNA and, when complexed to CAK, in RNA transcription by RNA polymerase II. In NER, TFIIH acts by opening DNA around the lesion to allow the excision of the damaged oligonucleotide and its replacement by a new DNA fragment. In transcription, TFIIH has an essential role in transcription initiation. When the pre-initiation complex (PIC) has been established, TFIIH is required for promoter opening and promoter escape. Phosphorylation of the C-terminal tail (CTD) of the largest subunit of RNA polymerase II by the kinase module CAK controls the initiation of transcription",
+      "accession": "P32780"
+    },
+    {
+      "gene_symbol": "LRRC37A2",
+      "UniProt_functional_annotation": "",
+      "accession": "A6NM11"
+    },
+    {
+      "gene_symbol": "LRRC37B",
+      "UniProt_functional_annotation": "",
+      "accession": "Q96QE4"
+    },
+    {
+      "gene_symbol": "LYPD2",
+      "UniProt_functional_annotation": "",
+      "accession": "Q6UXB3"
+    },
+    {
+      "gene_symbol": "MAP4K2",
+      "UniProt_functional_annotation": "Serine/threonine-protein kinase which acts as an essential component of the MAP kinase signal transduction pathway. Acts as a MAPK kinase kinase kinase (MAP4K) and is an upstream activator of the stress-activated protein kinase/c-Jun N-terminal kinase (SAP/JNK) signaling pathway and to a lesser extent of the p38 MAPKs signaling pathway. Required for the efficient activation of JNKs by TRAF6-dependent stimuli, including pathogen-associated molecular patterns (PAMPs) such as polyinosine-polycytidine (poly(IC)), lipopolysaccharides (LPS), lipid A, peptidoglycan (PGN), or bacterial flagellin. To a lesser degree, IL-1 and engagement of CD40 also stimulate MAP4K2-mediated JNKs activation. The requirement for MAP4K2/GCK is most pronounced for LPS signaling, and extends to LPS stimulation of c-Jun phosphorylation and induction of IL-8. Enhances MAP3K1 oligomerization, which may relieve N-terminal mediated MAP3K1 autoinhibition and lead to activation following autophosphorylation. Also mediates the SAP/JNK signaling pathway and the p38 MAPKs signaling pathway through activation of the MAP3Ks MAP3K10/MLK2 and MAP3K11/MLK3. May play a role in the regulation of vesicle targeting or fusion. regulation of vesicle targeting or fusion. Activator of the Hippo signaling pathway which plays a pivotal role in organ size control and tumor suppression by restricting proliferation and promoting apoptosis. MAP4Ks act in parallel to and are partially redundant with STK3/MST2 and STK4/MST2 in the phosphorylation and activation of LATS1/2, and establish MAP4Ks as components of the expanded Hippo pathway (PubMed:26437443)",
+      "accession": "Q12851"
+    },
+    {
+      "gene_symbol": "MED17",
+      "UniProt_functional_annotation": "Component of the Mediator complex, a coactivator involved in the regulated transcription of nearly all RNA polymerase II-dependent genes. Mediator functions as a bridge to convey information from gene-specific regulatory proteins to the basal RNA polymerase II transcription machinery. Mediator is recruited to promoters by direct interactions with regulatory proteins and serves as a scaffold for the assembly of a functional preinitiation complex with RNA polymerase II and the general transcription factors",
+      "accession": "Q9NVC6"
+    },
+    {
+      "gene_symbol": "MED28",
+      "UniProt_functional_annotation": "Component of the Mediator complex, a coactivator involved in the regulated transcription of nearly all RNA polymerase II-dependent genes. Mediator functions as a bridge to convey information from gene-specific regulatory proteins to the basal RNA polymerase II transcription machinery. Mediator is recruited to promoters by direct interactions with regulatory proteins and serves as a scaffold for the assembly of a functional preinitiation complex with RNA polymerase II and the general transcription factors. May be part of a complex containing NF2/merlin that participates in cellular signaling to the actin cytoskeleton downstream of tyrosine kinase signaling pathways",
+      "accession": "Q9H204"
+    },
+    {
+      "gene_symbol": "MED4",
+      "UniProt_functional_annotation": "Component of the Mediator complex, a coactivator involved in the regulated transcription of nearly all RNA polymerase II-dependent genes. Mediator functions as a bridge to convey information from gene-specific regulatory proteins to the basal RNA polymerase II transcription machinery. Mediator is recruited to promoters by direct interactions with regulatory proteins and serves as a scaffold for the assembly of a functional preinitiation complex with RNA polymerase II and the general transcription factors",
+      "accession": "Q9NPJ6"
+    },
+    {
+      "gene_symbol": "NAGK",
+      "UniProt_functional_annotation": "Converts endogenous N-acetylglucosamine (GlcNAc), a major component of complex carbohydrates, from lysosomal degradation or nutritional sources into GlcNAc 6-phosphate (PubMed:22692205). Involved in the N-glycolylneuraminic acid (Neu5Gc) degradation pathway: although human is not able to catalyze formation of Neu5Gc due to the inactive CMAHP enzyme, Neu5Gc is present in food and must be degraded (PubMed:22692205). Also has N-acetylmannosamine (ManNAc) kinase activity (By similarity). Also involved in innate immunity by promoting detection of bacterial peptidoglycan by NOD2: acts by catalyzing phosphorylation of muramyl dipeptide (MDP), a fragment of bacterial peptidoglycan, to generate 6-O-phospho-muramyl dipeptide, which acts as a direct ligand for NOD2 (PubMed:36002575)",
+      "accession": "Q9UJ70"
+    },
+    {
+      "gene_symbol": "NDUFA9",
+      "UniProt_functional_annotation": "Accessory subunit of the mitochondrial membrane respiratory chain NADH dehydrogenase (Complex I), that is believed not to be involved in catalysis. Required for proper complex I assembly (PubMed:28671271). Complex I functions in the transfer of electrons from NADH to the respiratory chain. The immediate electron acceptor for the enzyme is believed to be ubiquinone",
+      "accession": "Q16795"
+    },
+    {
+      "gene_symbol": "NKTR",
+      "UniProt_functional_annotation": "PPIase that catalyzes the cis-trans isomerization of proline imidic peptide bonds in oligopeptides and may therefore assist protein folding (PubMed:20676357). Component of a putative tumor-recognition complex involved in the function of NK cells (PubMed:8421688)",
+      "accession": "P30414"
+    },
+    {
+      "gene_symbol": "NUBP2",
+      "UniProt_functional_annotation": "Component of the cytosolic iron-sulfur (Fe/S) protein assembly (CIA) machinery. Required for maturation of extramitochondrial Fe-S proteins. The NUBP1-NUBP2 heterotetramer forms a Fe-S scaffold complex, mediating the de novo assembly of an Fe-S cluster and its transfer to target apoproteins. Negatively regulates cilium formation and structure",
+      "accession": "Q9Y5Y2"
+    },
+    {
+      "gene_symbol": "PBXIP1",
+      "UniProt_functional_annotation": "Regulator of pre-B-cell leukemia transcription factors (BPXs) function. Inhibits the binding of PBX1-HOX complex to DNA and blocks the transcriptional activity of E2A-PBX1. Tethers estrogen receptor-alpha (ESR1) to microtubules and allows them to influence estrogen receptors-alpha signaling",
+      "accession": "Q96AQ6"
+    },
+    {
+      "gene_symbol": "TARBP2",
+      "UniProt_functional_annotation": "Required for formation of the RNA induced silencing complex (RISC). Component of the RISC loading complex (RLC), also known as the micro-RNA (miRNA) loading complex (miRLC), which is composed of DICER1, AGO2 and TARBP2. Within the RLC/miRLC, DICER1 and TARBP2 are required to process precursor miRNAs (pre-miRNAs) to mature miRNAs and then load them onto AGO2. AGO2 bound to the mature miRNA constitutes the minimal RISC and may subsequently dissociate from DICER1 and TARBP2. May also play a role in the production of short interfering RNAs (siRNAs) from double-stranded RNA (dsRNA) by DICER1 (By similarity) (PubMed:15973356, PubMed:16142218, PubMed:16271387, PubMed:16357216, PubMed:16424907, PubMed:17452327, PubMed:18178619). Binds in vitro to the PRM1 3'-UTR (By similarity). Seems to act as a repressor of translation (By similarity). For some pre-miRNA substrates, may also alter the choice of cleavage site by DICER1 (PubMed:23063653). Negatively regulates IRF7-mediated IFN-beta signaling triggered by viral infection by inhibiting the phosphorylation of IRF7 and promoting its 'Lys'-48-linked ubiquitination and degradation (PubMed:30927622)\n(Microbial infection) Binds to the HIV-1 TAR RNA which is located in the long terminal repeat (LTR) of HIV-1, and stimulates translation of TAR-containing RNAs (PubMed:11438532, PubMed:12475984, PubMed:2011739). This is achieved in part at least by binding to and inhibiting EIF2AK2/PKR, thereby reducing phosphorylation and inhibition of EIF2S1/eIF-2-alpha (PubMed:11438532). May also promote translation of TAR-containing RNAs independently of EIF2AK2/PKR (PubMed:12475984). Mediates recruitment of FTSJ3 methyltransferase to HIV-1 RNA, leading to 2'-O-methylation of the viral genome, allowing HIV-1 to escape the innate immune system (PubMed:30626973)",
+      "accession": "Q15633"
+    },
+    {
+      "gene_symbol": "TFDP1",
+      "UniProt_functional_annotation": "Can stimulate E2F-dependent transcription. Binds DNA cooperatively with E2F family members through the E2 recognition site, 5'-TTTC[CG]CGC-3', found in the promoter region of a number of genes whose products are involved in cell cycle regulation or in DNA replication (PubMed:7739537, PubMed:8405995). The E2F1:DP complex appears to mediate both cell proliferation and apoptosis. Blocks adipocyte differentiation by repressing CEBPA binding to its target gene promoters (PubMed:20176812)",
+      "accession": "Q14186"
+    },
+    {
+      "gene_symbol": "TMEM104",
+      "UniProt_functional_annotation": "",
+      "accession": "Q8NE00"
+    },
+    {
+      "gene_symbol": "TRAPPC6A",
+      "UniProt_functional_annotation": "May play a role in vesicular transport during the biogenesis of melanosomes",
+      "accession": "O75865"
+    },
+    {
+      "gene_symbol": "USP6",
+      "UniProt_functional_annotation": "Deubiquitinase with an ATP-independent isopeptidase activity, cleaving at the C-terminus of the ubiquitin moiety. Catalyzes its own deubiquitination. In vitro, isoform 2, but not isoform 3, shows deubiquitinating activity. Promotes plasma membrane localization of ARF6 and selectively regulates ARF6-dependent endocytic protein trafficking. Is able to initiate tumorigenesis by inducing the production of matrix metalloproteinases following NF-kappa-B activation. May act as a GTPase-activating protein for RAB3A (PubMed:19077034)",
+      "accession": "P35125"
+    },
+    {
+      "gene_symbol": "USP7",
+      "UniProt_functional_annotation": "Hydrolase that deubiquitinates target proteins such as ARMC5, FOXO4, DEPTOR, KAT5, p53/TP53, MDM2, ERCC6, DNMT1, UHRF1, PTEN, KMT2E/MLL5 and DAXX (PubMed:11923872, PubMed:15053880, PubMed:16964248, PubMed:18716620, PubMed:25283148, PubMed:25865756, PubMed:26678539, PubMed:28655758, PubMed:33544460, PubMed:35216969). Together with DAXX, prevents MDM2 self-ubiquitination and enhances the E3 ligase activity of MDM2 towards p53/TP53, thereby promoting p53/TP53 ubiquitination and proteasomal degradation (PubMed:15053880, PubMed:16845383, PubMed:18566590, PubMed:20153724). Deubiquitinates p53/TP53, preventing degradation of p53/TP53, and enhances p53/TP53-dependent transcription regulation, cell growth repression and apoptosis (PubMed:25283148). Deubiquitinates p53/TP53 and MDM2 and strongly stabilizes p53/TP53 even in the presence of excess MDM2, and also induces p53/TP53-dependent cell growth repression and apoptosis (PubMed:11923872, PubMed:26786098). Deubiquitination of FOXO4 in presence of hydrogen peroxide is not dependent on p53/TP53 and inhibits FOXO4-induced transcriptional activity (PubMed:16964248). In association with DAXX, is involved in the deubiquitination and translocation of PTEN from the nucleus to the cytoplasm, both processes that are counteracted by PML (PubMed:18716620). Deubiquitinates KMT2E/MLL5 preventing KMT2E/MLL5 proteasomal-mediated degradation (PubMed:26678539). Involved in cell proliferation during early embryonic development. Involved in transcription-coupled nucleotide excision repair (TC-NER) in response to UV damage: recruited to DNA damage sites following interaction with KIAA1530/UVSSA and promotes deubiquitination of ERCC6, preventing UV-induced degradation of ERCC6 (PubMed:22466611, PubMed:22466612). Involved in maintenance of DNA methylation via its interaction with UHRF1 and DNMT1: acts by mediating deubiquitination of UHRF1 and DNMT1, preventing their degradation and promoting DNA methylation by DNMT1 (PubMed:21745816, PubMed:22411829). Deubiquitinates alkylation repair enzyme ALKBH3. OTUD4 recruits USP7 and USP9X to stabilize ALKBH3, thereby promoting the repair of alkylated DNA lesions (PubMed:25944111). Acts as a chromatin regulator via its association with the Polycomb group (PcG) multiprotein PRC1-like complex; may act by deubiquitinating components of the PRC1-like complex (PubMed:20601937). Able to mediate deubiquitination of histone H2B; it is however unsure whether this activity takes place in vivo (PubMed:20601937). Exhibits a preference towards 'Lys-48'-linked ubiquitin chains (PubMed:22689415). Increases regulatory T-cells (Treg) suppressive capacity by deubiquitinating and stabilizing the transcription factor FOXP3 which is crucial for Treg cell function (PubMed:23973222). Plays a role in the maintenance of the circadian clock periodicity via deubiquitination and stabilization of the CRY1 and CRY2 proteins (PubMed:27123980). Deubiquitinates REST, thereby stabilizing REST and promoting the maintenance of neural progenitor cells (PubMed:21258371). Deubiquitinates SIRT7, inhibiting SIRT7 histone deacetylase activity and regulating gluconeogenesis (PubMed:28655758). Involved in the regulation of WASH-dependent actin polymerization at the surface of endosomes and the regulation of endosomal protein recycling (PubMed:26365382). It maintains optimal WASH complex activity and precise F-actin levels via deubiquitination of TRIM27 and WASHC1 (PubMed:26365382). Mediates the deubiquitination of phosphorylated DEPTOR, promoting its stability and leading to decreased mTORC1 signaling (PubMed:35216969)\n(Microbial infection) Contributes to the overall stabilization and trans-activation capability of the herpesvirus 1 trans-acting transcriptional protein ICP0/VMW110 during HSV-1 infection\n(Microbial infection) Upon infection with Epstein-Barr virus, the interaction with viral EBNA1 increases the association of USP7 with PML proteins, which is required for the polyubiquitylation and degradation of PML",
+      "accession": "Q93009"
+    },
+    {
+      "gene_symbol": "ZEB2",
+      "UniProt_functional_annotation": "Transcriptional inhibitor that binds to DNA sequence 5'-CACCT-3' in different promoters (PubMed:16061479, PubMed:20516212). Represses transcription of E-cadherin (PubMed:16061479). Represses expression of MEOX2 (PubMed:20516212)",
+      "accession": "O60315"
+    },
+    {
+      "gene_symbol": "ZNF322",
+      "UniProt_functional_annotation": "Transcriptional activator (PubMed:15555580). Important for maintenance of pluripotency in embryonic stem cells (By similarity). Binds directly to the POU5F1 distal enhancer and the NANOG proximal promoter, and enhances expression of both genes (By similarity). Can also bind to numerous other gene promoters and regulates expression of many other pluripotency factors, either directly or indirectly (By similarity). Promotes inhibition of MAPK signaling during embryonic stem cell differentiation (By similarity)",
+      "accession": "Q6U7Q0"
+    }
+  ]
+}

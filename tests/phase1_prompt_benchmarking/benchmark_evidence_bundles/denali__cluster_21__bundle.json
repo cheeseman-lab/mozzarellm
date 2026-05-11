@@ -1,0 +1,166 @@
+{
+  "screen_name": "denali",
+  "cluster_id": "21",
+  "cluster_genes": [
+    {
+      "gene_symbol": "AURKA",
+      "UniProt_functional_annotation": "Mitotic serine/threonine kinase that contributes to the regulation of cell cycle progression (PubMed:11039908, PubMed:12390251, PubMed:17125279, PubMed:17360485, PubMed:18615013, PubMed:26246606). Associates with the centrosome and the spindle microtubules during mitosis and plays a critical role in various mitotic events including the establishment of mitotic spindle, centrosome duplication, centrosome separation as well as maturation, chromosomal alignment, spindle assembly checkpoint, and cytokinesis (PubMed:14523000, PubMed:26246606). Required for normal spindle positioning during mitosis and for the localization of NUMA1 and DCTN1 to the cell cortex during metaphase (PubMed:27335426). Required for initial activation of CDK1 at centrosomes (PubMed:13678582, PubMed:15128871). Phosphorylates numerous target proteins, including ARHGEF2, BORA, BRCA1, CDC25B, DLGP5, HDAC6, KIF2A, LATS2, NDEL1, PARD3, PPP1R2, PLK1, RASSF1, TACC3, p53/TP53 and TPX2 (PubMed:11551964, PubMed:14702041, PubMed:15128871, PubMed:15147269, PubMed:15987997, PubMed:17604723, PubMed:18056443, PubMed:18615013). Phosphorylates MCRS1 which is required for MCRS1-mediated kinetochore fiber assembly and mitotic progression (PubMed:27192185). Regulates KIF2A tubulin depolymerase activity (PubMed:19351716). Important for microtubule formation and/or stabilization (PubMed:18056443). Required for normal axon formation (PubMed:19812038). Plays a role in microtubule remodeling during neurite extension (PubMed:19668197). Also acts as a key regulatory component of the p53/TP53 pathway, and particularly the checkpoint-response pathways critical for oncogenic transformation of cells, by phosphorylating and destabilizing p53/TP53 (PubMed:14702041). Phosphorylates its own inhibitors, the protein phosphatase type 1 (PP1) isoforms, to inhibit their activity (PubMed:11551964). Inhibits cilia outgrowth (By similarity). Required for cilia disassembly via phosphorylation of HDAC6 and subsequent deacetylation of alpha-tubulin (PubMed:17604723, PubMed:20643351). Regulates protein levels of the anti-apoptosis protein BIRC5 by suppressing the expression of the SCF(FBXL7) E3 ubiquitin-protein ligase substrate adapter FBXL7 through the phosphorylation of the transcription factor FOXP1 (PubMed:28218735)",
+      "accession": "O14965"
+    },
+    {
+      "gene_symbol": "CDC27",
+      "UniProt_functional_annotation": "Component of the anaphase promoting complex/cyclosome (APC/C), a cell cycle-regulated E3 ubiquitin ligase that controls progression through mitosis and the G1 phase of the cell cycle (PubMed:18485873). The APC/C complex acts by mediating ubiquitination and subsequent degradation of target proteins: it mainly mediates the formation of 'Lys-11'-linked polyubiquitin chains and, to a lower extent, the formation of 'Lys-48'- and 'Lys-63'-linked polyubiquitin chains (PubMed:18485873). The APC/C complex catalyzes assembly of branched 'Lys-11'-/'Lys-48'-linked branched ubiquitin chains on target proteins (PubMed:29033132)",
+      "accession": "P30260"
+    },
+    {
+      "gene_symbol": "CENPW",
+      "UniProt_functional_annotation": "Component of the CENPA-NAC (nucleosome-associated) complex, a complex that plays a central role in assembly of kinetochore proteins, mitotic progression and chromosome segregation (By similarity). The CENPA-NAC complex recruits the CENPA-CAD (nucleosome distal) complex and may be involved in incorporation of newly synthesized CENPA into centromeres (By similarity). Part of a nucleosome-associated complex that binds specifically to histone H3-containing nucleosomes at the centromere, as opposed to nucleosomes containing CENPA. Component of the heterotetrameric CENP-T-W-S-X complex that binds and supercoils DNA, and plays an important role in kinetochore assembly. CENPW has a fundamental role in kinetochore assembly and function. It is one of the inner kinetochore proteins, with most further proteins binding downstream. Required for normal chromosome organization and normal progress through mitosis",
+      "accession": "Q5EE01"
+    },
+    {
+      "gene_symbol": "CEP192",
+      "UniProt_functional_annotation": "Required for mitotic centrosome maturation and bipolar spindle assembly (PubMed:17980596, PubMed:18207742, PubMed:25042804). Appears to be a major regulator of pericentriolar material (PCM) recruitment, centrosome maturation, and centriole duplication (PubMed:17980596, PubMed:18207742, PubMed:25042804). Centrosome-specific activating scaffold for AURKA and PLK1 (PubMed:25042804)",
+      "accession": "Q8TEP8"
+    },
+    {
+      "gene_symbol": "CKAP5",
+      "UniProt_functional_annotation": "Binds to the plus end of microtubules and regulates microtubule dynamics and microtubule organization. Acts as a processive microtubule polymerase. Promotes cytoplasmic microtubule nucleation and elongation. Plays a major role in organizing spindle poles. In spindle formation protects kinetochore microtubules from depolymerization by KIF2C and has an essential role in centrosomal microtubule assembly independently of KIF2C activity. Contributes to centrosome integrity. Acts as a component of the TACC3/ch-TOG/clathrin complex proposed to contribute to stabilization of kinetochore fibers of the mitotic spindle by acting as inter-microtubule bridge. The TACC3/ch-TOG/clathrin complex is required for the maintenance of kinetochore fiber tension (PubMed:23532825). Enhances the strength of NDC80 complex-mediated kinetochore-tip microtubule attachments (PubMed:27156448)",
+      "accession": "Q14008"
+    },
+    {
+      "gene_symbol": "DLGAP5",
+      "UniProt_functional_annotation": "Potential cell cycle regulator that may play a role in carcinogenesis of cancer cells. Mitotic phosphoprotein regulated by the ubiquitin-proteasome pathway. Key regulator of adherens junction integrity and differentiation that may be involved in CDH1-mediated adhesion and signaling in epithelial cells",
+      "accession": "Q15398"
+    },
+    {
+      "gene_symbol": "HAUS1",
+      "UniProt_functional_annotation": "Contributes to mitotic spindle assembly, maintenance of centrosome integrity and completion of cytokinesis as part of the HAUS augmin-like complex",
+      "accession": "Q96CS2"
+    },
+    {
+      "gene_symbol": "HAUS2",
+      "UniProt_functional_annotation": "Contributes to mitotic spindle assembly, maintenance of centrosome integrity and completion of cytokinesis as part of the HAUS augmin-like complex",
+      "accession": "Q9NVX0"
+    },
+    {
+      "gene_symbol": "HAUS3",
+      "UniProt_functional_annotation": "Contributes to mitotic spindle assembly, maintenance of centrosome integrity and completion of cytokinesis as part of the HAUS augmin-like complex",
+      "accession": "Q68CZ6"
+    },
+    {
+      "gene_symbol": "HAUS4",
+      "UniProt_functional_annotation": "Contributes to mitotic spindle assembly, maintenance of centrosome integrity and completion of cytokinesis as part of the HAUS augmin-like complex",
+      "accession": "Q9H6D7"
+    },
+    {
+      "gene_symbol": "HAUS5",
+      "UniProt_functional_annotation": "Contributes to mitotic spindle assembly, maintenance of centrosome integrity and completion of cytokinesis as part of the HAUS augmin-like complex",
+      "accession": "O94927"
+    },
+    {
+      "gene_symbol": "HAUS6",
+      "UniProt_functional_annotation": "Contributes to mitotic spindle assembly, maintenance of centrosome integrity and completion of cytokinesis as part of the HAUS augmin-like complex. Promotes the nucleation of microtubules from the spindle through recruitment of NEDD1 and gamma-tubulin",
+      "accession": "Q7Z4H7"
+    },
+    {
+      "gene_symbol": "HAUS7",
+      "UniProt_functional_annotation": "Contributes to mitotic spindle assembly, maintenance of centrosome integrity and completion of cytokinesis as part of the HAUS augmin-like complex",
+      "accession": "Q99871"
+    },
+    {
+      "gene_symbol": "HAUS8",
+      "UniProt_functional_annotation": "Contributes to mitotic spindle assembly, maintenance of centrosome integrity and completion of cytokinesis as part of the HAUS augmin-like complex",
+      "accession": "Q9BT25"
+    },
+    {
+      "gene_symbol": "KIF11",
+      "UniProt_functional_annotation": "Motor protein required for establishing a bipolar spindle and thus contributing to chromosome congression during mitosis (PubMed:19001501, PubMed:37728657). Required in non-mitotic cells for transport of secretory proteins from the Golgi complex to the cell surface (PubMed:23857769)",
+      "accession": "P52732"
+    },
+    {
+      "gene_symbol": "KIF18A",
+      "UniProt_functional_annotation": "Microtubule-depolymerizing kinesin which plays a role in chromosome congression by reducing the amplitude of preanaphase oscillations and slowing poleward movement during anaphase, thus suppressing chromosome movements. May stabilize the CENPE-BUB1B complex at the kinetochores during early mitosis and maintains CENPE levels at kinetochores during chromosome congression",
+      "accession": "Q8NI77"
+    },
+    {
+      "gene_symbol": "NDC1",
+      "UniProt_functional_annotation": "Component of the nuclear pore complex (NPC), which plays a key role in de novo assembly and insertion of NPC in the nuclear envelope. Required for NPC and nuclear envelope assembly, possibly by forming a link between the nuclear envelope membrane and soluble nucleoporins, thereby anchoring the NPC in the membrane",
+      "accession": "Q9BTX1"
+    },
+    {
+      "gene_symbol": "NDC80",
+      "UniProt_functional_annotation": "Acts as a component of the essential kinetochore-associated NDC80 complex, which is required for chromosome segregation and spindle checkpoint activity (PubMed:12351790, PubMed:14654001, PubMed:14699129, PubMed:15062103, PubMed:15235793, PubMed:15239953, PubMed:15548592, PubMed:16732327, PubMed:30409912, PubMed:9315664). Required for kinetochore integrity and the organization of stable microtubule binding sites in the outer plate of the kinetochore (PubMed:15548592, PubMed:30409912). The NDC80 complex synergistically enhances the affinity of the SKA1 complex for microtubules and may allow the NDC80 complex to track depolymerizing microtubules (PubMed:23085020). Plays a role in chromosome congression and is essential for the end-on attachment of the kinetochores to spindle microtubules (PubMed:23891108, PubMed:25743205)",
+      "accession": "O14777"
+    },
+    {
+      "gene_symbol": "NEDD1",
+      "UniProt_functional_annotation": "Required for mitosis progression. Promotes the nucleation of microtubules from the spindle",
+      "accession": "Q8NHV4"
+    },
+    {
+      "gene_symbol": "NUF2",
+      "UniProt_functional_annotation": "Acts as a component of the essential kinetochore-associated NDC80 complex, which is required for chromosome segregation and spindle checkpoint activity (PubMed:12438418, PubMed:14654001, PubMed:15062103, PubMed:15235793, PubMed:15239953, PubMed:15548592, PubMed:17535814). Required for kinetochore integrity and the organization of stable microtubule binding sites in the outer plate of the kinetochore (PubMed:15548592). The NDC80 complex synergistically enhances the affinity of the SKA1 complex for microtubules and may allow the NDC80 complex to track depolymerizing microtubules (PubMed:23085020)",
+      "accession": "Q9BZD4"
+    },
+    {
+      "gene_symbol": "PLK1",
+      "UniProt_functional_annotation": "Serine/threonine-protein kinase that performs several important functions throughout M phase of the cell cycle, including the regulation of centrosome maturation and spindle assembly, the removal of cohesins from chromosome arms, the inactivation of anaphase-promoting complex/cyclosome (APC/C) inhibitors, and the regulation of mitotic exit and cytokinesis (PubMed:11202906, PubMed:12207013, PubMed:12447691, PubMed:12524548, PubMed:12738781, PubMed:12852856, PubMed:12939256, PubMed:14532005, PubMed:14734534, PubMed:15070733, PubMed:15148369, PubMed:15469984, PubMed:16198290, PubMed:16247472, PubMed:16980960, PubMed:17081991, PubMed:17351640, PubMed:17376779, PubMed:17617734, PubMed:18174154, PubMed:18331714, PubMed:18418051, PubMed:18477460, PubMed:18521620, PubMed:18615013, PubMed:19160488, PubMed:19351716, PubMed:19468300, PubMed:19468302, PubMed:19473992, PubMed:19509060, PubMed:19597481, PubMed:23455478, PubMed:23509069, PubMed:28512243, PubMed:8991084). Polo-like kinase proteins act by binding and phosphorylating proteins that are already phosphorylated on a specific motif recognized by the POLO box domains (PubMed:11202906, PubMed:12207013, PubMed:12447691, PubMed:12524548, PubMed:12738781, PubMed:12852856, PubMed:12939256, PubMed:14532005, PubMed:14734534, PubMed:15070733, PubMed:15148369, PubMed:15469984, PubMed:16198290, PubMed:16247472, PubMed:16980960, PubMed:17081991, PubMed:17351640, PubMed:17376779, PubMed:17617734, PubMed:18174154, PubMed:18331714, PubMed:18418051, PubMed:18477460, PubMed:18521620, PubMed:18615013, PubMed:19160488, PubMed:19351716, PubMed:19468300, PubMed:19468302, PubMed:19473992, PubMed:19509060, PubMed:19597481, PubMed:23455478, PubMed:23509069, PubMed:28512243, PubMed:8991084). Phosphorylates BORA, BUB1B/BUBR1, CCNB1, CDC25C, CEP55, ECT2, ERCC6L, FBXO5/EMI1, FOXM1, KIF20A/MKLP2, CENPU, NEDD1, NINL, NPM1, NUDC, PKMYT1/MYT1, KIZ, MRE11, PPP1R12A/MYPT1, POLQ, PRC1, RACGAP1/CYK4, RAD51, RHNO1, SGO1, STAG2/SA2, TEX14, TOPORS, p73/TP73, TPT1, WEE1 and HNRNPU (PubMed:11202906, PubMed:12207013, PubMed:12447691, PubMed:12524548, PubMed:12738781, PubMed:12852856, PubMed:12939256, PubMed:14532005, PubMed:14734534, PubMed:15070733, PubMed:15148369, PubMed:15469984, PubMed:16198290, PubMed:16247472, PubMed:16980960, PubMed:17081991, PubMed:17218258, PubMed:17351640, PubMed:17376779, PubMed:17617734, PubMed:18174154, PubMed:18331714, PubMed:18418051, PubMed:18477460, PubMed:18521620, PubMed:18615013, PubMed:19160488, PubMed:19351716, PubMed:19468300, PubMed:19468302, PubMed:19473992, PubMed:19509060, PubMed:19597481, PubMed:22325354, PubMed:23455478, PubMed:23509069, PubMed:25986610, PubMed:26811421, PubMed:28512243, PubMed:37440612, PubMed:37674080, PubMed:8991084). Plays a key role in centrosome functions and the assembly of bipolar spindles by phosphorylating KIZ, NEDD1 and NINL (PubMed:16980960, PubMed:19509060). NEDD1 phosphorylation promotes subsequent targeting of the gamma-tubulin ring complex (gTuRC) to the centrosome, an important step for spindle formation (PubMed:19509060). Phosphorylation of NINL component of the centrosome leads to NINL dissociation from other centrosomal proteins (PubMed:12852856). Involved in mitosis exit and cytokinesis by phosphorylating CEP55, ECT2, KIF20A/MKLP2, CENPU, PRC1 and RACGAP1 (PubMed:12939256, PubMed:16247472, PubMed:17351640, PubMed:19468300, PubMed:19468302). Recruited at the central spindle by phosphorylating and docking PRC1 and KIF20A/MKLP2; creates its own docking sites on PRC1 and KIF20A/MKLP2 by mediating phosphorylation of sites subsequently recognized by the POLO box domains (PubMed:12939256, PubMed:17351640). Phosphorylates RACGAP1, thereby creating a docking site for the Rho GTP exchange factor ECT2 that is essential for the cleavage furrow formation (PubMed:19468300, PubMed:19468302). Promotes the central spindle recruitment of ECT2 (PubMed:16247472). Plays a central role in G2/M transition of mitotic cell cycle by phosphorylating CCNB1, CDC25C, FOXM1, CENPU, PKMYT1/MYT1, PPP1R12A/MYPT1 and WEE1 (PubMed:11202906, PubMed:12447691, PubMed:12524548, PubMed:19160488). Part of a regulatory circuit that promotes the activation of CDK1 by phosphorylating the positive regulator CDC25C and inhibiting the negative regulators WEE1 and PKMYT1/MYT1 (PubMed:11202906). Also acts by mediating phosphorylation of cyclin-B1 (CCNB1) on centrosomes in prophase (PubMed:12447691, PubMed:12524548). Phosphorylates FOXM1, a key mitotic transcription regulator, leading to enhance FOXM1 transcriptional activity (PubMed:19160488). Involved in kinetochore functions and sister chromatid cohesion by phosphorylating BUB1B/BUBR1, FBXO5/EMI1 and STAG2/SA2 (PubMed:15148369, PubMed:15469984, PubMed:17376779, PubMed:18331714). PLK1 is high on non-attached kinetochores suggesting a role of PLK1 in kinetochore attachment or in spindle assembly checkpoint (SAC) regulation (PubMed:17617734). Required for kinetochore localization of BUB1B (PubMed:17376779). Regulates the dissociation of cohesin from chromosomes by phosphorylating cohesin subunits such as STAG2/SA2 (By similarity). Phosphorylates SGO1: required for spindle pole localization of isoform 3 of SGO1 and plays a role in regulating its centriole cohesion function (PubMed:18331714). Mediates phosphorylation of FBXO5/EMI1, a negative regulator of the APC/C complex during prophase, leading to FBXO5/EMI1 ubiquitination and degradation by the proteasome (PubMed:15148369, PubMed:15469984). Acts as a negative regulator of p53 family members: phosphorylates TOPORS, leading to inhibit the sumoylation of p53/TP53 and simultaneously enhance the ubiquitination and subsequent degradation of p53/TP53 (PubMed:19473992). Phosphorylates the transactivation domain of the transcription factor p73/TP73, leading to inhibit p73/TP73-mediated transcriptional activation and pro-apoptotic functions. Phosphorylates BORA, and thereby promotes the degradation of BORA (PubMed:18521620). Contributes to the regulation of AURKA function (PubMed:18615013, PubMed:18662541). Also required for recovery after DNA damage checkpoint and entry into mitosis (PubMed:18615013, PubMed:18662541). Phosphorylates MISP, leading to stabilization of cortical and astral microtubule attachments required for proper spindle positioning (PubMed:23509069). Together with MEIKIN, acts as a regulator of kinetochore function during meiosis I: required both for mono-orientation of kinetochores on sister chromosomes and protection of centromeric cohesin from separase-mediated cleavage (By similarity). Phosphorylates CEP68 and is required for its degradation (PubMed:25503564). Regulates nuclear envelope breakdown during prophase by phosphorylating DCTN1 resulting in its localization in the nuclear envelope (PubMed:20679239). Phosphorylates the heat shock transcription factor HSF1, promoting HSF1 nuclear translocation upon heat shock (PubMed:15661742). Phosphorylates HSF1 also in the early mitotic period; this phosphorylation regulates HSF1 localization to the spindle pole, the recruitment of the SCF(BTRC) ubiquitin ligase complex induicing HSF1 degradation, and hence mitotic progression (PubMed:18794143). Regulates mitotic progression by phosphorylating RIOK2 (PubMed:21880710). Through the phosphorylation of DZIP1 regulates the localization during mitosis of the BBSome, a ciliary protein complex involved in cilium biogenesis (PubMed:27979967). Regulates DNA repair during mitosis by mediating phosphorylation of POLQ and RHNO1, thereby promoting POLQ recruitment to DNA damage sites (PubMed:37440612, PubMed:37674080). Phosphorylates ATXN10 which may play a role in the regulation of cytokinesis and may stimulate the proteasome-mediated degradation of ATXN10 (PubMed:21857149)",
+      "accession": "P53350"
+    },
+    {
+      "gene_symbol": "SASS6",
+      "UniProt_functional_annotation": "Central scaffolding component of the centrioles ensuring their 9-fold symmetry (By similarity). Required for centrosome biogenesis and duplication: required both for mother-centriole-dependent centriole duplication and deuterosome-dependent centriole amplification in multiciliated cells (PubMed:15665853, PubMed:16244668, PubMed:17681131). Not required for centriole formation in embryonic stem cells but necessary to maintain centriole architecture (By similarity). Required for the recruitment of STIL to the procentriole and for STIL-mediated centriole amplification (PubMed:22020124). Overexpression results in excess foci-bearing centriolar markers (PubMed:15665853)",
+      "accession": "Q6UVJ0"
+    },
+    {
+      "gene_symbol": "SKA1",
+      "UniProt_functional_annotation": "Component of the SKA complex, a microtubule plus end-binding complex of the outer kinetochore that stabilizes spindle microtubule-kinetochore attachments, promotes alignment of chromosomes at the mitotic spindle equator (chromosome congression) and assists suppression of the spindle assembly checkpoint (PubMed:17093495, PubMed:19289083, PubMed:22371557, PubMed:22483620, PubMed:23085020, PubMed:26981768, PubMed:27697923, PubMed:29487209, PubMed:31804178). Kinetochores, consisting of a centromere-associated inner segment and a microtubule-contacting outer segment, play a crucial role in chromosome segregation by mediating the physical connection between centromeric DNA and spindle microtubules (PubMed:19289083, PubMed:22483620, PubMed:23085020, PubMed:28479321, PubMed:29487209). The outer kinetochore is made up of the ten-subunit KMN network complex, comprising the MIS12, NDC80 and KNL1 complexes, and auxiliary microtubule-associated components such as the SKA complex; together they connect the outer kinetochore with the inner kinetochore, bind microtubules, and mediate interactions with mitotic checkpoint proteins that delay anaphase until chromosomes are bioriented on the spindle (PubMed:17093495, PubMed:19289083, PubMed:23085020, PubMed:28479321, PubMed:29487209). The SKA complex is loaded onto bioriented kinetochores and it facilitates chromosome congression by stabilizing microtubules together with MAPRE1, and end-on attachment of the NDC80 complex to depolymerizing spindle microtubules, thereby assisting the poleward-moving kinetochore in withstanding microtubule pulling forces (PubMed:19289083, PubMed:22371557, PubMed:22454517, PubMed:23085020, PubMed:24413531, PubMed:27697923, PubMed:28479321, PubMed:28495837, PubMed:29487209). The complex associates with dynamic microtubule plus-ends and can track both depolymerizing and elongating microtubules (PubMed:23085020, PubMed:29153323). The complex recruits protein phosphatase 1 (PP1) to the kinetochore in prometaphase and metaphase, to oppose spindle assembly checkpoint signaling and promote the onset of anaphase (PubMed:26981768). In the complex, it mediates interactions with microtubules (PubMed:19289083, PubMed:22483620, PubMed:23085020, PubMed:24413531, PubMed:27667719, PubMed:29153323, PubMed:36592928). It also stimulates AURKB/Aurora B catalytic activity (PubMed:27697923). During meiosis the SKA complex stabilizes the meiotic spindle and is required for its migration to the cortex (By similarity)",
+      "accession": "Q96BD8"
+    },
+    {
+      "gene_symbol": "SKA2",
+      "UniProt_functional_annotation": "Component of the SKA1 complex, a microtubule-binding subcomplex of the outer kinetochore that is essential for proper chromosome segregation (PubMed:17093495, PubMed:19289083, PubMed:23085020). Required for timely anaphase onset during mitosis, when chromosomes undergo bipolar attachment on spindle microtubules leading to silencing of the spindle checkpoint (PubMed:17093495). The SKA1 complex is a direct component of the kinetochore-microtubule interface and directly associates with microtubules as oligomeric assemblies (PubMed:19289083). The complex facilitates the processive movement of microspheres along a microtubule in a depolymerization-coupled manner (PubMed:17093495, PubMed:19289083). In the complex, it is required for SKA1 localization (PubMed:19289083). Affinity for microtubules is synergistically enhanced in the presence of the ndc-80 complex and may allow the ndc-80 complex to track depolymerizing microtubules (PubMed:23085020)",
+      "accession": "Q8WVK7"
+    },
+    {
+      "gene_symbol": "SKA3",
+      "UniProt_functional_annotation": "Component of the SKA1 complex, a microtubule-binding subcomplex of the outer kinetochore that is essential for proper chromosome segregation (PubMed:19289083, PubMed:19360002, PubMed:23085020). The SKA1 complex is a direct component of the kinetochore-microtubule interface and directly associates with microtubules as oligomeric assemblies (PubMed:19289083, PubMed:19360002). The complex facilitates the processive movement of microspheres along a microtubule in a depolymerization-coupled manner (PubMed:19289083). In the complex, it mediates the microtubule-stimulated oligomerization (PubMed:19289083). Affinity for microtubules is synergistically enhanced in the presence of the ndc-80 complex and may allow the ndc-80 complex to track depolymerizing microtubules (PubMed:23085020)",
+      "accession": "Q8IX90"
+    },
+    {
+      "gene_symbol": "SPC24",
+      "UniProt_functional_annotation": "Acts as a component of the essential kinetochore-associated NDC80 complex, which is required for chromosome segregation and spindle checkpoint activity (PubMed:14738735). Required for kinetochore integrity and the organization of stable microtubule binding sites in the outer plate of the kinetochore (PubMed:14738735). The NDC80 complex synergistically enhances the affinity of the SKA1 complex for microtubules and may allow the NDC80 complex to track depolymerizing microtubules (PubMed:23085020)",
+      "accession": "Q8NBT2"
+    },
+    {
+      "gene_symbol": "SPC25",
+      "UniProt_functional_annotation": "Acts as a component of the essential kinetochore-associated NDC80 complex, which is required for chromosome segregation and spindle checkpoint activity (PubMed:14699129, PubMed:14738735). Required for kinetochore integrity and the organization of stable microtubule binding sites in the outer plate of the kinetochore (PubMed:14699129, PubMed:14738735). The NDC80 complex synergistically enhances the affinity of the SKA1 complex for microtubules and may allow the NDC80 complex to track depolymerizing microtubules (PubMed:23085020)",
+      "accession": "Q9HBM1"
+    },
+    {
+      "gene_symbol": "SPDL1",
+      "UniProt_functional_annotation": "Required for the localization of dynein and dynactin to the mitotic kinetochore. Dynein is believed to control the initial lateral interaction between the kinetochore and spindle microtubules and to facilitate the subsequent formation of end-on kinetochore-microtubule attachments mediated by the NDC80 complex. Also required for correct spindle orientation. Does not appear to be required for the removal of spindle assembly checkpoint (SAC) proteins from the kinetochore upon bipolar spindle attachment (PubMed:17576797, PubMed:19468067). Acts as an adapter protein linking the dynein motor complex to various cargos and converts dynein from a non-processive to a highly processive motor in the presence of dynactin. Facilitates the interaction between dynein and dynactin and activates dynein processivity (the ability to move along a microtubule for a long distance without falling off the track) (PubMed:25035494). Plays a role in cell migration (PubMed:30258100)",
+      "accession": "Q96EA4"
+    },
+    {
+      "gene_symbol": "STIL",
+      "UniProt_functional_annotation": "Immediate-early gene. Plays an important role in embryonic development as well as in cellular growth and proliferation; its long-term silencing affects cell survival and cell cycle distribution as well as decreases CDK1 activity correlated with reduced phosphorylation of CDK1. Plays a role as a positive regulator of the sonic hedgehog pathway, acting downstream of PTCH1 (PubMed:16024801, PubMed:9372240). Plays an important role in the regulation of centriole duplication. Required for the onset of procentriole formation and proper mitotic progression. During procentriole formation, is essential for the correct loading of SASS6 and CPAP to the base of the procentriole to initiate procentriole assembly (PubMed:22020124). In complex with STIL acts as a modulator of PLK4-driven cytoskeletal rearrangements and directional cell motility (PubMed:29712910, PubMed:32107292)",
+      "accession": "Q15468"
+    },
+    {
+      "gene_symbol": "TACC3",
+      "UniProt_functional_annotation": "Plays a role in the microtubule-dependent coupling of the nucleus and the centrosome. Involved in the processes that regulate centrosome-mediated interkinetic nuclear migration (INM) of neural progenitors (By similarity). Acts as a component of the TACC3/ch-TOG/clathrin complex proposed to contribute to stabilization of kinetochore fibers of the mitotic spindle by acting as inter-microtubule bridge. The TACC3/ch-TOG/clathrin complex is required for the maintenance of kinetochore fiber tension (PubMed:21297582, PubMed:23532825). May be involved in the control of cell growth and differentiation. May contribute to cancer (PubMed:14767476)",
+      "accession": "Q9Y6A5"
+    },
+    {
+      "gene_symbol": "TUBGCP4",
+      "UniProt_functional_annotation": "Component of the gamma-tubulin ring complex (gTuRC) which mediates microtubule nucleation (PubMed:38305685, PubMed:38609661, PubMed:39321809). The gTuRC regulates the minus-end nucleation of alpha-beta tubulin heterodimers that grow into microtubule protafilaments, a critical step in centrosome duplication and spindle formation (PubMed:38305685, PubMed:38609661, PubMed:39321809)",
+      "accession": "Q9UGJ1"
+    },
+    {
+      "gene_symbol": "TUBGCP6",
+      "UniProt_functional_annotation": "Component of the gamma-tubulin ring complex (gTuRC) which mediates microtubule nucleation (PubMed:11694571, PubMed:38305685, PubMed:38609661, PubMed:39321809). The gTuRC regulates the minus-end nucleation of alpha-beta tubulin heterodimers that grow into microtubule protafilaments, a critical step in centrosome duplication and spindle formation (PubMed:38305685, PubMed:38609661, PubMed:39321809)",
+      "accession": "Q96RT7"
+    }
+  ]
+}
