@@ -65,7 +65,7 @@ def save_trace(
         trace.update(extra)
 
     out = traces_dir / f"cluster_{cluster_id}.json"
-    out.write_text(json.dumps(trace, indent=2, ensure_ascii=False, default=str))
+    out.write_text(json.dumps(trace, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
     return out
 
 
