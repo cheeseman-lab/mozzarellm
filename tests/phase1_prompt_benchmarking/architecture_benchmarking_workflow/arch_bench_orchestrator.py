@@ -1,0 +1,556 @@
+"""Architecture benchmark orchestrator — main loop and CLI entry point.
+
+Runs the LLM Analysis architecture benchmark across configured routes, clusters,
+and replicates. Produces JSONL outputs, traces, and a Markdown report.
+
+Usage:
+    python arch_bench_orchestrator.py --config ../configs/arch_bench_default.yaml
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import sys
+import time
+from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
+
+# Ensure repo root is on sys.path for imports
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=_REPO_ROOT / ".env")
+except ImportError:
+    pass  # dotenv not required if env vars are set externally
+
+import pandas as pd
+
+from mozzarellm.clients.llm_api_clients import create_client
+from mozzarellm.pipeline.literature_mcp import get_available_mcp_servers
+from mozzarellm.utils.prompt_factory import (
+    make_cluster_analysis_system_prompt,
+    make_single_cluster_analysis_user_prompt,
+    compose_stepwise_user_turns,
+)
+from mozzarellm.utils.trace import save_trace
+
+from .arch_bench_configparse import BenchmarkConfig, load_config
+from .arch_bench_dry_run import (
+    generate_mock_parsed_output,
+    generate_mock_raw_outputs,
+    _load_bundle_genes,
+)
+from .arch_bench_metricfns import compute_all_metrics
+from .arch_bench_reportgen import generate_report
+from .arch_bench_routes import Route, build_routes_from_config
+
+
+# =============================================================================
+# HELPERS
+# =============================================================================
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _build_run_id(
+    experiment_id: str, route_name: str, screen_name: str, cluster_id: str, replicate: int
+) -> str:
+    return f"{experiment_id}__{route_name}__{screen_name}__cluster_{cluster_id}__rep_{replicate}"
+
+
+def _resolve_bundle_path(bundles_dir: Path, screen_name: str, cluster_id: str) -> Path | None:
+    """Locate the evidence bundle for a given (screen, cluster) pair."""
+    expected = bundles_dir / f"{screen_name}__cluster_{cluster_id}__bundle.json"
+    if expected.exists():
+        return expected
+    # Fallback: glob search
+    pattern = f"{screen_name}__cluster_{cluster_id}__bundle.json"
+    matches = list(bundles_dir.glob(pattern))
+    return matches[0] if matches else None
+
+
+def _resolve_screen_context_path(inputs_dir: Path, screen_name: str) -> Path | None:
+    """Locate screen context JSON for a given screen."""
+    expected = inputs_dir / f"{screen_name}_screen_context.json"
+    return expected if expected.exists() else None
+
+
+def _load_benchmark_clusters(csv_path: Path) -> pd.DataFrame:
+    """Load benchmark clusters CSV (columns: screen_name, cluster_id, gene_symbol)."""
+    df = pd.read_csv(csv_path)
+    required = {"screen_name", "cluster_id", "gene_symbol"}
+    if not required.issubset(set(df.columns)):
+        raise ValueError(f"benchmark_clusters.csv must have columns: {required}. Got: {list(df.columns)}")
+    df["cluster_id"] = df["cluster_id"].astype(str)
+    return df
+
+
+def _filter_clusters(
+    df: pd.DataFrame, config: BenchmarkConfig
+) -> list[tuple[str, str]]:
+    """Return deduplicated (screen_name, cluster_id) pairs after applying config filters."""
+    pairs = df[["screen_name", "cluster_id"]].drop_duplicates()
+
+    # Screen filter
+    if config.screens_include != "all":
+        pairs = pairs[pairs["screen_name"].isin(config.screens_include)]
+
+    # Cluster filter
+    if config.clusters_include != "all":
+        filter_set = {(c.screen_name, c.cluster_id) for c in config.clusters_include}
+        pairs = pairs[
+            pairs.apply(lambda r: (r["screen_name"], r["cluster_id"]) in filter_set, axis=1)
+        ]
+
+    return list(pairs.itertuples(index=False, name=None))
+
+
+def _append_jsonl(path: Path, record: dict) -> None:
+    """Append one JSON record to a .jsonl file."""
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, default=str) + "\n")
+
+
+# =============================================================================
+# PROMPT CONSTRUCTION
+# =============================================================================
+
+
+def construct_prompts(
+    route: Route,
+    screen_name: str,
+    screen_context_path: Path,
+    cluster_id: str,
+    bundle_path: Path,
+    output_dir: Path,
+) -> dict:
+    """Construct system and user prompts for a given route+cluster.
+
+    Returns a dict with keys: system_prompt, user_prompt, stepwise_turns (or None).
+    """
+    # Build a pseudo cluster_to_bundle_path_map for the existing utility
+    cluster_to_bundle_map = {str(cluster_id): bundle_path}
+
+    system_prompt = make_cluster_analysis_system_prompt(
+        screen_name=screen_name,
+        screen_context_path=screen_context_path,
+        mode=route.mode,
+        mcp=route.mcp,
+        output_dir=output_dir / "prompts_used",
+    )
+
+    user_prompt = make_single_cluster_analysis_user_prompt(
+        cluster_id, screen_name, cluster_to_bundle_map
+    )
+
+    stepwise_turns = None
+    if route.delivery == "multi_turn":
+        stepwise_turns = compose_stepwise_user_turns(route.mcp)
+
+    return {
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "stepwise_turns": stepwise_turns,
+    }
+
+
+# =============================================================================
+# SINGLE RUN EXECUTION
+# =============================================================================
+
+
+def execute_single_run(
+    route: Route,
+    screen_name: str,
+    cluster_id: str,
+    bundle_path: Path,
+    screen_context_path: Path,
+    replicate: int,
+    config: BenchmarkConfig,
+    client,
+    output_dir: Path,
+) -> dict:
+    """Execute a single benchmark run and return the full record."""
+    run_id = _build_run_id(config.experiment_id, route.name, screen_name, cluster_id, replicate)
+
+    # Construct prompts
+    prompts = construct_prompts(
+        route=route,
+        screen_name=screen_name,
+        screen_context_path=screen_context_path,
+        cluster_id=cluster_id,
+        bundle_path=bundle_path,
+        output_dir=output_dir,
+    )
+    system_prompt = prompts["system_prompt"]
+    user_prompt = prompts["user_prompt"]
+    stepwise_turns = prompts["stepwise_turns"]
+
+    system_prompt_hash = _sha256(system_prompt)
+    user_prompt_hash = _sha256(user_prompt)
+
+    # Load bundle genes for metrics
+    bundle_genes = _load_bundle_genes(bundle_path)
+
+    # Execute or mock
+    parsed = None
+    raw_outputs = {}
+    error = None
+
+    if config.run.dry_run:
+        parsed = generate_mock_parsed_output(cluster_id, bundle_genes, route)
+        raw_outputs = generate_mock_raw_outputs(route)
+    else:
+        try:
+            parsed, raw_outputs = client.analyze(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                mode=route.mode,
+                mcp=route.mcp,
+            )
+            error = raw_outputs.get("error")
+        except Exception as e:
+            error = f"{type(e).__name__}: {e}"
+            raw_outputs = {
+                "response_text": "",
+                "tool_calls": [],
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "elapsed_s": 0.0,
+                "cost_usd": 0.0,
+                "pricing_warning": None,
+                "schema_warnings": [],
+                "error": error,
+                "steps": [],
+            }
+
+    # Compute metrics
+    metrics = compute_all_metrics(
+        parsed=parsed,
+        raw_outputs=raw_outputs,
+        cluster_id=cluster_id,
+        bundle_genes=bundle_genes,
+        mcp_enabled=route.mcp,
+    )
+
+    # Build record
+    record = {
+        "run_id": run_id,
+        "experiment_id": config.experiment_id,
+        "route": route.name,
+        "mode": route.mode,
+        "mcp": route.mcp,
+        "delivery": route.delivery,
+        "screen_name": screen_name,
+        "cluster_id": cluster_id,
+        "replicate": replicate,
+        "model_name": config.model.model_name,
+        "temperature": config.model.temperature,
+        "system_prompt_hash": system_prompt_hash,
+        "user_prompt_hash": user_prompt_hash,
+        "evidence_bundle_path": str(bundle_path),
+        "screen_context_path": str(screen_context_path),
+        "parsed_output": parsed,
+        "metrics": metrics,
+        "trace_path": str(output_dir / "traces" / f"{run_id}.json"),
+        "latency_seconds": raw_outputs.get("elapsed_s", 0.0),
+        "input_tokens": raw_outputs.get("input_tokens"),
+        "output_tokens": raw_outputs.get("output_tokens"),
+        "total_tokens": (raw_outputs.get("input_tokens", 0) or 0) + (raw_outputs.get("output_tokens", 0) or 0),
+        "estimated_cost_usd": raw_outputs.get("cost_usd"),
+        "schema_warnings": raw_outputs.get("schema_warnings", []),
+        "mcp_tool_calls": raw_outputs.get("tool_calls", []),
+        "error": error,
+    }
+
+    # Save outputs
+    _save_run_artifacts(
+        record=record,
+        prompts=prompts,
+        raw_outputs=raw_outputs,
+        parsed=parsed,
+        route=route,
+        config=config,
+        output_dir=output_dir,
+    )
+
+    return record
+
+
+def _save_run_artifacts(
+    record: dict,
+    prompts: dict,
+    raw_outputs: dict,
+    parsed: dict | None,
+    route: Route,
+    config: BenchmarkConfig,
+    output_dir: Path,
+) -> None:
+    """Persist all per-run artifacts to JSONL files and trace."""
+    run_id = record["run_id"]
+
+    # Prompts
+    if config.run.save_prompts:
+        prompt_record = {
+            "run_id": run_id,
+            "route": route.name,
+            "screen_name": record["screen_name"],
+            "cluster_id": record["cluster_id"],
+            "replicate": record["replicate"],
+            "mode": route.mode,
+            "mcp": route.mcp,
+            "delivery": route.delivery,
+            "system_prompt": prompts["system_prompt"],
+            "user_prompt": prompts["user_prompt"],
+            "stepwise_turns": (
+                [
+                    {"step_index": i + 1, "component": t["content"][:50], "mcp": t["mcp"], "content": t["content"]}
+                    for i, t in enumerate(prompts["stepwise_turns"])
+                ]
+                if prompts["stepwise_turns"]
+                else None
+            ),
+            "system_prompt_hash": record["system_prompt_hash"],
+            "user_prompt_hash": record["user_prompt_hash"],
+        }
+        _append_jsonl(output_dir / "prompts.jsonl", prompt_record)
+
+    # Raw outputs
+    if config.run.save_raw_outputs:
+        raw_record = {
+            "run_id": run_id,
+            "route": route.name,
+            "raw_output": raw_outputs.get("response_text", ""),
+            "tool_calls": raw_outputs.get("tool_calls", []),
+            "steps": raw_outputs.get("steps", []),
+            "error": raw_outputs.get("error"),
+        }
+        _append_jsonl(output_dir / "raw_outputs.jsonl", raw_record)
+
+    # Parsed outputs
+    if config.run.save_parsed_outputs:
+        parsed_record = {
+            "run_id": run_id,
+            "route": route.name,
+            "parsed_output": parsed,
+        }
+        _append_jsonl(output_dir / "parsed_outputs.jsonl", parsed_record)
+
+    # Metrics
+    metrics_record = {"run_id": run_id, "route": route.name, **record["metrics"]}
+    _append_jsonl(output_dir / "metrics.jsonl", metrics_record)
+
+    # Trace
+    if config.run.save_traces:
+        trace_dir = output_dir / "traces"
+        trace_dir.mkdir(parents=True, exist_ok=True)
+        trace_data = {
+            "run_id": run_id,
+            "route": route.name,
+            "mode": route.mode,
+            "mcp": route.mcp,
+            "raw_response": raw_outputs.get("response_text", ""),
+            "parsed_output": parsed,
+            "tokens": {
+                "input": raw_outputs.get("input_tokens"),
+                "output": raw_outputs.get("output_tokens"),
+            },
+            "cost": raw_outputs.get("cost_usd", 0.0),
+            "error": raw_outputs.get("error"),
+        }
+        if route.delivery == "multi_turn":
+            trace_data["steps"] = raw_outputs.get("steps", [])
+            trace_data["final_parsed_output"] = parsed
+        (trace_dir / f"{run_id}.json").write_text(
+            json.dumps(trace_data, indent=2, default=str), encoding="utf-8"
+        )
+
+
+# =============================================================================
+# MAIN ORCHESTRATION
+# =============================================================================
+
+
+def run_benchmark(config: BenchmarkConfig) -> list[dict]:
+    """Main benchmark loop. Returns list of all run records."""
+    output_dir = config.experiment_output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save config snapshot
+    config_snapshot = {
+        "experiment_id": config.experiment_id,
+        "model": asdict(config.model),
+        "run": asdict(config.run),
+        "routes_include": config.routes_include,
+        "screens_include": config.screens_include,
+        "clusters_include": (
+            config.clusters_include
+            if config.clusters_include == "all"
+            else [asdict(c) for c in config.clusters_include]
+        ),
+        "mcp": asdict(config.mcp),
+        "evaluation": asdict(config.evaluation),
+        "paths": {k: str(v) for k, v in asdict(config.paths).items()},
+    }
+    (output_dir / "config_snapshot.yaml").write_text(
+        json.dumps(config_snapshot, indent=2, default=str), encoding="utf-8"
+    )
+
+    # Load benchmark data
+    print(f"Loading benchmark clusters from: {config.paths.benchmark_clusters_csv}")
+    clusters_df = _load_benchmark_clusters(config.paths.benchmark_clusters_csv)
+    cluster_pairs = _filter_clusters(clusters_df, config)
+    print(f"  {len(cluster_pairs)} (screen, cluster) pairs after filtering.")
+
+    # Build routes
+    routes = build_routes_from_config(config.routes_include)
+    print(f"  {len(routes)} routes: {[r.name for r in routes]}")
+
+    # MCP preflight
+    mcp_routes = [r for r in routes if r.mcp]
+    mcp_available = True
+    if mcp_routes and config.mcp.preflight and not config.run.dry_run:
+        print("  MCP preflight check...", end=" ")
+        available_servers = get_available_mcp_servers()
+        if "pubmed" not in available_servers:
+            print("FAILED (PubMed unavailable)")
+            if config.mcp.fail_if_unavailable:
+                raise RuntimeError("PubMed MCP server unavailable and fail_if_unavailable=True")
+            print("  WARNING: MCP routes will be skipped.")
+            mcp_available = False
+        else:
+            print("OK")
+
+    # Initialize LLM client (unless dry-run)
+    client = None
+    if not config.run.dry_run:
+        api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        client = create_client(model=config.model.model_name, api_key=api_key)
+        print(f"  Client: {type(client).__name__} ({config.model.model_name})")
+
+    # Main loop
+    total_runs = len(routes) * len(cluster_pairs) * config.run.num_replicates
+    print(f"\nStarting benchmark: {total_runs} total runs")
+    print(f"  Output: {output_dir}\n")
+
+    all_records = []
+    run_counter = 0
+
+    for route in routes:
+        # Skip MCP routes if preflight failed
+        if route.mcp and not mcp_available and not config.run.dry_run:
+            print(f"  [SKIP] Route {route.name} — MCP unavailable")
+            continue
+
+        for screen_name, cluster_id in cluster_pairs:
+            # Resolve paths
+            bundle_path = _resolve_bundle_path(
+                config.paths.evidence_bundles_dir, screen_name, cluster_id
+            )
+            if bundle_path is None:
+                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} — bundle not found")
+                continue
+
+            screen_context_path = _resolve_screen_context_path(
+                config.paths.benchmark_inputs_dir, screen_name
+            )
+            if screen_context_path is None:
+                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} — screen context not found")
+                continue
+
+            for rep in range(1, config.run.num_replicates + 1):
+                run_counter += 1
+                run_id = _build_run_id(config.experiment_id, route.name, screen_name, cluster_id, rep)
+                print(f"  [{run_counter}/{total_runs}] {run_id}", end=" ")
+
+                try:
+                    record = execute_single_run(
+                        route=route,
+                        screen_name=screen_name,
+                        cluster_id=cluster_id,
+                        bundle_path=bundle_path,
+                        screen_context_path=screen_context_path,
+                        replicate=rep,
+                        config=config,
+                        client=client,
+                        output_dir=output_dir,
+                    )
+                    all_records.append(record)
+
+                    if record.get("error"):
+                        print(f"ERROR: {record['error'][:80]}")
+                    else:
+                        latency = record.get("latency_seconds", 0)
+                        cost = record.get("estimated_cost_usd", 0) or 0
+                        print(f"OK ({latency:.1f}s, ${cost:.4f})")
+
+                except Exception as e:
+                    print(f"EXCEPTION: {e}")
+                    if not config.run.continue_on_error:
+                        raise
+
+    # Save run manifest
+    manifest = {
+        "experiment_id": config.experiment_id,
+        "timestamp": datetime.now().isoformat(),
+        "total_runs": len(all_records),
+        "routes_executed": list({r["route"] for r in all_records}),
+        "screens_executed": list({r["screen_name"] for r in all_records}),
+        "clusters_executed": list({(r["screen_name"], r["cluster_id"]) for r in all_records}),
+        "errors": sum(1 for r in all_records if r.get("error")),
+    }
+    (output_dir / "run_manifest.json").write_text(
+        json.dumps(manifest, indent=2, default=str), encoding="utf-8"
+    )
+
+    # Generate report
+    print(f"\nGenerating report...")
+    report_path = generate_report(all_records, config_snapshot, output_dir)
+    print(f"  Report: {report_path}")
+    print(f"  Done. {len(all_records)} runs completed, {manifest['errors']} errors.")
+
+    return all_records
+
+
+# =============================================================================
+# CLI
+# =============================================================================
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Architecture benchmark runner for LLM Analysis."
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to YAML config file.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=None,
+        help="Override config to enable dry-run mode.",
+    )
+    args = parser.parse_args()
+
+    config = load_config(args.config)
+    if args.dry_run:
+        config.run.dry_run = True
+
+    run_benchmark(config)
+
+
+if __name__ == "__main__":
+    main()

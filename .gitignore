@@ -46,6 +46,7 @@ debug/
 # Results and data (optional, comment out if you want to track these)
 results/
 output/
+tests/phase1_prompt_benchmarking/benchmarking_outputs
 
 # Benchmark results in examples/
 examples/ops/results/
