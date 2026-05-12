@@ -1,3 +1,6 @@
 [submodule "interface/output"]
 	path = interface/output
 	url = https://github.com/cheeseman-lab/MLLM-Interface-Outputs.git
+[submodule "tests/phase1_prompt_benchmarking/benchmarking_outputs"]
+	path = tests/phase1_prompt_benchmarking/benchmarking_outputs
+	url = https://github.com/cheeseman-lab/MLLM-Analysis-Benchmarking-Outputs2.git
