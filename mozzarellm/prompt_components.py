@@ -61,7 +61,7 @@ BOUNDARY RULES (apply in order):
 - Otherwise → NOVEL_ROLE
 
 STEP B — CLASSIFY: For NOVEL_ROLE and UNCHARACTERIZED genes, assign a sub-class
-(see classification rules below) and a priority score (1-10).
+(see classification rules below).
 """
 
 NOVEL_CLASSIFICATION_RULES = """
@@ -72,8 +72,7 @@ Sub-classes for NOVEL_ROLE genes (genes with established functions in OTHER path
   PARTIAL_EVIDENCE: Preliminary data (e.g., proteomics hit, co-expression) suggests a link to this pathway, but no focused mechanistic study. If a focused study exists, recategorize as ESTABLISHED.
   CONTRADICTORY_EVIDENCE: The gene's known function is incompatible with this pathway.
 
-Assign exactly one sub-class per gene. Then assign a priority score (1-10) for follow-up,
-considering sub-class, evidence quality, pathway relevance, and experimental tractability.
+Assign exactly one sub-class per gene.
 """
 
 UNCHARACTERIZED_CLASSIFICATION_RULES = """
@@ -84,8 +83,7 @@ Sub-classes for UNCHARACTERIZED genes (no focused study of molecular function in
   ANNOTATED_ONLY: Has a gene name and domain/motif annotations, but no mechanistic study.
   NON_HUMAN_CHARACTERIZED: Functionally studied in a non-human organism only.
 
-Assign exactly one sub-class per gene. Then assign a priority score (1-10) for follow-up,
-considering sub-class, evidence quality, pathway relevance, and experimental tractability.
+Assign exactly one sub-class per gene.
 """
 
 # =============================================================================
@@ -281,8 +279,8 @@ STEPS_DEFAULT_MCP = [
 #   CAT  = Cluster Analysis Task  (always present)
 #   SC   = Screen Context         (always present, injected per-case — NOT in registry)
 #   GCR  = Gene Categorization Rules
-#   NPR  = Novel Prioritization Rules
-#   UPR  = Uncharacterized Prioritization Rules
+#   NPR  = Novel Classification Rules
+#   UPR  = Uncharacterized Classification Rules
 #   PCC  = Pathway Confidence Criteria
 #   O    = Output format (JSON)
 #
@@ -290,7 +288,7 @@ STEPS_DEFAULT_MCP = [
 #   cPH  = Pathway Hypothesis step
 #   cPSC = Pathway Selection & Confidence step (references PCC)
 #   cGCR = Gene Categorization step            (references GCR)
-#   cPri = Sub-classification / Prioritization (references NPR & UPR)
+#   cPri = Sub-classification (references NPR & UPR)
 #   cVer = Verification step
 #   cO   = Final JSON Output step              (references O)
 #
