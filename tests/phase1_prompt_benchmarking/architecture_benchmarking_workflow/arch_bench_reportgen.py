@@ -154,8 +154,11 @@ def _build_report_markdown(
     lines.append(f"**Experiment:** `{config_dict.get('experiment_id', 'unknown')}`")
     lines.append(f"**Model:** `{config_dict.get('model', {}).get('model_name', 'unknown')}`")
     lines.append(f"**Replicates:** {config_dict.get('run', {}).get('num_replicates', '?')}")
-    lines.append(f"**Total runs:** {len(records)}")
+    lines.append(f"**Total LLM Analysis Runs:** {len(records)}")
     lines.append(f"**Dry run:** {config_dict.get('run', {}).get('dry_run', False)}")
+    lines.append("")
+    lines.append("> **Note:** Total LLM Analysis Runs = routes \u00d7 clusters \u00d7 replicates. ")
+    lines.append("> Per-screen totals follow the same formula scoped to that screen's clusters.")
     lines.append("")
 
     # Summary table
@@ -274,7 +277,7 @@ def _build_report_markdown(
     for screen_name, screen_records in sorted(by_screen.items()):
         lines.append(f"### {screen_name}")
         lines.append(f"- Clusters: {len(set(r['cluster_id'] for r in screen_records))}")
-        lines.append(f"- Total runs: {len(screen_records)}")
+        lines.append(f"- Total LLM Analysis Runs: {len(screen_records)}")
         errors = [r for r in screen_records if r.get("error")]
         lines.append(f"- Errors: {len(errors)}")
         lines.append("")

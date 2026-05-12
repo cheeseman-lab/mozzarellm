@@ -610,7 +610,7 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
     print(f"\nGenerating report...")
     report_path = generate_report(all_records, config_snapshot, output_dir)
     print(f"  Report: {report_path}")
-    print(f"  Done. {len(all_records)} runs completed, {manifest['errors']} errors.")
+    print(f"  Done. {len(all_records)} analysis runs completed, {manifest['errors']} errors.")
 
     return all_records
 
