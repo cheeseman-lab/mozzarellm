@@ -42,7 +42,7 @@ from mozzarellm.utils.prompt_factory import (
 )
 from mozzarellm.utils.trace import save_trace
 
-from .arch_bench_configparse import BenchmarkConfig, load_config
+from .arch_bench_configparse import BenchmarkConfig, TimingConfig, load_config
 from .arch_bench_dry_run import (
     generate_mock_parsed_output,
     generate_mock_raw_outputs,
@@ -169,6 +169,68 @@ def construct_prompts(
 # =============================================================================
 
 
+def _build_timing_dict(
+    route: Route,
+    t_prompt: float | None,
+    t_model: float | None,
+    t_metrics: float | None,
+    t_io: float | None,
+    t_full_run: float | None,
+    raw_outputs: dict,
+    timing_cfg: TimingConfig | None = None,
+) -> dict:
+    """Assemble the per-run timing dict, respecting TimingConfig flags."""
+    if timing_cfg is None:
+        timing_cfg = TimingConfig()
+
+    n_api_calls = 1
+    step_latencies = None
+    slowest_step = None
+    mcp_tool_latency = None
+
+    steps = raw_outputs.get("steps", [])
+    if timing_cfg.track_step_latencies and route.delivery == "multi_turn" and steps:
+        n_api_calls = len(steps)
+        step_latencies = []
+        max_lat, max_comp = 0.0, None
+        for i, s in enumerate(steps):
+            lat = s.get("elapsed_s", s.get("latency_seconds", 0.0)) or 0.0
+            comp = s.get("component", f"step_{i+1}")
+            step_latencies.append({
+                "step_index": i + 1,
+                "component": comp,
+                "mcp": bool(s.get("mcp", False)),
+                "latency_seconds": lat,
+            })
+            if lat > max_lat:
+                max_lat, max_comp = lat, comp
+        slowest_step = max_comp
+    elif route.delivery == "multi_turn" and steps:
+        n_api_calls = len(steps)
+
+    # MCP tool-level latency (sum of tool call durations if available)
+    if timing_cfg.track_mcp_tool_latency:
+        tool_calls = raw_outputs.get("tool_calls", [])
+        if route.mcp and tool_calls:
+            mcp_tool_latency = sum(
+                tc.get("latency_seconds", 0.0) for tc in tool_calls if isinstance(tc, dict)
+            ) or None
+
+    return {
+        "full_run_time_seconds": t_full_run if timing_cfg.track_full_run else None,
+        "prompt_construction_seconds": t_prompt if timing_cfg.track_prompt_construction else None,
+        "model_latency_seconds": t_model if timing_cfg.track_model_latency else None,
+        "parse_time_seconds": None,  # parse is inside client.analyze; not separately measurable
+        "metrics_time_seconds": t_metrics if timing_cfg.track_metrics else None,
+        "io_write_time_seconds": t_io if timing_cfg.track_io else None,
+        "mcp_preflight_seconds": None,  # measured once at benchmark level, not per-run
+        "mcp_tool_latency_seconds": mcp_tool_latency,
+        "n_api_calls": n_api_calls,
+        "step_latencies_seconds": step_latencies,
+        "slowest_step_component": slowest_step,
+    }
+
+
 def execute_single_run(
     route: Route,
     screen_name: str,
@@ -181,9 +243,11 @@ def execute_single_run(
     output_dir: Path,
 ) -> dict:
     """Execute a single benchmark run and return the full record."""
+    t_run_start = time.perf_counter()
     run_id = _build_run_id(config.experiment_id, route.name, screen_name, cluster_id, replicate)
 
-    # Construct prompts
+    # --- Prompt construction ---
+    t0 = time.perf_counter()
     prompts = construct_prompts(
         route=route,
         screen_name=screen_name,
@@ -195,6 +259,7 @@ def execute_single_run(
     system_prompt = prompts["system_prompt"]
     user_prompt = prompts["user_prompt"]
     stepwise_turns = prompts["stepwise_turns"]
+    t_prompt = time.perf_counter() - t0
 
     system_prompt_hash = _sha256(system_prompt)
     user_prompt_hash = _sha256(user_prompt)
@@ -202,11 +267,12 @@ def execute_single_run(
     # Load bundle genes for metrics
     bundle_genes = _load_bundle_genes(bundle_path)
 
-    # Execute or mock
+    # --- Model execution ---
     parsed = None
     raw_outputs = {}
     error = None
 
+    t0 = time.perf_counter()
     if config.run.dry_run:
         parsed = generate_mock_parsed_output(cluster_id, bundle_genes, route)
         raw_outputs = generate_mock_raw_outputs(route)
@@ -233,14 +299,30 @@ def execute_single_run(
                 "error": error,
                 "steps": [],
             }
+    t_model = time.perf_counter() - t0
 
-    # Compute metrics
+    # --- Metrics computation ---
+    t0 = time.perf_counter()
     metrics = compute_all_metrics(
         parsed=parsed,
         raw_outputs=raw_outputs,
         cluster_id=cluster_id,
         bundle_genes=bundle_genes,
         mcp_enabled=route.mcp,
+    )
+    t_metrics = time.perf_counter() - t0
+
+    # --- Build timing ---
+    # (IO time filled in after _save_run_artifacts)
+    timing = _build_timing_dict(
+        route=route,
+        t_prompt=t_prompt,
+        t_model=t_model,
+        t_metrics=t_metrics,
+        t_io=0.0,  # placeholder, updated below
+        t_full_run=0.0,  # placeholder, updated below
+        raw_outputs=raw_outputs,
+        timing_cfg=config.timing,
     )
 
     # Build record
@@ -262,6 +344,7 @@ def execute_single_run(
         "screen_context_path": str(screen_context_path),
         "parsed_output": parsed,
         "metrics": metrics,
+        "timing": timing,
         "trace_path": str(output_dir / "traces" / f"{run_id}.json"),
         "latency_seconds": raw_outputs.get("elapsed_s", 0.0),
         "input_tokens": raw_outputs.get("input_tokens"),
@@ -273,7 +356,8 @@ def execute_single_run(
         "error": error,
     }
 
-    # Save outputs
+    # --- IO writes ---
+    t0 = time.perf_counter()
     _save_run_artifacts(
         record=record,
         prompts=prompts,
@@ -283,6 +367,12 @@ def execute_single_run(
         config=config,
         output_dir=output_dir,
     )
+    t_io = time.perf_counter() - t0
+
+    # Finalize timing
+    t_full_run = time.perf_counter() - t_run_start
+    timing["io_write_time_seconds"] = t_io
+    timing["full_run_time_seconds"] = t_full_run
 
     return record
 
@@ -366,6 +456,7 @@ def _save_run_artifacts(
                 "output": raw_outputs.get("output_tokens"),
             },
             "cost": raw_outputs.get("cost_usd", 0.0),
+            "timing": record.get("timing", {}),
             "error": raw_outputs.get("error"),
         }
         if route.delivery == "multi_turn":
@@ -400,6 +491,7 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
         ),
         "mcp": asdict(config.mcp),
         "evaluation": asdict(config.evaluation),
+        "timing": asdict(config.timing),
         "paths": {k: str(v) for k, v in asdict(config.paths).items()},
     }
     (output_dir / "config_snapshot.yaml").write_text(
@@ -490,9 +582,10 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
                     if record.get("error"):
                         print(f"ERROR: {record['error'][:80]}")
                     else:
-                        latency = record.get("latency_seconds", 0)
+                        full_t = record.get("timing", {}).get("full_run_time_seconds", 0)
+                        model_lat = record.get("timing", {}).get("model_latency_seconds", 0)
                         cost = record.get("estimated_cost_usd", 0) or 0
-                        print(f"OK ({latency:.1f}s, ${cost:.4f})")
+                        print(f"OK (full={full_t:.1f}s, model={model_lat:.1f}s, ${cost:.4f})")
 
                 except Exception as e:
                     print(f"EXCEPTION: {e}")

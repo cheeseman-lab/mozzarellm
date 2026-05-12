@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import json
+import statistics
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -74,7 +75,22 @@ def _summarize_route(records: list[dict]) -> dict[str, Any]:
 
     errors = [r for r in records if r.get("error")]
 
-    return {
+    # Timing aggregates
+    timing_list = [r.get("timing", {}) for r in records]
+
+    def _timing_vals(key):
+        return [t.get(key) for t in timing_list if t.get(key) is not None]
+
+    full_run_times = _timing_vals("full_run_time_seconds")
+    model_lats = _timing_vals("model_latency_seconds")
+    n_calls_vals = _timing_vals("n_api_calls")
+
+    # Derived: seconds per schema-compliant / gene-complete output
+    schema_ok_count = sum(1 for m in metrics_list if m.get("schema_compliance"))
+    gene_ok_count = sum(1 for m in metrics_list if (m.get("gene_completeness") or 0) >= 1.0)
+    total_full = sum(full_run_times) if full_run_times else 0
+
+    summary = {
         "n_runs": n,
         "n_errors": len(errors),
         "error_rate": len(errors) / n,
@@ -93,7 +109,23 @@ def _summarize_route(records: list[dict]) -> dict[str, Any]:
         "total_cost_usd": sum(
             m.get("estimated_cost_usd", 0) or 0 for m in metrics_list
         ),
+        # Timing
+        "mean_full_run_time_seconds": statistics.mean(full_run_times) if full_run_times else None,
+        "median_full_run_time_seconds": statistics.median(full_run_times) if full_run_times else None,
+        "p95_full_run_time_seconds": (
+            sorted(full_run_times)[int(len(full_run_times) * 0.95)] if len(full_run_times) >= 2 else
+            (full_run_times[0] if full_run_times else None)
+        ),
+        "mean_model_latency_seconds": statistics.mean(model_lats) if model_lats else None,
+        "mean_n_api_calls": statistics.mean(n_calls_vals) if n_calls_vals else None,
+        "seconds_per_schema_compliant_output": (
+            total_full / schema_ok_count if schema_ok_count else None
+        ),
+        "seconds_per_gene_complete_output": (
+            total_full / gene_ok_count if gene_ok_count else None
+        ),
     }
+    return summary
 
 
 def _write_aggregate_csv(route_summaries: dict, path: Path) -> None:
@@ -184,6 +216,53 @@ def _build_report_markdown(
             f"| {_fmt(s.get('total_cost_usd'), '.4f')} |"
         )
     lines.append("")
+
+    # Timing
+    lines.append("## Timing")
+    lines.append("")
+    lines.append(
+        "| Route | Full Run (mean) | Full Run (med) | Full Run (p95) | Model (mean) "
+        "| API Calls | s/schema OK | s/gene OK |"
+    )
+    lines.append(
+        "|-------|-----------------|----------------|----------------|------------- "
+        "|-----------|-------------|-----------|"
+    )
+    for route_name, s in sorted(route_summaries.items()):
+        lines.append(
+            f"| {route_name} "
+            f"| {_fmt(s.get('mean_full_run_time_seconds'), '.1f')} "
+            f"| {_fmt(s.get('median_full_run_time_seconds'), '.1f')} "
+            f"| {_fmt(s.get('p95_full_run_time_seconds'), '.1f')} "
+            f"| {_fmt(s.get('mean_model_latency_seconds'), '.1f')} "
+            f"| {_fmt(s.get('mean_n_api_calls'), '.1f')} "
+            f"| {_fmt(s.get('seconds_per_schema_compliant_output'), '.1f')} "
+            f"| {_fmt(s.get('seconds_per_gene_complete_output'), '.1f')} |"
+        )
+    lines.append("")
+
+    # Overhead comparison
+    _route_full = {rn: s.get("mean_full_run_time_seconds") for rn, s in route_summaries.items()}
+    baseline_full = _route_full.get("3a")
+    if baseline_full is not None:
+        lines.append("### Overhead vs Baseline (3a)")
+        lines.append("")
+        lines.append("| Route | Mean Full Run (s) | Overhead (s) | Overhead (%) |")
+        lines.append("|-------|-------------------|-------------|-------------|")
+        for route_name in sorted(route_summaries.keys()):
+            w = _route_full.get(route_name)
+            if w is not None:
+                delta = w - baseline_full
+                pct = (delta / baseline_full * 100) if baseline_full > 0 else 0
+                lines.append(
+                    f"| {route_name} "
+                    f"| {w:.1f} "
+                    f"| {'+' if delta >= 0 else ''}{delta:.1f} "
+                    f"| {'+' if pct >= 0 else ''}{pct:.0f}% |"
+                )
+            else:
+                lines.append(f"| {route_name} | — | — | — |")
+        lines.append("")
 
     # Per-screen breakdown
     lines.append("## Per-Screen Breakdown")

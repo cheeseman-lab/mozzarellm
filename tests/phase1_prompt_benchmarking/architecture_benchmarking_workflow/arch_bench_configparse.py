@@ -52,6 +52,17 @@ class EvaluationConfig:
 
 
 @dataclass
+class TimingConfig:
+    track_full_run: bool = True
+    track_prompt_construction: bool = True
+    track_model_latency: bool = True
+    track_metrics: bool = True
+    track_io: bool = True
+    track_step_latencies: bool = True
+    track_mcp_tool_latency: bool = True
+
+
+@dataclass
 class ClusterFilter:
     screen_name: str
     cluster_id: str
@@ -72,6 +83,7 @@ class BenchmarkConfig:
     clusters_include: list[ClusterFilter] | str = "all"
     mcp: McpConfig = field(default_factory=McpConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
+    timing: TimingConfig = field(default_factory=TimingConfig)
 
     @property
     def experiment_output_dir(self) -> Path:
@@ -179,6 +191,19 @@ def load_config(config_path: Path) -> BenchmarkConfig:
             logical_consistency=ev.get("logical_consistency", cfg.evaluation.logical_consistency),
             efficiency=ev.get("efficiency", cfg.evaluation.efficiency),
             robustness=ev.get("robustness", cfg.evaluation.robustness),
+        )
+
+    # Timing
+    if "timing" in raw:
+        tm = raw["timing"]
+        cfg.timing = TimingConfig(
+            track_full_run=tm.get("track_full_run", cfg.timing.track_full_run),
+            track_prompt_construction=tm.get("track_prompt_construction", cfg.timing.track_prompt_construction),
+            track_model_latency=tm.get("track_model_latency", cfg.timing.track_model_latency),
+            track_metrics=tm.get("track_metrics", cfg.timing.track_metrics),
+            track_io=tm.get("track_io", cfg.timing.track_io),
+            track_step_latencies=tm.get("track_step_latencies", cfg.timing.track_step_latencies),
+            track_mcp_tool_latency=tm.get("track_mcp_tool_latency", cfg.timing.track_mcp_tool_latency),
         )
 
     return cfg

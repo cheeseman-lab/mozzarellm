@@ -1,7 +1,7 @@
-# Architecture Benchmark Configuration
-# Tests LLM Analysis across all six prompt-delivery routes.
+# Dry-run test config — validates benchmark infrastructure without API calls.
+# Runs 2 routes on 1 screen (denali) with 1 replicate.
 
-experiment_id: arch_bench_v1
+experiment_id: arch_bench_dry_test
 
 paths:
   benchmark_inputs_dir: benchmark_inputs
@@ -14,12 +14,10 @@ model:
   model_name: claude-sonnet-4-5
   temperature: 0.2
   max_tokens: 4000
-  top_p: null
-  top_k: null
 
 run:
-  num_replicates: 3
-  dry_run: false
+  num_replicates: 1
+  dry_run: true
   continue_on_error: true
   save_prompts: true
   save_raw_outputs: true
@@ -29,20 +27,17 @@ run:
 routes:
   include:
     - 3a
-    - 3a_mcp
     - 3b
-    - 3b_mcp
-    - 3c
-    - 3c_mcp
 
 screens:
-  include: all
+  include:
+    - denali
 
 clusters:
   include: all
 
 mcp:
-  preflight: true
+  preflight: false
   fail_if_unavailable: false
 
 evaluation:

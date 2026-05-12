@@ -1,7 +1,6 @@
-# Architecture Benchmark Configuration
-# Tests LLM Analysis across all six prompt-delivery routes.
+# Live run — denali screen only, all 6 routes, 3 replicates.
 
-experiment_id: arch_bench_v1
+experiment_id: arch_bench_denali_live
 
 paths:
   benchmark_inputs_dir: benchmark_inputs
@@ -14,11 +13,9 @@ model:
   model_name: claude-sonnet-4-5
   temperature: 0.2
   max_tokens: 4000
-  top_p: null
-  top_k: null
 
 run:
-  num_replicates: 3
+  num_replicates: 1
   dry_run: false
   continue_on_error: true
   save_prompts: true
@@ -36,7 +33,8 @@ routes:
     - 3c_mcp
 
 screens:
-  include: all
+  include:
+    - denali
 
 clusters:
   include: all
