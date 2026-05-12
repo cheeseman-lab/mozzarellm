@@ -30,6 +30,7 @@ class PathsConfig:
 class RunConfig:
     num_replicates: int = 3
     dry_run: bool = False
+    workflow_testing: bool = False
     continue_on_error: bool = True
     save_prompts: bool = True
     save_raw_outputs: bool = True
@@ -87,7 +88,10 @@ class BenchmarkConfig:
 
     @property
     def experiment_output_dir(self) -> Path:
-        return self.paths.output_dir / self.experiment_id
+        base = self.paths.output_dir
+        if self.run.workflow_testing:
+            base = base / "_workflow_testing"
+        return base / self.experiment_id
 
 
 def _resolve_paths(paths_dict: dict[str, Any], base_dir: Path) -> dict[str, Any]:
@@ -146,6 +150,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
         cfg.run = RunConfig(
             num_replicates=r.get("num_replicates", cfg.run.num_replicates),
             dry_run=r.get("dry_run", cfg.run.dry_run),
+            workflow_testing=r.get("workflow_testing", cfg.run.workflow_testing),
             continue_on_error=r.get("continue_on_error", cfg.run.continue_on_error),
             save_prompts=r.get("save_prompts", cfg.run.save_prompts),
             save_raw_outputs=r.get("save_raw_outputs", cfg.run.save_raw_outputs),
