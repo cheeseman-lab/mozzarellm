@@ -42,14 +42,14 @@ from mozzarellm.utils.prompt_factory import (
 )
 from mozzarellm.utils.trace import save_trace
 
-from .arch_bench_configparse import BenchmarkConfig, TimingConfig, load_config
-from .arch_bench_dry_run import (
+from .bench_configparse import BenchmarkConfig, TimingConfig, load_config
+from .bench_dry_run import (
     generate_mock_parsed_output,
     generate_mock_raw_outputs,
     _load_bundle_genes,
 )
-from .arch_bench_metricfns import compute_all_metrics
-from .arch_bench_reportgen import generate_report
+from .bench_metricfns import compute_all_metrics
+from .bench_reportgen import generate_report
 from .arch_bench_routes import Route, build_routes_from_config
 
 
