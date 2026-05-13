@@ -1,13 +1,14 @@
-# Dry-run test config -- validates benchmark infrastructure without API calls.
-# Runs 2 routes on 1 screen (denali) with 1 replicate.
+# Order Benchmark Dry-Run Test Configuration (Phase 2)
+# Uses mock outputs to validate the order benchmarking infrastructure
+# without making any LLM API calls.
 
-experiment_id: arch_bench_dry_test
+experiment_id: order_bench_dry_run_test
 
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
   evidence_bundles_dir: benchmark_evidence_bundles
-  output_dir: benchmarking_outputs/1.arch
+  output_dir: benchmarking_outputs/2.order
 
 model:
   provider: anthropic
@@ -26,10 +27,16 @@ run:
   save_parsed_outputs: true
   save_traces: true
 
-routes:
-  include:
-    - 3a
+# Order benchmarking (Phase 2)
+# When enabled, routes are built from base_routes × variants below.
+order_benchmark:
+  enabled: true
+  base_routes:
     - 3b
+  variants:
+    - canonical
+    - late_screen_context
+    - early_output_format
 
 screens:
   include:

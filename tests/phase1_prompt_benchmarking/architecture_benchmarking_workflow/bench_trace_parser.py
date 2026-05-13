@@ -36,7 +36,7 @@ from typing import Any
 # shorter variants to avoid ambiguity.
 TRACE_FILENAME_RE = re.compile(
     r"^(?P<experiment_id>.+?)__"
-    r"(?P<route>3a_mcp|3b_mcp|3c_mcp|3a|3b|3c)__"
+    r"(?P<route>3[abc](?:_mcp)?(?:_order_[a-z_]+)?)__"
     r"(?P<screen_name>.+?)__"
     r"cluster_(?P<cluster_id>.+?)__"
     r"rep_(?P<replicate>\d+)\.json$"
@@ -67,7 +67,7 @@ def parse_trace_filename(path: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Parsed-output → gene rows
+# Parsed-output -> gene rows
 # ---------------------------------------------------------------------------
 
 CSV_COLUMNS = [
@@ -84,6 +84,11 @@ CSV_COLUMNS = [
     "pathway",
     "pathway_confidence",
     "source_trace_path",
+    # Phase 2 order benchmarking metadata
+    "base_route",
+    "order_variant",
+    "order_hypothesis",
+    "component_order",
 ]
 
 
@@ -123,6 +128,10 @@ def _extract_gene_rows(
                 "pathway": pathway,
                 "pathway_confidence": pathway_confidence,
                 "source_trace_path": source_path,
+                "base_route": meta.get("base_route", ""),
+                "order_variant": meta.get("order_variant", ""),
+                "order_hypothesis": meta.get("order_hypothesis", ""),
+                "component_order": meta.get("component_order", ""),
             }
         )
 
@@ -143,6 +152,10 @@ def _extract_gene_rows(
                 "pathway": pathway,
                 "pathway_confidence": pathway_confidence,
                 "source_trace_path": source_path,
+                "base_route": meta.get("base_route", ""),
+                "order_variant": meta.get("order_variant", ""),
+                "order_hypothesis": meta.get("order_hypothesis", ""),
+                "component_order": meta.get("component_order", ""),
             }
         )
 
@@ -163,6 +176,10 @@ def _extract_gene_rows(
                 "pathway": pathway,
                 "pathway_confidence": pathway_confidence,
                 "source_trace_path": source_path,
+                "base_route": meta.get("base_route", ""),
+                "order_variant": meta.get("order_variant", ""),
+                "order_hypothesis": meta.get("order_hypothesis", ""),
+                "component_order": meta.get("component_order", ""),
             }
         )
 
@@ -193,7 +210,7 @@ def extract_predictions_from_traces(traces_dir: Path) -> dict[str, list[dict]]:
         try:
             trace_data = json.loads(trace_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as e:
-            parse_failures.append(f"{trace_path.name}: JSON read error — {e}")
+            parse_failures.append(f"{trace_path.name}: JSON read error -- {e}")
             continue
 
         # Resolve metadata: prefer JSON fields, fall back to filename-parsed values
@@ -206,6 +223,15 @@ def extract_predictions_from_traces(traces_dir: Path) -> dict[str, list[dict]]:
             or str(trace_data.get("parsed_output", {}).get("cluster_id", "")),
             "replicate": file_meta.get("replicate") or 1,
             "run_id": trace_data.get("run_id", trace_path.stem),
+            # Phase 2 order metadata (from trace JSON, empty for Phase 1)
+            "base_route": trace_data.get("base_route", ""),
+            "order_variant": trace_data.get("order_variant", ""),
+            "order_hypothesis": trace_data.get("order_hypothesis", ""),
+            "component_order": (
+                ",".join(trace_data["component_order"])
+                if isinstance(trace_data.get("component_order"), list)
+                else str(trace_data.get("component_order", ""))
+            ),
         }
 
         if not meta["route"]:
@@ -262,7 +288,7 @@ def write_prediction_csvs(
             writer.writerows(rows)
 
         written.append(out_path)
-        print(f"  [trace_parser] Wrote {len(rows)} gene rows → {out_path.name}")
+        print(f"  [trace_parser] Wrote {len(rows)} gene rows -> {out_path.name}")
 
     return written
 

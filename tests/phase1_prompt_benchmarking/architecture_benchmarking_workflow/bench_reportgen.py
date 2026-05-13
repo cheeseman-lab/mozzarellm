@@ -264,8 +264,13 @@ def _build_report_markdown(
                     f"| {'+' if pct >= 0 else ''}{pct:.0f}% |"
                 )
             else:
-                lines.append(f"| {route_name} | — | — | — |")
+                lines.append(f"| {route_name} | -- | -- | -- |")
         lines.append("")
+
+    # Order variant comparison (Phase 2)
+    order_records = [r for r in records if r.get("order_variant", "none") != "none"]
+    if order_records:
+        lines.extend(_build_order_variant_section(route_summaries, records))
 
     # Per-screen breakdown
     lines.append("## Per-Screen Breakdown")
@@ -298,15 +303,92 @@ def _build_report_markdown(
     return lines
 
 
+def _build_order_variant_section(
+    route_summaries: dict[str, dict],
+    records: list[dict],
+) -> list[str]:
+    """Build Markdown section comparing order variants (Phase 2)."""
+    lines: list[str] = []
+    lines.append("## Order Variant Comparison (Phase 2)")
+    lines.append("")
+
+    # Group records by (base_route, order_variant)
+    by_base_variant: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    for rec in records:
+        base = rec.get("base_route", rec.get("route", "unknown"))
+        variant = rec.get("order_variant", "none")
+        by_base_variant[base][variant].append(rec)
+
+    # Comparison table per base route
+    for base_route in sorted(by_base_variant.keys()):
+        variants = by_base_variant[base_route]
+        lines.append(f"### Base Route: {base_route}")
+        lines.append("")
+        lines.append(
+            "| Variant | Hypothesis | Runs | Parse% | Schema% | Gene Compl. | Latency (s) | Cost ($) |"
+        )
+        lines.append(
+            "|---------|-----------|------|--------|---------|-------------|-------------|----------|"
+        )
+
+        for variant_name in sorted(variants.keys()):
+            vrecs = variants[variant_name]
+            hypothesis = vrecs[0].get("order_hypothesis") or "--"
+            n = len(vrecs)
+            metrics_list = [r.get("metrics", {}) for r in vrecs]
+
+            def _rate(key):
+                vals = [m.get(key) for m in metrics_list if m.get(key) is not None]
+                return sum(1 for v in vals if v) / len(vals) if vals else None
+
+            def _mean(key):
+                vals = [m.get(key) for m in metrics_list if m.get(key) is not None]
+                return sum(vals) / len(vals) if vals else None
+
+            lines.append(
+                f"| {variant_name} "
+                f"| {hypothesis} "
+                f"| {n} "
+                f"| {_pct(_rate('json_parse_success'))} "
+                f"| {_pct(_rate('schema_compliance'))} "
+                f"| {_pct(_mean('gene_completeness'))} "
+                f"| {_fmt(_mean('latency_seconds'), '.1f')} "
+                f"| {_fmt(_mean('estimated_cost_usd'), '.4f')} |"
+            )
+        lines.append("")
+
+    # Hypothesis summary
+    lines.append("### Hypothesis Summary")
+    lines.append("")
+    hypotheses_seen: dict[str, str] = {}
+    for rec in records:
+        h = rec.get("order_hypothesis")
+        v = rec.get("order_variant", "none")
+        if h and h != "--" and h not in hypotheses_seen:
+            hypotheses_seen[h] = v
+
+    if hypotheses_seen:
+        lines.append("| Hypothesis | Variant | Interpretation |")
+        lines.append("|-----------|---------|----------------|")
+        for h, v in sorted(hypotheses_seen.items()):
+            lines.append(f"| {h} | {v} | _(compare canonical vs {v} above)_ |")
+        lines.append("")
+    else:
+        lines.append("_No hypothesis metadata found in records._")
+        lines.append("")
+
+    return lines
+
+
 def _pct(val: float | None) -> str:
     """Format a 0-1 rate as percentage string."""
     if val is None:
-        return "—"
+        return "--"
     return f"{val * 100:.0f}%"
 
 
 def _fmt(val: float | None, fmt: str) -> str:
     """Format a numeric value."""
     if val is None:
-        return "—"
+        return "--"
     return f"{val:{fmt}}"

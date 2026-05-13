@@ -1,4 +1,4 @@
-"""Architecture benchmark orchestrator — main loop and CLI entry point.
+"""Architecture benchmark orchestrator -- main loop and CLI entry point.
 
 Runs the LLM Analysis architecture benchmark across configured routes, clusters,
 and replicates. Produces JSONL outputs, traces, and a Markdown report.
@@ -51,6 +51,7 @@ from .bench_dry_run import (
 from .bench_metricfns import compute_all_metrics
 from .bench_reportgen import generate_report
 from .arch_bench_routes import Route, build_routes_from_config
+from .order_bench_orderings import build_order_benchmark_routes, compose_stepwise_turns_from_route
 
 
 # =============================================================================
@@ -142,21 +143,38 @@ def construct_prompts(
     # Build a pseudo cluster_to_bundle_path_map for the existing utility
     cluster_to_bundle_map = {str(cluster_id): bundle_path}
 
+    # Phase 2 order-variant routes use the flexible component_order assembly
+    # path. Phase 1 routes (order_variant == "") use the original mode-based
+    # default assembly to preserve backward compatibility exactly.
+    is_order_variant = bool(route.order_variant)
+
     # For 3a/3b routes: save system prompt once with stable filename, reuse on subsequent calls.
     # For 3c (stepwise) routes: build system prompt in memory only 
     # to save space, the multi-turn conversation is recorded in traces/prompts.jsonl only -- can extract later if needed.
     if route.delivery == "multi_turn":
-        system_prompt = make_cluster_analysis_system_prompt(
-            screen_name=screen_name,
-            screen_context_path=screen_context_path,
-            mode=route.mode,
-            mcp=route.mcp,
-            output_dir=None,
-        )
+        if is_order_variant:
+            # Stepwise order-variant: build system prompt from system_components
+            # using mode="standard" to avoid step numbering in the system prompt.
+            system_prompt = make_cluster_analysis_system_prompt(
+                screen_name=screen_name,
+                screen_context_path=screen_context_path,
+                mode="standard",
+                mcp=route.mcp,
+                component_order=list(route.system_components),
+                output_dir=None,
+            )
+        else:
+            system_prompt = make_cluster_analysis_system_prompt(
+                screen_name=screen_name,
+                screen_context_path=screen_context_path,
+                mode=route.mode,
+                mcp=route.mcp,
+                output_dir=None,
+            )
     else:
         prompt_filename = f"system_prompt_{route.name}_{route.mode}"
         prompt_file = output_dir / "prompts_used" / f"{prompt_filename}.txt"
-        if prompt_file.exists():
+        if prompt_file.exists() and not is_order_variant:
             system_prompt = prompt_file.read_text(encoding="utf-8")
         else:
             system_prompt = make_cluster_analysis_system_prompt(
@@ -164,6 +182,9 @@ def construct_prompts(
                 screen_context_path=screen_context_path,
                 mode=route.mode,
                 mcp=route.mcp,
+                component_order=(
+                    list(route.component_order) if is_order_variant else None
+                ),
                 output_dir=output_dir / "prompts_used",
                 prompt_filename=prompt_filename,
             )
@@ -174,7 +195,12 @@ def construct_prompts(
 
     stepwise_turns = None
     if route.delivery == "multi_turn":
-        stepwise_turns = compose_stepwise_user_turns(route.mcp)
+        if is_order_variant and route.user_turns:
+            stepwise_turns = compose_stepwise_turns_from_route(
+                route, screen_context_path
+            )
+        else:
+            stepwise_turns = compose_stepwise_user_turns(route.mcp)
 
     return {
         "system_prompt": system_prompt,
@@ -374,6 +400,16 @@ def execute_single_run(
         "schema_warnings": raw_outputs.get("schema_warnings", []),
         "mcp_tool_calls": raw_outputs.get("tool_calls", []),
         "error": error,
+        # Order benchmarking metadata (Phase 2)
+        "base_route": route.base_route or route.name,
+        "order_variant": route.order_variant or "none",
+        "order_hypothesis": route.order_hypothesis or None,
+        "component_order": list(route.component_order),
+        "system_components": list(route.system_components) if route.system_components else [],
+        "user_turns_order": (
+            [{"component": t.component, "mcp": t.mcp} for t in route.user_turns]
+            if route.user_turns else []
+        ),
     }
 
     # --- IO writes ---
@@ -521,6 +557,7 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
         "mcp": asdict(config.mcp),
         "evaluation": asdict(config.evaluation),
         "timing": asdict(config.timing),
+        "order_benchmark": asdict(config.order_benchmark),
         "paths": {k: str(v) for k, v in asdict(config.paths).items()},
     }
     (output_dir / "config_snapshot.yaml").write_text(
@@ -534,8 +571,17 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
     print(f"  {len(cluster_pairs)} (screen, cluster) pairs after filtering.")
 
     # Build routes
-    routes = build_routes_from_config(config.routes_include)
-    print(f"  {len(routes)} routes: {[r.name for r in routes]}")
+    if config.order_benchmark.enabled:
+        base_routes = build_routes_from_config(config.order_benchmark.base_routes)
+        routes = build_order_benchmark_routes(
+            base_routes=base_routes,
+            order_variants=config.order_benchmark.variants,
+        )
+        print(f"  [Phase 2] {len(routes)} order-variant routes from "
+              f"{len(base_routes)} base route(s): {[r.name for r in routes]}")
+    else:
+        routes = build_routes_from_config(config.routes_include)
+        print(f"  {len(routes)} routes: {[r.name for r in routes]}")
 
     # MCP preflight
     mcp_routes = [r for r in routes if r.mcp]
@@ -570,7 +616,7 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
     for route in routes:
         # Skip MCP routes if preflight failed
         if route.mcp and not mcp_available and not config.run.dry_run:
-            print(f"  [SKIP] Route {route.name} — MCP unavailable")
+            print(f"  [SKIP] Route {route.name} -- MCP unavailable")
             continue
 
         for screen_name, cluster_id in cluster_pairs:
@@ -579,14 +625,14 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
                 config.paths.evidence_bundles_dir, screen_name, cluster_id
             )
             if bundle_path is None:
-                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} — bundle not found")
+                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- bundle not found")
                 continue
 
             screen_context_path = _resolve_screen_context_path(
                 config.paths.benchmark_inputs_dir, screen_name
             )
             if screen_context_path is None:
-                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} — screen context not found")
+                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- screen context not found")
                 continue
 
             for rep in range(1, config.run.num_replicates + 1):

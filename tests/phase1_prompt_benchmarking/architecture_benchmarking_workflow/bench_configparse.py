@@ -65,6 +65,13 @@ class TimingConfig:
 
 
 @dataclass
+class OrderBenchmarkConfig:
+    enabled: bool = False
+    base_routes: list[str] = field(default_factory=list)
+    variants: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ClusterFilter:
     screen_name: str
     cluster_id: str
@@ -86,6 +93,7 @@ class BenchmarkConfig:
     mcp: McpConfig = field(default_factory=McpConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     timing: TimingConfig = field(default_factory=TimingConfig)
+    order_benchmark: OrderBenchmarkConfig = field(default_factory=OrderBenchmarkConfig)
 
     @property
     def experiment_output_dir(self) -> Path:
@@ -211,6 +219,15 @@ def load_config(config_path: Path) -> BenchmarkConfig:
             track_io=tm.get("track_io", cfg.timing.track_io),
             track_step_latencies=tm.get("track_step_latencies", cfg.timing.track_step_latencies),
             track_mcp_tool_latency=tm.get("track_mcp_tool_latency", cfg.timing.track_mcp_tool_latency),
+        )
+
+    # Order benchmark (Phase 2)
+    if "order_benchmark" in raw:
+        ob = raw["order_benchmark"]
+        cfg.order_benchmark = OrderBenchmarkConfig(
+            enabled=ob.get("enabled", False),
+            base_routes=ob.get("base_routes", []),
+            variants=ob.get("variants", []),
         )
 
     return cfg

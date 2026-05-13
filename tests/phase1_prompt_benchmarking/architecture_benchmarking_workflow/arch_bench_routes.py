@@ -33,6 +33,10 @@ class Route:
     system_components: tuple[str, ...] = ()
     user_turns: tuple[StepwiseTurn, ...] = ()
     description: str = ""
+    # Phase 2 order benchmarking metadata (empty for Phase 1 routes).
+    base_route: str = ""
+    order_variant: str = ""
+    order_hypothesis: str = ""
 
     @property
     def mode_tag(self) -> str:

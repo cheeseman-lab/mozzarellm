@@ -7,7 +7,7 @@ paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
   evidence_bundles_dir: benchmark_evidence_bundles
-  output_dir: benchmarking_outputs/1.architecture_testing_outputs
+  output_dir: benchmarking_outputs/1.arch
 
 model:
   provider: anthropic

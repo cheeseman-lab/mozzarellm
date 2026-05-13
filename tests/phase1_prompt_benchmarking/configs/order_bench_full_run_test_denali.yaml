@@ -1,45 +1,58 @@
-# Dry-run test config -- validates benchmark infrastructure without API calls.
-# Runs 2 routes on 1 screen (denali) with 1 replicate.
+# Order Benchmark — Full Run (Phase 2)
+# All 6 base routes × all 5 order variants = 30 order-variant routes.
+# 30 routes × 14 clusters × 3 replicates = 1,260 LLM analysis runs.
 
-experiment_id: arch_bench_dry_test
+experiment_id: order_bench_full_v1
 
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
   evidence_bundles_dir: benchmark_evidence_bundles
-  output_dir: benchmarking_outputs/1.arch
+  output_dir: benchmarking_outputs/2.order
 
 model:
   provider: anthropic
   model_name: claude-sonnet-4-5
   temperature: 0.2
   max_tokens: 4000
+  top_p: null
+  top_k: null
 
 run:
-  num_replicates: 1
-  dry_run: true
-  workflow_testing: true
-  overwrite_outputs: true
+  num_replicates: 3
+  dry_run: false
+  workflow_testing: false
+  overwrite_outputs: false
   continue_on_error: true
   save_prompts: true
   save_raw_outputs: true
   save_parsed_outputs: true
   save_traces: true
 
-routes:
-  include:
+# Order benchmarking (Phase 2)
+# When enabled, routes are built from base_routes × variants below.
+order_benchmark:
+  enabled: true
+  base_routes:
     - 3a
     - 3b
 
+  variants:
+    - canonical
+    - late_screen_context
+    - prioritization_before_classification
+    - early_output_format
+    - delayed_task_anchor
+
 screens:
-  include:
+  include: 
     - denali
 
 clusters:
   include: all
 
 mcp:
-  preflight: false
+  preflight: true
   fail_if_unavailable: false
 
 evaluation:
