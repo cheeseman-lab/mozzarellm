@@ -232,16 +232,15 @@ def make_cluster_analysis_system_prompt(
         steps = override_CoT_steps or (STEPS_DEFAULT_MCP if mcp else STEPS_DEFAULT)
         steps = [_substitute_screen_context(s, SCREEN_CONTEXT_TEXT) for s in steps]
         prompt = "\n\n".join(steps[:2])
-    if not output_dir:
-        output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    # save system prompt to file — use stable filename if provided, else timestamp
-    if prompt_filename:
-        fname = prompt_filename if prompt_filename.endswith(".txt") else f"{prompt_filename}.txt"
-    else:
-        fname = f"cluster_analysis_phase1_system_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-    with open(output_dir / fname, "w", encoding="utf-8") as f:
-        f.write(prompt)
+    # Save system prompt to file if output_dir is provided
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if prompt_filename:
+            fname = prompt_filename if prompt_filename.endswith(".txt") else f"{prompt_filename}.txt"
+        else:
+            fname = f"cluster_analysis_phase1_system_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        with open(output_dir / fname, "w", encoding="utf-8") as f:
+            f.write(prompt)
     return prompt
 
 
