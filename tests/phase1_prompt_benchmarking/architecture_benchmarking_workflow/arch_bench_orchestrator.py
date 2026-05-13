@@ -142,17 +142,23 @@ def construct_prompts(
     # Build a pseudo cluster_to_bundle_path_map for the existing utility
     cluster_to_bundle_map = {str(cluster_id): bundle_path}
 
-    # Use stable filename when overwriting to avoid timestamp-based accumulation
-    prompt_filename = f"system_prompt_{route.name}_{route.mode}" if overwrite_outputs else None
+    # Use stable per-route filename to avoid redundant files 
+    # system prompt is static across the 3a/3b + mcp routes
+    prompt_filename = f"system_prompt_{route.name}_{route.mode}"
+    prompt_file = output_dir / "prompts_used" / f"{prompt_filename}.txt"
 
-    system_prompt = make_cluster_analysis_system_prompt(
-        screen_name=screen_name,
-        screen_context_path=screen_context_path,
-        mode=route.mode,
-        mcp=route.mcp,
-        output_dir=output_dir / "prompts_used",
-        prompt_filename=prompt_filename,
-    )
+    # For non-stepwise routes, skip writing if the file already exists (reuse)
+    if not route.delivery == "multi_turn" and prompt_file.exists():
+        system_prompt = prompt_file.read_text(encoding="utf-8")
+    else:
+        system_prompt = make_cluster_analysis_system_prompt(
+            screen_name=screen_name,
+            screen_context_path=screen_context_path,
+            mode=route.mode,
+            mcp=route.mcp,
+            output_dir=output_dir / "prompts_used",
+            prompt_filename=prompt_filename,
+        )
 
     user_prompt = make_single_cluster_analysis_user_prompt(
         cluster_id, screen_name, cluster_to_bundle_map

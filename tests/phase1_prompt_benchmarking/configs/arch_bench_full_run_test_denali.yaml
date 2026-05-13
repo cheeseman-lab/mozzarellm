@@ -28,7 +28,7 @@ run:
 routes:
   include:
     - 3a
-    - 3a_mcp
+    - 3c_mcp
 
 screens:
   include:
