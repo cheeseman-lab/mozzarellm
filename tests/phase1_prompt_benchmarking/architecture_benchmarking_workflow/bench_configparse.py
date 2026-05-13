@@ -131,7 +131,9 @@ def load_config(config_path: Path) -> BenchmarkConfig:
     if "paths" in raw:
         paths_raw = _resolve_paths(raw["paths"], base_dir)
         cfg.paths = PathsConfig(
-            benchmark_inputs_dir=paths_raw.get("benchmark_inputs_dir", base_dir / "benchmark_inputs"),
+            benchmark_inputs_dir=paths_raw.get(
+                "benchmark_inputs_dir", base_dir / "benchmark_inputs"
+            ),
             benchmark_clusters_csv=paths_raw.get(
                 "benchmark_clusters_csv", base_dir / "benchmark_inputs" / "benchmark_clusters.csv"
             ),
@@ -184,9 +186,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
             cfg.clusters_include = "all"
         else:
             cfg.clusters_include = [
-                ClusterFilter(
-                    screen_name=c["screen_name"], cluster_id=str(c["cluster_id"])
-                )
+                ClusterFilter(screen_name=c["screen_name"], cluster_id=str(c["cluster_id"]))
                 for c in clusters_raw
             ]
 
@@ -213,12 +213,16 @@ def load_config(config_path: Path) -> BenchmarkConfig:
         tm = raw["timing"]
         cfg.timing = TimingConfig(
             track_full_run=tm.get("track_full_run", cfg.timing.track_full_run),
-            track_prompt_construction=tm.get("track_prompt_construction", cfg.timing.track_prompt_construction),
+            track_prompt_construction=tm.get(
+                "track_prompt_construction", cfg.timing.track_prompt_construction
+            ),
             track_model_latency=tm.get("track_model_latency", cfg.timing.track_model_latency),
             track_metrics=tm.get("track_metrics", cfg.timing.track_metrics),
             track_io=tm.get("track_io", cfg.timing.track_io),
             track_step_latencies=tm.get("track_step_latencies", cfg.timing.track_step_latencies),
-            track_mcp_tool_latency=tm.get("track_mcp_tool_latency", cfg.timing.track_mcp_tool_latency),
+            track_mcp_tool_latency=tm.get(
+                "track_mcp_tool_latency", cfg.timing.track_mcp_tool_latency
+            ),
         )
 
     # Order benchmark (Phase 2)

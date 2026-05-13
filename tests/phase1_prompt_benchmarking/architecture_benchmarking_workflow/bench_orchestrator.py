@@ -27,6 +27,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv(dotenv_path=_REPO_ROOT / ".env")
 except ImportError:
     pass  # dotenv not required if env vars are set externally
@@ -91,14 +92,14 @@ def _load_benchmark_clusters(csv_path: Path) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
     required = {"screen_name", "cluster_id", "gene_symbol"}
     if not required.issubset(set(df.columns)):
-        raise ValueError(f"benchmark_clusters.csv must have columns: {required}. Got: {list(df.columns)}")
+        raise ValueError(
+            f"benchmark_clusters.csv must have columns: {required}. Got: {list(df.columns)}"
+        )
     df["cluster_id"] = df["cluster_id"].astype(str)
     return df
 
 
-def _filter_clusters(
-    df: pd.DataFrame, config: BenchmarkConfig
-) -> list[tuple[str, str]]:
+def _filter_clusters(df: pd.DataFrame, config: BenchmarkConfig) -> list[tuple[str, str]]:
     """Return deduplicated (screen_name, cluster_id) pairs after applying config filters."""
     pairs = df[["screen_name", "cluster_id"]].drop_duplicates()
 
@@ -149,7 +150,7 @@ def construct_prompts(
     is_order_variant = bool(route.order_variant)
 
     # For 3a/3b routes: save system prompt once with stable filename, reuse on subsequent calls.
-    # For 3c (stepwise) routes: build system prompt in memory only 
+    # For 3c (stepwise) routes: build system prompt in memory only
     # to save space, the multi-turn conversation is recorded in traces/prompts.jsonl only -- can extract later if needed.
     if route.delivery == "multi_turn":
         if is_order_variant:
@@ -182,9 +183,7 @@ def construct_prompts(
                 screen_context_path=screen_context_path,
                 mode=route.mode,
                 mcp=route.mcp,
-                component_order=(
-                    list(route.component_order) if is_order_variant else None
-                ),
+                component_order=(list(route.component_order) if is_order_variant else None),
                 output_dir=output_dir / "prompts_used",
                 prompt_filename=prompt_filename,
             )
@@ -196,9 +195,7 @@ def construct_prompts(
     stepwise_turns = None
     if route.delivery == "multi_turn":
         if is_order_variant and route.user_turns:
-            stepwise_turns = compose_stepwise_turns_from_route(
-                route, screen_context_path
-            )
+            stepwise_turns = compose_stepwise_turns_from_route(route, screen_context_path)
         else:
             stepwise_turns = compose_stepwise_user_turns(route.mcp)
 
@@ -240,13 +237,15 @@ def _build_timing_dict(
         max_lat, max_comp = 0.0, None
         for i, s in enumerate(steps):
             lat = s.get("elapsed_s", s.get("latency_seconds", 0.0)) or 0.0
-            comp = s.get("component", f"step_{i+1}")
-            step_latencies.append({
-                "step_index": i + 1,
-                "component": comp,
-                "mcp": bool(s.get("mcp", False)),
-                "latency_seconds": lat,
-            })
+            comp = s.get("component", f"step_{i + 1}")
+            step_latencies.append(
+                {
+                    "step_index": i + 1,
+                    "component": comp,
+                    "mcp": bool(s.get("mcp", False)),
+                    "latency_seconds": lat,
+                }
+            )
             if lat > max_lat:
                 max_lat, max_comp = lat, comp
         slowest_step = max_comp
@@ -257,9 +256,10 @@ def _build_timing_dict(
     if timing_cfg.track_mcp_tool_latency:
         tool_calls = raw_outputs.get("tool_calls", [])
         if route.mcp and tool_calls:
-            mcp_tool_latency = sum(
-                tc.get("latency_seconds", 0.0) for tc in tool_calls if isinstance(tc, dict)
-            ) or None
+            mcp_tool_latency = (
+                sum(tc.get("latency_seconds", 0.0) for tc in tool_calls if isinstance(tc, dict))
+                or None
+            )
 
     return {
         "full_run_time_seconds": t_full_run if timing_cfg.track_full_run else None,
@@ -395,7 +395,8 @@ def execute_single_run(
         "latency_seconds": raw_outputs.get("elapsed_s", 0.0),
         "input_tokens": raw_outputs.get("input_tokens"),
         "output_tokens": raw_outputs.get("output_tokens"),
-        "total_tokens": (raw_outputs.get("input_tokens", 0) or 0) + (raw_outputs.get("output_tokens", 0) or 0),
+        "total_tokens": (raw_outputs.get("input_tokens", 0) or 0)
+        + (raw_outputs.get("output_tokens", 0) or 0),
         "estimated_cost_usd": raw_outputs.get("cost_usd"),
         "schema_warnings": raw_outputs.get("schema_warnings", []),
         "mcp_tool_calls": raw_outputs.get("tool_calls", []),
@@ -408,7 +409,8 @@ def execute_single_run(
         "system_components": list(route.system_components) if route.system_components else [],
         "user_turns_order": (
             [{"component": t.component, "mcp": t.mcp} for t in route.user_turns]
-            if route.user_turns else []
+            if route.user_turns
+            else []
         ),
     }
 
@@ -460,7 +462,12 @@ def _save_run_artifacts(
             "user_prompt": prompts["user_prompt"],
             "stepwise_turns": (
                 [
-                    {"step_index": i + 1, "component": t["content"][:50], "mcp": t["mcp"], "content": t["content"]}
+                    {
+                        "step_index": i + 1,
+                        "component": t["content"][:50],
+                        "mcp": t["mcp"],
+                        "content": t["content"],
+                    }
                     for i, t in enumerate(prompts["stepwise_turns"])
                 ]
                 if prompts["stepwise_turns"]
@@ -577,8 +584,10 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
             base_routes=base_routes,
             order_variants=config.order_benchmark.variants,
         )
-        print(f"  [Phase 2] {len(routes)} order-variant routes from "
-              f"{len(base_routes)} base route(s): {[r.name for r in routes]}")
+        print(
+            f"  [Phase 2] {len(routes)} order-variant routes from "
+            f"{len(base_routes)} base route(s): {[r.name for r in routes]}"
+        )
     else:
         routes = build_routes_from_config(config.routes_include)
         print(f"  {len(routes)} routes: {[r.name for r in routes]}")
@@ -601,7 +610,11 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
     # Initialize LLM client (unless dry-run)
     client = None
     if not config.run.dry_run:
-        api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        api_key = (
+            os.getenv("ANTHROPIC_API_KEY")
+            or os.getenv("OPENAI_API_KEY")
+            or os.getenv("GOOGLE_API_KEY")
+        )
         client = create_client(model=config.model.model_name, api_key=api_key)
         print(f"  Client: {type(client).__name__} ({config.model.model_name})")
 
@@ -625,19 +638,25 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
                 config.paths.evidence_bundles_dir, screen_name, cluster_id
             )
             if bundle_path is None:
-                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- bundle not found")
+                print(
+                    f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- bundle not found"
+                )
                 continue
 
             screen_context_path = _resolve_screen_context_path(
                 config.paths.benchmark_inputs_dir, screen_name
             )
             if screen_context_path is None:
-                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- screen context not found")
+                print(
+                    f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- screen context not found"
+                )
                 continue
 
             for rep in range(1, config.run.num_replicates + 1):
                 run_counter += 1
-                run_id = _build_run_id(config.experiment_id, route.name, screen_name, cluster_id, rep)
+                run_id = _build_run_id(
+                    config.experiment_id, route.name, screen_name, cluster_id, rep
+                )
                 print(f"  [{run_counter}/{total_runs}] {run_id}", end=" ")
 
                 try:
@@ -696,9 +715,7 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Architecture benchmark runner for LLM Analysis."
-    )
+    parser = argparse.ArgumentParser(description="Architecture benchmark runner for LLM Analysis.")
     parser.add_argument(
         "--config",
         type=Path,

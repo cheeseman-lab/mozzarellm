@@ -18,8 +18,18 @@ from mozzarellm.schemas.mcp_schemas import (
 )
 
 VALID_CONFIDENCE_VALUES = {"High", "Medium", "Low"}
-VALID_NOVEL_SUBCLASSES = {"NO_EVIDENCE", "INDIRECT_EVIDENCE", "PARTIAL_EVIDENCE", "CONTRADICTORY_EVIDENCE"}
-VALID_UNCHARACTERIZED_SUBCLASSES = {"DARK_GENE", "NASCENT", "ANNOTATED_ONLY", "NON_HUMAN_CHARACTERIZED"}
+VALID_NOVEL_SUBCLASSES = {
+    "NO_EVIDENCE",
+    "INDIRECT_EVIDENCE",
+    "PARTIAL_EVIDENCE",
+    "CONTRADICTORY_EVIDENCE",
+}
+VALID_UNCHARACTERIZED_SUBCLASSES = {
+    "DARK_GENE",
+    "NASCENT",
+    "ANNOTATED_ONLY",
+    "NON_HUMAN_CHARACTERIZED",
+}
 
 
 # =============================================================================
@@ -176,7 +186,9 @@ def _validate_literature_output(parsed: dict) -> list[str]:
         try:
             LiteratureReclassification.model_validate(entry)
         except ValidationError as e:
-            warnings.append(f"literature_informed_reclassifications[{i}]: {e.error_count()} error(s)")
+            warnings.append(
+                f"literature_informed_reclassifications[{i}]: {e.error_count()} error(s)"
+            )
 
     # Validate per-gene literature_validation blocks
     for category_key in ("novel_role_genes", "uncharacterized_genes"):
@@ -189,7 +201,9 @@ def _validate_literature_output(parsed: dict) -> list[str]:
                     LiteratureValidation.model_validate(lit_val)
                 except ValidationError as e:
                     gene_name = gene_entry.get("gene", f"index_{i}")
-                    warnings.append(f"{category_key}.{gene_name}.literature_validation: {e.error_count()} error(s)")
+                    warnings.append(
+                        f"{category_key}.{gene_name}.literature_validation: {e.error_count()} error(s)"
+                    )
 
     return warnings
 

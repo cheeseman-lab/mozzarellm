@@ -106,24 +106,23 @@ def _summarize_route(records: list[dict]) -> dict[str, Any]:
         "mean_input_tokens": _mean("input_tokens"),
         "mean_output_tokens": _mean("output_tokens"),
         "mean_cost_usd": _mean("estimated_cost_usd"),
-        "total_cost_usd": sum(
-            m.get("estimated_cost_usd", 0) or 0 for m in metrics_list
-        ),
+        "total_cost_usd": sum(m.get("estimated_cost_usd", 0) or 0 for m in metrics_list),
         # Timing
         "mean_full_run_time_seconds": statistics.mean(full_run_times) if full_run_times else None,
-        "median_full_run_time_seconds": statistics.median(full_run_times) if full_run_times else None,
+        "median_full_run_time_seconds": statistics.median(full_run_times)
+        if full_run_times
+        else None,
         "p95_full_run_time_seconds": (
-            sorted(full_run_times)[int(len(full_run_times) * 0.95)] if len(full_run_times) >= 2 else
-            (full_run_times[0] if full_run_times else None)
+            sorted(full_run_times)[int(len(full_run_times) * 0.95)]
+            if len(full_run_times) >= 2
+            else (full_run_times[0] if full_run_times else None)
         ),
         "mean_model_latency_seconds": statistics.mean(model_lats) if model_lats else None,
         "mean_n_api_calls": statistics.mean(n_calls_vals) if n_calls_vals else None,
         "seconds_per_schema_compliant_output": (
             total_full / schema_ok_count if schema_ok_count else None
         ),
-        "seconds_per_gene_complete_output": (
-            total_full / gene_ok_count if gene_ok_count else None
-        ),
+        "seconds_per_gene_complete_output": (total_full / gene_ok_count if gene_ok_count else None),
     }
     return summary
 
@@ -165,12 +164,10 @@ def _build_report_markdown(
     lines.append("## Route Comparison")
     lines.append("")
     lines.append(
-        "| Route | Runs | Errors | Parse% | Schema% | Gene Compl. | "
-        "Latency (s) | Cost ($) |"
+        "| Route | Runs | Errors | Parse% | Schema% | Gene Compl. | Latency (s) | Cost ($) |"
     )
     lines.append(
-        "|-------|------|--------|--------|---------|-------------|"
-        "-------------|----------|"
+        "|-------|------|--------|--------|---------|-------------|-------------|----------|"
     )
     for route_name, s in sorted(route_summaries.items()):
         lines.append(
@@ -293,9 +290,7 @@ def _build_report_markdown(
         lines.append("## Errors")
         lines.append("")
         for rec in error_records[:20]:  # cap at 20
-            lines.append(
-                f"- `{rec['run_id']}`: {rec['error'][:200]}"
-            )
+            lines.append(f"- `{rec['run_id']}`: {rec['error'][:200]}")
         if len(error_records) > 20:
             lines.append(f"- ... and {len(error_records) - 20} more")
         lines.append("")

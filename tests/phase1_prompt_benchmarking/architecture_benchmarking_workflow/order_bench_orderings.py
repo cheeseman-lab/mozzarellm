@@ -237,8 +237,7 @@ def validate_order_variant_names(names: list[str]) -> list[str]:
     invalid = [n for n in names if n not in ORDER_VARIANTS]
     if invalid:
         raise ValueError(
-            f"Unknown order variant(s): {invalid}. "
-            f"Valid variants: {sorted(ORDER_VARIANTS.keys())}"
+            f"Unknown order variant(s): {invalid}. Valid variants: {sorted(ORDER_VARIANTS.keys())}"
         )
     return names
 
@@ -280,8 +279,7 @@ def apply_order_variant(route: Route, variant_name: str) -> Route:
         new_system_components = spec.get("system_components", ())
         turn_keys = spec.get("user_turn_keys", ())
         new_user_turns = tuple(
-            StepwiseTurn(component=comp, mcp=mcp_flag)
-            for comp, mcp_flag in turn_keys
+            StepwiseTurn(component=comp, mcp=mcp_flag) for comp, mcp_flag in turn_keys
         )
 
     return Route(
@@ -344,10 +342,7 @@ def compose_stepwise_turns_from_route(
     turns: list[dict] = []
     for i, turn in enumerate(route.user_turns):
         if turn.component == "SC":
-            content = (
-                "The following experimental context is provided: "
-                + screen_context_text
-            )
+            content = "The following experimental context is provided: " + screen_context_text
         elif turn.component in registry:
             content = registry[turn.component]
         else:
@@ -356,9 +351,11 @@ def compose_stepwise_turns_from_route(
                 f"Valid keys: {sorted(registry.keys())} + 'SC'"
             )
 
-        turns.append({
-            "content": f"STEP {i + 1} - {content}",
-            "mcp": turn.mcp,
-        })
+        turns.append(
+            {
+                "content": f"STEP {i + 1} - {content}",
+                "mcp": turn.mcp,
+            }
+        )
 
     return turns
