@@ -1,7 +1,6 @@
 # Live run -- denali screen only, all 6 routes, 3 replicates.
 
-experiment_id: arch_bench_denali_live
-
+experiment_id: arch_bench_denali_live_test
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv

@@ -2,8 +2,7 @@
 # All 6 base routes × all 5 order variants = 30 order-variant routes.
 # 30 routes × 14 clusters × 3 replicates = 1,260 LLM analysis runs.
 
-experiment_id: order_bench_full_v1
-
+experiment_id: order_bench_denali_live_test
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
@@ -21,8 +20,8 @@ model:
 run:
   num_replicates: 1
   dry_run: false
-  workflow_testing: false
-  overwrite_outputs: false
+  workflow_testing: true  
+  overwrite_outputs: true
   continue_on_error: true
   save_prompts: true
   save_raw_outputs: true
