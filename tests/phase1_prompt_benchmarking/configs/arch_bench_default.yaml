@@ -18,7 +18,7 @@ model:
   top_k: null
 
 run:
-  num_replicates: 3
+  num_replicates: 1
   dry_run: false
   workflow_testing: false
   overwrite_outputs: false
