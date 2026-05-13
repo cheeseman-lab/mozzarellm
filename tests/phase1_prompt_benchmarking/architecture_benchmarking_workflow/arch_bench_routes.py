@@ -1,9 +1,15 @@
-"""Route library for architecture benchmarking.
+"""Route definitions for prompt-architecture benchmarking.
 
-Defines the six LLM-analysis routes as first-class objects. Each route carries
-all metadata needed by the orchestrator to construct prompts, call the model,
-and tag outputs. Routes are constructed once from config and passed around —
-keeping the orchestrator DRY and making new routes trivial to add.
+Each Route is a frozen dataclass encoding a unique prompt-delivery configuration:
+mode (standard / cot / stepwise), MCP toggle, delivery mechanism, and the ordered list of prompt components.
+More details on each component can be found in the README and prompt-assembly-routes-info.md.
+
+ROUTE_REGISTRY maps short names (3a, 3a_mcp, 3b, ...) to Route objects used by the orchestrator for prompt
+construction, model dispatch, and output tagging.
+
+Phase 2 order-benchmarking extends Route with metadata fields (base_route,
+order_variant, order_hypothesis) so perturbed orderings can be traced back
+to their defined baseline.
 """
 
 from __future__ import annotations
