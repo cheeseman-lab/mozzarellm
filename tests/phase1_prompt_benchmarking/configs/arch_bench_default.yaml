@@ -21,6 +21,7 @@ run:
   num_replicates: 3
   dry_run: false
   workflow_testing: false
+  overwrite_outputs: false
   continue_on_error: true
   save_prompts: true
   save_raw_outputs: true

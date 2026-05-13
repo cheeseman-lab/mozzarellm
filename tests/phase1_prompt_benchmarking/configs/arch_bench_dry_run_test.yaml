@@ -18,7 +18,8 @@ model:
 run:
   num_replicates: 1
   dry_run: true
-  workflow_testing: false
+  workflow_testing: true
+  overwrite_outputs: true
   continue_on_error: true
   save_prompts: true
   save_raw_outputs: true

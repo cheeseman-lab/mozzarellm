@@ -133,6 +133,7 @@ def construct_prompts(
     cluster_id: str,
     bundle_path: Path,
     output_dir: Path,
+    overwrite_outputs: bool = False,
 ) -> dict:
     """Construct system and user prompts for a given route+cluster.
 
@@ -141,12 +142,16 @@ def construct_prompts(
     # Build a pseudo cluster_to_bundle_path_map for the existing utility
     cluster_to_bundle_map = {str(cluster_id): bundle_path}
 
+    # Use stable filename when overwriting to avoid timestamp-based accumulation
+    prompt_filename = f"system_prompt_{route.name}_{route.mode}" if overwrite_outputs else None
+
     system_prompt = make_cluster_analysis_system_prompt(
         screen_name=screen_name,
         screen_context_path=screen_context_path,
         mode=route.mode,
         mcp=route.mcp,
         output_dir=output_dir / "prompts_used",
+        prompt_filename=prompt_filename,
     )
 
     user_prompt = make_single_cluster_analysis_user_prompt(
@@ -255,6 +260,7 @@ def execute_single_run(
         cluster_id=cluster_id,
         bundle_path=bundle_path,
         output_dir=output_dir,
+        overwrite_outputs=config.run.overwrite_outputs,
     )
     system_prompt = prompts["system_prompt"]
     user_prompt = prompts["user_prompt"]
@@ -475,7 +481,16 @@ def _save_run_artifacts(
 def run_benchmark(config: BenchmarkConfig) -> list[dict]:
     """Main benchmark loop. Returns list of all run records."""
     output_dir = config.experiment_output_dir
+
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # When overwrite_outputs is enabled, truncate JSONL files so they start
+    # fresh instead of appending. Prompt .txt and trace .json files already
+    # use stable names and will simply be overwritten in place.
+    if config.run.overwrite_outputs:
+        for jsonl_file in output_dir.glob("*.jsonl"):
+            jsonl_file.write_text("", encoding="utf-8")
+        print(f"  [overwrite_outputs] Truncated JSONL files in {output_dir}")
 
     # Save config snapshot
     config_snapshot = {

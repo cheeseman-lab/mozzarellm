@@ -31,6 +31,7 @@ class RunConfig:
     num_replicates: int = 3
     dry_run: bool = False
     workflow_testing: bool = False
+    overwrite_outputs: bool = False
     continue_on_error: bool = True
     save_prompts: bool = True
     save_raw_outputs: bool = True
@@ -151,6 +152,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
             num_replicates=r.get("num_replicates", cfg.run.num_replicates),
             dry_run=r.get("dry_run", cfg.run.dry_run),
             workflow_testing=r.get("workflow_testing", cfg.run.workflow_testing),
+            overwrite_outputs=r.get("overwrite_outputs", cfg.run.overwrite_outputs),
             continue_on_error=r.get("continue_on_error", cfg.run.continue_on_error),
             save_prompts=r.get("save_prompts", cfg.run.save_prompts),
             save_raw_outputs=r.get("save_raw_outputs", cfg.run.save_raw_outputs),
