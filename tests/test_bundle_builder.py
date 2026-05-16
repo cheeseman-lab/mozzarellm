@@ -453,7 +453,7 @@ def test_build_evidence_bundles_creates_json_files(tmp_path, mock_uniprot_client
     assert bundle["screen_name"] == "test"
     assert bundle["cluster_id"] == "1"
     assert len(bundle["cluster_genes"]) == 2
-    assert "feature_overlaps" in bundle
+    assert "feature_coherence" in bundle
 
     # Verify gene data in bundle
     gene_symbols = [gene["gene_symbol"] for gene in bundle["cluster_genes"]]

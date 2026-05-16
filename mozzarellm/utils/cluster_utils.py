@@ -20,31 +20,60 @@ def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFra
     return [group for _cluster_id, group in df.groupby(cluster_id_column, sort=False)]
 
 
-def find_feature_overlaps(df: pd.DataFrame, feature_columns: list[str]) -> dict[str, str]:
-    """Find overlapping comma-separated features in specified columns.
+def compute_feature_coherence(
+    df: pd.DataFrame,
+    feature_columns: list[str],
+    gene_column: str,
+) -> dict:
+    """Compute per-feature gene-coverage across a cluster with supporting gene lists.
 
-    Returns a mapping from column name to a comma-separated string of features that
-    appear in 2+ rows.
+    Each column in `feature_columns` is a comma-separated per-gene list of features
+    differentially significant in a given direction. Direction is inferred from the
+    column name — substring "up" → up, substring "down" → down.
+
+    Returns a dict with `n_genes_in_cluster` and a `features` array, one row per
+    feature called by at least one gene, with `n_up`/`frac_up`/`up_genes` and
+    `n_down`/`frac_down`/`down_genes`. Sorted by aggregate signal (most-covered first).
     """
-    overlaps: dict[str, str] = {}
-    for col in feature_columns:
-        if col not in df.columns:
-            overlaps[col] = ""
-            continue
+    n_genes = len(df)
+    up_col = next((c for c in feature_columns if "up" in c.lower()), None)
+    down_col = next((c for c in feature_columns if "down" in c.lower()), None)
 
-        feature_counts: dict[str, int] = {}
-        for feature_str in df[col].dropna():
-            if not isinstance(feature_str, str) or not feature_str:
+    def _gene_to_features(col: str | None) -> dict[str, list[str]]:
+        if col is None or col not in df.columns:
+            return {}
+        out: dict[str, list[str]] = {}
+        for _, row in df.iterrows():
+            gene = row[gene_column]
+            features_str = row.get(col, "")
+            if not isinstance(features_str, str) or not features_str:
                 continue
-            features = [f.strip() for f in feature_str.split(",") if f.strip()]
-            for feature in features:
-                feature_counts[feature] = feature_counts.get(feature, 0) + 1
+            for f in (x.strip() for x in features_str.split(",")):
+                if f:
+                    out.setdefault(f, []).append(gene)
+        return out
 
-        overlapping = [f for f, count in feature_counts.items() if count >= 2]
-        overlapping.sort(key=lambda f: (-feature_counts[f], f))
-        overlaps[col] = ",".join(overlapping) if overlapping else ""
+    up_map = _gene_to_features(up_col)
+    down_map = _gene_to_features(down_col)
 
-    return overlaps
+    rows = []
+    for feat in sorted(set(up_map) | set(down_map)):
+        ups = up_map.get(feat, [])
+        downs = down_map.get(feat, [])
+        rows.append(
+            {
+                "feature": feat,
+                "n_up": len(ups),
+                "frac_up": round(len(ups) / n_genes, 3) if n_genes else 0.0,
+                "up_genes": ups,
+                "n_down": len(downs),
+                "frac_down": round(len(downs) / n_genes, 3) if n_genes else 0.0,
+                "down_genes": downs,
+            }
+        )
+    rows.sort(key=lambda r: (-(r["n_up"] + r["n_down"]), r["feature"]))
+
+    return {"n_genes_in_cluster": n_genes, "features": rows}
 
 
 def build_cluster_id_to_bundle_path(

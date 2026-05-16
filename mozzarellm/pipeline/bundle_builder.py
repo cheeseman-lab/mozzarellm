@@ -11,7 +11,7 @@ from mozzarellm.schemas.bundle_schemas import (
     ScreenContext,
 )
 from mozzarellm.utils.io import load_table, write_bundle
-from mozzarellm.utils.cluster_utils import cluster_chunker, find_feature_overlaps
+from mozzarellm.utils.cluster_utils import cluster_chunker, compute_feature_coherence
 from mozzarellm.clients.uniprot_api_client import UniProtClient
 
 DEFAULT_ACCESSION_COL = "accession"
@@ -258,7 +258,9 @@ def build_evidence_bundles(
         }
 
         if feature_columns:
-            evidence_bundle["feature_overlaps"] = find_feature_overlaps(chunk, feature_columns)
+            evidence_bundle["feature_coherence"] = compute_feature_coherence(
+                chunk, feature_columns, gene_column=gene_column
+            )
 
         # save bundle as json
         output_path = Path(OUTPUT_DIR / f"{screen_name}__cluster_{cluster_id}__bundle.json")

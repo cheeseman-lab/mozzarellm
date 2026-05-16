@@ -39,6 +39,9 @@ from mozzarellm.pipeline.bundle_builder import (
 )
 from mozzarellm.pipeline.literature_mcp import get_available_mcp_servers
 from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
+from mozzarellm.prompt_components import (
+    CANONICAL_FEATURE_INTERP_COT_ORDER,
+)
 from mozzarellm.utils.prompt_factory import (
     make_cluster_analysis_system_prompt,
     make_single_cluster_analysis_user_prompt,
@@ -154,8 +157,9 @@ def _validate_cluster(
     }
 
 
-def _mode_tag(mode: str, mcp: bool) -> str:
-    return f"{mode}_mcp" if mcp else mode
+def _mode_tag(mode: str, mcp: bool, feature_interp: bool = False) -> str:
+    tag = f"{mode}_mcp" if mcp else mode
+    return f"{tag}_feat" if feature_interp else tag
 
 
 def run_dataset(
@@ -163,6 +167,7 @@ def run_dataset(
     model: str,
     mode: str,
     mcp: bool,
+    feature_interp: bool,
     clusters: list[str] | None,
     run_dir: Path,
     bundle_cache_dir: Path,
@@ -173,8 +178,17 @@ def run_dataset(
     validation = VALIDATION_DATA[dataset_name]
     screen_name = f"benchmark_{dataset_name}"
 
+    if feature_interp and not cfg.get("feature_columns"):
+        raise ValueError(
+            f"--feature-interp requires the dataset to have feature_columns; "
+            f"'{dataset_name}' has none. Currently only 'ops' is supported."
+        )
+
     print(f"\n{'=' * 60}")
-    print(f"Dataset: {dataset_name.upper()}  |  Model: {model}  |  Mode: {mode}  |  MCP: {mcp}")
+    print(
+        f"Dataset: {dataset_name.upper()}  |  Model: {model}  |  Mode: {mode}  |  "
+        f"MCP: {mcp}  |  FeatInterp: {feature_interp}"
+    )
     print(f"{'=' * 60}")
 
     # Load gene-wise data and filter to benchmark clusters
@@ -213,12 +227,18 @@ def run_dataset(
     cluster_to_bundle = build_cluster_id_to_bundle_path(bundle_dir, screen_name=screen_name)
     print(f"Bundles ready for: {sorted(cluster_to_bundle.keys())}")
 
-    # Build system prompt for the chosen mode.
+    # Build system prompt for the chosen mode. Feature-interp routes through the
+    # component-order path so the recall + consistency steps slot into the canonical CoT.
+    # MCP variant of the feature-interp order is not yet supported (the registry lacks a
+    # literature-validation key on cot-mcp); --feature-interp with --mcp currently falls
+    # back to the non-MCP canonical order.
+    component_order = CANONICAL_FEATURE_INTERP_COT_ORDER if feature_interp else None
     system_prompt = make_cluster_analysis_system_prompt(
         screen_name=screen_name,
         screen_context_path=cfg["screen_context"],
         mode=mode,
         mcp=mcp,
+        component_order=component_order,
         output_dir=run_dir / "prompts_used",
     )
 
@@ -232,7 +252,11 @@ def run_dataset(
             print(f"  [SKIP] Cluster {cluster_id}: no bundle found")
             continue
 
-        print(f"  Querying cluster {cluster_id} [{_mode_tag(mode, mcp)}]...", end=" ", flush=True)
+        print(
+            f"  Querying cluster {cluster_id} [{_mode_tag(mode, mcp, feature_interp)}]...",
+            end=" ",
+            flush=True,
+        )
         t0 = time.time()
         user_prompt = make_single_cluster_analysis_user_prompt(
             cluster_id, screen_name, cluster_to_bundle
@@ -492,6 +516,11 @@ def main():
         action="store_true",
         help="Attach PubMed MCP tools. Orthogonal to --mode (each combination has distinct behavior).",
     )
+    parser.add_argument(
+        "--feature-interp",
+        action="store_true",
+        help="Enable feature coherence + pathway consistency reasoning. Requires the dataset to have feature_columns (currently 'ops' only). The bundle's `feature_coherence` table feeds a recall step over per-feature gene fractions; a bounded consistency check then ties the essential signature to dominant_process. Routes through CANONICAL_FEATURE_INTERP_COT_ORDER. (MCP variant TBD.)",
+    )
     parser.add_argument("--clusters", nargs="+", help="Specific cluster IDs to test")
     parser.add_argument(
         "--bundle-cache-dir",
@@ -515,10 +544,11 @@ def main():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     mode_tag = f"_{args.mode}"
     mcp_tag = "_mcp" if args.mcp else ""
+    feat_tag = "_feat" if args.feature_interp else ""
     run_dir = (
         EXAMPLES_DIR
         / "benchmark_results"
-        / f"run_{timestamp}_{args.dataset}_{args.model.replace('/', '_')}{mode_tag}{mcp_tag}"
+        / f"run_{timestamp}_{args.dataset}_{args.model.replace('/', '_')}{mode_tag}{mcp_tag}{feat_tag}"
     )
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -533,6 +563,7 @@ def main():
             model=args.model,
             mode=args.mode,
             mcp=args.mcp,
+            feature_interp=args.feature_interp,
             clusters=[str(c) for c in args.clusters] if args.clusters else None,
             run_dir=run_dir,
             bundle_cache_dir=args.bundle_cache_dir,
