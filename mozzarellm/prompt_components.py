@@ -339,32 +339,6 @@ COT_STEP_OUTPUT = f"""FINAL JSON OUTPUT:
 - Include concise summary highlighting key findings and evidence quality
 According to {OUTPUT_FORMAT_JSON}"""
 
-STEPS_DEFAULT = [
-    CLUSTER_ANALYSIS_TASK,
-    COT_SCREEN_CONTEXT,
-    COT_STEP_PATHWAY_HYPOTHESIS,
-    COT_STEP_GENE_CATEGORIZATION,
-    COT_STEP_SUBCLASSIFICATION,
-    COT_STEP_PATHWAY_SELECTION,
-    COT_STEP_VERIFICATION,
-    COT_STEP_OUTPUT,
-]
-
-# MCP variant: literature validation is inserted AFTER sub-classification but
-# BEFORE pathway selection/verification, so updated gene categories can affect
-# the percent-fit calculation and therefore pathway confidence.
-STEPS_DEFAULT_MCP = [
-    CLUSTER_ANALYSIS_TASK,
-    COT_SCREEN_CONTEXT,
-    COT_STEP_PATHWAY_HYPOTHESIS,
-    COT_STEP_GENE_CATEGORIZATION,
-    COT_STEP_SUBCLASSIFICATION,
-    STEP_LITERATURE_VALIDATION,
-    COT_STEP_PATHWAY_SELECTION,
-    COT_STEP_VERIFICATION,
-    COT_STEP_OUTPUT,
-]
-
 # =============================================================================
 # COMPONENT REGISTRY & CANONICAL ORDERS
 # =============================================================================
@@ -399,47 +373,44 @@ COMPONENT_REGISTRY = {
     "NPR": NOVEL_CLASSIFICATION_RULES,
     "UPR": UNCHARACTERIZED_CLASSIFICATION_RULES,
     "PCC": PATHWAY_CONFIDENCE_CRITERIA,
-    "O":   OUTPUT_FORMAT_JSON,
+    "O": OUTPUT_FORMAT_JSON,
     "LIT": STEP_LITERATURE_VALIDATION,
-    "cPH":  COT_STEP_PATHWAY_HYPOTHESIS,
+    "cPH": COT_STEP_PATHWAY_HYPOTHESIS,
     "cGCR": COT_STEP_GENE_CATEGORIZATION,
     "cPri": COT_STEP_SUBCLASSIFICATION,
     "cPSC": COT_STEP_PATHWAY_SELECTION,
     "cVer": COT_STEP_VERIFICATION,
-    "cFC":  STEP_FEATURE_COHERENCE,
-    "cPC":  STEP_PATHWAY_CONSISTENCY,
-    "cO":   COT_STEP_OUTPUT,
+    "cFC": STEP_FEATURE_COHERENCE,
+    "cPC": STEP_PATHWAY_CONSISTENCY,
+    "cO": COT_STEP_OUTPUT,
 }
 
 CANONICAL_ZERO_SHOT_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]
+CANONICAL_ZERO_SHOT_MCP_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "LIT", "O"]
 CANONICAL_COT_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cO"]
-CANONICAL_FEATURE_INTERP_COT_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cFC", "cPC", "cO"]
-
-
-def assemble_cot_instructions(
-    steps: list[str] | None = None,
-    screen_context: str | None = None,
-) -> str:
-    """Assemble COT instructions from modular steps.
-
-    Args:
-        steps: List of COT step strings. Defaults to STEPS_DEFAULT.
-        screen_context: Optional screen context JSON string. If provided and
-            COT_SCREEN_CONTEXT is in steps, it will be replaced with the
-            context header + actual context.
-
-    Returns:
-        Formatted COT instructions with numbered steps.
-    """
-    if steps is None:
-        steps = STEPS_DEFAULT
-
-    # Replace COT_SCREEN_CONTEXT placeholder with actual context if provided
-    if screen_context is not None:
-        steps = [
-            f"{COT_SCREEN_CONTEXT}\n{screen_context}" if step == COT_SCREEN_CONTEXT else step
-            for step in steps
-        ]
-
-    numbered = [f"STEP {i + 1} - {step}" for i, step in enumerate(steps)]
-    return "\n\n".join(numbered)
+CANONICAL_COT_MCP_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "LIT", "cPSC", "cVer", "cO"]
+CANONICAL_FEATURE_INTERP_COT_ORDER = [
+    "CAT",
+    "SC",
+    "cPH",
+    "cGCR",
+    "cPri",
+    "cPSC",
+    "cVer",
+    "cFC",
+    "cPC",
+    "cO",
+]
+CANONICAL_FEATURE_INTERP_COT_MCP_ORDER = [
+    "CAT",
+    "SC",
+    "cPH",
+    "cGCR",
+    "cPri",
+    "LIT",
+    "cPSC",
+    "cVer",
+    "cFC",
+    "cPC",
+    "cO",
+]
