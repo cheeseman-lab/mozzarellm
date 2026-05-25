@@ -201,6 +201,102 @@ In the final output, include:
 - A top-level `literature_informed_pathway_revision` object: {{"pre_literature_pathway": "your tentative pathway BEFORE literature validation", "post_literature_pathway": "your final pathway AFTER literature validation (may be the same)", "pathway_changed": true/false, "rationale": "one sentence — what literature drove the change, or why it stayed the same"}}."""
 
 # =============================================================================
+# FEATURE COHERENCE + PATHWAY CONSISTENCY (feature-interp mode)
+# =============================================================================
+
+FEATURE_COHERENCE_OUTPUT_FORMAT = """
+The top-level "feature_coherence" field must contain:
+- "concrete": true | false — true only if essential up/down forms a coherent signature driven by overlapping gene subsets
+- "essential_up": array of {"feature": "...", "frac_up": float, "supporting_genes": ["..."]} (empty when not concrete)
+- "essential_down": array of {"feature": "...", "frac_down": float, "supporting_genes": ["..."]} (empty when not concrete)
+- "mixed_or_unsupported": array of {"feature": "...", "frac_up": float, "frac_down": float}
+- "rationale": one or two sentences citing fractions and gene-subset overlap; no biology
+"""
+
+STEP_FEATURE_COHERENCE = f"""FEATURE COHERENCE (recall — discrete table, no biology):
+
+Each evidence bundle includes a `feature_coherence` field with a per-feature breakdown
+across the cluster: for each feature, `n_up` / `frac_up` and `n_down` / `frac_down` of
+the cluster genes calling it differentially significant in that direction, along with
+the corresponding `up_genes` / `down_genes` lists. This is the data for this step.
+
+You may also use the per-gene `up_features` / `down_features` lists in `cluster_genes`
+ONLY to verify that candidate "essential" features are driven by an OVERLAPPING gene
+subset (not disjoint subsets that just sum to a high fraction).
+
+Procedure:
+
+1. From `feature_coherence.features`, identify "essential" features:
+   - Strong UP: high `frac_up` AND `frac_down` near zero. The supporting gene set must
+     be cohesive — features that aggregate to a high fraction but are driven by largely
+     non-overlapping gene subsets are NOT essential.
+   - Strong DOWN: high `frac_down` AND `frac_up` near zero. Same gene-overlap criterion.
+2. List "mixed_or_unsupported" features — those with both directions modest, or with
+   conflicting directional signal. Do not include features with no signal at all.
+3. Set `concrete`:
+   - true when essential_up + essential_down forms a coherent feature signature: multiple
+     features with strong directional agreement, driven by overlapping gene subsets.
+   - false when no features have strong agreement, OR the candidates with agreement are
+     driven by disjoint gene subsets.
+4. Write `rationale` (one or two sentences). Cite features by name and gene-fractions.
+   When `concrete` is false, briefly state which lens failed (no agreement, or disjoint
+   gene subsets, or both). NO biology, NO mechanisms, NO pathway concepts in this step.
+
+Hard guardrails:
+- This step is recall over a discrete table. Do not introduce mechanisms or biology.
+- Do not invent feature names; only cite features present in `feature_coherence.features`.
+- Off-ramp: if no features pass the criteria, set `concrete: false`, leave
+  `essential_up` and `essential_down` empty, and explain in the rationale.
+- Do not compute or state new biological themes here. The next step does the interpretation.
+
+In the final output, include:
+- A top-level `feature_coherence` object, per the schema:
+{FEATURE_COHERENCE_OUTPUT_FORMAT}"""
+
+PATHWAY_CONSISTENCY_OUTPUT_FORMAT = """
+The top-level "pathway_consistency" field must contain:
+- "verdict": "consistent" | "partial" | "inconsistent" | "no_signal" (required "no_signal" when feature_coherence.concrete is false)
+- "rationale": one or two sentences anchored to dominant_process; cite essential features by name; no new biology
+- "confidence_revision": null | one sentence (only set when essential signature materially changes confidence in dominant_process)
+"""
+
+STEP_PATHWAY_CONSISTENCY = f"""PATHWAY CONSISTENCY (bounded interpretation, anchored to the call):
+
+Using the essential feature signature you produced in FEATURE COHERENCE and the
+`dominant_process` you have already called, judge consistency.
+
+Procedure:
+
+1. Set `verdict`:
+   - "consistent": the essential up/down features track with what `dominant_process`
+     would imply.
+   - "partial": some essential features are consistent, others are not.
+   - "inconsistent": the essential signature contradicts `dominant_process`.
+   - "no_signal": REQUIRED when `feature_coherence.concrete` was false.
+
+2. Write `rationale` (ONE OR TWO sentences). Cite essential features by name and tie
+   them to `dominant_process`. Do not introduce biological mechanisms, pathway-adjacent
+   processes, or any concepts beyond what the literal pathway name in `dominant_process`
+   implies. The rationale's job is to CONNECT the recalled feature signature to the
+   pathway call, NOT to explain new biology.
+
+3. Optional `confidence_revision`: only populate when the essential feature signature
+   materially changes confidence in `dominant_process`. The justification must reference
+   essential features by name, not individual gene claims. Otherwise leave it null.
+
+Hard guardrails:
+- DO NOT modify `dominant_process` based on the feature signature. If features
+  contradict it, that is a confidence concern, not a re-call of the pathway.
+- DO NOT introduce new biological concepts, mechanisms, or pathways. The downstream
+  human-driven MCP exploration handles synthesis; this step is a bounded cross-check.
+- If `feature_coherence.concrete` is false, `verdict` must be "no_signal" and
+  `confidence_revision` must be null. No exceptions.
+
+In the final output, include:
+- A top-level `pathway_consistency` object, per the schema:
+{PATHWAY_CONSISTENCY_OUTPUT_FORMAT}"""
+
+# =============================================================================
 # CHAIN-OF-THOUGHT STEPS
 # =============================================================================
 
@@ -291,6 +387,8 @@ STEPS_DEFAULT_MCP = [
 #   cPri = Sub-classification (references NPR & UPR)
 #   cVer = Verification step
 #   cO   = Final JSON Output step              (references O)
+#   cFC  = Feature Coherence step  (feature-interp mode; emits feature_coherence)
+#   cPC  = Pathway Consistency step (feature-interp mode; emits pathway_consistency)
 #
 # NOTE: "SC" is not in the registry because screen context is dynamic
 # (varies per case). It is handled specially during assembly.
@@ -308,11 +406,14 @@ COMPONENT_REGISTRY = {
     "cPri": COT_STEP_SUBCLASSIFICATION,
     "cPSC": COT_STEP_PATHWAY_SELECTION,
     "cVer": COT_STEP_VERIFICATION,
+    "cFC":  STEP_FEATURE_COHERENCE,
+    "cPC":  STEP_PATHWAY_CONSISTENCY,
     "cO":   COT_STEP_OUTPUT,
 }
 
 CANONICAL_ZERO_SHOT_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]
 CANONICAL_COT_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cO"]
+CANONICAL_FEATURE_INTERP_COT_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cFC", "cPC", "cO"]
 
 
 def assemble_cot_instructions(

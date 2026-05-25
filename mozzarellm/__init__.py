@@ -25,6 +25,7 @@ from .prompt_components import (
     COMPONENT_REGISTRY,
     CANONICAL_ZERO_SHOT_ORDER,
     CANONICAL_COT_ORDER,
+    CANONICAL_FEATURE_INTERP_COT_ORDER,
 )
 from .utils.prompt_factory import assemble_from_component_order
 from .schemas.mcp_schemas import (
@@ -58,6 +59,7 @@ __all__ = [
     "COMPONENT_REGISTRY",
     "CANONICAL_ZERO_SHOT_ORDER",
     "CANONICAL_COT_ORDER",
+    "CANONICAL_FEATURE_INTERP_COT_ORDER",
     "assemble_from_component_order",
     # Literature validation schemas
     "RelevantPaper",
