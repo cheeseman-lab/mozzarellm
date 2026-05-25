@@ -181,10 +181,12 @@ class UniProtClient:
     @staticmethod
     def _generate_cluster_search_query(chunk: pd.DataFrame, stable_accession_col: str) -> str:
         """Generate a search query for a chunk of gene-level data."""
-        if stable_accession_col in chunk.columns:
-            chunk_genes = chunk[stable_accession_col].tolist()
-        else:
-            chunk_genes = chunk["accession"].tolist()
+        col = stable_accession_col if stable_accession_col in chunk.columns else "accession"
+        chunk_genes = [
+            str(a).strip()
+            for a in chunk[col].tolist()
+            if str(a).strip() and str(a).strip() != "NON_TARGETING_CONTROL"
+        ]
         return "(" + " OR ".join(chunk_genes) + ") AND reviewed:true"
         # TODO: handle edge case where chunk is >100 genes (search query limit)
 
