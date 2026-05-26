@@ -13,11 +13,11 @@ import pytest
 import requests
 
 from mozzarellm.clients.uniprot_api_client import (
-    UniProtClient,
-    DEFAULT_TIMEOUT,
-    DEFAULT_MAX_RETRIES,
-    DEFAULT_BACKOFF_TIME,
     BASE_URL,
+    DEFAULT_BACKOFF_TIME,
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_TIMEOUT,
+    UniProtClient,
 )
 
 ####################### TEST CONSTANTS #######################
@@ -394,11 +394,15 @@ def test_get_retries_on_failure(tmp_path):
 
 def test_get_raises_after_max_retries(client):
     """Test _get raises exception after exhausting retries"""
-    with patch.object(
-        client._session, "get", side_effect=requests.exceptions.RequestException("Persistent error")
+    with (
+        patch.object(
+            client._session,
+            "get",
+            side_effect=requests.exceptions.RequestException("Persistent error"),
+        ),
+        pytest.raises(requests.exceptions.RequestException, match="Persistent error"),
     ):
-        with pytest.raises(requests.exceptions.RequestException, match="Persistent error"):
-            client._get(path="/test")
+        client._get(path="/test")
 
 
 def test_get_uses_cache_if_available(client):
@@ -439,22 +443,26 @@ def test_get_accession_from_gene_symbol_unreviewed_fallback(client):
     """Test accession lookup falls back to unreviewed if no reviewed entries"""
     mock_response = {"results": [{"primaryAccession": "Q9UNREVIEWED", "reviewed": False}]}
 
-    with patch.object(client, "_get", return_value=mock_response):
-        with pytest.warns(UserWarning, match="No reviewed UniProt entries found"):
-            accession = client.get_accession_from_gene_symbol(
-                "NOVEL_GENE", organism_id=HUMAN_ORGANISM_ID
-            )
+    with (
+        patch.object(client, "_get", return_value=mock_response),
+        pytest.warns(UserWarning, match="No reviewed UniProt entries found"),
+    ):
+        accession = client.get_accession_from_gene_symbol(
+            "NOVEL_GENE", organism_id=HUMAN_ORGANISM_ID
+        )
 
     assert accession == "Q9UNREVIEWED"
 
 
 def test_get_accession_from_gene_symbol_no_results(client):
     """Test accession lookup returns empty string when no results"""
-    with patch.object(client, "_get", return_value={"results": []}):
-        with pytest.warns(UserWarning, match="No UniProt entries found"):
-            accession = client.get_accession_from_gene_symbol(
-                "NONEXISTENT", organism_id=HUMAN_ORGANISM_ID
-            )
+    with (
+        patch.object(client, "_get", return_value={"results": []}),
+        pytest.warns(UserWarning, match="No UniProt entries found"),
+    ):
+        accession = client.get_accession_from_gene_symbol(
+            "NONEXISTENT", organism_id=HUMAN_ORGANISM_ID
+        )
 
     assert accession == ""
 
@@ -508,9 +516,11 @@ def test_fetch_functional_annotations_no_results_raises(client):
     """Test fetching annotations raises when no results found"""
     chunk = pd.DataFrame({ACCESSION_COL: ["FAKE123"]})
 
-    with patch.object(client, "_get", return_value={"results": []}):
-        with pytest.raises(ValueError, match="No UniProt entries found"):
-            client.fetch_functional_annotations(chunk, ACCESSION_COL)
+    with (
+        patch.object(client, "_get", return_value={"results": []}),
+        pytest.raises(ValueError, match="No UniProt entries found"),
+    ):
+        client.fetch_functional_annotations(chunk, ACCESSION_COL)
 
 
 def test_generate_cluster_search_query():

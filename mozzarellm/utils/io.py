@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Iterable
 
 import pandas as pd
 from pydantic import ValidationError
+
 from mozzarellm.schemas.bundle_schemas import EvidenceBundle
 
 
@@ -13,7 +12,7 @@ def write_bundle(evidence_bundle_dict: dict, path: str | Path) -> Path:
     try:
         bundle = EvidenceBundle.model_validate(evidence_bundle_dict)
     except ValidationError as e:
-        raise ValueError(f"Invalid bundle: {e}")
+        raise ValueError(f"Invalid bundle: {e}") from e
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(bundle.model_dump_json(indent=2, exclude_none=True), encoding="utf-8")

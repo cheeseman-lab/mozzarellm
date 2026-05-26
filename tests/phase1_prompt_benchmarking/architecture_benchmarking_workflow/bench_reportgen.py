@@ -148,7 +148,7 @@ def _build_report_markdown(
 ) -> list[str]:
     """Build the Markdown report lines."""
     lines = []
-    lines.append(f"# Architecture Benchmark Report")
+    lines.append("# Architecture Benchmark Report")
     lines.append("")
     lines.append(f"**Experiment:** `{config_dict.get('experiment_id', 'unknown')}`")
     lines.append(f"**Model:** `{config_dict.get('model', {}).get('model_name', 'unknown')}`")
@@ -278,7 +278,7 @@ def _build_report_markdown(
 
     for screen_name, screen_records in sorted(by_screen.items()):
         lines.append(f"### {screen_name}")
-        lines.append(f"- Clusters: {len(set(r['cluster_id'] for r in screen_records))}")
+        lines.append(f"- Clusters: {len({r['cluster_id'] for r in screen_records})}")
         lines.append(f"- Total LLM Analysis Runs: {len(screen_records)}")
         errors = [r for r in screen_records if r.get("error")]
         lines.append(f"- Errors: {len(errors)}")
@@ -332,11 +332,11 @@ def _build_order_variant_section(
             n = len(vrecs)
             metrics_list = [r.get("metrics", {}) for r in vrecs]
 
-            def _rate(key):
+            def _rate(key, metrics_list=metrics_list):
                 vals = [m.get(key) for m in metrics_list if m.get(key) is not None]
                 return sum(1 for v in vals if v) / len(vals) if vals else None
 
-            def _mean(key):
+            def _mean(key, metrics_list=metrics_list):
                 vals = [m.get(key) for m in metrics_list if m.get(key) is not None]
                 return sum(vals) / len(vals) if vals else None
 

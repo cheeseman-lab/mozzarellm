@@ -80,6 +80,14 @@ exclude = [
     "*.egg-info",
 ]
 
+# Intentional per-file exceptions
+[tool.ruff.lint.per-file-ignores]
+# Orchestrator puts the repo root on sys.path before importing mozzarellm.*
+"tests/phase1_prompt_benchmarking/architecture_benchmarking_workflow/bench_orchestrator.py" = ["E402"]
+# Constant-style locals / Chain-of-Thought argument naming, kept by intent
+"mozzarellm/pipeline/bundle_builder.py" = ["N806"]
+"mozzarellm/utils/prompt_factory.py" = ["N806", "N803"]
+
 [tool.ruff.format]
 # Use double quotes for strings
 quote-style = "double"

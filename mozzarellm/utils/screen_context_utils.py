@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
+
 from mozzarellm.schemas.bundle_schemas import ScreenContext
 
 JSON_BYTE_CAP = 5_000  # 5 KB -- conservative cap, needs to be adjusted
@@ -8,7 +9,7 @@ JSON_BYTE_CAP = 5_000  # 5 KB -- conservative cap, needs to be adjusted
 
 def _context_json_validator(data) -> bool:
     """Validate that the context JSON is valid and doesn't contain TODO fields."""
-    if "TODO" in data.keys():
+    if "TODO" in data:
         raise ValueError(
             "Screen context JSON contains TODO field. Please double check the file and remove it."
         )
@@ -23,7 +24,7 @@ def load_screen_context_json(
     path: str | Path | None,
     *,
     override: bool = False,  # optional kwarg
-) -> Dict[str, Any] | None:
+) -> dict[str, Any] | None:
     """Load structured screen context from JSON."""
     try:
         if path is None:

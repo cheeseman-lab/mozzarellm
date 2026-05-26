@@ -13,7 +13,6 @@ import argparse
 import hashlib
 import json
 import os
-import shutil
 import sys
 import threading
 import time
@@ -39,23 +38,21 @@ import pandas as pd
 from mozzarellm.clients.llm_api_clients import create_client
 from mozzarellm.pipeline.literature_mcp import get_available_mcp_servers
 from mozzarellm.utils.prompt_factory import (
+    compose_stepwise_user_turns,
     make_cluster_analysis_system_prompt,
     make_single_cluster_analysis_user_prompt,
-    compose_stepwise_user_turns,
 )
-from mozzarellm.utils.trace import save_trace
 
+from .arch_bench_routes import Route, build_routes_from_config
 from .bench_configparse import BenchmarkConfig, TimingConfig, load_config
 from .bench_dry_run import (
+    _load_bundle_genes,
     generate_mock_parsed_output,
     generate_mock_raw_outputs,
-    _load_bundle_genes,
 )
 from .bench_metricfns import compute_all_metrics
 from .bench_reportgen import generate_report
-from .arch_bench_routes import Route, build_routes_from_config
 from .order_bench_orderings import build_order_benchmark_routes, compose_stepwise_turns_from_route
-
 
 # =============================================================================
 # HELPERS
@@ -126,9 +123,8 @@ def _filter_clusters(df: pd.DataFrame, config: BenchmarkConfig) -> list[tuple[st
 def _append_jsonl(path: Path, record: dict) -> None:
     """Append one JSON record to a .jsonl file (thread-safe)."""
     line = json.dumps(record, default=str) + "\n"
-    with _IO_LOCK:
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(line)
+    with _IO_LOCK, open(path, "a", encoding="utf-8") as f:
+        f.write(line)
 
 
 # =============================================================================
@@ -315,7 +311,6 @@ def execute_single_run(
     )
     system_prompt = prompts["system_prompt"]
     user_prompt = prompts["user_prompt"]
-    stepwise_turns = prompts["stepwise_turns"]
     t_prompt = time.perf_counter() - t0
 
     system_prompt_hash = _sha256(system_prompt)
@@ -642,7 +637,9 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
                 config.paths.evidence_bundles_dir, screen_name, cluster_id
             )
             if bundle_path is None:
-                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- bundle not found")
+                print(
+                    f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- bundle not found"
+                )
                 continue
             screen_context_path = _resolve_screen_context_path(
                 config.paths.benchmark_inputs_dir, screen_name
@@ -726,7 +723,7 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
     )
 
     # Generate report
-    print(f"\nGenerating report...")
+    print("\nGenerating report...")
     report_path = generate_report(all_records, config_snapshot, output_dir)
     print(f"  Report: {report_path}")
     print(f"  Done. {len(all_records)} analysis runs completed, {manifest['errors']} errors.")

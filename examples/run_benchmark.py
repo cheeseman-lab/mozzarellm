@@ -38,10 +38,10 @@ from mozzarellm.pipeline.bundle_builder import (
     get_or_append_stable_accession,
 )
 from mozzarellm.pipeline.literature_mcp import get_available_mcp_servers
-from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
 from mozzarellm.prompt_components import (
     CANONICAL_FEATURE_INTERP_COT_ORDER,
 )
+from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
 from mozzarellm.utils.prompt_factory import (
     make_cluster_analysis_system_prompt,
     make_single_cluster_analysis_user_prompt,
