@@ -6,7 +6,7 @@ experiment_id: order_bench_denali_live_test
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
-  evidence_bundles_dir: benchmark_evidence_bundles
+  evidence_bundles_dir: benchmark_evidence_bundles_uniprot
   output_dir: benchmarking_outputs/2.order
 
 model:

@@ -51,11 +51,6 @@
       "gene_symbol": "TMEM217B",
       "UniProt_functional_annotation": "",
       "accession": "A0A494BZU4"
-    },
-    {
-      "gene_symbol": "nontargeting_intergenic_CTACGCAGACAG",
-      "UniProt_functional_annotation": "",
-      "accession": "NON_TARGETING_CONTROL"
     }
   ]
 }

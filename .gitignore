@@ -53,7 +53,7 @@ examples/proteomics/results/
 examples/benchmark_results/
 
 # Bundle-build intermediates (regenerable provenance; the bundles themselves are tracked)
-tests/phase1_prompt_benchmarking/benchmark_evidence_bundles/*_analysis/
+tests/phase1_prompt_benchmarking/benchmark_evidence_bundles*/*_analysis/
 
 # IDE files
 .idea/

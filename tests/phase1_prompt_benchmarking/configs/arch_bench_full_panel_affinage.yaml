@@ -1,13 +1,13 @@
-# Architecture Benchmark — Full Panel (Phase 1)
+# Architecture Benchmark — Full Panel (Phase 1), Affinage evidence source
 # 18 clusters (14 annotated + 4 negative-set) × 6 routes × 1 replicate = 108 runs.
-# UniProt evidence source. Negative clusters are run-only (excluded from scoring).
+# Affinage narratives (gated on audit_flag; UniProt backup). Negatives are run-only.
 
-experiment_id: arch_bench_full_v1
+experiment_id: arch_bench_affinage_v1
 
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
-  evidence_bundles_dir: benchmark_evidence_bundles_uniprot
+  evidence_bundles_dir: benchmark_evidence_bundles_affinage
   output_dir: benchmarking_outputs/1.arch
 
 model:
