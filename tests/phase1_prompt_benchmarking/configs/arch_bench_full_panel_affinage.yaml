@@ -1,8 +1,8 @@
 # Architecture Benchmark — Full Panel (Phase 1), Affinage evidence source
-# 18 clusters (14 annotated + 4 negative-set) × 6 routes × 1 replicate = 108 runs.
+# 18 clusters (14 annotated + 4 negative-set) × 6 routes × 3 replicates = 324 runs.
 # Affinage narratives (gated on audit_flag; UniProt backup). Negatives are run-only.
 
-experiment_id: arch_bench_affinage_v1
+experiment_id: arch_bench_affinage_n3
 
 paths:
   benchmark_inputs_dir: benchmark_inputs
@@ -19,7 +19,7 @@ model:
   top_k: null
 
 run:
-  num_replicates: 1
+  num_replicates: 3
   max_workers: 4
   dry_run: false
   workflow_testing: false
