@@ -29,6 +29,7 @@ class PathsConfig:
 @dataclass
 class RunConfig:
     num_replicates: int = 3
+    max_workers: int = 4
     dry_run: bool = False
     workflow_testing: bool = False
     overwrite_outputs: bool = False
@@ -160,6 +161,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
         r = raw["run"]
         cfg.run = RunConfig(
             num_replicates=r.get("num_replicates", cfg.run.num_replicates),
+            max_workers=r.get("max_workers", cfg.run.max_workers),
             dry_run=r.get("dry_run", cfg.run.dry_run),
             workflow_testing=r.get("workflow_testing", cfg.run.workflow_testing),
             overwrite_outputs=r.get("overwrite_outputs", cfg.run.overwrite_outputs),

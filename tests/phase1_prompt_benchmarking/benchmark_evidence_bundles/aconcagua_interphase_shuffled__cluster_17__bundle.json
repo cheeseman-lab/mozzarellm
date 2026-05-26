@@ -1,0 +1,301 @@
+{
+  "screen_name": "aconcagua_interphase_shuffled",
+  "cluster_id": "17",
+  "cluster_genes": [
+    {
+      "gene_symbol": "ARF3",
+      "UniProt_functional_annotation": "GTP-binding protein that functions as an allosteric activator of the cholera toxin catalytic subunit, an ADP-ribosyltransferase. Involved in protein trafficking; may modulate vesicle budding and uncoating within the Golgi apparatus",
+      "accession": "P61204"
+    },
+    {
+      "gene_symbol": "ARL17A",
+      "UniProt_functional_annotation": "Putative small GTP-binding protein cycling between an inactive GDP-bound and an active GTP-bound form",
+      "accession": "Q8IVW1"
+    },
+    {
+      "gene_symbol": "B3GNT2",
+      "UniProt_functional_annotation": "Beta-1,3-N-acetylglucosaminyltransferase involved in the synthesis of poly-N-acetyllactosamine. Catalyzes the initiation and elongation of poly-N-acetyllactosamine chains. Shows a marked preference for Gal(beta1-4)Glc(NAc)-based acceptors (PubMed:9892646). Probably constitutes the main polylactosamine synthase",
+      "accession": "Q9NY97"
+    },
+    {
+      "gene_symbol": "BLM",
+      "UniProt_functional_annotation": "ATP-dependent DNA helicase that unwinds double-stranded (ds)DNA in a 3'-5' direction (PubMed:24816114, PubMed:25901030, PubMed:9388193, PubMed:9765292). Participates in DNA replication and repair (PubMed:12019152, PubMed:21325134, PubMed:23509288, PubMed:34606619). Involved in 5'-end resection of DNA during double-strand break (DSB) repair: unwinds DNA and recruits DNA2 which mediates the cleavage of 5'-ssDNA (PubMed:21325134). Stimulates DNA 4-way junction branch migration and DNA Holliday junction dissolution (PubMed:25901030). Binds single-stranded DNA (ssDNA), forked duplex DNA and Holliday junction DNA (PubMed:20639533, PubMed:24257077, PubMed:25901030). Unwinds G-quadruplex DNA; unwinding occurs in the 3'-5' direction and requires a 3' single-stranded end of at least 7 nucleotides (PubMed:18426915, PubMed:9765292). Helicase activity is higher on G-quadruplex substrates than on duplex DNA substrates (PubMed:9765292). Telomeres, immunoglobulin heavy chain switch regions and rDNA are notably G-rich; formation of G-quadruplex DNA would block DNA replication and transcription (PubMed:18426915, PubMed:9765292). Negatively regulates sister chromatid exchange (SCE) (PubMed:25901030). Recruited by the KHDC3L-OOEP scaffold to DNA replication forks where it is retained by TRIM25 ubiquitination, it thereby promotes the restart of stalled replication forks (By similarity)\n(Microbial infection) Eliminates nuclear HIV-1 cDNA, thereby suppressing immune sensing and proviral hyper-integration",
+      "accession": "P54132"
+    },
+    {
+      "gene_symbol": "CARNMT1",
+      "UniProt_functional_annotation": "N-methyltransferase that catalyzes the formation of anserine (beta-alanyl-N(Pi)-methyl-L-histidine) from carnosine. Anserine, a methylated derivative of carnosine (beta-alanyl-L-histidine), is an abundant constituent of vertebrate skeletal muscles. Also methylates other L-histidine-containing di- and tripeptides such as Gly-Gly-His, Gly-His and homocarnosine (GABA-His)",
+      "accession": "Q8N4J0"
+    },
+    {
+      "gene_symbol": "DENR",
+      "UniProt_functional_annotation": "Translation regulator forming a complex with MCTS1 to promote translation reinitiation. Translation reinitiation is the process where the small ribosomal subunit remains attached to the mRNA following termination of translation of a regulatory upstream ORF (uORF), and resume scanning on the same mRNA molecule to initiate translation of a downstream ORF, usually the main ORF (mORF). The MCTS1/DENR complex is pivotal to two linked mechanisms essential for translation reinitiation. Firstly, the dissociation of deacylated tRNAs from post-termination 40S ribosomal complexes during ribosome recycling. Secondly, the recruitment in an EIF2-independent manner of aminoacylated initiator tRNA to P site of 40S ribosomes for a new round of translation. This regulatory mechanism governs the translation of more than 150 genes which translation reinitiation is MCTS1/DENR complex-dependent",
+      "accession": "O43583"
+    },
+    {
+      "gene_symbol": "FAM104B",
+      "UniProt_functional_annotation": "",
+      "accession": "Q5XKR9"
+    },
+    {
+      "gene_symbol": "GTF2B",
+      "UniProt_functional_annotation": "General transcription factor that plays a role in transcription initiation by RNA polymerase II (Pol II). Involved in the pre-initiation complex (PIC) formation and Pol II recruitment at promoter DNA (PubMed:12931194, PubMed:1517211, PubMed:1876184, PubMed:1946368, PubMed:27193682, PubMed:3029109, PubMed:3818643, PubMed:7601352, PubMed:8413225, PubMed:8515820, PubMed:8516311, PubMed:8516312, PubMed:9420329). Together with the TATA box-bound TBP forms the core initiation complex and provides a bridge between TBP and the Pol II-TFIIF complex (PubMed:8413225, PubMed:8504927, PubMed:8515820, PubMed:8516311, PubMed:8516312). Released from the PIC early following the onset of transcription during the initiation and elongation transition and reassociates with TBP during the next transcription cycle (PubMed:7601352). Associates with chromatin to core promoter-specific regions (PubMed:12931194, PubMed:24441171). Binds to two distinct DNA core promoter consensus sequence elements in a TBP-independent manner; these IIB-recognition elements (BREs) are localized immediately upstream (BREu), 5'-[GC][GC][GA]CGCC-3', and downstream (BREd), 5'-[GA]T[TGA][TG][GT][TG][TG]-3', of the TATA box element (PubMed:10619841, PubMed:16230532, PubMed:7675079, PubMed:9420329). Modulates transcription start site selection (PubMed:10318856). Also exhibits autoacetyltransferase activity that contributes to the activated transcription (PubMed:12931194)",
+      "accession": "Q00403"
+    },
+    {
+      "gene_symbol": "HCFC1",
+      "UniProt_functional_annotation": "Transcriptional coregulator (By similarity). Serves as a scaffold protein, bridging interactions between transcription factors, including THAP11 and ZNF143, and transcriptional coregulators (PubMed:26416877). Involved in control of the cell cycle (PubMed:10629049, PubMed:10779346, PubMed:15190068, PubMed:16624878, PubMed:23629655). Also antagonizes transactivation by ZBTB17 and GABP2; represses ZBTB17 activation of the p15(INK4b) promoter and inhibits its ability to recruit p300 (PubMed:10675337, PubMed:12244100). Coactivator for EGR2 and GABP2 (PubMed:12244100, PubMed:14532282). Tethers the chromatin modifying Set1/Ash2 histone H3 'Lys-4' methyltransferase (H3K4me) and Sin3 histone deacetylase (HDAC) complexes (involved in the activation and repression of transcription, respectively) together (PubMed:12670868). Component of a THAP1/THAP3-HCFC1-OGT complex that is required for the regulation of the transcriptional activity of RRM1 (PubMed:20200153). As part of the NSL complex it may be involved in acetylation of nucleosomal histone H4 on several lysine residues (PubMed:20018852). Recruits KMT2E/MLL5 to E2F1 responsive promoters promoting transcriptional activation and thereby facilitates G1 to S phase transition (PubMed:23629655). Modulates expression of homeobox protein PDX1, perhaps acting in concert with transcription factor E2F1, thereby regulating pancreatic beta-cell growth and glucose-stimulated insulin secretion (By similarity). May negatively modulate transcriptional activity of FOXO3 (By similarity)\n(Microbial infection) In case of human herpes simplex virus (HSV) infection, HCFC1 forms a multiprotein-DNA complex with the viral transactivator protein VP16 and POU2F1 thereby enabling the transcription of the viral immediate early genes",
+      "accession": "P51610"
+    },
+    {
+      "gene_symbol": "HMGN2",
+      "UniProt_functional_annotation": "Binds to the inner side of the nucleosomal DNA thus altering the interaction between the DNA and the histone octamer. May be involved in the process which maintains transcribable genes in a unique chromatin conformation (By similarity)",
+      "accession": "P05204"
+    },
+    {
+      "gene_symbol": "IMP4",
+      "UniProt_functional_annotation": "Component of the 60-80S U3 small nucleolar ribonucleoprotein (U3 snoRNP). Required for the early cleavages during pre-18S ribosomal RNA processing (PubMed:12655004). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "Q96G21"
+    },
+    {
+      "gene_symbol": "KDM2A",
+      "UniProt_functional_annotation": "Histone demethylase that specifically demethylates 'Lys-36' of histone H3, thereby playing a central role in histone code. Preferentially demethylates dimethylated H3 'Lys-36' residue while it has weak or no activity for mono- and tri-methylated H3 'Lys-36'. May also recognize and bind to some phosphorylated proteins and promote their ubiquitination and degradation. Required to maintain the heterochromatic state. Associates with centromeres and represses transcription of small non-coding RNAs that are encoded by the clusters of satellite repeats at the centromere. Required to sustain centromeric integrity and genomic stability, particularly during mitosis. Regulates circadian gene expression by repressing the transcriptional activator activity of CLOCK-BMAL1 heterodimer and RORA in a catalytically-independent manner (PubMed:26037310)",
+      "accession": "Q9Y2K7"
+    },
+    {
+      "gene_symbol": "KRT16",
+      "UniProt_functional_annotation": "Epidermis-specific type I keratin that plays a key role in skin. Acts as a regulator of innate immunity in response to skin barrier breach: required for some inflammatory checkpoint for the skin barrier maintenance",
+      "accession": "P08779"
+    },
+    {
+      "gene_symbol": "KRT7",
+      "UniProt_functional_annotation": "Blocks interferon-dependent interphase and stimulates DNA synthesis in cells. Involved in the translational regulation of the human papillomavirus type 16 E7 mRNA (HPV16 E7)",
+      "accession": "P08729"
+    },
+    {
+      "gene_symbol": "KRTAP4-5",
+      "UniProt_functional_annotation": "In the hair cortex, hair keratin intermediate filaments are embedded in an interfilamentous matrix, consisting of hair keratin-associated proteins (KRTAP), which are essential for the formation of a rigid and resistant hair shaft through their extensive disulfide bond cross-linking with abundant cysteine residues of hair keratins. The matrix proteins include the high-sulfur and high-glycine-tyrosine keratins",
+      "accession": "Q9BYR2"
+    },
+    {
+      "gene_symbol": "LRRC10B",
+      "UniProt_functional_annotation": "",
+      "accession": "A6NIK2"
+    },
+    {
+      "gene_symbol": "MED28",
+      "UniProt_functional_annotation": "Component of the Mediator complex, a coactivator involved in the regulated transcription of nearly all RNA polymerase II-dependent genes. Mediator functions as a bridge to convey information from gene-specific regulatory proteins to the basal RNA polymerase II transcription machinery. Mediator is recruited to promoters by direct interactions with regulatory proteins and serves as a scaffold for the assembly of a functional preinitiation complex with RNA polymerase II and the general transcription factors. May be part of a complex containing NF2/merlin that participates in cellular signaling to the actin cytoskeleton downstream of tyrosine kinase signaling pathways",
+      "accession": "Q9H204"
+    },
+    {
+      "gene_symbol": "MINDY1",
+      "UniProt_functional_annotation": "Hydrolase that can specifically remove 'Lys-48'-linked conjugated ubiquitin from proteins. Has exodeubiquitinase activity and has a preference for long polyubiquitin chains. May play a regulatory role at the level of protein turnover",
+      "accession": "Q8N5J2"
+    },
+    {
+      "gene_symbol": "MRPS2",
+      "UniProt_functional_annotation": "Required for mitoribosome formation and stability, and mitochondrial translation",
+      "accession": "Q9Y399"
+    },
+    {
+      "gene_symbol": "MRPS28",
+      "UniProt_functional_annotation": "",
+      "accession": "P82673"
+    },
+    {
+      "gene_symbol": "MRPS33",
+      "UniProt_functional_annotation": "",
+      "accession": "Q9Y291"
+    },
+    {
+      "gene_symbol": "MVD",
+      "UniProt_functional_annotation": "Catalyzes the ATP dependent decarboxylation of (R)-5-diphosphomevalonate to form isopentenyl diphosphate (IPP). Functions in the mevalonate (MVA) pathway leading to isopentenyl diphosphate (IPP), a key precursor for the biosynthesis of isoprenoids and sterol synthesis",
+      "accession": "P53602"
+    },
+    {
+      "gene_symbol": "NDRG3",
+      "UniProt_functional_annotation": "",
+      "accession": "Q9UGV2"
+    },
+    {
+      "gene_symbol": "NDUFS1",
+      "UniProt_functional_annotation": "Core subunit of the mitochondrial membrane respiratory chain NADH dehydrogenase (Complex I) which catalyzes electron transfer from NADH through the respiratory chain, using ubiquinone as an electron acceptor (PubMed:30879903, PubMed:31557978). Essential for catalysing the entry and efficient transfer of electrons within complex I (PubMed:31557978). Plays a key role in the assembly and stability of complex I and participates in the association of complex I with ubiquinol-cytochrome reductase complex (Complex III) to form supercomplexes (PubMed:30879903, PubMed:31557978)",
+      "accession": "P28331"
+    },
+    {
+      "gene_symbol": "NDUFS5",
+      "UniProt_functional_annotation": "Accessory subunit of the mitochondrial membrane respiratory chain NADH dehydrogenase (Complex I), that is believed not to be involved in catalysis. Complex I functions in the transfer of electrons from NADH to the respiratory chain. The immediate electron acceptor for the enzyme is believed to be ubiquinone",
+      "accession": "O43920"
+    },
+    {
+      "gene_symbol": "NFE2",
+      "UniProt_functional_annotation": "Component of the NF-E2 complex essential for regulating erythroid and megakaryocytic maturation and differentiation. Binds to the hypersensitive site 2 (HS2) of the beta-globin control region (LCR). This subunit (NFE2) recognizes the TCAT/C sequence of the AP-1-like core palindrome present in a number of erythroid and megakaryocytic gene promoters. Requires MAFK or other small MAF proteins for binding to the NF-E2 motif. May play a role in all aspects of hemoglobin production from globin and heme synthesis to procurement of iron",
+      "accession": "Q16621"
+    },
+    {
+      "gene_symbol": "NRF1",
+      "UniProt_functional_annotation": "Transcription factor that activates the expression of the EIF2S1 (EIF2-alpha) gene. Links the transcriptional modulation of key metabolic genes to cellular growth and development. Implicated in the control of nuclear genes required for respiration, heme biosynthesis, and mitochondrial DNA transcription and replication",
+      "accession": "Q16656"
+    },
+    {
+      "gene_symbol": "PHGDH",
+      "UniProt_functional_annotation": "Catalyzes the reversible oxidation of 3-phospho-D-glycerate to 3-phosphonooxypyruvate, the first step of the phosphorylated L-serine biosynthesis pathway. Also catalyzes the reversible oxidation of 2-hydroxyglutarate to 2-oxoglutarate and the reversible oxidation of (S)-malate to oxaloacetate",
+      "accession": "O43175"
+    },
+    {
+      "gene_symbol": "PIK3R2",
+      "UniProt_functional_annotation": "Regulatory subunit of phosphoinositide-3-kinase (PI3K), a kinase that phosphorylates PtdIns(4,5)P2 (Phosphatidylinositol 4,5-bisphosphate) to generate phosphatidylinositol 3,4,5-trisphosphate (PIP3). PIP3 plays a key role by recruiting PH domain-containing proteins to the membrane, including AKT1 and PDPK1, activating signaling cascades involved in cell growth, survival, proliferation, motility and morphology. Binds to activated (phosphorylated) protein-tyrosine kinases, through its SH2 domain, and acts as an adapter, mediating the association of the p110 catalytic unit to the plasma membrane. Indirectly regulates autophagy (PubMed:23604317). Promotes nuclear translocation of XBP1 isoform 2 in a ER stress- and/or insulin-dependent manner during metabolic overloading in the liver and hence plays a role in glucose tolerance improvement (By similarity)",
+      "accession": "O00459"
+    },
+    {
+      "gene_symbol": "PMVK",
+      "UniProt_functional_annotation": "Catalyzes the reversible ATP-dependent phosphorylation of mevalonate 5-phosphate to produce mevalonate diphosphate and ADP, a key step in the mevalonic acid mediated biosynthesis of isopentenyl diphosphate and other polyisoprenoid metabolites",
+      "accession": "Q15126"
+    },
+    {
+      "gene_symbol": "PPP1R7",
+      "UniProt_functional_annotation": "Regulatory subunit of protein phosphatase 1",
+      "accession": "Q15435"
+    },
+    {
+      "gene_symbol": "PPRC1",
+      "UniProt_functional_annotation": "Acts as a coactivator during transcriptional activation of nuclear genes related to mitochondrial biogenesis and cell growth. Involved in the transcription coactivation of CREB and NRF1 target genes",
+      "accession": "Q5VV67"
+    },
+    {
+      "gene_symbol": "PRLHR",
+      "UniProt_functional_annotation": "Receptor for prolactin-releasing peptide (PrRP). Implicated in lactation, regulation of food intake and pain-signal processing",
+      "accession": "P49683"
+    },
+    {
+      "gene_symbol": "PRR20D",
+      "UniProt_functional_annotation": "",
+      "accession": "P86480"
+    },
+    {
+      "gene_symbol": "PSMA1",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P25786"
+    },
+    {
+      "gene_symbol": "RBX1",
+      "UniProt_functional_annotation": "E3 ubiquitin ligase component of multiple cullin-RING-based E3 ubiquitin-protein ligase (CRLs) complexes which mediate the ubiquitination and subsequent proteasomal degradation of target proteins, including proteins involved in cell cycle progression, signal transduction, transcription and transcription-coupled nucleotide excision repair (PubMed:10230407, PubMed:10579999, PubMed:11961546, PubMed:15983046, PubMed:16678110, PubMed:19112177, PubMed:19679664, PubMed:22748924, PubMed:23455478, PubMed:27565346, PubMed:29769719, PubMed:32355176, PubMed:33417871, PubMed:37844242, PubMed:38326650, PubMed:39504960, PubMed:39667934, PubMed:38316879). CRLs complexes and ARIH1 collaborate in tandem to mediate ubiquitination of target proteins, ARIH1 mediating addition of the first ubiquitin on CRLs targets (PubMed:27565346). The functional specificity of the E3 ubiquitin-protein ligase complexes depends on the variable substrate recognition components. As a component of the CSA complex mediates ubiquitination of Pol II subunit POLR2A at 'Lys-1268', a critical TC-NER checkpoint (PubMed:32355176, PubMed:34526721). Core component of the Cul7-RING(FBXW8) ubiquitin ligase complex, which mediates the ubiquitination and subsequent proteasomal degradation of target proteins (PubMed:35982156). Core component of a Cul9-RING ubiquitin ligase complex composed of CUL9 and RBX1, which mediates mono-ubiquitination of p53/TP53 (PubMed:38605244). Recruits the E2 ubiquitin-conjugating enzyme CDC34 to the complex and brings it into close proximity to the substrate. Probably also stimulates CDC34 autoubiquitination. May be required for histone H3 and histone H4 ubiquitination in response to ultraviolet and for subsequent DNA repair. Promotes the neddylation of CUL1, CUL2, CUL4 and CUL4 via its interaction with UBE2M. Involved in the ubiquitination of KEAP1, ENC1 and KLHL41. In concert with ATF2 and CUL3, promotes degradation of KAT5 thereby attenuating its ability to acetylate and activate ATM. As part of a multisubunit complex composed of elongin BC complex (ELOB and ELOC), elongin A/ELOA, RBX1 and CUL5; polyubiquitinates monoubiquitinated POLR2A (PubMed:19920177)",
+      "accession": "P62877"
+    },
+    {
+      "gene_symbol": "SAP30BP",
+      "UniProt_functional_annotation": "Plays a role in transcriptional repression by promoting histone deacetylase activity, leading to deacetylation of histone H3 (PubMed:21221920). Acts as a regulator of pre-mRNA splicing by facilitating assembly of the cyclin-L-CDK11 cyclin-dependent protein kinase complex, thereby promoting phosphorylation of SF3B1 (PubMed:38059508). May be involved in the regulation of beta-2-microglobulin genes (By similarity)\n(Microbial infection) Involved in transcriptional repression of HHV-1 genes TK and gC",
+      "accession": "Q9UHR5"
+    },
+    {
+      "gene_symbol": "SEBOX",
+      "UniProt_functional_annotation": "Probable transcription factor involved in the control of specification of mesoderm and endoderm",
+      "accession": "Q9HB31"
+    },
+    {
+      "gene_symbol": "SEC61G",
+      "UniProt_functional_annotation": "Component of SEC61 channel-forming translocon complex that mediates transport of signal peptide-containing precursor polypeptides across the endoplasmic reticulum (ER) (By similarity). Forms a ribosome receptor and a gated pore in the ER membrane, both functions required for cotranslational translocation of nascent polypeptides (By similarity). The SEC61 channel is also involved in ER membrane insertion of transmembrane proteins: it mediates membrane insertion of the first few transmembrane segments of proteins, while insertion of subsequent transmembrane regions of multi-pass membrane proteins is mediated by the multi-pass translocon (MPT) complex (PubMed:32820719, PubMed:36261522). The SEC61 channel cooperates with the translocating protein TRAM1 to import nascent proteins into the ER (By similarity)",
+      "accession": "P60059"
+    },
+    {
+      "gene_symbol": "SLBP",
+      "UniProt_functional_annotation": "RNA-binding protein involved in the histone pre-mRNA processing (PubMed:12588979, PubMed:19155325, PubMed:8957003, PubMed:9049306). Binds the stem-loop structure of replication-dependent histone pre-mRNAs and contributes to efficient 3'-end processing by stabilizing the complex between histone pre-mRNA and U7 small nuclear ribonucleoprotein (snRNP), via the histone downstream element (HDE) (PubMed:12588979, PubMed:19155325, PubMed:8957003, PubMed:9049306). Plays an important role in targeting mature histone mRNA from the nucleus to the cytoplasm and to the translation machinery (PubMed:12588979, PubMed:19155325, PubMed:8957003, PubMed:9049306). Stabilizes mature histone mRNA and could be involved in cell-cycle regulation of histone gene expression (PubMed:12588979, PubMed:19155325, PubMed:8957003, PubMed:9049306). Involved in the mechanism by which growing oocytes accumulate histone proteins that support early embryogenesis (By similarity). Binds to the 5' side of the stem-loop structure of histone pre-mRNAs (By similarity)",
+      "accession": "Q14493"
+    },
+    {
+      "gene_symbol": "SLC25A28",
+      "UniProt_functional_annotation": "Mitochondrial iron transporter that mediates iron uptake. Probably required for heme synthesis of hemoproteins and Fe-S cluster assembly in non-erythroid cells",
+      "accession": "Q96A46"
+    },
+    {
+      "gene_symbol": "SLU7",
+      "UniProt_functional_annotation": "Required for pre-mRNA splicing as component of the spliceosome (PubMed:10197984, PubMed:28502770, PubMed:30705154). Participates in the second catalytic step of pre-mRNA splicing, when the free hydroxyl group of exon I attacks the 3'-splice site to generate spliced mRNA and the excised lariat intron. Required for holding exon 1 properly in the spliceosome and for correct AG identification when more than one possible AG exists in 3'-splicing site region. May be involved in the activation of proximal AG. Probably also involved in alternative splicing regulation",
+      "accession": "O95391"
+    },
+    {
+      "gene_symbol": "SNRNP40",
+      "UniProt_functional_annotation": "Required for pre-mRNA splicing as component of the activated spliceosome (PubMed:11991638, PubMed:28076346, PubMed:28502770, PubMed:28781166, PubMed:29301961, PubMed:29360106, PubMed:30315277, PubMed:30705154). Component of the U5 small nuclear ribonucleoprotein (snRNP) complex and the U4/U6-U5 tri-snRNP complex, building blocks of the spliceosome (PubMed:16723661, PubMed:26912367, PubMed:9774689). As a component of the minor spliceosome, involved in the splicing of U12-type introns in pre-mRNAs (Probable)",
+      "accession": "Q96DI7"
+    },
+    {
+      "gene_symbol": "SOX4",
+      "UniProt_functional_annotation": "Transcriptional activator that binds with high affinity to the T-cell enhancer motif 5'-AACAAAG-3' motif (PubMed:30661772). Required for IL17A-producing Vgamma2-positive gamma-delta T-cell maturation and development, via binding to regulator loci of RORC to modulate expression (By similarity). Involved in skeletal myoblast differentiation by promoting gene expression of CALD1 (PubMed:26291311)",
+      "accession": "Q06945"
+    },
+    {
+      "gene_symbol": "STX10",
+      "UniProt_functional_annotation": "SNARE involved in vesicular transport from the late endosomes to the trans-Golgi network",
+      "accession": "O60499"
+    },
+    {
+      "gene_symbol": "TBL3",
+      "UniProt_functional_annotation": "Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome",
+      "accession": "Q12788"
+    },
+    {
+      "gene_symbol": "TMED2",
+      "UniProt_functional_annotation": "Involved in vesicular protein trafficking. Mainly functions in the early secretory pathway but also in post-Golgi membranes. Thought to act as cargo receptor at the lumenal side for incorporation of secretory cargo molecules into transport vesicles and to be involved in vesicle coat formation at the cytoplasmic side. In COPII vesicle-mediated anterograde transport involved in the transport of GPI-anchored proteins and proposed to act together with TMED10 as their cargo receptor; the function specifically implies SEC24C and SEC24D of the COPII vesicle coat and lipid raft-like microdomains of the ER. Recognizes GPI anchors structural remodeled in the ER by PGAP1 and MPPE1. In COPI vesicle-mediated retrograde transport inhibits the GTPase-activating activity of ARFGAP1 towards ARF1 thus preventing immature uncoating and allowing cargo selection to take place. Involved in trafficking of G protein-coupled receptors (GPCRs). Regulates F2RL1, OPRM1 and P2RY4 exocytic trafficking from the Golgi to the plasma membrane thus contributing to receptor resensitization. Facilitates CASR maturation and stabilization in the early secretory pathway and increases CASR plasma membrane targeting. Proposed to be involved in organization of intracellular membranes such as the maintenance of the Golgi apparatus. May also play a role in the biosynthesis of secreted cargo such as eventual processing",
+      "accession": "Q15363"
+    },
+    {
+      "gene_symbol": "TOMM22",
+      "UniProt_functional_annotation": "Central receptor component of the translocase of the outer membrane of mitochondria (TOM) complex essential for the recognition and translocation of cytosolically synthesized mitochondrial preproteins (PubMed:40080546). Together with the peripheral receptor TOMM20, functions as the transit peptide receptor and facilitates the movement of preproteins into the translocation pore (PubMed:10982837). The TOM complex associates with the ion channel VDAC2 and PINK1 kinase at depolarized mitochondria, this interaction stabilizes PINK1 at the outer mitochondrial membrane and triggers downstream mitophagy by the recruitment of the E3 ubiquitin ligase PRKN (PubMed:40080546). Required for the translocation across the mitochondrial outer membrane of cytochrome P450 monooxygenases (By similarity)",
+      "accession": "Q9NS69"
+    },
+    {
+      "gene_symbol": "TOPBP1",
+      "UniProt_functional_annotation": "Scaffold protein that acts as a key protein-protein adapter in DNA replication and DNA repair (PubMed:10498869, PubMed:11395493, PubMed:11714696, PubMed:17575048, PubMed:20545769, PubMed:21777809, PubMed:26811421, PubMed:30898438, PubMed:31135337, PubMed:33592542, PubMed:35597237, PubMed:37674080). Composed of multiple BRCT domains, which specifically recognize and bind phosphorylated proteins, bringing proteins together into functional combinations (PubMed:17575048, PubMed:20545769, PubMed:21777809, PubMed:26811421, PubMed:30898438, PubMed:31135337, PubMed:35597237, PubMed:37674080). Required for DNA replication initiation but not for the formation of pre-replicative complexes or the elongation stages (By similarity). Necessary for the loading of replication factors onto chromatin, including GMNC, CDC45, DNA polymerases and components of the GINS complex (By similarity). Plays a central role in DNA repair by bridging proteins and promoting recruitment of proteins to DNA damage sites (PubMed:30898438, PubMed:35597237, PubMed:37674080). Involved in double-strand break (DSB) repair via homologous recombination in S-phase by promoting the exchange between the DNA replication factor A (RPA) complex and RAD51 (PubMed:26811421, PubMed:35597237). Mechanistically, TOPBP1 is recruited to DNA damage sites in S-phase via interaction with phosphorylated HTATSF1, and promotes the loading of RAD51, thereby facilitating RAD51 nucleofilaments formation and RPA displacement, followed by homologous recombination (PubMed:35597237). Involved in microhomology-mediated end-joining (MMEJ) DNA repair by promoting recruitment of polymerase theta (POLQ) to DNA damage sites during mitosis (PubMed:37674080). MMEJ is an alternative non-homologous end-joining (NHEJ) machinery that takes place during mitosis to repair DSBs in DNA that originate in S-phase (PubMed:37674080). Recognizes and binds POLQ phosphorylated by PLK1, enabling its recruitment to DSBs for subsequent repair (PubMed:37674080). Involved in G1 DNA damage checkpoint by acting as a molecular adapter that couples TP53BP1 and the 9-1-1 complex (PubMed:31135337). In response to DNA damage, triggers the recruitment of checkpoint signaling proteins on chromatin, which activate the CHEK1 signaling pathway and block S-phase progression (PubMed:16530042, PubMed:21777809). Acts as an activator of the kinase activity of ATR (PubMed:16530042, PubMed:21777809). Also required for chromosomal stability when DSBs occur during mitosis by forming filamentous assemblies that bridge MDC1 and tether broken chromosomes during mitosis (PubMed:30898438). Together with CIP2A, plays an essential role in the response to genome instability generated by the presence of acentric chromosome fragments derived from shattered chromosomes within micronuclei (PubMed:35121901, PubMed:35842428, PubMed:37165191, PubMed:37316668). Micronuclei, which are frequently found in cancer cells, consist of chromatin surrounded by their own nuclear membrane: following breakdown of the micronuclear envelope, a process associated with chromothripsis, the CIP2A-TOPBP1 complex tethers chromosome fragments during mitosis to ensure clustered segregation of the fragments to a single daughter cell nucleus, facilitating re-ligation with limited chromosome scattering and loss (PubMed:37165191, PubMed:37316668). Recruits the SWI/SNF chromatin remodeling complex to E2F1-responsive promoters, thereby down-regulating E2F1 activity and inhibiting E2F1-dependent apoptosis during G1/S transition and after DNA damage (PubMed:12697828, PubMed:15075294)",
+      "accession": "Q92547"
+    },
+    {
+      "gene_symbol": "TRIM24",
+      "UniProt_functional_annotation": "Transcriptional coactivator that interacts with numerous nuclear receptors and coactivators and modulates the transcription of target genes. Interacts with chromatin depending on histone H3 modifications, having the highest affinity for histone H3 that is both unmodified at 'Lys-4' (H3K4me0) and acetylated at 'Lys-23' (H3K23ac). Has E3 protein-ubiquitin ligase activity. During the DNA damage response, participates in an autoregulatory feedback loop with TP53. Early in response to DNA damage, ATM kinase phosphorylates TRIM24 leading to its ubiquitination and degradation. After sufficient DNA repair has occurred, TP53 activates TRIM24 transcription, ultimately leading to TRIM24-mediated TP53 ubiquitination and degradation (PubMed:24820418). Plays a role in the regulation of cell proliferation and apoptosis, at least in part via its effects on p53/TP53 levels. Up-regulates ligand-dependent transcription activation by AR, GCR/NR3C1, thyroid hormone receptor (TR) and ESR1. Modulates transcription activation by retinoic acid (RA) receptors, including RARA. Plays a role in regulating retinoic acid-dependent proliferation of hepatocytes (By similarity). Also participates in innate immunity by mediating the specific 'Lys-63'-linked ubiquitination of TRAF3 leading to activation of downstream signal transduction of the type I IFN pathway (PubMed:32324863). Additionally, negatively regulates NLRP3/CASP1/IL-1beta-mediated pyroptosis and cell migration probably by ubiquitinating NLRP3 (PubMed:33724611)",
+      "accession": "O15164"
+    },
+    {
+      "gene_symbol": "TTC31",
+      "UniProt_functional_annotation": "",
+      "accession": "Q49AM3"
+    },
+    {
+      "gene_symbol": "UBE2Q2L",
+      "UniProt_functional_annotation": "",
+      "accession": ""
+    },
+    {
+      "gene_symbol": "UCN",
+      "UniProt_functional_annotation": "Acts in vitro to stimulate the secretion of adrenocorticotropic hormone (ACTH) (PubMed:8612563). Binds with high affinity to CRF receptor types 1, 2-alpha, and 2-beta (PubMed:8612563). Plays a role in the establishment of normal hearing thresholds (By similarity). Reduces food intake and regulates ghrelin levels in gastric body and plasma (By similarity)",
+      "accession": "P55089"
+    },
+    {
+      "gene_symbol": "VWA1",
+      "UniProt_functional_annotation": "Promotes matrix assembly (By similarity). Involved in the organization of skeletal muscles and in the formation of neuromuscular junctions (Probable)",
+      "accession": "Q6PCB0"
+    },
+    {
+      "gene_symbol": "ZNF143",
+      "UniProt_functional_annotation": "Transcription factor that activates expression of genes transcribed by both RNA polymerases II and III, and which is required to safeguard mitochondrial activity (PubMed:10893243, PubMed:14702349, PubMed:17938208, PubMed:26416877, PubMed:39708803, PubMed:9705341, PubMed:9776743). Specifically recognizes and binds the Staf-binding site (SBS), a consensus DNA-binding motif present in thousands of promoters (PubMed:17092945, PubMed:21177654, PubMed:23408857, PubMed:9705341). Activates the gene for selenocysteine tRNA (tRNAsec) (PubMed:23152058). Activates expression of small nuclear RNA (snRNA) transcribed by RNA polymerases II and III (PubMed:17938208, PubMed:9776743). Also activates expression of mRNAs and acts as a key regulator of cell proliferation and differentiation by specifically activating expression of a subset of nuclear-encoded mitochondrial genes, thereby controlling mitochondrial function (By similarity). Involved in the maintenance of embryonic stem cells by promoting association of POU5F1/OCT4 to promoters, leading to NANOG expresion (By similarity)",
+      "accession": "P52747"
+    },
+    {
+      "gene_symbol": "ZNF284",
+      "UniProt_functional_annotation": "May be involved in transcriptional regulation",
+      "accession": "Q2VY69"
+    },
+    {
+      "gene_symbol": "ZNF69",
+      "UniProt_functional_annotation": "May be involved in transcriptional regulation",
+      "accession": "Q9UC07"
+    },
+    {
+      "gene_symbol": "ZNF728",
+      "UniProt_functional_annotation": "",
+      "accession": "P0DKX0"
+    },
+    {
+      "gene_symbol": "ZRANB2",
+      "UniProt_functional_annotation": "Splice factor required for alternative splicing of TRA2B/SFRS10 transcripts. Binds to ssRNA containing the consensus sequence 5'-AGGUAA-3' (PubMed:21256132). May interfere with constitutive 5'-splice site selection",
+      "accession": "O95218"
+    }
+  ]
+}

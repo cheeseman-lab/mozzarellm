@@ -15,7 +15,9 @@ import json
 import os
 import shutil
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -58,6 +60,10 @@ from .order_bench_orderings import build_order_benchmark_routes, compose_stepwis
 # =============================================================================
 # HELPERS
 # =============================================================================
+
+# Serializes shared-file writes (JSONL appends, cached system-prompt .txt) when
+# runs execute concurrently in the thread pool.
+_IO_LOCK = threading.Lock()
 
 
 def _sha256(text: str) -> str:
@@ -118,9 +124,11 @@ def _filter_clusters(df: pd.DataFrame, config: BenchmarkConfig) -> list[tuple[st
 
 
 def _append_jsonl(path: Path, record: dict) -> None:
-    """Append one JSON record to a .jsonl file."""
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, default=str) + "\n")
+    """Append one JSON record to a .jsonl file (thread-safe)."""
+    line = json.dumps(record, default=str) + "\n"
+    with _IO_LOCK:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line)
 
 
 # =============================================================================
@@ -173,20 +181,23 @@ def construct_prompts(
                 output_dir=None,
             )
     else:
-        prompt_filename = f"system_prompt_{route.name}_{route.mode}"
+        # screen_name is part of the cache key: the system prompt embeds
+        # SCREEN_CONTEXT, so a route's prompt differs per screen.
+        prompt_filename = f"system_prompt_{route.name}_{route.mode}_{screen_name}"
         prompt_file = output_dir / "prompts_used" / f"{prompt_filename}.txt"
-        if prompt_file.exists() and not is_order_variant:
-            system_prompt = prompt_file.read_text(encoding="utf-8")
-        else:
-            system_prompt = make_cluster_analysis_system_prompt(
-                screen_name=screen_name,
-                screen_context_path=screen_context_path,
-                mode=route.mode,
-                mcp=route.mcp,
-                component_order=(list(route.component_order) if is_order_variant else None),
-                output_dir=output_dir / "prompts_used",
-                prompt_filename=prompt_filename,
-            )
+        with _IO_LOCK:
+            if prompt_file.exists() and not is_order_variant:
+                system_prompt = prompt_file.read_text(encoding="utf-8")
+            else:
+                system_prompt = make_cluster_analysis_system_prompt(
+                    screen_name=screen_name,
+                    screen_context_path=screen_context_path,
+                    mode=route.mode,
+                    mcp=route.mcp,
+                    component_order=(list(route.component_order) if is_order_variant else None),
+                    output_dir=output_dir / "prompts_used",
+                    prompt_filename=prompt_filename,
+                )
 
     user_prompt = make_single_cluster_analysis_user_prompt(
         cluster_id, screen_name, cluster_to_bundle_map
@@ -607,42 +618,32 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
         else:
             print("OK")
 
-    # Initialize LLM client (unless dry-run)
-    client = None
+    # Resolve API key once; clients are created per work item (the client
+    # stores last_usage on self, so a shared instance would cross-contaminate
+    # token/cost accounting across threads).
+    api_key = None
     if not config.run.dry_run:
         api_key = (
             os.getenv("ANTHROPIC_API_KEY")
             or os.getenv("OPENAI_API_KEY")
             or os.getenv("GOOGLE_API_KEY")
         )
-        client = create_client(model=config.model.model_name, api_key=api_key)
-        print(f"  Client: {type(client).__name__} ({config.model.model_name})")
+        probe = create_client(model=config.model.model_name, api_key=api_key)
+        print(f"  Client: {type(probe).__name__} ({config.model.model_name})")
 
-    # Main loop
-    total_runs = len(routes) * len(cluster_pairs) * config.run.num_replicates
-    print(f"\nStarting benchmark: {total_runs} total runs")
-    print(f"  Output: {output_dir}\n")
-
-    all_records = []
-    run_counter = 0
-
+    # Build the flat work list, resolving paths and applying skips up front.
+    work_items: list[tuple] = []
     for route in routes:
-        # Skip MCP routes if preflight failed
         if route.mcp and not mcp_available and not config.run.dry_run:
             print(f"  [SKIP] Route {route.name} -- MCP unavailable")
             continue
-
         for screen_name, cluster_id in cluster_pairs:
-            # Resolve paths
             bundle_path = _resolve_bundle_path(
                 config.paths.evidence_bundles_dir, screen_name, cluster_id
             )
             if bundle_path is None:
-                print(
-                    f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- bundle not found"
-                )
+                print(f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- bundle not found")
                 continue
-
             screen_context_path = _resolve_screen_context_path(
                 config.paths.benchmark_inputs_dir, screen_name
             )
@@ -651,40 +652,64 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
                     f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- screen context not found"
                 )
                 continue
-
             for rep in range(1, config.run.num_replicates + 1):
-                run_counter += 1
-                run_id = _build_run_id(
-                    config.experiment_id, route.name, screen_name, cluster_id, rep
+                work_items.append(
+                    (route, screen_name, cluster_id, bundle_path, screen_context_path, rep)
                 )
-                print(f"  [{run_counter}/{total_runs}] {run_id}", end=" ")
 
-                try:
-                    record = execute_single_run(
-                        route=route,
-                        screen_name=screen_name,
-                        cluster_id=cluster_id,
-                        bundle_path=bundle_path,
-                        screen_context_path=screen_context_path,
-                        replicate=rep,
-                        config=config,
-                        client=client,
-                        output_dir=output_dir,
-                    )
-                    all_records.append(record)
+    total_runs = len(work_items)
+    max_workers = 1 if config.run.dry_run else max(1, config.run.max_workers)
+    print(f"\nStarting benchmark: {total_runs} total runs (max_workers={max_workers})")
+    print(f"  Output: {output_dir}\n")
 
-                    if record.get("error"):
-                        print(f"ERROR: {record['error'][:80]}")
-                    else:
-                        full_t = record.get("timing", {}).get("full_run_time_seconds", 0)
-                        model_lat = record.get("timing", {}).get("model_latency_seconds", 0)
-                        cost = record.get("estimated_cost_usd", 0) or 0
-                        print(f"OK (full={full_t:.1f}s, model={model_lat:.1f}s, ${cost:.4f})")
+    def _run_one(item: tuple) -> dict:
+        route, screen_name, cluster_id, bundle_path, screen_context_path, rep = item
+        run_client = (
+            None
+            if config.run.dry_run
+            else create_client(model=config.model.model_name, api_key=api_key)
+        )
+        return execute_single_run(
+            route=route,
+            screen_name=screen_name,
+            cluster_id=cluster_id,
+            bundle_path=bundle_path,
+            screen_context_path=screen_context_path,
+            replicate=rep,
+            config=config,
+            client=run_client,
+            output_dir=output_dir,
+        )
 
-                except Exception as e:
-                    print(f"EXCEPTION: {e}")
-                    if not config.run.continue_on_error:
-                        raise
+    all_records = []
+    run_counter = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_run_one, item): item for item in work_items}
+        for future in as_completed(futures):
+            route, screen_name, cluster_id, _, _, rep = futures[future]
+            run_counter += 1
+            run_id = _build_run_id(config.experiment_id, route.name, screen_name, cluster_id, rep)
+            try:
+                record = future.result()
+            except Exception as e:
+                print(f"  [{run_counter}/{total_runs}] {run_id} EXCEPTION: {e}")
+                if not config.run.continue_on_error:
+                    for f in futures:
+                        f.cancel()
+                    raise
+                continue
+
+            all_records.append(record)
+            if record.get("error"):
+                print(f"  [{run_counter}/{total_runs}] {run_id} ERROR: {record['error'][:80]}")
+            else:
+                full_t = record.get("timing", {}).get("full_run_time_seconds", 0)
+                model_lat = record.get("timing", {}).get("model_latency_seconds", 0)
+                cost = record.get("estimated_cost_usd", 0) or 0
+                print(
+                    f"  [{run_counter}/{total_runs}] {run_id} "
+                    f"OK (full={full_t:.1f}s, model={model_lat:.1f}s, ${cost:.4f})"
+                )
 
     # Save run manifest
     manifest = {
@@ -728,11 +753,19 @@ def main():
         default=None,
         help="Override config to enable dry-run mode.",
     )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=None,
+        help="Override config run.max_workers (concurrent runs).",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
     if args.dry_run:
         config.run.dry_run = True
+    if args.max_workers is not None:
+        config.run.max_workers = args.max_workers
 
     run_benchmark(config)
 

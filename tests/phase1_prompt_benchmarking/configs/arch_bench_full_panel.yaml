@@ -1,5 +1,6 @@
 # Architecture Benchmark — Full Panel (Phase 1)
-# All 14 clusters × 6 prompt-delivery routes × 1 replicate = 84 LLM analysis runs.
+# 18 clusters (14 annotated + 4 negative-set) × 6 routes × 1 replicate = 108 runs.
+# UniProt evidence source. Negative clusters are run-only (excluded from scoring).
 
 experiment_id: arch_bench_full_v1
 
@@ -19,9 +20,10 @@ model:
 
 run:
   num_replicates: 1
+  max_workers: 4
   dry_run: false
   workflow_testing: false
-  overwrite_outputs: false
+  overwrite_outputs: true
   continue_on_error: true
   save_prompts: true
   save_raw_outputs: true

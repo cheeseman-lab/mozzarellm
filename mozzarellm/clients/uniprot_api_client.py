@@ -188,7 +188,6 @@ class UniProtClient:
             if str(a).strip() and str(a).strip() != "NON_TARGETING_CONTROL"
         ]
         return "(" + " OR ".join(chunk_genes) + ") AND reviewed:true"
-        # TODO: handle edge case where chunk is >100 genes (search query limit)
 
     def fetch_functional_annotations(
         self,
@@ -204,19 +203,29 @@ class UniProtClient:
             limit: max number of results to return
         """
 
-        query = self._generate_cluster_search_query(chunk, stable_accession_col)
+        col = stable_accession_col if stable_accession_col in chunk.columns else "accession"
+        valid = chunk[
+            chunk[col].map(
+                lambda a: bool(str(a).strip()) and str(a).strip() != "NON_TARGETING_CONTROL"
+            )
+        ]
 
-        # _get() handles HTTP errors and retries internally
-        response = self._get(
-            path="/uniprotkb/search",
-            params={
-                "query": query,
-                "format": "json",
-                "size": str(limit),
-                "fields": "cc_function",
-            },
-        )
-        results = response.get("results") or []
+        # UniProt rejects very long OR queries, so batch into <=limit accessions per query.
+        # _get() handles HTTP errors and retries internally.
+        results = []
+        for start in range(0, len(valid), limit):
+            sub = valid.iloc[start : start + limit]
+            query = self._generate_cluster_search_query(sub, stable_accession_col)
+            response = self._get(
+                path="/uniprotkb/search",
+                params={
+                    "query": query,
+                    "format": "json",
+                    "size": str(limit),
+                    "fields": "cc_function",
+                },
+            )
+            results.extend(response.get("results") or [])
 
         # Check if any entries were found
         num_accessions = len(chunk[stable_accession_col].unique())
