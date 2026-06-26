@@ -20,7 +20,6 @@ from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
 from .arch_bench_routes import Route, StepwiseTurn
 
-
 # ============================================================================
 # Order variant descriptor
 # ============================================================================

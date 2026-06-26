@@ -6,11 +6,11 @@ import os
 import platform
 import sqlite3
 import time
-from typing import Any
-import pandas as pd
-
-import requests
 import warnings
+from typing import Any
+
+import pandas as pd
+import requests
 
 ##### CONSTANTS ##### (configurable)
 DEFAULT_TIMEOUT = 30.0
@@ -90,7 +90,7 @@ class UniProtClient:
 
     def _make_cache_key(self, url: str, params: dict[str, Any] | None) -> str:
         params_json = json.dumps(params or {}, sort_keys=True, separators=(",", ":"))
-        payload = f"{url}|{params_json}".encode("utf-8")
+        payload = f"{url}|{params_json}".encode()
         return hashlib.sha256(payload).hexdigest()
 
     def _cache_get(self, cache_key: str) -> dict[str, Any] | None:
@@ -174,7 +174,7 @@ class UniProtClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.backoff * (2**attempt))
                 else:
-                    raise last_error
+                    raise last_error from None
         raise RuntimeError("UniProt request failed")
 
     ### QUERY GENERATION ###
@@ -264,7 +264,8 @@ class UniProtClient:
             warnings.warn(
                 f"{len(accessions_without_annotations)} accession(s) found but lack FUNCTION annotations: "
                 f"{accessions_without_annotations[:5]}"
-                + ("..." if len(accessions_without_annotations) > 5 else "")
+                + ("..." if len(accessions_without_annotations) > 5 else ""),
+                stacklevel=2,
             )
 
         # Raise if no annotations found at all
@@ -299,7 +300,7 @@ class UniProtClient:
 
         results = response.get("results") or []
         if not results:
-            warnings.warn(f"No UniProt entries found for gene_symbol '{gene_symbol}'")
+            warnings.warn(f"No UniProt entries found for gene_symbol '{gene_symbol}'", stacklevel=2)
             return ""
 
         reviewed = [r.get("primaryAccession") for r in results if r.get("reviewed")]
@@ -308,7 +309,8 @@ class UniProtClient:
             return reviewed[0]  # explicit, best effort match
         if warn_on_fallback:
             warnings.warn(
-                f"No reviewed UniProt entries found for gene_symbol '{gene_symbol}', falling back to unreviewed entries"
+                f"No reviewed UniProt entries found for gene_symbol '{gene_symbol}', falling back to unreviewed entries",
+                stacklevel=2,
             )
         for r in results:
             acc = r.get("primaryAccession")

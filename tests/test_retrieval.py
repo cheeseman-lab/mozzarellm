@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from mozzarellm.utils.local_retrieval import local_knowledge_context_retriever
 
 

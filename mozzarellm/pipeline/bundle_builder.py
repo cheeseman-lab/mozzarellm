@@ -1,19 +1,13 @@
-from pathlib import Path
-from typing import Any
-from pydantic import ValidationError
-import json
 import warnings
+from pathlib import Path
+
 import pandas as pd
-from mozzarellm.schemas.bundle_schemas import (
-    BundleGene,
-    BundleGeneAnnotations,
-    EvidenceBundle,
-    ScreenContext,
-)
-from mozzarellm.utils.io import load_table, write_bundle
-from mozzarellm.utils.cluster_utils import cluster_chunker, compute_feature_coherence
+
+from mozzarellm.clients.affinage_api_client import ANNOTATION_COL as AFFINAGE_COL
+from mozzarellm.clients.affinage_api_client import AffinageClient
 from mozzarellm.clients.uniprot_api_client import UniProtClient
-from mozzarellm.clients.affinage_api_client import AffinageClient, ANNOTATION_COL as AFFINAGE_COL
+from mozzarellm.utils.cluster_utils import cluster_chunker, compute_feature_coherence
+from mozzarellm.utils.io import load_table, write_bundle
 
 DEFAULT_ACCESSION_COL = "accession"
 
@@ -33,7 +27,7 @@ def _lookup_accession(
             warn_on_fallback=warn_on_fallback,
         )
     except Exception as e:
-        warnings.warn(f"UniProt lookup failed for gene_symbol '{gene_symbol}': {e}")
+        warnings.warn(f"UniProt lookup failed for gene_symbol '{gene_symbol}': {e}", stacklevel=2)
         return ""
     return accession or ""
 
@@ -97,7 +91,7 @@ def get_or_append_stable_accession(
             print(
                 f"Warning: {len(missing_genes)} genes not found in accession table: {list(missing_genes)[:5]}..."
             )
-            print(f"Falling back to UniProt API for missing genes...")
+            print("Falling back to UniProt API for missing genes...")
 
             # Fill missing accessions using UniProt API
             mask = accession_merged_cluster_df[accession_col].isna()
@@ -169,7 +163,7 @@ def add_functional_annotations_to_chunk(
         )
         chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
     except Exception as e:
-        warnings.warn(f"UniProt lookup failed for cluster '{cluster_id}': {e}")
+        warnings.warn(f"UniProt lookup failed for cluster '{cluster_id}': {e}", stacklevel=2)
         if source == "uniprot":
             return chunk_annotated
 
@@ -180,7 +174,9 @@ def add_functional_annotations_to_chunk(
         affinage = affinage_client.fetch_functional_annotations(chunk_annotated, gene_column)
         chunk_annotated = chunk_annotated.merge(affinage, on=gene_column, how="left")
         if source == "affinage" and "UniProt_functional_annotation" in chunk_annotated.columns:
-            has_affinage = chunk_annotated[AFFINAGE_COL].notna() & chunk_annotated[AFFINAGE_COL].ne("")
+            has_affinage = chunk_annotated[AFFINAGE_COL].notna() & chunk_annotated[AFFINAGE_COL].ne(
+                ""
+            )
             chunk_annotated.loc[has_affinage, "UniProt_functional_annotation"] = pd.NA
     # save as csv; output dir interface/output/
     OUTPUT_DIR = (

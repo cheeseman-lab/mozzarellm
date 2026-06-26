@@ -14,7 +14,6 @@ from mozzarellm.utils.cluster_utils import (
     cluster_chunker,
 )
 
-
 ####################### TEST CONSTANTS #######################
 
 CLUSTER_COL = "cluster"

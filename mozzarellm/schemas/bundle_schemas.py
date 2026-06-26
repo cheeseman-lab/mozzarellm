@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, Annotated
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, model_validator
 
 
 # Validation functions
@@ -57,7 +57,7 @@ class Controls(SemiFlexModel):
 
 
 class Provenance(SemiFlexModel):
-    dataset_name: RequiredStr 
+    dataset_name: RequiredStr
     citation: RequiredStr
     data_source: RequiredStr
 

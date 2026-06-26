@@ -3,19 +3,20 @@ Unit tests for mozzarellm.pipeline.bundle_builder
 """
 
 from __future__ import annotations
+
 import json
-import numpy as np
 from unittest.mock import Mock, patch
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from mozzarellm.pipeline.bundle_builder import (
-    get_or_append_stable_accession,
-    build_evidence_bundles,
-    add_functional_annotations_to_chunk,
-    _lookup_accession,
     DEFAULT_ACCESSION_COL,
+    _lookup_accession,
+    add_functional_annotations_to_chunk,
+    build_evidence_bundles,
+    get_or_append_stable_accession,
 )
 
 ####################### TEST CONSTANTS #######################

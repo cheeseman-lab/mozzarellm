@@ -10,7 +10,6 @@ import pytest
 
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
-
 ####################### FIXTURES #######################
 
 

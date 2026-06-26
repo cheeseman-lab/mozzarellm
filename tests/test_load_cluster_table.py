@@ -9,7 +9,6 @@ import pytest
 
 from mozzarellm.utils.io import load_table
 
-
 ####################### TEST CONSTANTS #######################
 
 

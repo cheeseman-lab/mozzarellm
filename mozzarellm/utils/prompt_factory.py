@@ -252,7 +252,7 @@ def _load_custom_template(template_path=None, template_string=None):
         try:
             p = Path(template_path)
         except Exception as e:
-            raise ValueError(f"Invalid custom template path: {template_path!r}. Error: {e}")
+            raise ValueError(f"Invalid custom template path: {template_path!r}. Error: {e}") from e
 
         if not p.exists():
             raise ValueError(f"Custom template path does not exist: {str(p)!r}")
@@ -267,7 +267,7 @@ def _load_custom_template(template_path=None, template_string=None):
         try:
             return p.read_text(encoding="utf-8")
         except Exception as e:
-            raise ValueError(f"Failed to read custom template file: {str(p)!r}. Error: {e}")
+            raise ValueError(f"Failed to read custom template file: {str(p)!r}. Error: {e}") from e
 
     raise ValueError("Custom template path not provided and template string not provided")
 
