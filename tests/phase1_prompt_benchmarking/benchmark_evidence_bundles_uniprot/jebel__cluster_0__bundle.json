@@ -1,0 +1,786 @@
+{
+  "screen_name": "jebel",
+  "cluster_id": "0",
+  "cluster_genes": [
+    {
+      "gene_symbol": "AAMP",
+      "UniProt_functional_annotation": "Plays a role in angiogenesis and cell migration. In smooth muscle cell migration, may act through the RhoA pathway",
+      "accession": "Q13685"
+    },
+    {
+      "gene_symbol": "BMS1",
+      "UniProt_functional_annotation": "GTPase required for the synthesis of 40S ribosomal subunits and for processing of pre-ribosomal RNA (pre-rRNA) at sites A0, A1, and A2. Controls access of pre-rRNA intermediates to RCL1 during ribosome biogenesis by binding RCL1 in a GTP-dependent manner, and delivering it to pre-ribosomes. GTP-binding and/or GTP hydrolysis may induce conformational rearrangements within the BMS1-RCL1 complex allowing the interaction of RCL1 with its RNA substrate. Required for RCL1 import into the nucleus",
+      "accession": "Q14692"
+    },
+    {
+      "gene_symbol": "BOP1",
+      "UniProt_functional_annotation": "Component of the PeBoW complex, which is required for maturation of 28S and 5.8S ribosomal RNAs and formation of the 60S ribosome",
+      "accession": "Q14137"
+    },
+    {
+      "gene_symbol": "BOP1",
+      "UniProt_functional_annotation": "Component of the PeBoW complex, which is required for maturation of 28S and 5.8S ribosomal RNAs and formation of the 60S ribosome",
+      "accession": "Q14137"
+    },
+    {
+      "gene_symbol": "BRIX1",
+      "UniProt_functional_annotation": "Required for biogenesis of the 60S ribosomal subunit",
+      "accession": "Q8TDN6"
+    },
+    {
+      "gene_symbol": "BUD23",
+      "UniProt_functional_annotation": "S-adenosyl-L-methionine-dependent methyltransferase that specifically methylates the N(7) position of a guanine in 18S rRNA (PubMed:25851604). Requires the methyltransferase adapter protein TRM112 for full rRNA methyltransferase activity (PubMed:25851604). Involved in the pre-rRNA processing steps leading to small-subunit rRNA production independently of its RNA-modifying catalytic activity (PubMed:25851604). Important for biogenesis end export of the 40S ribosomal subunit independent on its methyltransferase activity (PubMed:24086612). Locus-specific steroid receptor coactivator. Potentiates transactivation by glucocorticoid (NR3C1), mineralocorticoid (NR3C2), androgen (AR) and progesterone (PGR) receptors (PubMed:24488492). Required for the maintenance of open chromatin at the TSC22D3/GILZ locus to facilitate NR3C1 loading on the response elements (PubMed:24488492). Required for maintenance of dimethylation on histone H3 'Lys-79' (H3K79me2), although direct histone methyltransferase activity is not observed in vitro (PubMed:24488492)",
+      "accession": "O43709"
+    },
+    {
+      "gene_symbol": "CCDC86",
+      "UniProt_functional_annotation": "Required for proper chromosome segregation during mitosis and error-free mitotic progression",
+      "accession": "Q9H6F5"
+    },
+    {
+      "gene_symbol": "CENPE",
+      "UniProt_functional_annotation": "Microtubule plus-end-directed kinetochore motor which plays an important role in chromosome congression, microtubule-kinetochore conjugation and spindle assembly checkpoint activation. Drives chromosome congression (alignment of chromosomes at the spindle equator resulting in the formation of the metaphase plate) by mediating the lateral sliding of polar chromosomes along spindle microtubules towards the spindle equator and by aiding the establishment and maintenance of connections between kinetochores and spindle microtubules (PubMed:23891108, PubMed:25395579, PubMed:7889940). The transport of pole-proximal chromosomes towards the spindle equator is favored by microtubule tracks that are detyrosinated (PubMed:25908662). Acts as a processive bi-directional tracker of dynamic microtubule tips; after chromosomes have congressed, continues to play an active role at kinetochores, enhancing their links with dynamic microtubule ends (PubMed:23955301). Suppresses chromosome congression in NDC80-depleted cells and contributes positively to congression only when microtubules are stabilized (PubMed:25743205). Plays an important role in the formation of stable attachments between kinetochores and spindle microtubules (PubMed:17535814) The stabilization of kinetochore-microtubule attachment also requires CENPE-dependent localization of other proteins to the kinetochore including BUB1B, MAD1 and MAD2. Plays a role in spindle assembly checkpoint activation (SAC) via its interaction with BUB1B resulting in the activation of its kinase activity, which is important for activating SAC. Necessary for the mitotic checkpoint signal at individual kinetochores to prevent aneuploidy due to single chromosome loss (By similarity)",
+      "accession": "Q02224"
+    },
+    {
+      "gene_symbol": "CTDP1",
+      "UniProt_functional_annotation": "Processively dephosphorylates 'Ser-2' and 'Ser-5' of the heptad repeats YSPTSPS in the C-terminal domain of the largest RNA polymerase II subunit. This promotes the activity of RNA polymerase II. Plays a role in the exit from mitosis by dephosphorylating crucial mitotic substrates (USP44, CDC20 and WEE1) that are required for M-phase-promoting factor (MPF)/CDK1 inactivation",
+      "accession": "Q9Y5B0"
+    },
+    {
+      "gene_symbol": "DDX18",
+      "UniProt_functional_annotation": "ATP-dependent RNA helicase that plays a role in the regulation of R-loop homeostasis in both endogenous R-loop-prone regions and at sites of DNA damage. At endogenous loci such as actively transcribed genes, may act as a helicase to resolve the formation of R-loop during transcription and prevent the interference of R-loop with DNA-replication machinery. Also participates in the removal of DNA-lesion-associated R-loop (PubMed:35858569). Plays an essential role for establishing pluripotency during embryogenesis and for pluripotency maintenance in embryonic stem cells. Mechanistically, prevents the polycomb repressive complex 2 (PRC2) from accessing rDNA loci and protects the active chromatin status in nucleolus (By similarity)",
+      "accession": "Q9NVP1"
+    },
+    {
+      "gene_symbol": "DDX24",
+      "UniProt_functional_annotation": "ATP-dependent RNA helicase that plays a role in various aspects of RNA metabolism including pre-mRNA splicing and is thereby involved in different biological processes such as cell cycle regulation or innate immunity (PubMed:24204270, PubMed:24980433). Plays an inhibitory role in TP53 transcriptional activity and subsequently in TP53 controlled cell growth arrest and senescence by inhibiting its EP300 mediated acetylation (PubMed:25867071). Negatively regulates cytosolic RNA-mediated innate immune signaling at least in part by affecting RIPK1/IRF7 interactions. Alternatively, possesses antiviral activity by recognizing gammaherpesvirus transcripts in the context of lytic reactivation (PubMed:36298642). Plays an essential role in cell cycle regulation in vascular smooth muscle cells by interacting with and regulating FANCA (Fanconi anemia complementation group A) mRNA (By similarity)\n(Microbial infection) Plays a positive role in HIV-1 infection by promoting Rev-dependent nuclear export of viral RNAs and their packaging into virus particles (PubMed:24204270)",
+      "accession": "Q9GZR7"
+    },
+    {
+      "gene_symbol": "DDX47",
+      "UniProt_functional_annotation": "Required for efficient ribosome biogenesis (By similarity). May have a role in mRNA splicing (PubMed:16963496). Involved in apoptosis (PubMed:15977068)",
+      "accession": "Q9H0S4"
+    },
+    {
+      "gene_symbol": "DDX56",
+      "UniProt_functional_annotation": "Nucleolar RNA helicase that plays a role in various biological processes including innate immunity, ribosome biogenesis or nucleolus organization (PubMed:31340999, PubMed:33789112). Plays an essential role in maintaining nucleolar integrity in planarian stem cells (PubMed:33789112). Maintains embryonic stem cells proliferation by conventional regulation of ribosome assembly and interaction with OCT4 and POU5F1 complex (By similarity). Regulates antiviral innate immunity by inhibiting the virus-triggered signaling nuclear translocation of IRF3 (PubMed:31340999). Mechanistically, acts by disrupting the interaction between IRF3 and importin IPO5 (PubMed:31340999). May play a role in later stages of the processing of the pre-ribosomal particles leading to mature 60S ribosomal subunits. Has intrinsic ATPase activity\n(Microbial infection) Helicase activity is important for packaging viral RNA into virions during West Nile virus infection\n(Microbial infection) Plays a positive role in foot-and-mouth disease virus replication by inhibiting the phosphorylation of IRF3 leading to inhibition of type I interferon\n(Microbial infection) Plays a positive role in EMCV replication by interrupting IRF3 phosphorylation and its nucleus translocation",
+      "accession": "Q9NY93"
+    },
+    {
+      "gene_symbol": "DHX37",
+      "UniProt_functional_annotation": "ATP-binding RNA helicase that plays a role in maturation of the small ribosomal subunit in ribosome biogenesis (PubMed:30582406). Required for the release of the U3 snoRNP from pre-ribosomal particles (PubMed:30582406). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). Plays a role in early testis development (PubMed:31287541, PubMed:31337883). Probably also plays a role in brain development (PubMed:31256877)",
+      "accession": "Q8IY37"
+    },
+    {
+      "gene_symbol": "DIMT1",
+      "UniProt_functional_annotation": "Specifically dimethylates two adjacent adenosines in the loop of a conserved hairpin near the 3'-end of 18S rRNA in the 40S particle (PubMed:25851604). Involved in the pre-rRNA processing steps leading to small-subunit rRNA production independently of its RNA-modifying catalytic activity (PubMed:25851604). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "Q9UNQ2"
+    },
+    {
+      "gene_symbol": "EIF1AD",
+      "UniProt_functional_annotation": "Plays a role into cellular response to oxidative stress. Decreases cell proliferation",
+      "accession": "Q8N9N8"
+    },
+    {
+      "gene_symbol": "EIF2B3",
+      "UniProt_functional_annotation": "Acts as a component of the translation initiation factor 2B (eIF2B) complex, which catalyzes the exchange of GDP for GTP on the eukaryotic initiation factor 2 (eIF2) complex gamma subunit (PubMed:25858979, PubMed:27023709, PubMed:31048492). Its guanine nucleotide exchange factor activity is repressed when bound to eIF2 complex phosphorylated on the alpha subunit, thereby limiting the amount of methionyl-initiator methionine tRNA available to the ribosome and consequently global translation is repressed (PubMed:25858979, PubMed:31048492)",
+      "accession": "Q9NR50"
+    },
+    {
+      "gene_symbol": "EIF6",
+      "UniProt_functional_annotation": "Binds to the 60S ribosomal subunit and prevents its association with the 40S ribosomal subunit to form the 80S initiation complex in the cytoplasm (PubMed:10085284, PubMed:14654845, PubMed:21536732, PubMed:32669547). Behaves as a stimulatory translation initiation factor downstream insulin/growth factors. Is also involved in ribosome biogenesis. Associates with pre-60S subunits in the nucleus and is involved in its nuclear export. Cytoplasmic release of TIF6 from 60S subunits and nuclear relocalization is promoted by a RACK1 (RACK1)-dependent protein kinase C activity (PubMed:10085284, PubMed:14654845, PubMed:21536732). In tissues responsive to insulin, controls fatty acid synthesis and glycolysis by exerting translational control of adipogenic transcription factors such as CEBPB, CEBPD and ATF4 that have G/C rich or uORF in their 5'UTR. Required for ROS-dependent megakaryocyte maturation and platelets formation, controls the expression of mitochondrial respiratory chain genes involved in reactive oxygen species (ROS) synthesis (By similarity). Involved in miRNA-mediated gene silencing by the RNA-induced silencing complex (RISC). Required for both miRNA-mediated translational repression and miRNA-mediated cleavage of complementary mRNAs by RISC (PubMed:17507929). Modulates cell cycle progression and global translation of pre-B cells, its activation seems to be rate-limiting in tumorigenesis and tumor growth (By similarity)",
+      "accession": "P56537"
+    },
+    {
+      "gene_symbol": "EP400",
+      "UniProt_functional_annotation": "Component of the NuA4 histone acetyltransferase complex which is involved in transcriptional activation of select genes principally by acetylation of nucleosomal histones H4 and H2A. This modification may both alter nucleosome - DNA interactions and promote interaction of the modified histones with other proteins which positively regulate transcription. May be required for transcriptional activation of E2F1 and MYC target genes during cellular proliferation. The NuA4 complex ATPase and helicase activities seem to be, at least in part, contributed by the association of RUVBL1 and RUVBL2 with EP400. May regulate ZNF42 transcription activity. Component of a SWR1-like complex that specifically mediates the removal of histone H2A.Z/H2AZ1 from the nucleosome",
+      "accession": "Q96L91"
+    },
+    {
+      "gene_symbol": "ESF1",
+      "UniProt_functional_annotation": "May constitute a novel regulatory system for basal transcription. Negatively regulates ABT1 (By similarity)",
+      "accession": "Q9H501"
+    },
+    {
+      "gene_symbol": "FAU",
+      "UniProt_functional_annotation": "May have pro-apoptotic activity\nComponent of the 40S subunit of the ribosome. Contributes to the assembly and function of 40S ribosomal subunits",
+      "accession": "P62861"
+    },
+    {
+      "gene_symbol": "GNL2",
+      "UniProt_functional_annotation": "GTPase that associates with pre-60S ribosomal subunits in the nucleolus and is required for their nuclear export and maturation (PubMed:32669547). May promote cell proliferation possibly by increasing p53/TP53 protein levels, and consequently those of its downstream product CDKN1A/p21, and decreasing RPL23A protein levels (PubMed:26203195)",
+      "accession": "Q13823"
+    },
+    {
+      "gene_symbol": "GNL3L",
+      "UniProt_functional_annotation": "Stabilizes TERF1 telomeric association by preventing TERF1 recruitment by PML. Stabilizes TERF1 protein by preventing its ubiquitination and hence proteasomal degradation. Does so by interfering with TERF1-binding to FBXO4 E3 ubiquitin-protein ligase. Required for cell proliferation. By stabilizing TRF1 protein during mitosis, promotes metaphase-to-anaphase transition. Stabilizes MDM2 protein by preventing its ubiquitination, and hence proteasomal degradation. By acting on MDM2, may affect TP53 activity. Required for normal processing of ribosomal pre-rRNA. Binds GTP",
+      "accession": "Q9NVN8"
+    },
+    {
+      "gene_symbol": "HEATR1",
+      "UniProt_functional_annotation": "Ribosome biogenesis factor; required for recruitment of Myc to nucleoli (PubMed:38225354). Involved in nucleolar processing of pre-18S ribosomal RNA. Required for optimal pre-ribosomal RNA transcription by RNA polymerase I (PubMed:17699751). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). Involved in neuronal-lineage cell proliferation (PubMed:38225354)",
+      "accession": "Q9H583"
+    },
+    {
+      "gene_symbol": "ISG20L2",
+      "UniProt_functional_annotation": "3'-> 5'-exoribonuclease involved in ribosome biogenesis in the processing of the 12S pre-rRNA. Displays a strong specificity for a 3'-end containing a free hydroxyl group",
+      "accession": "Q9H9L3"
+    },
+    {
+      "gene_symbol": "KRI1",
+      "UniProt_functional_annotation": "",
+      "accession": "Q8N9T8"
+    },
+    {
+      "gene_symbol": "LSG1",
+      "UniProt_functional_annotation": "Functions as a GTPase (PubMed:16209721). May act by mediating the release of NMD3 from the 60S ribosomal subunit after export into the cytoplasm during the 60S ribosomal subunit maturation (PubMed:31148378)",
+      "accession": "Q9H089"
+    },
+    {
+      "gene_symbol": "LTV1",
+      "UniProt_functional_annotation": "Essential for ribosome biogenesis",
+      "accession": "Q96GA3"
+    },
+    {
+      "gene_symbol": "LTV1",
+      "UniProt_functional_annotation": "Essential for ribosome biogenesis",
+      "accession": "Q96GA3"
+    },
+    {
+      "gene_symbol": "MAK16",
+      "UniProt_functional_annotation": "",
+      "accession": "Q9BXY0"
+    },
+    {
+      "gene_symbol": "MCM5",
+      "UniProt_functional_annotation": "Acts as a component of the MCM2-7 complex (MCM complex) which is the replicative helicase essential for 'once per cell cycle' DNA replication initiation and elongation in eukaryotic cells (PubMed:40940420). Core component of CDC45-MCM-GINS (CMG) helicase, the molecular machine that unwinds template DNA during replication, and around which the replisome is built (PubMed:16899510, PubMed:32453425, PubMed:34694004, PubMed:34700328, PubMed:35585232). The active ATPase sites in the MCM2-7 ring are formed through the interaction surfaces of two neighboring subunits such that a critical structure of a conserved arginine finger motif is provided in trans relative to the ATP-binding site of the Walker A box of the adjacent subunit. The six ATPase active sites, however, are likely to contribute differentially to the complex helicase activity (PubMed:32453425)",
+      "accession": "P33992"
+    },
+    {
+      "gene_symbol": "MDM2",
+      "UniProt_functional_annotation": "E3 ubiquitin-protein ligase that mediates ubiquitination of p53/TP53, leading to its degradation by the proteasome (PubMed:29681526). Inhibits p53/TP53- and p73/TP73-mediated cell cycle arrest and apoptosis by binding its transcriptional activation domain. Also acts as a ubiquitin ligase E3 toward itself and ARRB1. Permits the nuclear export of p53/TP53. Promotes proteasome-dependent ubiquitin-independent degradation of retinoblastoma RB1 protein. Inhibits DAXX-mediated apoptosis by inducing its ubiquitination and degradation. Component of the TRIM28/KAP1-MDM2-p53/TP53 complex involved in stabilizing p53/TP53. Also a component of the TRIM28/KAP1-ERBB4-MDM2 complex which links growth factor and DNA damage response pathways. Mediates ubiquitination and subsequent proteasome degradation of DYRK2 in nucleus. Ubiquitinates IGF1R and SNAI1 and promotes them to proteasomal degradation (PubMed:12821780, PubMed:15053880, PubMed:15195100, PubMed:15632057, PubMed:16337594, PubMed:17290220, PubMed:19098711, PubMed:19219073, PubMed:19837670, PubMed:19965871, PubMed:20173098, PubMed:20385133, PubMed:20858735, PubMed:22128911). Ubiquitinates DCX, leading to DCX degradation and reduction of the dendritic spine density of olfactory bulb granule cells (By similarity). Ubiquitinates DLG4, leading to proteasomal degradation of DLG4 which is required for AMPA receptor endocytosis (By similarity). Negatively regulates NDUFS1, leading to decreased mitochondrial respiration, marked oxidative stress, and commitment to the mitochondrial pathway of apoptosis (PubMed:30879903). Binds NDUFS1 leading to its cytosolic retention rather than mitochondrial localization resulting in decreased supercomplex assembly (interactions between complex I and complex III), decreased complex I activity, ROS production, and apoptosis (PubMed:30879903)",
+      "accession": "Q00987"
+    },
+    {
+      "gene_symbol": "MRTO4",
+      "UniProt_functional_annotation": "Component of the ribosome assembly machinery. Nuclear paralog of the ribosomal protein P0, it binds pre-60S subunits at an early stage of assembly in the nucleolus, and is replaced by P0 in cytoplasmic pre-60S subunits and mature 80S ribosomes",
+      "accession": "Q9UKD2"
+    },
+    {
+      "gene_symbol": "MTREX",
+      "UniProt_functional_annotation": "Catalyzes the ATP-dependent unwinding of RNA duplexes with a single-stranded 3' RNA extension (PubMed:27871484, PubMed:29844170, PubMed:29906447). Central subunit of many protein complexes, namely TRAMP-like, nuclear exosome targeting (NEXT) and poly(A) tail exosome targeting (PAXT) (PubMed:21855801, PubMed:27871484, PubMed:29844170). NEXT functions as an RNA exosome cofactor that directs a subset of non-coding short-lived RNAs for exosomal degradation. NEXT is involved in surveillance and turnover of aberrant transcripts and non-coding RNAs (PubMed:27871484, PubMed:29844170). PAXT directs a subset of long and polyadenylated poly(A) RNAs for exosomal degradation. The RNA exosome is fundamental for the degradation of RNA in eukaryotic nuclei. Substrate targeting is facilitated by its cofactor ZCCHC8, which links to RNA-binding protein adapters (PubMed:27871484). Associated with the RNA exosome complex and involved in the 3'-processing of the 7S pre-RNA to the mature 5.8S rRNA (PubMed:17412707, PubMed:29107693). May be involved in pre-mRNA splicing. In the context of NEXT complex can also in vitro unwind DNA:RNA heteroduplexes with a 3' poly (A) RNA tracking strand (PubMed:29844170). Can promote unwinding and degradation of structured RNA substrates when associated with the nuclear exosome and its cofactors. Can displace a DNA strand while translocating on RNA to ultimately degrade the RNA within a DNA/RNA heteroduplex (PubMed:29906447). Plays a role in DNA damage response (PubMed:29902117)",
+      "accession": "P42285"
+    },
+    {
+      "gene_symbol": "NEPRO",
+      "UniProt_functional_annotation": "Specific component of the MRP ribonucleoprotein endoribonuclease, Rnase/Mrp complex, a ribonucleoprotein complex involved in pre-rRNA processing (PubMed:28115465, PubMed:40413743). May play a role in cortex development as part of the Notch signaling pathway. Downstream of Notch may repress the expression of proneural genes and inhibit neuronal differentiation thereby maintaining neural progenitors. May also play a role in preimplentation embryo development (By similarity)",
+      "accession": "Q6NW34"
+    },
+    {
+      "gene_symbol": "NFS1",
+      "UniProt_functional_annotation": "Cysteine desulfurase, of the core iron-sulfur cluster (ISC) assembly complex, that catalyzes the desulfuration of L-cysteine to L-alanine, as component of the cysteine desulfurase complex, leading to the formation of a cysteine persulfide intermediate at the active site cysteine residue and participates in the [2Fe-2S] clusters assembly on the scaffolding protein ISCU (PubMed:18650437, PubMed:29097656, PubMed:31101807). The persulfide is then transferred on the flexible Cys loop from the catalytic site of NFS1 to the surface of NFS1 (PubMed:29097656). After the NFS1-linked persulfide sulfur is transferred to one of the conserved Cys residues of the scaffold, a reaction assisted by FXN (By similarity). The core iron-sulfur cluster (ISC) assembly complex is involved in the de novo synthesis of a [2Fe-2S] cluster, the first step of the mitochondrial iron-sulfur protein biogenesis. This process is initiated by the cysteine desulfurase complex (NFS1:LYRM4:NDUFAB1) that produces persulfide which is delivered on the scaffold protein ISCU in a FXN-dependent manner. Then this complex is stabilized by FDX2 which provides reducing equivalents to accomplish the [2Fe-2S] cluster assembly. Finally, the [2Fe-2S] cluster is transferred from ISCU to chaperone proteins, including HSCB, HSPA9 and GLRX5 (By similarity)\nMay catalyze the desulfuration of L-cysteine to L-alanine as component of the cysteine desulfurase complex (NFS1:LYRM4), leading to the formation of a cysteine persulfide intermediate (PubMed:16527810, PubMed:18650437). Acts as a sulfur donor for MOCS3 by transferring the sulfur of the cysteine persulfide intermediate on MOCS3 (PubMed:18650437, PubMed:23593335)",
+      "accession": "Q9Y697"
+    },
+    {
+      "gene_symbol": "NIFK",
+      "UniProt_functional_annotation": "",
+      "accession": "Q9BYG3"
+    },
+    {
+      "gene_symbol": "NLE1",
+      "UniProt_functional_annotation": "Plays a role in regulating Notch activity. Plays a role in regulating the expression of CDKN1A and several members of the Wnt pathway, probably via its effects on Notch activity. Required during embryogenesis for inner mass cell survival (By similarity)",
+      "accession": "Q9NVX2"
+    },
+    {
+      "gene_symbol": "NMD3",
+      "UniProt_functional_annotation": "Acts as an adapter for the XPO1/CRM1-mediated export of the 60S ribosomal subunit",
+      "accession": "Q96D46"
+    },
+    {
+      "gene_symbol": "NOB1",
+      "UniProt_functional_annotation": "May play a role in mRNA degradation (Probable). Endonuclease required for processing of 20S pre-rRNA precursor and biogenesis of 40S ribosomal subunits (By similarity)",
+      "accession": "Q9ULX3"
+    },
+    {
+      "gene_symbol": "NOL8",
+      "UniProt_functional_annotation": "Plays an essential role in the survival of diffuse-type gastric cancer cells. Acts as a nucleolar anchoring protein for DDX47. May be involved in regulation of gene expression at the post-transcriptional level or in ribosome biogenesis in cancer cells",
+      "accession": "Q76FK4"
+    },
+    {
+      "gene_symbol": "NOP16",
+      "UniProt_functional_annotation": "",
+      "accession": "Q9Y3C1"
+    },
+    {
+      "gene_symbol": "NOP2",
+      "UniProt_functional_annotation": "S-adenosyl-L-methionine-dependent methyltransferase that specifically methylates the C(5) position of cytosine 4447 in 28S rRNA (PubMed:26196125). Required for efficient rRNA processing and 60S ribosomal subunit biogenesis (PubMed:24120868, PubMed:36161484). Regulates pre-rRNA processing through non-catalytic complex formation with box C/D snoRNAs and facilitates the recruitment of U3 and U8 snoRNAs to pre-90S ribosomal particles and their stable assembly into snoRNP complexes (PubMed:36161484). May play a role in the regulation of the cell cycle and the increased nucleolar activity that is associated with the cell proliferation (PubMed:24120868)",
+      "accession": "P46087"
+    },
+    {
+      "gene_symbol": "NPM1",
+      "UniProt_functional_annotation": "Involved in diverse cellular processes such as ribosome biogenesis, centrosome duplication, protein chaperoning, histone assembly, cell proliferation, and regulation of tumor suppressors p53/TP53 and ARF. Binds ribosome presumably to drive ribosome nuclear export. Associated with nucleolar ribonucleoprotein structures and bind single-stranded nucleic acids. Acts as a chaperonin for the core histones H3, H2B and H4. Stimulates APEX1 endonuclease activity on apurinic/apyrimidinic (AP) double-stranded DNA but inhibits APEX1 endonuclease activity on AP single-stranded RNA. May exert a control of APEX1 endonuclease activity within nucleoli devoted to repair AP on rDNA and the removal of oxidized rRNA molecules. In concert with BRCA2, regulates centrosome duplication. Regulates centriole duplication: phosphorylation by PLK2 is able to trigger centriole replication. Negatively regulates the activation of EIF2AK2/PKR and suppresses apoptosis through inhibition of EIF2AK2/PKR autophosphorylation. Antagonizes the inhibitory effect of ATF5 on cell proliferation and relieves ATF5-induced G2/M blockade (PubMed:22528486). In complex with MYC enhances the transcription of MYC target genes (PubMed:25956029). May act as chaperonin or cotransporter in the nucleolar localization of transcription termination factor TTF1 (By similarity)",
+      "accession": "P06748"
+    },
+    {
+      "gene_symbol": "PCF11",
+      "UniProt_functional_annotation": "Component of pre-mRNA cleavage complex II, which promotes transcription termination by RNA polymerase II",
+      "accession": "O94913"
+    },
+    {
+      "gene_symbol": "PDCD2",
+      "UniProt_functional_annotation": "Chaperone for ribosomal protein uS5; cotranslationally associates with uS5 and accompanies the ribosomal protein to assembly sites in the nucleus; appears to function redundantly to PDCD2L",
+      "accession": "Q16342"
+    },
+    {
+      "gene_symbol": "PDCD2",
+      "UniProt_functional_annotation": "Chaperone for ribosomal protein uS5; cotranslationally associates with uS5 and accompanies the ribosomal protein to assembly sites in the nucleus; appears to function redundantly to PDCD2L",
+      "accession": "Q16342"
+    },
+    {
+      "gene_symbol": "PES1",
+      "UniProt_functional_annotation": "Component of the PeBoW complex, which is required for maturation of 28S and 5.8S ribosomal RNAs and formation of the 60S ribosome",
+      "accession": "O00541"
+    },
+    {
+      "gene_symbol": "PES1",
+      "UniProt_functional_annotation": "Component of the PeBoW complex, which is required for maturation of 28S and 5.8S ribosomal RNAs and formation of the 60S ribosome",
+      "accession": "O00541"
+    },
+    {
+      "gene_symbol": "PNO1",
+      "UniProt_functional_annotation": "Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). Positively regulates dimethylation of two adjacent adenosines in the loop of a conserved hairpin near the 3'-end of 18S rRNA (PubMed:25851604)",
+      "accession": "Q9NRX1"
+    },
+    {
+      "gene_symbol": "POLR2A",
+      "UniProt_functional_annotation": "Catalytic core component of RNA polymerase II (Pol II), a DNA-dependent RNA polymerase which synthesizes mRNA precursors and many functional non-coding RNAs using the four ribonucleoside triphosphates as substrates (By similarity) (PubMed:23748380, PubMed:27193682, PubMed:30190596, PubMed:9852112). Pol II-mediated transcription cycle proceeds through transcription initiation, transcription elongation and transcription termination stages. During transcription initiation, Pol II pre-initiation complex (PIC) is recruited to DNA promoters, with focused-type promoters containing either the initiator (Inr) element, or the TATA-box found in cell-type specific genes and dispersed-type promoters that often contain hypomethylated CpG islands usually found in housekeeping genes. Once the polymerase has escaped from the promoter it enters the elongation phase during which RNA is actively polymerized, based on complementarity with the template DNA strand. Transcription termination involves the release of the RNA transcript and polymerase from the DNA (By similarity) (PubMed:23748380, PubMed:27193682, PubMed:28108474, PubMed:30190596, PubMed:9852112). Forms Pol II active center together with the second largest subunit POLR2B/RPB2. Appends one nucleotide at a time to the 3' end of the nascent RNA, with POLR2A/RPB1 most likely contributing a Mg(2+)-coordinating DxDGD motif, and POLR2B/RPB2 participating in the coordination of a second Mg(2+) ion and providing lysine residues believed to facilitate Watson-Crick base pairing between the incoming nucleotide and template base. Typically, Mg(2+) ions direct a 5' nucleoside triphosphate to form a phosphodiester bond with the 3' hydroxyl of the preceding nucleotide of the nascent RNA, with the elimination of pyrophosphate. The reversible pyrophosphorolysis can occur at high pyrophosphate concentrations (By similarity) (PubMed:30190596, PubMed:8381534, PubMed:9852112). Can proofread the nascent RNA transcript by means of a 3' -> 5' exonuclease activity. If a ribonucleotide is mis-incorporated, backtracks along the template DNA and cleaves the phosphodiester bond releasing the mis-incorporated 5'-ribonucleotide (By similarity) (PubMed:8381534). Through its unique C-terminal domain (CTD, 52 heptapeptide tandem repeats) serves as a platform for assembly of factors that regulate transcription initiation, elongation and termination. CTD phosphorylation on Ser-5 mediates Pol II promoter escape, whereas phosphorylation on Ser-2 is required for Pol II pause release during transcription elongation and further pre-mRNA processing. Additionally, the regulation of gene expression levels depends on the balance between methylation and acetylation levels of the CTD-lysines. Initiation or early elongation steps of transcription of growth-factor-induced immediate early genes are regulated by the acetylation status of the CTD. Methylation and dimethylation have a repressive effect on target genes expression. Cooperates with mRNA splicing machinery in co-transcriptional 5'-end capping and co-transcriptional splicing of pre-mRNA (By similarity) (PubMed:24207025, PubMed:26124092)\nRNA-dependent RNA polymerase that catalyzes the extension of a non-coding RNA (ncRNA) at the 3'-end using the four ribonucleoside triphosphates as substrates. An internal ncRNA sequence near the 3'-end serves as a template in a single-round Pol II-mediated RNA polymerization reaction. May decrease the stability of ncRNAs that repress Pol II-mediated gene transcription\n(Microbial infection) Acts as an RNA-dependent RNA polymerase when associated with small delta antigen of Hepatitis delta virus, acting both as a replicase and transcriptase for the viral RNA circular genome",
+      "accession": "P24928"
+    },
+    {
+      "gene_symbol": "POP5",
+      "UniProt_functional_annotation": "Component of ribonuclease P, a protein complex that generates mature tRNA molecules by cleaving their 5'-ends (PubMed:11413139, PubMed:30454648). Also a component of the MRP ribonuclease complex, which cleaves pre-rRNA sequences (PubMed:28115465)",
+      "accession": "Q969H6"
+    },
+    {
+      "gene_symbol": "PYGM",
+      "UniProt_functional_annotation": "Allosteric enzyme that catalyzes the rate-limiting step in glycogen catabolism, the phosphorolytic cleavage of glycogen to produce glucose-1-phosphate, and plays a central role in maintaining cellular and organismal glucose homeostasis",
+      "accession": "P11217"
+    },
+    {
+      "gene_symbol": "RBM19",
+      "UniProt_functional_annotation": "Plays a role in embryo pre-implantation development",
+      "accession": "Q9Y4C8"
+    },
+    {
+      "gene_symbol": "RCL1",
+      "UniProt_functional_annotation": "As part of the small subunit (SSU) processome, it plays a role in 40S-ribosomal-subunit biogenesis in the early pre-rRNA processing steps at sites A0, A1 and A2 that are required for proper maturation of the 18S RNA (By similarity). Activates BMS1 by promoting GDP/GTP exchange (By similarity). Does not have cyclase activity (By similarity)",
+      "accession": "Q9Y2P8"
+    },
+    {
+      "gene_symbol": "RPF1",
+      "UniProt_functional_annotation": "E3 ubiquitin-protein ligase which accepts ubiquitin from an E2 ubiquitin-conjugating enzyme in the form of a thioester and then directly transfers the ubiquitin to targeted substrates. Specifically ubiquitinates 'Lys-63' in target proteins (PubMed:19920177, PubMed:21399620, PubMed:23644597). Involved in the pathway leading to the degradation of VEGFR-2/KDFR, independently of its ubiquitin-ligase activity. Monoubiquitinates IGF1R at multiple sites, thus leading to receptor internalization and degradation in lysosomes (By similarity). Ubiquitinates FGFR1, leading to receptor internalization and degradation in lysosomes (PubMed:21765395). Promotes ubiquitination of RAPGEF2 (PubMed:11598133). According to PubMed:18562292 the direct link between NEDD4 and PTEN regulation through polyubiquitination described in PubMed:17218260 is questionable. Involved in ubiquitination of ERBB4 intracellular domain E4ICD (By similarity). Part of a signaling complex composed of NEDD4, RAP2A and TNIK which regulates neuronal dendrite extension and arborization during development (By similarity). Ubiquitinates TNK2 and regulates EGF-induced degradation of EGFR and TNF2 (PubMed:20086093). Ubiquitinates BRAT1 and this ubiquitination is enhanced in the presence of NDFIP1 (PubMed:25631046). Ubiquitinates DAZAP2, leading to its proteasomal degradation (PubMed:11342538). Ubiquitinates POLR2A (PubMed:19920177). Functions as a platform to recruit USP13 to form an NEDD4-USP13 deubiquitination complex that plays a critical role in cleaving the 'Lys-48'-linked ubiquitin chains of VPS34 and then stabilizing VPS34, thus promoting the formation of autophagosomes (PubMed:32101753)\n(Microbial infection) Involved in the ubiquitination of Ebola virus protein VP40 which plays a role in viral budding",
+      "accession": "P46934"
+    },
+    {
+      "gene_symbol": "RPF2",
+      "UniProt_functional_annotation": "Involved in ribosomal large subunit assembly. May regulate the localization of the 5S RNP/5S ribonucleoprotein particle to the nucleolus",
+      "accession": "Q9H7B2"
+    },
+    {
+      "gene_symbol": "RPL10",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:26290468). Plays a role in the formation of actively translating ribosomes (PubMed:26290468). May play a role in the embryonic brain development (PubMed:25316788)",
+      "accession": "P27635"
+    },
+    {
+      "gene_symbol": "RPL10A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P62906"
+    },
+    {
+      "gene_symbol": "RPL10A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P62906"
+    },
+    {
+      "gene_symbol": "RPL11",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:19191325, PubMed:32669547). The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules (PubMed:19191325, PubMed:32669547). The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain (PubMed:19191325, PubMed:32669547). The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel (PubMed:19191325, PubMed:32669547). As part of the 5S RNP/5S ribonucleoprotein particle it is an essential component of the LSU, required for its formation and the maturation of rRNAs (PubMed:12962325, PubMed:19061985, PubMed:24120868). It also couples ribosome biogenesis to p53/TP53 activation. As part of the 5S RNP it accumulates in the nucleoplasm and inhibits MDM2, when ribosome biogenesis is perturbed, mediating the stabilization and the activation of TP53 (PubMed:24120868). Promotes nucleolar location of PML (By similarity)",
+      "accession": "P62913"
+    },
+    {
+      "gene_symbol": "RPL12",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:25901680). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:25901680). Binds directly to 26S ribosomal RNA (PubMed:25901680)",
+      "accession": "P30050"
+    },
+    {
+      "gene_symbol": "RPL13",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:31630789, PubMed:32669547). The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules (Probable). The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain (Probable). The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel (Probable). As part of the LSU, it is probably required for its formation and the maturation of rRNAs (PubMed:31630789). Plays a role in bone development (PubMed:31630789)",
+      "accession": "P26373"
+    },
+    {
+      "gene_symbol": "RPL13A",
+      "UniProt_functional_annotation": "Associated with ribosomes but is not required for canonical ribosome function and has extra-ribosomal functions (PubMed:14567916, PubMed:17218275, PubMed:23636399, PubMed:32669547). Component of the GAIT (gamma interferon-activated inhibitor of translation) complex which mediates interferon-gamma-induced transcript-selective translation inhibition in inflammation processes (PubMed:23071094). Upon interferon-gamma activation and subsequent phosphorylation dissociates from the ribosome and assembles into the GAIT complex which binds to stem loop-containing GAIT elements in the 3'-UTR of diverse inflammatory mRNAs (such as ceruplasmin) and suppresses their translation (PubMed:23071094). In the GAIT complex interacts with m7G cap-bound eIF4G at or near the eIF3-binding site and blocks the recruitment of the 43S ribosomal complex (PubMed:23071094). Involved in methylation of rRNA (PubMed:17921318)",
+      "accession": "P40429"
+    },
+    {
+      "gene_symbol": "RPL14",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P50914"
+    },
+    {
+      "gene_symbol": "RPL15",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P61313"
+    },
+    {
+      "gene_symbol": "RPL17",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P18621"
+    },
+    {
+      "gene_symbol": "RPL17-C18orf32",
+      "UniProt_functional_annotation": "",
+      "accession": "A0A0A0MRF8"
+    },
+    {
+      "gene_symbol": "RPL18",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547)",
+      "accession": "Q07020"
+    },
+    {
+      "gene_symbol": "RPL18A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "Q02543"
+    },
+    {
+      "gene_symbol": "RPL19",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P84098"
+    },
+    {
+      "gene_symbol": "RPL23",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P62829"
+    },
+    {
+      "gene_symbol": "RPL24",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P83731"
+    },
+    {
+      "gene_symbol": "RPL26",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:26100019, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:26100019, PubMed:32669547)",
+      "accession": "P61254"
+    },
+    {
+      "gene_symbol": "RPL27A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P46776"
+    },
+    {
+      "gene_symbol": "RPL3",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547, PubMed:35674491). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P39023"
+    },
+    {
+      "gene_symbol": "RPL30",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P62888"
+    },
+    {
+      "gene_symbol": "RPL31",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P62899"
+    },
+    {
+      "gene_symbol": "RPL32",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P62910"
+    },
+    {
+      "gene_symbol": "RPL35",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547)",
+      "accession": "P42766"
+    },
+    {
+      "gene_symbol": "RPL35A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547). Required for the proliferation and viability of hematopoietic cells (PubMed:18535205)",
+      "accession": "P18077"
+    },
+    {
+      "gene_symbol": "RPL36",
+      "UniProt_functional_annotation": "Inhibits C2CD2L/TMEM24-dependent transport of phosphatidylinositol, the precursor of phosphatidylinositol 4,5-bisphosphate (PI(4,5)P2), from its site of synthesis in the endoplasmic reticulum to the cell membrane (PubMed:33479206). This leads to down-regulation of the PI3K-AKT-mTOR signaling pathway (PubMed:33479206)",
+      "accession": "C0HME6"
+    },
+    {
+      "gene_symbol": "RPL37",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P61927"
+    },
+    {
+      "gene_symbol": "RPL37A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P61513"
+    },
+    {
+      "gene_symbol": "RPL38",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P63173"
+    },
+    {
+      "gene_symbol": "RPL39",
+      "UniProt_functional_annotation": "RNA-binding component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P62891"
+    },
+    {
+      "gene_symbol": "RPL4",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P36578"
+    },
+    {
+      "gene_symbol": "RPL4",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P36578"
+    },
+    {
+      "gene_symbol": "RPL5",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules. The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain. The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel. As part of the 5S RNP/5S ribonucleoprotein particle it is an essential component of the LSU, required for its formation and the maturation of rRNAs (PubMed:12962325, PubMed:19061985, PubMed:23636399, PubMed:24120868). It also couples ribosome biogenesis to p53/TP53 activation. As part of the 5S RNP it accumulates in the nucleoplasm and inhibits MDM2, when ribosome biogenesis is perturbed, mediating the stabilization and the activation of TP53 (PubMed:24120868)",
+      "accession": "P46777"
+    },
+    {
+      "gene_symbol": "RPL6",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:32669547)\n(Microbial infection) Specifically binds to domain C of the Tax-responsive enhancer element in the long terminal repeat of HTLV-I (PubMed:8457378)",
+      "accession": "Q02878"
+    },
+    {
+      "gene_symbol": "RPL7",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:12962325, PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:12962325, PubMed:23636399, PubMed:32669547). Binds to G-rich structures in 28S rRNA and in mRNAs (PubMed:12962325). Plays a regulatory role in the translation apparatus; inhibits cell-free translation of mRNAs (PubMed:12962325)",
+      "accession": "P18124"
+    },
+    {
+      "gene_symbol": "RPL7A",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P62424"
+    },
+    {
+      "gene_symbol": "RPL8",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P62917"
+    },
+    {
+      "gene_symbol": "RPL9",
+      "UniProt_functional_annotation": "Component of the large ribosomal subunit (PubMed:23636399, PubMed:32669547). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:32669547)",
+      "accession": "P32969"
+    },
+    {
+      "gene_symbol": "RPLP0",
+      "UniProt_functional_annotation": "Ribosomal protein P0 is the functional equivalent of E.coli protein L10",
+      "accession": "P05388"
+    },
+    {
+      "gene_symbol": "RPLP2",
+      "UniProt_functional_annotation": "Plays an important role in the elongation step of protein synthesis",
+      "accession": "P05387"
+    },
+    {
+      "gene_symbol": "RPS10",
+      "UniProt_functional_annotation": "Component of the 40S ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399)",
+      "accession": "P46783"
+    },
+    {
+      "gene_symbol": "RPS11",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62280"
+    },
+    {
+      "gene_symbol": "RPS11",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62280"
+    },
+    {
+      "gene_symbol": "RPS12",
+      "UniProt_functional_annotation": "Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). Subunit of the 40S ribosomal complex (By similarity)",
+      "accession": "P25398"
+    },
+    {
+      "gene_symbol": "RPS13",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62277"
+    },
+    {
+      "gene_symbol": "RPS14",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62263"
+    },
+    {
+      "gene_symbol": "RPS14",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell. Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62263"
+    },
+    {
+      "gene_symbol": "RPS15",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399)",
+      "accession": "P62841"
+    },
+    {
+      "gene_symbol": "RPS15A",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). Required for proper erythropoiesis (PubMed:27909223)",
+      "accession": "P62244"
+    },
+    {
+      "gene_symbol": "RPS16",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62249"
+    },
+    {
+      "gene_symbol": "RPS16",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62249"
+    },
+    {
+      "gene_symbol": "RPS17",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P08708"
+    },
+    {
+      "gene_symbol": "RPS18",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell",
+      "accession": "P62269"
+    },
+    {
+      "gene_symbol": "RPS19",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Required for pre-rRNA processing and maturation of 40S ribosomal subunits (PubMed:16990592). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P39019"
+    },
+    {
+      "gene_symbol": "RPS2",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules (PubMed:23636399). The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain (PubMed:23636399). The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel (PubMed:23636399). Plays a role in the assembly and function of the 40S ribosomal subunit (By similarity). Mutations in this protein affects the control of translational fidelity (By similarity). Involved in nucleolar processing of pre-18S ribosomal RNA and ribosome assembly (By similarity)",
+      "accession": "P15880"
+    },
+    {
+      "gene_symbol": "RPS20",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399)",
+      "accession": "P60866"
+    },
+    {
+      "gene_symbol": "RPS21",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:25901680, PubMed:25957688). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:25901680, PubMed:25957688)",
+      "accession": "P63220"
+    },
+    {
+      "gene_symbol": "RPS23",
+      "UniProt_functional_annotation": "Component of the ribosome, a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:25901680, PubMed:25957688, PubMed:28257692). The small ribosomal subunit (SSU) binds messenger RNAs (mRNAs) and translates the encoded message by selecting cognate aminoacyl-transfer RNA (tRNA) molecules (PubMed:23636399, PubMed:25901680, PubMed:25957688). The large subunit (LSU) contains the ribosomal catalytic site termed the peptidyl transferase center (PTC), which catalyzes the formation of peptide bonds, thereby polymerizing the amino acids delivered by tRNAs into a polypeptide chain (PubMed:23636399, PubMed:25901680, PubMed:25957688). The nascent polypeptides leave the ribosome through a tunnel in the LSU and interact with protein factors that function in enzymatic processing, targeting, and the membrane insertion of nascent chains at the exit of the ribosomal tunnel (PubMed:23636399, PubMed:25901680, PubMed:25957688). Plays an important role in translational accuracy (PubMed:28257692). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62266"
+    },
+    {
+      "gene_symbol": "RPS24",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Required for processing of pre-rRNA and maturation of 40S ribosomal subunits (PubMed:18230666). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62847"
+    },
+    {
+      "gene_symbol": "RPS25",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399)",
+      "accession": "P62851"
+    },
+    {
+      "gene_symbol": "RPS26",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:25901680, PubMed:25957688). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:25901680, PubMed:25957688)",
+      "accession": "P62854"
+    },
+    {
+      "gene_symbol": "RPS27A",
+      "UniProt_functional_annotation": "Exists either covalently attached to another protein, or free (unanchored). When covalently bound, it is conjugated to target proteins via an isopeptide bond either as a monomer (monoubiquitin), a polymer linked via different Lys residues of the ubiquitin (polyubiquitin chains) or a linear polymer linked via the initiator Met of the ubiquitin (linear polyubiquitin chains). Polyubiquitin chains, when attached to a target protein, have different functions depending on the Lys residue of the ubiquitin that is linked: Lys-6-linked may be involved in DNA repair; Lys-11-linked is involved in ERAD (endoplasmic reticulum-associated degradation) and in cell-cycle regulation; Lys-29-linked is involved in proteotoxic stress response and cell cycle; Lys-33-linked is involved in kinase modification; Lys-48-linked is involved in protein degradation via the proteasome; Lys-63-linked is involved in endocytosis, DNA-damage responses as well as in signaling processes leading to activation of the transcription factor NF-kappa-B. Linear polymer chains formed via attachment by the initiator Met lead to cell signaling. Ubiquitin is usually conjugated to Lys residues of target proteins, however, in rare cases, conjugation to Cys or Ser residues has been observed. When polyubiquitin is free (unanchored-polyubiquitin), it also has distinct roles, such as in activation of protein kinases, and in signaling\nComponent of the 40S subunit of the ribosome (PubMed:23636399, PubMed:9582194). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:23636399, PubMed:34516797)",
+      "accession": "P62979"
+    },
+    {
+      "gene_symbol": "RPS28",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:25901680, PubMed:25957688). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:25901680, PubMed:25957688). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62857"
+    },
+    {
+      "gene_symbol": "RPS29",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:25901680, PubMed:25957688). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:25901680, PubMed:25957688)",
+      "accession": "P62273"
+    },
+    {
+      "gene_symbol": "RPS3",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399, PubMed:8706699). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399, PubMed:8706699). Has endonuclease activity and plays a role in repair of damaged DNA (PubMed:7775413). Cleaves phosphodiester bonds of DNAs containing altered bases with broad specificity and cleaves supercoiled DNA more efficiently than relaxed DNA (PubMed:15707971). Displays high binding affinity for 7,8-dihydro-8-oxoguanine (8-oxoG), a common DNA lesion caused by reactive oxygen species (ROS) (PubMed:14706345). Has also been shown to bind with similar affinity to intact and damaged DNA (PubMed:18610840). Stimulates the N-glycosylase activity of the base excision protein OGG1 (PubMed:15518571). Enhances the uracil excision activity of UNG1 (PubMed:18973764). Also stimulates the cleavage of the phosphodiester backbone by APEX1 (PubMed:18973764). When located in the mitochondrion, reduces cellular ROS levels and mitochondrial DNA damage (PubMed:23911537). Has also been shown to negatively regulate DNA repair in cells exposed to hydrogen peroxide (PubMed:17049931). Plays a role in regulating transcription as part of the NF-kappa-B p65-p50 complex where it binds to the RELA/p65 subunit, enhances binding of the complex to DNA and promotes transcription of target genes (PubMed:18045535). Represses its own translation by binding to its cognate mRNA (PubMed:20217897). Binds to and protects TP53/p53 from MDM2-mediated ubiquitination (PubMed:19656744). Involved in spindle formation and chromosome movement during mitosis by regulating microtubule polymerization (PubMed:23131551). Involved in induction of apoptosis through its role in activation of CASP8 (PubMed:14988002). Induces neuronal apoptosis by interacting with the E2F1 transcription factor and acting synergistically with it to up-regulate pro-apoptotic proteins BCL2L11/BIM and HRK/Dp5 (PubMed:20605787). Interacts with TRADD following exposure to UV radiation and induces apoptosis by caspase-dependent JNK activation (PubMed:22510408)",
+      "accession": "P23396"
+    },
+    {
+      "gene_symbol": "RPS3A",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797). May play a role during erythropoiesis through regulation of transcription factor DDIT3 (By similarity)",
+      "accession": "P61247"
+    },
+    {
+      "gene_symbol": "RPS4X",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit. The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62701"
+    },
+    {
+      "gene_symbol": "RPS5",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P46782"
+    },
+    {
+      "gene_symbol": "RPS6",
+      "UniProt_functional_annotation": "Component of the 40S small ribosomal subunit (PubMed:23636399, PubMed:8706699). Plays an important role in controlling cell growth and proliferation through the selective translation of particular classes of mRNA (PubMed:17220279). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62753"
+    },
+    {
+      "gene_symbol": "RPS7",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Required for rRNA maturation (PubMed:19061985). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62081"
+    },
+    {
+      "gene_symbol": "RPS8",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P62241"
+    },
+    {
+      "gene_symbol": "RPS9",
+      "UniProt_functional_annotation": "Component of the small ribosomal subunit (PubMed:23636399). The ribosome is a large ribonucleoprotein complex responsible for the synthesis of proteins in the cell (PubMed:23636399). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "P46781"
+    },
+    {
+      "gene_symbol": "RPSA",
+      "UniProt_functional_annotation": "Required for the assembly and/or stability of the 40S ribosomal subunit. Required for the processing of the 20S rRNA-precursor to mature 18S rRNA in a late step of the maturation of 40S ribosomal subunits. Also functions as a cell surface receptor for laminin. Plays a role in cell adhesion to the basement membrane and in the consequent activation of signaling transduction pathways. May play a role in cell fate determination and tissue morphogenesis. Acts as a PPP1R16B-dependent substrate of PPP1CA\n(Microbial infection) Acts as a receptor for the Adeno-associated viruses 2,3,8 and 9\n(Microbial infection) Acts as a receptor for the Dengue virus\n(Microbial infection) Acts as a receptor for the Sindbis virus\n(Microbial infection) Acts as a receptor for the Venezuelan equine encephalitis virus\n(Microbial infection) Acts as a receptor for the pathogenic prion protein\n(Microbial infection) Acts as a receptor for bacteria",
+      "accession": "P08865"
+    },
+    {
+      "gene_symbol": "RRN3",
+      "UniProt_functional_annotation": "Required for efficient transcription initiation by RNA polymerase I (Pol I). Required for the formation of the competent pre-initiation complex (PIC)",
+      "accession": "Q9NYV6"
+    },
+    {
+      "gene_symbol": "RRP15",
+      "UniProt_functional_annotation": "",
+      "accession": "Q9Y3B9"
+    },
+    {
+      "gene_symbol": "RSL24D1",
+      "UniProt_functional_annotation": "Involved in the biogenesis of the 60S ribosomal subunit. Ensures the docking of GTPBP4/NOG1 to pre-60S particles (By similarity)",
+      "accession": "Q9UHA3"
+    },
+    {
+      "gene_symbol": "SDAD1",
+      "UniProt_functional_annotation": "Required for 60S pre-ribosomal subunits export to the cytoplasm",
+      "accession": "Q9NVU7"
+    },
+    {
+      "gene_symbol": "SLC25A28",
+      "UniProt_functional_annotation": "Mitochondrial iron transporter that mediates iron uptake. Probably required for heme synthesis of hemoproteins and Fe-S cluster assembly in non-erythroid cells",
+      "accession": "Q96A46"
+    },
+    {
+      "gene_symbol": "SRFBP1",
+      "UniProt_functional_annotation": "May be involved in regulating transcriptional activation of cardiac genes during the aging process. May play a role in biosynthesis and/or processing of SLC2A4 in adipose cells (By similarity)",
+      "accession": "Q8NEF9"
+    },
+    {
+      "gene_symbol": "SURF6",
+      "UniProt_functional_annotation": "Binds to both DNA and RNA in vitro, with a stronger binding capacity for RNA. May represent a nucleolar constitutive protein involved in ribosomal biosynthesis or assembly (By similarity)",
+      "accession": "O75683"
+    },
+    {
+      "gene_symbol": "TAF1",
+      "UniProt_functional_annotation": "The TFIID basal transcription factor complex plays a major role in the initiation of RNA polymerase II (Pol II)-dependent transcription (PubMed:33795473). TFIID recognizes and binds promoters with or without a TATA box via its subunit TBP, a TATA-box-binding protein, and promotes assembly of the pre-initiation complex (PIC) (PubMed:33795473). The TFIID complex consists of TBP and TBP-associated factors (TAFs), including TAF1, TAF2, TAF3, TAF4, TAF5, TAF6, TAF7, TAF8, TAF9, TAF10, TAF11, TAF12 and TAF13 (PubMed:33795473). TAF1 is the largest component and core scaffold of the TFIID complex, involved in nucleating complex assembly (PubMed:25412659, PubMed:27007846, PubMed:33795473). TAF1 forms a promoter DNA binding subcomplex of TFIID, together with TAF7 and TAF2 (PubMed:33795473). Contains novel N- and C-terminal Ser/Thr kinase domains which can autophosphorylate or transphosphorylate other transcription factors (PubMed:25412659, PubMed:8625415). Phosphorylates TP53 on 'Thr-55' which leads to MDM2-mediated degradation of TP53 (PubMed:25412659). Phosphorylates GTF2A1 and GTF2F1 on Ser residues (PubMed:25412659). Possesses DNA-binding activity (PubMed:25412659). Essential for progression of the G1 phase of the cell cycle (PubMed:11278496, PubMed:15053879, PubMed:2038334, PubMed:8450888, PubMed:8625415, PubMed:9660973, PubMed:9858607). Exhibits histone acetyltransferase activity towards histones H3 and H4 (PubMed:15870300)",
+      "accession": "P21675"
+    },
+    {
+      "gene_symbol": "TEAD1",
+      "UniProt_functional_annotation": "Transcription factor which plays a key role in the Hippo signaling pathway, a pathway involved in organ size control and tumor suppression by restricting proliferation and promoting apoptosis. The core of this pathway is composed of a kinase cascade wherein MST1/MST2, in complex with its regulatory protein SAV1, phosphorylates and activates LATS1/2 in complex with its regulatory protein MOB1, which in turn phosphorylates and inactivates YAP1 oncoprotein and WWTR1/TAZ. Acts by mediating gene expression of YAP1 and WWTR1/TAZ, thereby regulating cell proliferation, migration and epithelial mesenchymal transition (EMT) induction. Binds specifically and cooperatively to the SPH and GT-IIC 'enhansons' (5'-GTGGAATGT-3') and activates transcription in vivo in a cell-specific manner. The activation function appears to be mediated by a limiting cell-specific transcriptional intermediary factor (TIF). Involved in cardiac development. Binds to the M-CAT motif",
+      "accession": "P28347"
+    },
+    {
+      "gene_symbol": "TSR1",
+      "UniProt_functional_annotation": "Required during maturation of the 40S ribosomal subunit in the nucleolus",
+      "accession": "Q2NL82"
+    },
+    {
+      "gene_symbol": "TSR2",
+      "UniProt_functional_annotation": "May be involved in 20S pre-rRNA processing",
+      "accession": "Q969E8"
+    },
+    {
+      "gene_symbol": "TWISTNB",
+      "UniProt_functional_annotation": "Component of RNA polymerase I (Pol I), a DNA-dependent RNA polymerase which synthesizes ribosomal RNA precursors using the four ribonucleoside triphosphates as substrates. Through its association with RRN3/TIF-IA may be involved in recruitment of Pol I to rDNA promoters",
+      "accession": "Q3B726"
+    },
+    {
+      "gene_symbol": "UBA52",
+      "UniProt_functional_annotation": "Exists either covalently attached to another protein, or free (unanchored). When covalently bound, it is conjugated to target proteins via an isopeptide bond either as a monomer (monoubiquitin), a polymer linked via different Lys residues of the ubiquitin (polyubiquitin chains) or a linear polymer linked via the initiator Met of the ubiquitin (linear polyubiquitin chains). Polyubiquitin chains, when attached to a target protein, have different functions depending on the Lys residue of the ubiquitin that is linked: Lys-6-linked may be involved in DNA repair; Lys-11-linked is involved in ERAD (endoplasmic reticulum-associated degradation) and in cell-cycle regulation; Lys-29-linked is involved in proteotoxic stress response and cell cycle; Lys-33-linked is involved in kinase modification; Lys-48-linked is involved in protein degradation via the proteasome; Lys-63-linked is involved in endocytosis, DNA-damage responses as well as in signaling processes leading to activation of the transcription factor NF-kappa-B. Linear polymer chains formed via attachment by the initiator Met lead to cell signaling. Ubiquitin is usually conjugated to Lys residues of target proteins, however, in rare cases, conjugation to Cys or Ser residues has been observed. When polyubiquitin is free (unanchored-polyubiquitin), it also has distinct roles, such as in activation of protein kinases, and in signaling\nComponent of the 60S subunit of the ribosome (PubMed:23169626, PubMed:23636399, PubMed:32669547, PubMed:39048817, PubMed:39103523). Ribosomal protein L40 is essential for translation of a subset of cellular transcripts, and especially for cap-dependent translation of vesicular stomatitis virus mRNAs (PubMed:23169626, PubMed:23636399, PubMed:32669547, PubMed:39048817, PubMed:39103523)",
+      "accession": "P62987"
+    },
+    {
+      "gene_symbol": "UBTF",
+      "UniProt_functional_annotation": "Recognizes the ribosomal RNA gene promoter and activates transcription mediated by RNA polymerase I (Pol I) through cooperative interactions with the transcription factor SL1/TIF-IB complex. It binds specifically to the upstream control element and can activate Pol I promoter escape",
+      "accession": "P17480"
+    },
+    {
+      "gene_symbol": "URB2",
+      "UniProt_functional_annotation": "Essential for hematopietic stem cell development through the regulation of p53/TP53 pathway",
+      "accession": "Q14146"
+    },
+    {
+      "gene_symbol": "UTP11",
+      "UniProt_functional_annotation": "Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome. Involved in nucleolar processing of pre-18S ribosomal RNA",
+      "accession": "Q9Y3A2"
+    },
+    {
+      "gene_symbol": "UTP14A",
+      "UniProt_functional_annotation": "May be required for ribosome biogenesis",
+      "accession": "Q9BVJ6"
+    },
+    {
+      "gene_symbol": "UTP15",
+      "UniProt_functional_annotation": "Ribosome biogenesis factor. Involved in nucleolar processing of pre-18S ribosomal RNA. Required for optimal pre-ribosomal RNA transcription by RNA polymerase I (PubMed:17699751). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome (PubMed:34516797)",
+      "accession": "Q8TED0"
+    },
+    {
+      "gene_symbol": "UTP20",
+      "UniProt_functional_annotation": "Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome. Involved in 18S pre-rRNA processing. Associates with U3 snoRNA",
+      "accession": "O75691"
+    },
+    {
+      "gene_symbol": "WDR12",
+      "UniProt_functional_annotation": "Component of the PeBoW complex, which is required for maturation of 28S and 5.8S ribosomal RNAs and formation of the 60S ribosome",
+      "accession": "Q9GZL7"
+    },
+    {
+      "gene_symbol": "WDR43",
+      "UniProt_functional_annotation": "Ribosome biogenesis factor that coordinates hyperactive transcription and ribogenesis (PubMed:17699751). Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome. Involved in nucleolar processing of pre-18S ribosomal RNA. Required for optimal pre-ribosomal RNA transcription by RNA polymerase I (PubMed:17699751, PubMed:34516797). Essential for stem cell pluripotency and embryonic development. In the nucleoplasm, recruited by promoter-associated/nascent transcripts and transcription to active promoters where it facilitates releases of elongation factor P-TEFb and paused RNA polymerase II to allow transcription elongation and maintain high-level expression of its targets genes (By similarity)",
+      "accession": "Q15061"
+    },
+    {
+      "gene_symbol": "WDR74",
+      "UniProt_functional_annotation": "Regulatory protein of the MTREX-exosome complex involved in the synthesis of the 60S ribosomal subunit (PubMed:26456651). Participates in an early cleavage of the pre-rRNA processing pathway in cooperation with NVL (PubMed:29107693). Required for blastocyst formation, is necessary for RNA transcription, processing and/or stability during preimplantation development (By similarity)",
+      "accession": "Q6RFH5"
+    },
+    {
+      "gene_symbol": "WDR75",
+      "UniProt_functional_annotation": "Ribosome biogenesis factor. Part of the small subunit (SSU) processome, first precursor of the small eukaryotic ribosomal subunit. During the assembly of the SSU processome in the nucleolus, many ribosome biogenesis factors, an RNA chaperone and ribosomal proteins associate with the nascent pre-rRNA and work in concert to generate RNA folding, modifications, rearrangements and cleavage as well as targeted degradation of pre-ribosomal RNA by the RNA exosome. Involved in nucleolar processing of pre-18S ribosomal RNA. Required for optimal pre-ribosomal RNA transcription by RNA polymerase I",
+      "accession": "Q8IWA0"
+    },
+    {
+      "gene_symbol": "WWTR1",
+      "UniProt_functional_annotation": "Transcriptional coactivator which acts as a downstream regulatory target in the Hippo signaling pathway that plays a pivotal role in organ size control and tumor suppression by restricting proliferation and promoting apoptosis (PubMed:11118213, PubMed:18227151, PubMed:23911299). The core of this pathway is composed of a kinase cascade wherein STK3/MST2 and STK4/MST1, in complex with its regulatory protein SAV1, phosphorylates and activates LATS1/2 in complex with its regulatory protein MOB1, which in turn phosphorylates and inactivates YAP1 oncoprotein and WWTR1/TAZ (PubMed:18227151). WWTR1 enhances PAX8 and NKX2-1/TTF1-dependent gene activation (PubMed:19010321). In conjunction with YAP1, involved in the regulation of TGFB1-dependent SMAD2 and SMAD3 nuclear accumulation (PubMed:18568018). Plays a key role in coupling SMADs to the transcriptional machinery such as the mediator complex (PubMed:18568018). Regulates embryonic stem-cell self-renewal, promotes cell proliferation and epithelial-mesenchymal transition (PubMed:18227151, PubMed:18568018)",
+      "accession": "Q9GZV5"
+    },
+    {
+      "gene_symbol": "ZCCHC9",
+      "UniProt_functional_annotation": "May down-regulate transcription mediated by NF-kappa-B and the serum response element",
+      "accession": "Q8N567"
+    },
+    {
+      "gene_symbol": "ZNF574",
+      "UniProt_functional_annotation": "Part of a ribosome quality control that mediates surveillance of ribosome assembly and promotes degradation of ribosomes with assembly defects",
+      "accession": "Q6ZN55"
+    },
+    {
+      "gene_symbol": "ZNRD1",
+      "UniProt_functional_annotation": "Core component of RNA polymerase I (Pol I), a DNA-dependent RNA polymerase which synthesizes ribosomal RNA precursors using the four ribonucleoside triphosphates as substrates. Can mediate Pol I proofreading of the nascent RNA transcript. Anchors into the Pol I active site to monitor transcription fidelity and cleave mis-incorporated 5'-ribonucleotides",
+      "accession": "Q9P1U0"
+    }
+  ]
+}

@@ -1,16 +1,15 @@
 """Tests for prompt_factory module."""
 
 import re
-import pytest
 
-from mozzarellm.utils.prompt_factory import make_cluster_analysis_system_prompt
 from mozzarellm.prompt_components import (
-    COT_STEP_PATHWAY_HYPOTHESIS,
+    CANONICAL_COT_ORDER,
     COT_STEP_GENE_CATEGORIZATION,
-    COT_STEP_VERIFICATION,
     COT_STEP_OUTPUT,
-    STEPS_DEFAULT,
+    COT_STEP_PATHWAY_HYPOTHESIS,
+    COT_STEP_VERIFICATION,
 )
+from mozzarellm.utils.prompt_factory import make_cluster_analysis_system_prompt
 
 
 def test_standard_mode_returns_string(tmp_path):
@@ -66,7 +65,7 @@ def test_cot_mode_uses_steps(tmp_path):
         output_dir=tmp_path,
     )
     step_headers = re.findall(r"^STEP \d+ - ", result, re.MULTILINE)
-    assert len(step_headers) == len(STEPS_DEFAULT)
+    assert len(step_headers) == len(CANONICAL_COT_ORDER)
 
 
 def test_cot_mode_includes_task_as_step1(tmp_path):

@@ -11,8 +11,9 @@ from mozzarellm.schemas.bundle_schemas import (
     ScreenContext,
 )
 from mozzarellm.utils.io import load_table, write_bundle
-from mozzarellm.utils.cluster_utils import cluster_chunker, find_feature_overlaps
+from mozzarellm.utils.cluster_utils import cluster_chunker, compute_feature_coherence
 from mozzarellm.clients.uniprot_api_client import UniProtClient
+from mozzarellm.clients.affinage_api_client import AffinageClient, ANNOTATION_COL as AFFINAGE_COL
 
 DEFAULT_ACCESSION_COL = "accession"
 
@@ -141,30 +142,46 @@ def add_functional_annotations_to_chunk(
     chunk: pd.DataFrame,
     screen_name: str,
     cluster_id_column: str,
+    gene_column: str | None = None,
     stable_accession_col: str | None = None,
+    source: str = "uniprot",
     uniprot_client: UniProtClient | None = None,
+    affinage_client: AffinageClient | None = None,
     output_dir: Path | str | None = None,
 ) -> pd.DataFrame:
-    """Add annotation columns to a chunk of gene-level data. Calls UniprotAPIClient to fetch annotations."""
+    """Add annotation columns to a chunk of gene-level data.
+
+    source="uniprot" (default) fetches UniProt functional annotations; "affinage"
+    fetches Affinage narratives (alias-resolved, audit-gated) with UniProt as the
+    per-gene backup; "both" keeps both columns.
+    """
     if stable_accession_col is None:
         stable_accession_col = DEFAULT_ACCESSION_COL
     chunk_annotated = chunk.copy()
     cluster_id = chunk_annotated[cluster_id_column].iloc[0]
 
-    # initialize client
+    # UniProt annotations — primary for uniprot/both, backup for affinage
     if uniprot_client is None:
         uniprot_client = UniProtClient()
-
-    # fetch annotations as 2 column dataframe
     try:
         annotations = uniprot_client.fetch_functional_annotations(
             chunk_annotated, stable_accession_col
         )
+        chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
     except Exception as e:
         warnings.warn(f"UniProt lookup failed for cluster '{cluster_id}': {e}")
-        return chunk_annotated
-    # add annotations to chunk
-    chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
+        if source == "uniprot":
+            return chunk_annotated
+
+    # Affinage narratives, with UniProt left as the per-gene backup
+    if source in ("affinage", "both"):
+        if affinage_client is None:
+            affinage_client = AffinageClient()
+        affinage = affinage_client.fetch_functional_annotations(chunk_annotated, gene_column)
+        chunk_annotated = chunk_annotated.merge(affinage, on=gene_column, how="left")
+        if source == "affinage" and "UniProt_functional_annotation" in chunk_annotated.columns:
+            has_affinage = chunk_annotated[AFFINAGE_COL].notna() & chunk_annotated[AFFINAGE_COL].ne("")
+            chunk_annotated.loc[has_affinage, "UniProt_functional_annotation"] = pd.NA
     # save as csv; output dir interface/output/
     OUTPUT_DIR = (
         Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
@@ -202,12 +219,16 @@ def build_evidence_bundles(
     | Path
     | None = None,  # optionally change the directory where the knowledge files are stored
     top_k: int = 10,
+    source: str = "uniprot",
     uniprot_client: UniProtClient | None = None,  # Inject dependency
+    affinage_client: AffinageClient | None = None,
     output_dir: Path | str | None = None,
     flat_output: bool = False,
 ):
     if uniprot_client is None:
         uniprot_client = UniProtClient()  # Create once
+    if affinage_client is None and source in ("affinage", "both"):
+        affinage_client = AffinageClient()
     # validate required columns in cluster table
     if cluster_id_column not in acc_cluster_df.columns:
         raise ValueError(f"Missing column '{cluster_id_column}' in cluster table")
@@ -238,8 +259,11 @@ def build_evidence_bundles(
             chunk=chunk,
             screen_name=screen_name,
             cluster_id_column=cluster_id_column,
+            gene_column=gene_column,
             stable_accession_col=stable_accession_col,
+            source=source,
             uniprot_client=uniprot_client,
+            affinage_client=affinage_client,
             output_dir=output_dir,
         )
 
@@ -250,6 +274,13 @@ def build_evidence_bundles(
         # convert to json
         cluster_as_json = annotated_chunk.to_dict(orient="records")
 
+        # for affinage/both, drop the empty backup-source key so each gene shows only its source
+        if source in ("affinage", "both"):
+            for gene in cluster_as_json:
+                for col in ("UniProt_functional_annotation", AFFINAGE_COL):
+                    if gene.get(col) == "":
+                        gene.pop(col, None)
+
         # screen context + cluster info = evidence bundle
         evidence_bundle = {
             "screen_name": screen_name,
@@ -258,7 +289,9 @@ def build_evidence_bundles(
         }
 
         if feature_columns:
-            evidence_bundle["feature_overlaps"] = find_feature_overlaps(chunk, feature_columns)
+            evidence_bundle["feature_coherence"] = compute_feature_coherence(
+                chunk, feature_columns, gene_column=gene_column
+            )
 
         # save bundle as json
         output_path = Path(OUTPUT_DIR / f"{screen_name}__cluster_{cluster_id}__bundle.json")

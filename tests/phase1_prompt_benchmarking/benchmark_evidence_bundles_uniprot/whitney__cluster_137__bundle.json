@@ -1,0 +1,56 @@
+{
+  "screen_name": "whitney",
+  "cluster_id": "137",
+  "cluster_genes": [
+    {
+      "gene_symbol": "B3GNT2",
+      "UniProt_functional_annotation": "Beta-1,3-N-acetylglucosaminyltransferase involved in the synthesis of poly-N-acetyllactosamine. Catalyzes the initiation and elongation of poly-N-acetyllactosamine chains. Shows a marked preference for Gal(beta1-4)Glc(NAc)-based acceptors (PubMed:9892646). Probably constitutes the main polylactosamine synthase",
+      "accession": "Q9NY97"
+    },
+    {
+      "gene_symbol": "DNAH14",
+      "UniProt_functional_annotation": "Force generating protein of respiratory cilia. Produces force towards the minus ends of microtubules. Dynein has ATPase activity; the force-producing power stroke is thought to occur on release of ADP. Involved in sperm motility; implicated in sperm flagellar assembly (By similarity)",
+      "accession": "Q0VDD8"
+    },
+    {
+      "gene_symbol": "DNAJC22",
+      "UniProt_functional_annotation": "May function as a co-chaperone",
+      "accession": "Q8N4W6"
+    },
+    {
+      "gene_symbol": "ENSG00000288591",
+      "UniProt_functional_annotation": "",
+      "accession": ""
+    },
+    {
+      "gene_symbol": "LOC124901069",
+      "UniProt_functional_annotation": "",
+      "accession": ""
+    },
+    {
+      "gene_symbol": "PPEF1",
+      "UniProt_functional_annotation": "May have a role in the recovery or adaptation response of photoreceptors. May have a role in development",
+      "accession": "O14829"
+    },
+    {
+      "gene_symbol": "PRKAG3",
+      "UniProt_functional_annotation": "AMP/ATP-binding subunit of AMP-activated protein kinase (AMPK), an energy sensor protein kinase that plays a key role in regulating cellular energy metabolism (PubMed:14722619, PubMed:17878938, PubMed:24563466). In response to reduction of intracellular ATP levels, AMPK activates energy-producing pathways and inhibits energy-consuming processes: inhibits protein, carbohydrate and lipid biosynthesis, as well as cell growth and proliferation. AMPK acts via direct phosphorylation of metabolic enzymes, and by longer-term effects via phosphorylation of transcription regulators. AMPK also acts as a regulator of cellular polarity by remodeling the actin cytoskeleton; probably by indirectly activating myosin. The AMPK gamma3 subunit is a non-catalytic subunit with a regulatory role in muscle energy metabolism (PubMed:17878938). It mediates binding to AMP, ADP and ATP, leading to AMPK activation or inhibition: AMP-binding results in allosteric activation of alpha catalytic subunit (PRKAA1 or PRKAA2) both by inducing phosphorylation and preventing dephosphorylation of catalytic subunits. ADP also stimulates phosphorylation, without stimulating already phosphorylated catalytic subunit. ATP promotes dephosphorylation of catalytic subunit, rendering the AMPK enzyme inactive",
+      "accession": "Q9UGI9"
+    },
+    {
+      "gene_symbol": "PSG7",
+      "UniProt_functional_annotation": "",
+      "accession": "Q13046"
+    },
+    {
+      "gene_symbol": "TEKT5",
+      "UniProt_functional_annotation": "Sperm-specific microtubule inner protein (MIP) part of the dynein-decorated doublet microtubules (DMTs) in flagellar axoneme. Forms an extensive interaction network in different conformations that reinforces the helix bundle composed by other tektin proteins (TEKT1 to TEKT4) and MIPs to anchor the tektin bundle onto the tubulin wall of A-tubule of the sperm flagellum",
+      "accession": "Q96M29"
+    },
+    {
+      "gene_symbol": "TMEM217B",
+      "UniProt_functional_annotation": "",
+      "accession": "A0A494BZU4"
+    }
+  ]
+}

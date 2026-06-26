@@ -1,37 +1,52 @@
-# Live run -- denali screen only, all 6 routes, 3 replicates.
+# Order Benchmark — Full Panel (Phase 2)
+# All 14 clusters × [3a, 3b] base × 5 variants × 1 replicate = 140 LLM analysis runs.
+# experiment_id is `_panel_v1` (not `_full_v1`) to avoid collision with Alexa's
+# existing denali run.
 
-experiment_id: arch_bench_denali_live_test
+experiment_id: order_bench_full_panel_v1
+
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
   evidence_bundles_dir: benchmark_evidence_bundles_uniprot
-  output_dir: benchmarking_outputs/1.arch
+  output_dir: benchmarking_outputs/2.order
 
 model:
   provider: anthropic
   model_name: claude-sonnet-4-5
   temperature: 0.2
   max_tokens: 4000
+  top_p: null
+  top_k: null
 
 run:
   num_replicates: 1
   dry_run: false
-  workflow_testing: true
-  overwrite_outputs: true
+  workflow_testing: false
+  overwrite_outputs: false
   continue_on_error: true
   save_prompts: true
   save_raw_outputs: true
   save_parsed_outputs: true
   save_traces: true
 
-routes:
-  include:
+# Order benchmarking (Phase 2)
+# When enabled, routes are built from base_routes × variants below.
+# The routes.include field is only used if order_benchmark.enabled = false.
+order_benchmark:
+  enabled: true
+  base_routes:
     - 3a
-    - 3c_mcp
+    - 3b
+  variants:
+    - canonical
+    - late_screen_context
+    - prioritization_before_classification
+    - early_output_format
+    - delayed_task_anchor
 
 screens:
-  include:
-    - denali
+  include: all
 
 clusters:
   include: all

@@ -22,17 +22,10 @@ from datetime import datetime
 from pathlib import Path
 
 from mozzarellm.prompt_components import (
-    CLUSTER_ANALYSIS_TASK,
-    COT_SCREEN_CONTEXT,
-    GENE_CATEGORIZATION_RULES,
-    NOVEL_CLASSIFICATION_RULES,
-    OUTPUT_FORMAT_JSON,
-    PATHWAY_CONFIDENCE_CRITERIA,
-    STEP_LITERATURE_VALIDATION,
-    STEPS_DEFAULT,
-    STEPS_DEFAULT_MCP,
-    UNCHARACTERIZED_CLASSIFICATION_RULES,
-    assemble_cot_instructions,
+    CANONICAL_COT_MCP_ORDER,
+    CANONICAL_COT_ORDER,
+    CANONICAL_ZERO_SHOT_MCP_ORDER,
+    CANONICAL_ZERO_SHOT_ORDER,
     COMPONENT_REGISTRY,
 )
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
@@ -49,29 +42,24 @@ def _resolve_screen_context(screen_context_path: Path | None, override: bool) ->
     return json.dumps(ctx_obj, ensure_ascii=False)
 
 
-def _substitute_screen_context(step: str, screen_context: str) -> str:
-    """Replace the screen-context placeholder in a single step text with the actual JSON."""
-    return f"{COT_SCREEN_CONTEXT}\n{screen_context}" if step == COT_SCREEN_CONTEXT else step
-
-
 def compose_stepwise_user_turns(mcp: bool) -> list[dict]:
     """Per-turn user content for stepwise mode.
 
-    The first two canonical steps (TASK + screen context) live in the system
+    The first two canonical components (TASK + screen context) live in the system
     prompt; this returns the remaining reasoning steps formatted as `STEP N - ...`,
     plus a flag for which turns should attach MCP tools.
 
     Returns a list of `{"content": str, "mcp": bool}`. The client walks these
     sequentially, prepending the cluster bundle to turn 0's content.
     """
-    canonical = STEPS_DEFAULT_MCP if mcp else STEPS_DEFAULT
-    runner_steps = canonical[2:]  # skip TASK + screen-context (system-prompt content)
+    canonical = CANONICAL_COT_MCP_ORDER if mcp else CANONICAL_COT_ORDER
+    runner_keys = canonical[2:]  # skip CAT + SC (system-prompt content)
     return [
         {
-            "content": f"STEP {i + 1} - {step}",
-            "mcp": (mcp and step == STEP_LITERATURE_VALIDATION),
+            "content": f"STEP {i + 1} - {COMPONENT_REGISTRY[key]}",
+            "mcp": (mcp and key == "LIT"),
         }
-        for i, step in enumerate(runner_steps)
+        for i, key in enumerate(runner_keys)
     ]
 
 
@@ -149,7 +137,7 @@ def make_cluster_analysis_system_prompt(
                   step is inserted before OUTPUT_FORMAT_JSON.
 
       - cot:      numbered chain-of-thought — `STEP 1 - ..., STEP 2 - ...` from
-                  the canonical `STEPS_DEFAULT` (or `STEPS_DEFAULT_MCP` when mcp=True).
+                  `CANONICAL_COT_ORDER` (or `CANONICAL_COT_MCP_ORDER` when mcp=True).
                   Single API call.
 
       - stepwise: same canonical step list as cot, but delivered as separate API turns.
@@ -207,28 +195,20 @@ def make_cluster_analysis_system_prompt(
     # MODE-BASED PROMPT CONSTRUCTION (default path)
     # =========================================================================
     elif mode == "standard":
-        # Historical default: flat rules-based prompt. No step structure.
-        components = [
-            CLUSTER_ANALYSIS_TASK,
-            f"The following experimental context is provided: {SCREEN_CONTEXT_TEXT}",
-            GENE_CATEGORIZATION_RULES,
-            NOVEL_CLASSIFICATION_RULES,
-            UNCHARACTERIZED_CLASSIFICATION_RULES,
-            PATHWAY_CONFIDENCE_CRITERIA,
-        ]
-        if mcp:
-            components.append(STEP_LITERATURE_VALIDATION)
-        components.append(OUTPUT_FORMAT_JSON)
-        prompt = "\n\n".join(components)
+        order = CANONICAL_ZERO_SHOT_MCP_ORDER if mcp else CANONICAL_ZERO_SHOT_ORDER
+        prompt = assemble_from_component_order(order, SCREEN_CONTEXT_TEXT, cot_mode=False)
     elif mode == "cot":
-        # Numbered chain-of-thought; one API call.
-        steps = override_CoT_steps or (STEPS_DEFAULT_MCP if mcp else STEPS_DEFAULT)
-        steps = [_substitute_screen_context(s, SCREEN_CONTEXT_TEXT) for s in steps]
-        prompt = "\n\n".join(f"STEP {i + 1} - {s}" for i, s in enumerate(steps))
+        if override_CoT_steps:
+            prompt = "\n\n".join(f"STEP {i + 1} - {s}" for i, s in enumerate(override_CoT_steps))
+        else:
+            order = CANONICAL_COT_MCP_ORDER if mcp else CANONICAL_COT_ORDER
+            prompt = assemble_from_component_order(order, SCREEN_CONTEXT_TEXT, cot_mode=True)
     else:  # stepwise — system prompt holds TASK + screen context only; runner walks the rest as user turns
-        steps = override_CoT_steps or (STEPS_DEFAULT_MCP if mcp else STEPS_DEFAULT)
-        steps = [_substitute_screen_context(s, SCREEN_CONTEXT_TEXT) for s in steps]
-        prompt = "\n\n".join(steps[:2])
+        if override_CoT_steps:
+            prompt = "\n\n".join(override_CoT_steps[:2])
+        else:
+            order = CANONICAL_COT_MCP_ORDER if mcp else CANONICAL_COT_ORDER
+            prompt = assemble_from_component_order(order[:2], SCREEN_CONTEXT_TEXT, cot_mode=False)
     # Save system prompt to file if output_dir is provided
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)

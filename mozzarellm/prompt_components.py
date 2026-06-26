@@ -201,6 +201,102 @@ In the final output, include:
 - A top-level `literature_informed_pathway_revision` object: {{"pre_literature_pathway": "your tentative pathway BEFORE literature validation", "post_literature_pathway": "your final pathway AFTER literature validation (may be the same)", "pathway_changed": true/false, "rationale": "one sentence — what literature drove the change, or why it stayed the same"}}."""
 
 # =============================================================================
+# FEATURE COHERENCE + PATHWAY CONSISTENCY (feature-interp mode)
+# =============================================================================
+
+FEATURE_COHERENCE_OUTPUT_FORMAT = """
+The top-level "feature_coherence" field must contain:
+- "concrete": true | false — true only if essential up/down forms a coherent signature driven by overlapping gene subsets
+- "essential_up": array of {"feature": "...", "frac_up": float, "supporting_genes": ["..."]} (empty when not concrete)
+- "essential_down": array of {"feature": "...", "frac_down": float, "supporting_genes": ["..."]} (empty when not concrete)
+- "mixed_or_unsupported": array of {"feature": "...", "frac_up": float, "frac_down": float}
+- "rationale": one or two sentences citing fractions and gene-subset overlap; no biology
+"""
+
+STEP_FEATURE_COHERENCE = f"""FEATURE COHERENCE (recall — discrete table, no biology):
+
+Each evidence bundle includes a `feature_coherence` field with a per-feature breakdown
+across the cluster: for each feature, `n_up` / `frac_up` and `n_down` / `frac_down` of
+the cluster genes calling it differentially significant in that direction, along with
+the corresponding `up_genes` / `down_genes` lists. This is the data for this step.
+
+You may also use the per-gene `up_features` / `down_features` lists in `cluster_genes`
+ONLY to verify that candidate "essential" features are driven by an OVERLAPPING gene
+subset (not disjoint subsets that just sum to a high fraction).
+
+Procedure:
+
+1. From `feature_coherence.features`, identify "essential" features:
+   - Strong UP: high `frac_up` AND `frac_down` near zero. The supporting gene set must
+     be cohesive — features that aggregate to a high fraction but are driven by largely
+     non-overlapping gene subsets are NOT essential.
+   - Strong DOWN: high `frac_down` AND `frac_up` near zero. Same gene-overlap criterion.
+2. List "mixed_or_unsupported" features — those with both directions modest, or with
+   conflicting directional signal. Do not include features with no signal at all.
+3. Set `concrete`:
+   - true when essential_up + essential_down forms a coherent feature signature: multiple
+     features with strong directional agreement, driven by overlapping gene subsets.
+   - false when no features have strong agreement, OR the candidates with agreement are
+     driven by disjoint gene subsets.
+4. Write `rationale` (one or two sentences). Cite features by name and gene-fractions.
+   When `concrete` is false, briefly state which lens failed (no agreement, or disjoint
+   gene subsets, or both). NO biology, NO mechanisms, NO pathway concepts in this step.
+
+Hard guardrails:
+- This step is recall over a discrete table. Do not introduce mechanisms or biology.
+- Do not invent feature names; only cite features present in `feature_coherence.features`.
+- Off-ramp: if no features pass the criteria, set `concrete: false`, leave
+  `essential_up` and `essential_down` empty, and explain in the rationale.
+- Do not compute or state new biological themes here. The next step does the interpretation.
+
+In the final output, include:
+- A top-level `feature_coherence` object, per the schema:
+{FEATURE_COHERENCE_OUTPUT_FORMAT}"""
+
+PATHWAY_CONSISTENCY_OUTPUT_FORMAT = """
+The top-level "pathway_consistency" field must contain:
+- "verdict": "consistent" | "partial" | "inconsistent" | "no_signal" (required "no_signal" when feature_coherence.concrete is false)
+- "rationale": one or two sentences anchored to dominant_process; cite essential features by name; no new biology
+- "confidence_revision": null | one sentence (only set when essential signature materially changes confidence in dominant_process)
+"""
+
+STEP_PATHWAY_CONSISTENCY = f"""PATHWAY CONSISTENCY (bounded interpretation, anchored to the call):
+
+Using the essential feature signature you produced in FEATURE COHERENCE and the
+`dominant_process` you have already called, judge consistency.
+
+Procedure:
+
+1. Set `verdict`:
+   - "consistent": the essential up/down features track with what `dominant_process`
+     would imply.
+   - "partial": some essential features are consistent, others are not.
+   - "inconsistent": the essential signature contradicts `dominant_process`.
+   - "no_signal": REQUIRED when `feature_coherence.concrete` was false.
+
+2. Write `rationale` (ONE OR TWO sentences). Cite essential features by name and tie
+   them to `dominant_process`. Do not introduce biological mechanisms, pathway-adjacent
+   processes, or any concepts beyond what the literal pathway name in `dominant_process`
+   implies. The rationale's job is to CONNECT the recalled feature signature to the
+   pathway call, NOT to explain new biology.
+
+3. Optional `confidence_revision`: only populate when the essential feature signature
+   materially changes confidence in `dominant_process`. The justification must reference
+   essential features by name, not individual gene claims. Otherwise leave it null.
+
+Hard guardrails:
+- DO NOT modify `dominant_process` based on the feature signature. If features
+  contradict it, that is a confidence concern, not a re-call of the pathway.
+- DO NOT introduce new biological concepts, mechanisms, or pathways. The downstream
+  human-driven MCP exploration handles synthesis; this step is a bounded cross-check.
+- If `feature_coherence.concrete` is false, `verdict` must be "no_signal" and
+  `confidence_revision` must be null. No exceptions.
+
+In the final output, include:
+- A top-level `pathway_consistency` object, per the schema:
+{PATHWAY_CONSISTENCY_OUTPUT_FORMAT}"""
+
+# =============================================================================
 # CHAIN-OF-THOUGHT STEPS
 # =============================================================================
 
@@ -243,32 +339,6 @@ COT_STEP_OUTPUT = f"""FINAL JSON OUTPUT:
 - Include concise summary highlighting key findings and evidence quality
 According to {OUTPUT_FORMAT_JSON}"""
 
-STEPS_DEFAULT = [
-    CLUSTER_ANALYSIS_TASK,
-    COT_SCREEN_CONTEXT,
-    COT_STEP_PATHWAY_HYPOTHESIS,
-    COT_STEP_GENE_CATEGORIZATION,
-    COT_STEP_SUBCLASSIFICATION,
-    COT_STEP_PATHWAY_SELECTION,
-    COT_STEP_VERIFICATION,
-    COT_STEP_OUTPUT,
-]
-
-# MCP variant: literature validation is inserted AFTER sub-classification but
-# BEFORE pathway selection/verification, so updated gene categories can affect
-# the percent-fit calculation and therefore pathway confidence.
-STEPS_DEFAULT_MCP = [
-    CLUSTER_ANALYSIS_TASK,
-    COT_SCREEN_CONTEXT,
-    COT_STEP_PATHWAY_HYPOTHESIS,
-    COT_STEP_GENE_CATEGORIZATION,
-    COT_STEP_SUBCLASSIFICATION,
-    STEP_LITERATURE_VALIDATION,
-    COT_STEP_PATHWAY_SELECTION,
-    COT_STEP_VERIFICATION,
-    COT_STEP_OUTPUT,
-]
-
 # =============================================================================
 # COMPONENT REGISTRY & CANONICAL ORDERS
 # =============================================================================
@@ -291,6 +361,8 @@ STEPS_DEFAULT_MCP = [
 #   cPri = Sub-classification (references NPR & UPR)
 #   cVer = Verification step
 #   cO   = Final JSON Output step              (references O)
+#   cFC  = Feature Coherence step  (feature-interp mode; emits feature_coherence)
+#   cPC  = Pathway Consistency step (feature-interp mode; emits pathway_consistency)
 #
 # NOTE: "SC" is not in the registry because screen context is dynamic
 # (varies per case). It is handled specially during assembly.
@@ -301,178 +373,44 @@ COMPONENT_REGISTRY = {
     "NPR": NOVEL_CLASSIFICATION_RULES,
     "UPR": UNCHARACTERIZED_CLASSIFICATION_RULES,
     "PCC": PATHWAY_CONFIDENCE_CRITERIA,
-    "O":   OUTPUT_FORMAT_JSON,
+    "O": OUTPUT_FORMAT_JSON,
     "LIT": STEP_LITERATURE_VALIDATION,
-    "cPH":  COT_STEP_PATHWAY_HYPOTHESIS,
+    "cPH": COT_STEP_PATHWAY_HYPOTHESIS,
     "cGCR": COT_STEP_GENE_CATEGORIZATION,
     "cPri": COT_STEP_SUBCLASSIFICATION,
     "cPSC": COT_STEP_PATHWAY_SELECTION,
     "cVer": COT_STEP_VERIFICATION,
-    "cO":   COT_STEP_OUTPUT,
+    "cFC": STEP_FEATURE_COHERENCE,
+    "cPC": STEP_PATHWAY_CONSISTENCY,
+    "cO": COT_STEP_OUTPUT,
 }
 
 CANONICAL_ZERO_SHOT_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]
+CANONICAL_ZERO_SHOT_MCP_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "LIT", "O"]
 CANONICAL_COT_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cO"]
-
-
-def assemble_cot_instructions(
-    steps: list[str] | None = None,
-    screen_context: str | None = None,
-) -> str:
-    """Assemble COT instructions from modular steps.
-
-    Args:
-        steps: List of COT step strings. Defaults to STEPS_DEFAULT.
-        screen_context: Optional screen context JSON string. If provided and
-            COT_SCREEN_CONTEXT is in steps, it will be replaced with the
-            context header + actual context.
-
-    Returns:
-        Formatted COT instructions with numbered steps.
-    """
-    if steps is None:
-        steps = STEPS_DEFAULT
-
-    # Replace COT_SCREEN_CONTEXT placeholder with actual context if provided
-    if screen_context is not None:
-        steps = [
-            f"{COT_SCREEN_CONTEXT}\n{screen_context}" if step == COT_SCREEN_CONTEXT else step
-            for step in steps
-        ]
-
-    numbered = [f"STEP {i + 1} - {step}" for i, step in enumerate(steps)]
-    return "\n\n".join(numbered)
-
-
-# =============================================================================
-# PHENOTYPIC-STRENGTH-CONFIDENCE CROSS-CHECK (inserted by prompt_factory if phenotypic strength available)
-# =============================================================================
-# PLACEHOLDER: To be implemented
-#
-# Purpose: Cross-validate pathway confidence against phenotypic strength to identify edge cases
-# Timing: AFTER establishing pathway confidence in Section 5
-#
-# This section should:
-# - Present the phenotypic strength for the cluster (e.g., "8.5/10" or "strong"/"weak")
-# - Cross-check against the confidence level just assigned
-# - Identify and flag four scenarios:
-#   * HIGH confidence + HIGH strength → Affirm: "Well-supported, strong signal - ideal case"
-#   * LOW confidence + LOW strength → Affirm: "Weak signal - appropriately uncertain"
-#   * HIGH confidence + LOW strength → FLAG: "Reconsider - is the pathway too broad/generic? Are you overcalling confidence?"
-#   * LOW confidence + HIGH strength → FLAG: "Deep dive needed - strong effect suggests important biology. You may be missing the true pathway or this could be novel."
-# - For mismatched cases, prompt re-examination of the pathway hypothesis
-# - Request updated reasoning in the summary if confidence should be adjusted
-#
-# Example structure:
-# """
-# PHENOTYPIC-STRENGTH-CONFIDENCE CROSS-CHECK:
-# Your pathway assignment: {confidence_level} confidence
-# Phenotypic strength: {strength_level} (score: {strength_value})
-#
-# Evaluate the alignment:
-# - ALIGNED (High/High or Low/Low): Your assessment is consistent with effect strength
-# - MISMATCH (High confidence + Low strength): Are you overcalling confidence? Is the pathway too generic?
-# - MISMATCH (Low confidence + High strength): Strong phenotype suggests important biology - dig deeper for the true pathway. This could be a discovery opportunity.
-#
-# If mismatched, revisit your pathway hypothesis and explain your reasoning in the summary.
-# """
-
-PHENOTYPIC_STRENGTH_CONFIDENCE_EVALUATION = None  # Placeholder for future implementation
-
-
-# =============================================================================
-# MECHANISTIC HYPOTHESIS FROM FEATURE DIRECTIONALITY (inserted by prompt_factory if features available)
-# =============================================================================
-# PLACEHOLDER: To be implemented
-#
-# Purpose: Generate mechanistic hypotheses based on which features are up/down regulated
-# Timing: AFTER confidence assessment and phenotypic strength check - uses pathway context to interpret directionality
-#
-# This section should:
-# - Present up-regulated vs down-regulated features/genes/imaging features
-# - Guide hypothesis generation about WHAT IS HAPPENING mechanistically in this cluster
-# - Connect directional changes to specific pathway components or processes
-# - For perturbation screens (Perturb-seq): suggest which pathway branch/component is being affected
-# - For imaging screens (OPS): suggest which cellular processes are altered based on feature changes
-# - Frame as hypothesis generation to guide experiments, NOT as validation/refinement of the pathway
-# - Create a bridge between pathway identification and experimental design
-#
-# Example structure:
-# """
-# MECHANISTIC HYPOTHESIS (based on feature directionality):
-# The following features show consistent directional changes across genes in this cluster:
-#
-# UP-REGULATED: {up_features}
-# DOWN-REGULATED: {down_features}
-#
-# Given the {pathway_name} pathway you identified, generate mechanistic hypotheses:
-# - What might be happening at the molecular/cellular level? (e.g., "Upregulation of X with downregulation of Y suggests activation of the upstream regulatory branch")
-# - Which specific components or branches of the pathway are likely affected?
-# - Are these changes consistent with activation, inhibition, feedback, or compensation within the pathway?
-# - What cellular process is being altered to produce these specific directional changes?
-# - Does this suggest a particular mechanistic model within the broader pathway?
-#
-# Frame your mechanistic hypothesis to set up follow-up experimental validation.
-# """
-
-FEATURE_DIRECTIONALITY_HYPOTHESIS = None  # Placeholder for future implementation
-
-
-# =============================================================================
-# FOLLOW-UP EXPERIMENT SUGGESTIONS (inserted by prompt_factory if enabled)
-# =============================================================================
-# PLACEHOLDER: To be implemented
-#
-# Purpose: Suggest specific, actionable experiments to validate pathway assignment and test mechanistic hypotheses
-# Timing: FINAL analytical section - after pathway, confidence, phenotypic strength, and mechanistic hypothesis
-#
-# This section should:
-# - Suggest 2-4 concrete, specific follow-up experiments
-# - Target three goals:
-#   1. Validate the pathway assignment (confirm pathway involvement)
-#   2. Test high-priority genes (validate UNCHARACTERIZED and NOVEL_ROLE genes)
-#   3. Test mechanistic hypotheses (if feature directionality data available)
-# - Be specific: name genes to test, specific assays/techniques, expected readouts
-# - Consider the experimental modality (genetic perturbations, biochemical assays, imaging, epistasis, etc.)
-# - Tailor suggestions to confidence level and phenotypic strength:
-#   * High confidence + high strength: focus on mechanism and novel genes
-#   * Mismatched cases: suggest experiments to resolve the discrepancy
-# - Prioritize experiments that test high-priority (score ≥8) genes
-# - Be actionable and implementable in a real lab setting
-#
-# Example structure:
-# """
-# SUGGESTED FOLLOW-UP EXPERIMENTS:
-# Based on your analysis (pathway: {pathway_name}, confidence: {confidence}, phenotypic strength: {strength}, mechanism: {hypothesis}), suggest 2-4 specific experiments:
-#
-# 1. VALIDATE PATHWAY ASSIGNMENT:
-#    - Experiment: [specific assay/technique]
-#    - Genes to test: [which established genes as positive controls]
-#    - Expected outcome: [what would confirm pathway involvement]
-#
-# 2. TEST HIGH-PRIORITY GENES:
-#    - For UNCHARACTERIZED genes: [specific experiment to test pathway role]
-#    - For NOVEL_ROLE genes: [specific experiment to test proposed new function]
-#    - Focus on priority ≥8 genes: [list specific genes]
-#    - Expected outcomes: [what would validate their roles]
-#
-# 3. TEST MECHANISTIC HYPOTHESIS (if directionality available):
-#    - Experiment: [assay to test your mechanistic model]
-#    - Readouts: [what measurements distinguish between mechanisms]
-#    - Expected outcomes: [results that support/refute hypothesis]
-#
-# 4. RESOLVE AMBIGUITY (if applicable):
-#    - For low confidence: [experiment to increase confidence in pathway]
-#    - For strength mismatch: [experiment to explain the discrepancy]
-#    - For heterogeneous clusters: [experiment to identify subclusters or alternative pathways]
-#
-# Be specific and actionable: name genes, assays, techniques, and expected results.
-# """
-
-FOLLOW_UP_EXPERIMENT_SUGGESTIONS = None  # Placeholder for future implementation
-
-
-# =============================================================================
-# ON HANDLING RETRIEVED EVIDENCE (inserted by prompt_factory when RAG enabled)
-# =============================================================================
-# Evidence snippets from knowledge base retrieval are inserted here
+CANONICAL_COT_MCP_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "LIT", "cPSC", "cVer", "cO"]
+CANONICAL_FEATURE_INTERP_COT_ORDER = [
+    "CAT",
+    "SC",
+    "cPH",
+    "cGCR",
+    "cPri",
+    "cPSC",
+    "cVer",
+    "cFC",
+    "cPC",
+    "cO",
+]
+CANONICAL_FEATURE_INTERP_COT_MCP_ORDER = [
+    "CAT",
+    "SC",
+    "cPH",
+    "cGCR",
+    "cPri",
+    "LIT",
+    "cPSC",
+    "cVer",
+    "cFC",
+    "cPC",
+    "cO",
+]

@@ -1,10 +1,13 @@
-# Live run -- denali screen only, all 6 routes, 3 replicates.
+# Architecture Benchmark — Full Panel (Phase 1), Affinage evidence source
+# 18 clusters (14 annotated + 4 negative-set) × 6 routes × 3 replicates = 324 runs.
+# Affinage narratives (gated on audit_flag; UniProt backup). Negatives are run-only.
 
-experiment_id: arch_bench_denali_live_test
+experiment_id: arch_bench_affinage_n3
+
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
-  evidence_bundles_dir: benchmark_evidence_bundles_uniprot
+  evidence_bundles_dir: benchmark_evidence_bundles_affinage
   output_dir: benchmarking_outputs/1.arch
 
 model:
@@ -12,11 +15,14 @@ model:
   model_name: claude-sonnet-4-5
   temperature: 0.2
   max_tokens: 4000
+  top_p: null
+  top_k: null
 
 run:
-  num_replicates: 1
+  num_replicates: 3
+  max_workers: 4
   dry_run: false
-  workflow_testing: true
+  workflow_testing: false
   overwrite_outputs: true
   continue_on_error: true
   save_prompts: true
@@ -27,11 +33,14 @@ run:
 routes:
   include:
     - 3a
+    - 3a_mcp
+    - 3b
+    - 3b_mcp
+    - 3c
     - 3c_mcp
 
 screens:
-  include:
-    - denali
+  include: all
 
 clusters:
   include: all

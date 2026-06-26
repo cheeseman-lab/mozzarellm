@@ -22,13 +22,14 @@ class ModelConfig:
 class PathsConfig:
     benchmark_inputs_dir: Path = Path("benchmark_inputs")
     benchmark_clusters_csv: Path = Path("benchmark_inputs/benchmark_clusters.csv")
-    evidence_bundles_dir: Path = Path("benchmark_evidence_bundles")
+    evidence_bundles_dir: Path = Path("benchmark_evidence_bundles_uniprot")
     output_dir: Path = Path("1.architecture_testing_outputs")
 
 
 @dataclass
 class RunConfig:
     num_replicates: int = 3
+    max_workers: int = 4
     dry_run: bool = False
     workflow_testing: bool = False
     overwrite_outputs: bool = False
@@ -138,7 +139,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
                 "benchmark_clusters_csv", base_dir / "benchmark_inputs" / "benchmark_clusters.csv"
             ),
             evidence_bundles_dir=paths_raw.get(
-                "evidence_bundles_dir", base_dir / "benchmark_evidence_bundles"
+                "evidence_bundles_dir", base_dir / "benchmark_evidence_bundles_uniprot"
             ),
             output_dir=paths_raw.get("output_dir", base_dir / "1.architecture_testing_outputs"),
         )
@@ -160,6 +161,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
         r = raw["run"]
         cfg.run = RunConfig(
             num_replicates=r.get("num_replicates", cfg.run.num_replicates),
+            max_workers=r.get("max_workers", cfg.run.max_workers),
             dry_run=r.get("dry_run", cfg.run.dry_run),
             workflow_testing=r.get("workflow_testing", cfg.run.workflow_testing),
             overwrite_outputs=r.get("overwrite_outputs", cfg.run.overwrite_outputs),
