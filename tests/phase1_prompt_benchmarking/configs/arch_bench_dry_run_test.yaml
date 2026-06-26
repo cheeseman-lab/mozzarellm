@@ -1,0 +1,58 @@
+# Dry-run test config -- validates benchmark infrastructure without API calls.
+# Runs 2 routes on 1 screen (denali) with 1 replicate.
+
+experiment_id: arch_bench_dry_test
+
+paths:
+  benchmark_inputs_dir: benchmark_inputs
+  benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
+  evidence_bundles_dir: benchmark_evidence_bundles
+  output_dir: benchmarking_outputs/1.arch
+
+model:
+  provider: anthropic
+  model_name: claude-sonnet-4-5
+  temperature: 0.2
+  max_tokens: 4000
+
+run:
+  num_replicates: 1
+  dry_run: true
+  workflow_testing: true
+  overwrite_outputs: true
+  continue_on_error: true
+  save_prompts: true
+  save_raw_outputs: true
+  save_parsed_outputs: true
+  save_traces: true
+
+routes:
+  include:
+    - 3a
+    - 3b
+
+screens:
+  include:
+    - denali
+
+clusters:
+  include: all
+
+mcp:
+  preflight: false
+  fail_if_unavailable: false
+
+evaluation:
+  structural: true
+  logical_consistency: true
+  efficiency: true
+  robustness: true
+
+timing:
+  track_full_run: true
+  track_prompt_construction: true
+  track_model_latency: true
+  track_metrics: true
+  track_io: true
+  track_step_latencies: true
+  track_mcp_tool_latency: true

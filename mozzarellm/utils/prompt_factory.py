@@ -106,15 +106,11 @@ def assemble_from_component_order(
     parts = []
     for key in component_order:
         if key == "SC":
-            parts.append(
-                "The following experimental context is provided: "
-                + screen_context_text
-            )
+            parts.append("The following experimental context is provided: " + screen_context_text)
         else:
             if key not in registry:
                 raise ValueError(
-                    f"Unknown component key: {key!r}. "
-                    f"Valid keys: {sorted(registry.keys())} + 'SC'"
+                    f"Unknown component key: {key!r}. Valid keys: {sorted(registry.keys())} + 'SC'"
                 )
             parts.append(registry[key])
 
@@ -133,11 +129,13 @@ def make_cluster_analysis_system_prompt(
     mcp: bool = False,
     component_order: list[str] | None = None,
     component_overrides: dict[str, str] | None = None,
-    override_CoT_steps: list[str] | None = None,  # testing utility for prompt-permutation experiments
+    override_CoT_steps: list[str]
+    | None = None,  # testing utility for prompt-permutation experiments
     override_screen_context: bool = False,  # testing utility
     template_path: Path | None = None,
     template_string: str | None = None,
     output_dir: Path | None = None,
+    prompt_filename: str | None = None,
 ):
     """
     Creates a system prompt for gene cluster analysis.
@@ -231,17 +229,17 @@ def make_cluster_analysis_system_prompt(
         steps = override_CoT_steps or (STEPS_DEFAULT_MCP if mcp else STEPS_DEFAULT)
         steps = [_substitute_screen_context(s, SCREEN_CONTEXT_TEXT) for s in steps]
         prompt = "\n\n".join(steps[:2])
-    if not output_dir:
-        output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    # save system prompt to file with timestamp
-    with open(
-        output_dir
-        / f"cluster_analysis_phase1_system_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-        "w",
-        encoding="utf-8",
-    ) as f:
-        f.write(prompt)
+    # Save system prompt to file if output_dir is provided
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if prompt_filename:
+            fname = (
+                prompt_filename if prompt_filename.endswith(".txt") else f"{prompt_filename}.txt"
+            )
+        else:
+            fname = f"cluster_analysis_phase1_system_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        with open(output_dir / fname, "w", encoding="utf-8") as f:
+            f.write(prompt)
     return prompt
 
 

@@ -25,6 +25,7 @@ from mozzarellm.pipeline.bundle_builder import (
     get_or_append_stable_accession,
 )
 from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
+
 load_dotenv()  # walks upward to find .env automatically
 
 
@@ -40,6 +41,7 @@ ORGANISM_ID = 9606  # human
 
 # feature columns if present (for later run maybe)
 FEATURE_COLUMNS: list[str] = []
+
 
 # per-screen processing
 def process_screen(screen_name: str, screen_df: pd.DataFrame) -> dict:
