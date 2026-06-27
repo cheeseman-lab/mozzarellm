@@ -74,6 +74,23 @@ class OrderBenchmarkConfig:
 
 
 @dataclass
+class WordingBenchmarkConfig:
+    """Phase 3 wording benchmark selector (compact, hypothesis-driven).
+
+    Selects which W-numbered targets to run and how alternate-text sources are
+    resolved. The override targets and alternate text live outside this config
+    (wording_bench_targets.py / wording_bench_alternates.py).
+    """
+
+    enabled: bool = False
+    base_routes: list[str] = field(default_factory=lambda: ["3a"])
+    # "all", a range string like "W1-W5", or an explicit list like ["W1", "W3"].
+    targets: str | list[str] = "all"
+    default_source: str | None = None
+    force_source: str | None = None
+
+
+@dataclass
 class ClusterFilter:
     screen_name: str
     cluster_id: str
@@ -96,6 +113,7 @@ class BenchmarkConfig:
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     timing: TimingConfig = field(default_factory=TimingConfig)
     order_benchmark: OrderBenchmarkConfig = field(default_factory=OrderBenchmarkConfig)
+    wording_benchmark: WordingBenchmarkConfig = field(default_factory=WordingBenchmarkConfig)
 
     @property
     def experiment_output_dir(self) -> Path:
@@ -235,6 +253,17 @@ def load_config(config_path: Path) -> BenchmarkConfig:
             enabled=ob.get("enabled", False),
             base_routes=ob.get("base_routes", []),
             variants=ob.get("variants", []),
+        )
+
+    # Wording benchmark (Phase 3)
+    if "wording_benchmark" in raw:
+        wb = raw["wording_benchmark"]
+        cfg.wording_benchmark = WordingBenchmarkConfig(
+            enabled=wb.get("enabled", False),
+            base_routes=wb.get("base_routes", ["3a"]),
+            targets=wb.get("targets", "all"),
+            default_source=wb.get("default_source"),
+            force_source=wb.get("force_source"),
         )
 
     return cfg

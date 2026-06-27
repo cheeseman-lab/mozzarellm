@@ -53,6 +53,7 @@ from .bench_dry_run import (
 from .bench_metricfns import compute_all_metrics
 from .bench_reportgen import generate_report
 from .order_bench_orderings import build_order_benchmark_routes, compose_stepwise_turns_from_route
+from .wording_bench_targets import build_wording_override_runs
 
 # =============================================================================
 # HELPERS
@@ -140,10 +141,19 @@ def construct_prompts(
     bundle_path: Path,
     output_dir: Path,
     overwrite_outputs: bool = False,
+    component_overrides: dict[str, str] | None = None,
+    condition_name: str | None = None,
 ) -> dict:
     """Construct system and user prompts for a given route+cluster.
 
     Returns a dict with keys: system_prompt, user_prompt, stepwise_turns (or None).
+
+    Args:
+        component_overrides: Phase 3 wording overrides — {component_key: text}
+            passed through to ``make_cluster_analysis_system_prompt``.
+        condition_name: Stable label for cached prompt filenames. For wording runs
+            this is the per-condition run-route name so different wording conditions
+            on the same base route do not collide in the prompt cache.
     """
     # Build a pseudo cluster_to_bundle_path_map for the existing utility
     cluster_to_bundle_map = {str(cluster_id): bundle_path}
@@ -152,6 +162,8 @@ def construct_prompts(
     # path. Phase 1 routes (order_variant == "") use the original mode-based
     # default assembly to preserve backward compatibility exactly.
     is_order_variant = bool(route.order_variant)
+    # Label used for the on-disk prompt filename; defaults to the route name.
+    prompt_label = condition_name or route.name
 
     # For 3a/3b routes: save system prompt once with stable filename, reuse on subsequent calls.
     # For 3c (stepwise) routes: build system prompt in memory only
@@ -166,6 +178,7 @@ def construct_prompts(
                 mode="standard",
                 mcp=route.mcp,
                 component_order=list(route.system_components),
+                component_overrides=component_overrides,
                 output_dir=None,
             )
         else:
@@ -174,12 +187,14 @@ def construct_prompts(
                 screen_context_path=screen_context_path,
                 mode=route.mode,
                 mcp=route.mcp,
+                component_overrides=component_overrides,
                 output_dir=None,
             )
     else:
         # screen_name is part of the cache key: the system prompt embeds
-        # SCREEN_CONTEXT, so a route's prompt differs per screen.
-        prompt_filename = f"system_prompt_{route.name}_{route.mode}_{screen_name}"
+        # SCREEN_CONTEXT, so a route's prompt differs per screen. prompt_label
+        # distinguishes wording conditions on the same base route.
+        prompt_filename = f"system_prompt_{prompt_label}_{route.mode}_{screen_name}"
         prompt_file = output_dir / "prompts_used" / f"{prompt_filename}.txt"
         with _IO_LOCK:
             if prompt_file.exists() and not is_order_variant:
@@ -191,6 +206,7 @@ def construct_prompts(
                     mode=route.mode,
                     mcp=route.mcp,
                     component_order=(list(route.component_order) if is_order_variant else None),
+                    component_overrides=component_overrides,
                     output_dir=output_dir / "prompts_used",
                     prompt_filename=prompt_filename,
                 )
@@ -293,10 +309,25 @@ def execute_single_run(
     config: BenchmarkConfig,
     client,
     output_dir: Path,
+    component_overrides: dict[str, str] | None = None,
+    condition_name: str | None = None,
+    extra_record_fields: dict | None = None,
 ) -> dict:
-    """Execute a single benchmark run and return the full record."""
+    """Execute a single benchmark run and return the full record.
+
+    Args:
+        component_overrides: Phase 3 wording overrides passed to prompt construction.
+        condition_name: Per-condition label (e.g. wording run-route name). Used for
+            run_id, the record's "route" field, and prompt-cache filenames so that
+            distinct conditions on the same base route do not collide.
+        extra_record_fields: Extra key/values merged into the output record (e.g.
+            wording metadata).
+    """
     t_run_start = time.perf_counter()
-    run_id = _build_run_id(config.experiment_id, route.name, screen_name, cluster_id, replicate)
+    record_route_name = condition_name or route.name
+    run_id = _build_run_id(
+        config.experiment_id, record_route_name, screen_name, cluster_id, replicate
+    )
 
     # --- Prompt construction ---
     t0 = time.perf_counter()
@@ -308,6 +339,8 @@ def execute_single_run(
         bundle_path=bundle_path,
         output_dir=output_dir,
         overwrite_outputs=config.run.overwrite_outputs,
+        component_overrides=component_overrides,
+        condition_name=condition_name,
     )
     system_prompt = prompts["system_prompt"]
     user_prompt = prompts["user_prompt"]
@@ -381,7 +414,7 @@ def execute_single_run(
     record = {
         "run_id": run_id,
         "experiment_id": config.experiment_id,
-        "route": route.name,
+        "route": record_route_name,
         "mode": route.mode,
         "mcp": route.mcp,
         "delivery": route.delivery,
@@ -420,6 +453,10 @@ def execute_single_run(
         ),
     }
 
+    # Merge any caller-provided extra fields (e.g. Phase 3 wording metadata).
+    if extra_record_fields:
+        record.update(extra_record_fields)
+
     # --- IO writes ---
     t0 = time.perf_counter()
     _save_run_artifacts(
@@ -452,12 +489,14 @@ def _save_run_artifacts(
 ) -> None:
     """Persist all per-run artifacts to JSONL files and trace."""
     run_id = record["run_id"]
+    # Condition label (base route for Phase 1/2; wording run-route name for Phase 3).
+    route_label = record.get("route", route.name)
 
     # Prompts
     if config.run.save_prompts:
         prompt_record = {
             "run_id": run_id,
-            "route": route.name,
+            "route": route_label,
             "screen_name": record["screen_name"],
             "cluster_id": record["cluster_id"],
             "replicate": record["replicate"],
@@ -488,7 +527,7 @@ def _save_run_artifacts(
     if config.run.save_raw_outputs:
         raw_record = {
             "run_id": run_id,
-            "route": route.name,
+            "route": route_label,
             "raw_output": raw_outputs.get("response_text", ""),
             "tool_calls": raw_outputs.get("tool_calls", []),
             "steps": raw_outputs.get("steps", []),
@@ -500,13 +539,13 @@ def _save_run_artifacts(
     if config.run.save_parsed_outputs:
         parsed_record = {
             "run_id": run_id,
-            "route": route.name,
+            "route": route_label,
             "parsed_output": parsed,
         }
         _append_jsonl(output_dir / "parsed_outputs.jsonl", parsed_record)
 
     # Metrics
-    metrics_record = {"run_id": run_id, "route": route.name, **record["metrics"]}
+    metrics_record = {"run_id": run_id, "route": route_label, **record["metrics"]}
     _append_jsonl(output_dir / "metrics.jsonl", metrics_record)
 
     # Trace
@@ -515,7 +554,7 @@ def _save_run_artifacts(
         trace_dir.mkdir(parents=True, exist_ok=True)
         trace_data = {
             "run_id": run_id,
-            "route": route.name,
+            "route": route_label,
             "mode": route.mode,
             "mcp": route.mcp,
             "raw_response": raw_outputs.get("response_text", ""),
@@ -732,6 +771,216 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
 
 
 # =============================================================================
+# PHASE 3: WORDING BENCHMARK
+# =============================================================================
+
+
+def run_wording_benchmark(config: BenchmarkConfig) -> list[dict]:
+    """Phase 3 wording benchmark loop.
+
+    Reuses the shared threaded execution path (execute_single_run / ThreadPoolExecutor
+    / per-work-item client) used by the architecture and order benchmarks. The only
+    Phase-3-specific behaviour is building wording override runs and passing
+    component_overrides + wording metadata into each run.
+    """
+    wcfg = config.wording_benchmark
+    output_dir = config.experiment_output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if config.run.overwrite_outputs:
+        for jsonl_file in output_dir.glob("*.jsonl"):
+            jsonl_file.write_text("", encoding="utf-8")
+        print(f"  [overwrite_outputs] Truncated JSONL files in {output_dir}")
+
+    # Save config snapshot
+    config_snapshot = {
+        "experiment_id": config.experiment_id,
+        "model": asdict(config.model),
+        "run": asdict(config.run),
+        "screens_include": config.screens_include,
+        "clusters_include": (
+            config.clusters_include
+            if config.clusters_include == "all"
+            else [asdict(c) for c in config.clusters_include]
+        ),
+        "mcp": asdict(config.mcp),
+        "evaluation": asdict(config.evaluation),
+        "timing": asdict(config.timing),
+        "wording_benchmark": asdict(config.wording_benchmark),
+        "paths": {k: str(v) for k, v in asdict(config.paths).items()},
+    }
+    (output_dir / "config_snapshot.yaml").write_text(
+        json.dumps(config_snapshot, indent=2, default=str), encoding="utf-8"
+    )
+
+    # Load benchmark data
+    print(f"Loading benchmark clusters from: {config.paths.benchmark_clusters_csv}")
+    clusters_df = _load_benchmark_clusters(config.paths.benchmark_clusters_csv)
+    cluster_pairs = _filter_clusters(clusters_df, config)
+    print(f"  {len(cluster_pairs)} (screen, cluster) pairs after filtering.")
+
+    # Build wording override runs (base_route x selected targets; canonical always included)
+    wording_runs = build_wording_override_runs(
+        base_route_names=wcfg.base_routes,
+        target_selector=wcfg.targets,
+        default_source=wcfg.default_source,
+        force_source=wcfg.force_source,
+    )
+    print(
+        f"  [Phase 3] {len(wording_runs)} wording conditions from "
+        f"{len(wcfg.base_routes)} base route(s): {[w.run_route_name for w in wording_runs]}"
+    )
+
+    # MCP preflight (if any base route uses MCP)
+    mcp_runs = [w for w in wording_runs if w.base_route.mcp]
+    mcp_available = True
+    if mcp_runs and config.mcp.preflight and not config.run.dry_run:
+        print("  MCP preflight check...", end=" ")
+        available_servers = get_available_mcp_servers()
+        if "pubmed" not in available_servers:
+            print("FAILED (PubMed unavailable)")
+            if config.mcp.fail_if_unavailable:
+                raise RuntimeError("PubMed MCP server unavailable and fail_if_unavailable=True")
+            print("  WARNING: MCP routes will be skipped.")
+            mcp_available = False
+        else:
+            print("OK")
+
+    # Resolve API key once; clients are created per work item.
+    api_key = None
+    if not config.run.dry_run:
+        api_key = (
+            os.getenv("ANTHROPIC_API_KEY")
+            or os.getenv("OPENAI_API_KEY")
+            or os.getenv("GOOGLE_API_KEY")
+        )
+        probe = create_client(model=config.model.model_name, api_key=api_key)
+        print(f"  Client: {type(probe).__name__} ({config.model.model_name})")
+
+    # Build flat work list
+    work_items: list[tuple] = []
+    for wrun in wording_runs:
+        route = wrun.base_route
+        if route.mcp and not mcp_available and not config.run.dry_run:
+            print(f"  [SKIP] {wrun.run_route_name} -- MCP unavailable")
+            continue
+        for screen_name, cluster_id in cluster_pairs:
+            bundle_path = _resolve_bundle_path(
+                config.paths.evidence_bundles_dir, screen_name, cluster_id
+            )
+            if bundle_path is None:
+                print(
+                    f"  [SKIP] {wrun.run_route_name}/{screen_name}/cluster_{cluster_id} "
+                    "-- bundle not found"
+                )
+                continue
+            screen_context_path = _resolve_screen_context_path(
+                config.paths.benchmark_inputs_dir, screen_name
+            )
+            if screen_context_path is None:
+                print(
+                    f"  [SKIP] {wrun.run_route_name}/{screen_name}/cluster_{cluster_id} "
+                    "-- screen context not found"
+                )
+                continue
+            for rep in range(1, config.run.num_replicates + 1):
+                work_items.append(
+                    (wrun, screen_name, cluster_id, bundle_path, screen_context_path, rep)
+                )
+
+    total_runs = len(work_items)
+    max_workers = 1 if config.run.dry_run else max(1, config.run.max_workers)
+    print(f"\nStarting wording benchmark: {total_runs} total runs (max_workers={max_workers})")
+    print(f"  Output: {output_dir}\n")
+
+    def _run_one(item: tuple) -> dict:
+        wrun, screen_name, cluster_id, bundle_path, screen_context_path, rep = item
+        run_client = (
+            None
+            if config.run.dry_run
+            else create_client(model=config.model.model_name, api_key=api_key)
+        )
+        extra = {
+            "wording_source": wrun.source,
+            "wording_target_id": wrun.target_id,
+            "wording_target_name": wrun.target_name,
+            "wording_hypothesis": wrun.hypothesis,
+            "wording_overridden_components": list(wrun.components),
+            "wording_component_override_keys": list(wrun.component_overrides.keys()),
+        }
+        return execute_single_run(
+            route=wrun.base_route,
+            screen_name=screen_name,
+            cluster_id=cluster_id,
+            bundle_path=bundle_path,
+            screen_context_path=screen_context_path,
+            replicate=rep,
+            config=config,
+            client=run_client,
+            output_dir=output_dir,
+            component_overrides=wrun.component_overrides,
+            condition_name=wrun.run_route_name,
+            extra_record_fields=extra,
+        )
+
+    all_records = []
+    run_counter = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_run_one, item): item for item in work_items}
+        for future in as_completed(futures):
+            wrun, screen_name, cluster_id, _, _, rep = futures[future]
+            run_counter += 1
+            run_id = _build_run_id(
+                config.experiment_id, wrun.run_route_name, screen_name, cluster_id, rep
+            )
+            try:
+                record = future.result()
+            except Exception as e:
+                print(f"  [{run_counter}/{total_runs}] {run_id} EXCEPTION: {e}")
+                if not config.run.continue_on_error:
+                    for f in futures:
+                        f.cancel()
+                    raise
+                continue
+
+            all_records.append(record)
+            if record.get("error"):
+                print(f"  [{run_counter}/{total_runs}] {run_id} ERROR: {record['error'][:80]}")
+            else:
+                full_t = record.get("timing", {}).get("full_run_time_seconds", 0)
+                model_lat = record.get("timing", {}).get("model_latency_seconds", 0)
+                cost = record.get("estimated_cost_usd", 0) or 0
+                print(
+                    f"  [{run_counter}/{total_runs}] {run_id} "
+                    f"OK (full={full_t:.1f}s, model={model_lat:.1f}s, ${cost:.4f})"
+                )
+
+    # Save run manifest
+    manifest = {
+        "experiment_id": config.experiment_id,
+        "phase": "wording",
+        "timestamp": datetime.now().isoformat(),
+        "total_runs": len(all_records),
+        "conditions_executed": list({r["route"] for r in all_records}),
+        "targets_executed": list({r.get("wording_target_id") for r in all_records}),
+        "screens_executed": list({r["screen_name"] for r in all_records}),
+        "clusters_executed": list({(r["screen_name"], r["cluster_id"]) for r in all_records}),
+        "errors": sum(1 for r in all_records if r.get("error")),
+    }
+    (output_dir / "run_manifest.json").write_text(
+        json.dumps(manifest, indent=2, default=str), encoding="utf-8"
+    )
+
+    # Generate report
+    print("\nGenerating report...")
+    report_path = generate_report(all_records, config_snapshot, output_dir)
+    print(f"  Report: {report_path}")
+    print(f"  Done. {len(all_records)} analysis runs completed, {manifest['errors']} errors.")
+
+    return all_records
+
+
+# =============================================================================
 # CLI
 # =============================================================================
 
@@ -764,7 +1013,12 @@ def main():
     if args.max_workers is not None:
         config.run.max_workers = args.max_workers
 
-    run_benchmark(config)
+    # Dispatch: Phase 3 wording benchmark takes precedence when enabled, mirroring
+    # how Phase 2 order benchmarking is selected within run_benchmark.
+    if getattr(config, "wording_benchmark", None) and config.wording_benchmark.enabled:
+        run_wording_benchmark(config)
+    else:
+        run_benchmark(config)
 
 
 if __name__ == "__main__":
