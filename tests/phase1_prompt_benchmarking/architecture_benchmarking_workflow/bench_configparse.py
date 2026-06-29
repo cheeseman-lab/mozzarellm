@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ class PathsConfig:
     benchmark_clusters_csv: Path = Path("benchmark_inputs/benchmark_clusters.csv")
     evidence_bundles_dir: Path = Path("benchmark_evidence_bundles_uniprot")
     output_dir: Path = Path("1.architecture_testing_outputs")
+    bundle_source: str = "uniprot"  # "uniprot" or "affinage"
 
 
 @dataclass
@@ -67,10 +69,19 @@ class TimingConfig:
 
 
 @dataclass
+class ArchitectureBenchmarkConfig:
+    enabled: bool = True
+    base_routes: list[str] = field(
+        default_factory=lambda: ["3a", "3a_mcp", "3b", "3b_mcp", "3c", "3c_mcp"]
+    )
+
+
+@dataclass
 class OrderBenchmarkConfig:
     enabled: bool = False
     base_routes: list[str] = field(default_factory=list)
-    variants: list[str] = field(default_factory=list)
+    # "all", a range string like "O1-O4", or an explicit list like ["O", "O1"].
+    variants: str | list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -104,14 +115,14 @@ class BenchmarkConfig:
     paths: PathsConfig = field(default_factory=PathsConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     run: RunConfig = field(default_factory=RunConfig)
-    routes_include: list[str] = field(
-        default_factory=lambda: ["3a", "3a_mcp", "3b", "3b_mcp", "3c", "3c_mcp"]
-    )
     screens_include: list[str] | str = "all"
     clusters_include: list[ClusterFilter] | str = "all"
     mcp: McpConfig = field(default_factory=McpConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     timing: TimingConfig = field(default_factory=TimingConfig)
+    architecture_benchmark: ArchitectureBenchmarkConfig = field(
+        default_factory=ArchitectureBenchmarkConfig
+    )
     order_benchmark: OrderBenchmarkConfig = field(default_factory=OrderBenchmarkConfig)
     wording_benchmark: WordingBenchmarkConfig = field(default_factory=WordingBenchmarkConfig)
 
@@ -120,7 +131,15 @@ class BenchmarkConfig:
         base = self.paths.output_dir
         if self.run.workflow_testing:
             base = base / "_workflow_testing"
-        return base / self.experiment_id
+            return base / self.experiment_id
+        elif self.run.overwrite_outputs:
+            # When intentionally overwriting, use consistent path (no timestamp)
+            return base / self.experiment_id
+        else:
+            # Production runs with unique timestamps
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            bundle_suffix = self.paths.bundle_source
+            return base / f"{self.experiment_id}_{bundle_suffix}_{timestamp}"
 
 
 def _resolve_paths(paths_dict: dict[str, Any], base_dir: Path) -> dict[str, Any]:
@@ -150,6 +169,14 @@ def load_config(config_path: Path) -> BenchmarkConfig:
     # Paths
     if "paths" in raw:
         paths_raw = _resolve_paths(raw["paths"], base_dir)
+        # Parse bundle_source (defaults to "uniprot")
+        bundle_source = raw["paths"].get("bundle_source", "uniprot")
+        # Auto-resolve evidence_bundles_dir based on bundle_source if not explicitly set
+        if "evidence_bundles_dir" in paths_raw:
+            evidence_bundles_dir = paths_raw["evidence_bundles_dir"]
+        else:
+            evidence_bundles_dir = base_dir / f"benchmark_evidence_bundles_{bundle_source}"
+
         cfg.paths = PathsConfig(
             benchmark_inputs_dir=paths_raw.get(
                 "benchmark_inputs_dir", base_dir / "benchmark_inputs"
@@ -157,10 +184,9 @@ def load_config(config_path: Path) -> BenchmarkConfig:
             benchmark_clusters_csv=paths_raw.get(
                 "benchmark_clusters_csv", base_dir / "benchmark_inputs" / "benchmark_clusters.csv"
             ),
-            evidence_bundles_dir=paths_raw.get(
-                "evidence_bundles_dir", base_dir / "benchmark_evidence_bundles_uniprot"
-            ),
+            evidence_bundles_dir=evidence_bundles_dir,
             output_dir=paths_raw.get("output_dir", base_dir / "1.architecture_testing_outputs"),
+            bundle_source=bundle_source,
         )
 
     # Model
@@ -191,10 +217,19 @@ def load_config(config_path: Path) -> BenchmarkConfig:
             save_traces=r.get("save_traces", cfg.run.save_traces),
         )
 
-    # Routes
-    if "routes" in raw:
+    # Architecture benchmark (Phase 1)
+    if "architecture_benchmark" in raw:
+        ab = raw["architecture_benchmark"]
+        cfg.architecture_benchmark = ArchitectureBenchmarkConfig(
+            enabled=ab.get("enabled", True),
+            base_routes=ab.get("base_routes", cfg.architecture_benchmark.base_routes),
+        )
+    elif "routes" in raw:
         routes_section = raw["routes"]
-        cfg.routes_include = routes_section.get("include", cfg.routes_include)
+        cfg.architecture_benchmark = ArchitectureBenchmarkConfig(
+            enabled=True,
+            base_routes=routes_section.get("include", cfg.architecture_benchmark.base_routes),
+        )
 
     # Screens
     if "screens" in raw:

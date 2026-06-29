@@ -19,10 +19,10 @@ Adding a new hypothesis-driven override target requires editing ONLY this file:
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 
 from .arch_bench_routes import ROUTE_REGISTRY, Route
+from .order_bench_orderings import resolve_variant_ids
 from .wording_bench_alternates import WORDING_ALTERNATE_SET_REGISTRY
 
 
@@ -127,7 +127,8 @@ WORDING_OVERRIDE_TARGET_REGISTRY: dict[str, WordingOverrideTarget] = {
         source="wording_v1",
     ),
 }
-
+# NOTE: a base component (e.g. GCR) override WILL NOT propogate to a CoT component (e.g. cGCR) (embedded components are fixed at import time);
+# Every component needs to be overridden explicitly.
 
 # =============================================================================
 # Concrete run spec
@@ -152,9 +153,9 @@ class WordingOverrideRun:
 
     @property
     def run_route_name(self) -> str:
-        """Condition label: ``{base_route}_w_{source_or_canonical}__{id}_{name}``."""
+        """Condition label: ``{base_route}_{source_or_canonical}_{id}_{name}``."""
         src = self.source if self.source is not None else "canonical"
-        return f"{self.base_route.name}_w_{src}__{self.target_id}_{self.target_name}"
+        return f"{self.base_route.name}_{src}_{self.target_id}_{self.target_name}"
 
 
 # =============================================================================
@@ -195,8 +196,6 @@ def resolve_source(
 # Target selection (all / list / range)
 # =============================================================================
 
-_RANGE_RE = re.compile(r"^W(\d+)-W(\d+)$")
-
 
 def resolve_target_ids(target_selector: str | list[str]) -> list[str]:
     """Expand a target selector into an ordered, de-duplicated list of target ids.
@@ -208,38 +207,16 @@ def resolve_target_ids(target_selector: str | list[str]) -> list[str]:
         - "W1"                   -> single id
 
     ``W0`` (canonical) is always included and placed first.
+
+    Delegates to :func:`~.order_bench_orderings.resolve_variant_ids`.
     """
-    if target_selector == "all":
-        ids = list(WORDING_OVERRIDE_TARGET_REGISTRY.keys())
-    elif isinstance(target_selector, str):
-        m = _RANGE_RE.match(target_selector.strip())
-        if m:
-            lo, hi = int(m.group(1)), int(m.group(2))
-            if hi < lo:
-                raise ValueError(f"Invalid target range (hi < lo): {target_selector!r}")
-            ids = [f"W{i}" for i in range(lo, hi + 1)]
-        else:
-            ids = [target_selector.strip()]
-    else:
-        ids = [str(t).strip() for t in target_selector]
-
-    # Validate ids exist
-    unknown = [t for t in ids if t not in WORDING_OVERRIDE_TARGET_REGISTRY]
-    if unknown:
-        raise ValueError(
-            f"Unknown wording target id(s): {unknown}. "
-            f"Known: {sorted(WORDING_OVERRIDE_TARGET_REGISTRY)}"
-        )
-
-    # Always include canonical W0, first, de-duplicated while preserving order.
-    ordered = ["W0"] + [t for t in ids if t != "W0"]
-    seen: set[str] = set()
-    result: list[str] = []
-    for t in ordered:
-        if t not in seen:
-            seen.add(t)
-            result.append(t)
-    return result
+    return resolve_variant_ids(
+        target_selector,
+        prefix="W",
+        registry=WORDING_OVERRIDE_TARGET_REGISTRY,
+        canonical_key="W0",
+        label="wording target",
+    )
 
 
 # =============================================================================

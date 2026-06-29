@@ -128,6 +128,41 @@ may still contain valuable discovery candidates.
 """
 
 # =============================================================================
+# Alternate text constants — wording_v1 CoT components
+# =============================================================================
+# CoT components (cGCR, cPri, cPSC) embed their baseline counterparts at
+# import time, so overriding GCR/NPR/UPR/PCC has NO effect on them.  To run
+# wording experiments on CoT/stepwise routes (3b, 3c) the registry must also
+# contain standalone CoT-framed replacements keyed by the CoT shorthand.
+
+# cGCR (W3 on CoT routes): imperative CoT gene-categorization step.
+# Mirrors GCR_ALT_V1 but wrapped in the CoT framing that cGCR normally uses.
+cGCR_ALT_V1 = f"""GENE CATEGORIZATION (cite evidence):
+For each gene, assign to exactly one category: ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED
+These are defined according to the following rules: {GCR_ALT_V1}
+"""
+
+# cPri (W4 on CoT routes): terse CoT sub-classification step.
+# Mirrors NPR_ALT_V1 + UPR_ALT_V1 in the cPri frame.
+cPri_ALT_V1 = f"""SUB-CLASSIFICATION:
+For NOVEL_ROLE genes, assign one sub-class: NO_EVIDENCE / INDIRECT_EVIDENCE / PARTIAL_EVIDENCE / CONTRADICTORY_EVIDENCE
+These are defined according to the following rules: {NPR_ALT_V1}
+For UNCHARACTERIZED genes, assign one sub-class: DARK_GENE / NASCENT / ANNOTATED_ONLY / NON_HUMAN_CHARACTERIZED
+These are defined according to the following rules: {UPR_ALT_V1}
+Cite specific annotations that inform each classification."""
+
+# cPSC (W5 on CoT routes): qualitative CoT pathway-selection step.
+# Mirrors PCC_ALT_V1 in the cPSC frame.
+cPSC_ALT_V1 = f"""PATHWAY SELECTION:
+Once you have identified candidate pathway(s), evaluate how well EACH pathway explains the cluster using
+these stringent criteria based on what percentage of genes fit the proposed pathway: {PCC_ALT_V1}
+Now, select a dominant pathway based on:
+  * Number of established genes with direct roles
+  * Coherence of functional relationships
+  * Quality of supporting evidence"""
+
+
+# =============================================================================
 # Alternate text constants — wording_v2
 # =============================================================================
 # A separate version set. Currently sparse: it only redefines CAT with the
@@ -148,11 +183,16 @@ CAT_ALT_V2 = CLUSTER_ANALYSIS_TASK_MULTI
 
 WORDING_ALTERNATE_SET_REGISTRY: dict[str, dict[str, str]] = {
     "wording_v1": {
+        # Standard route keys
         "CAT": CAT_ALT_V1,
         "GCR": GCR_ALT_V1,
         "NPR": NPR_ALT_V1,
         "UPR": UPR_ALT_V1,
         "PCC": PCC_ALT_V1,
+        # CoT/stepwise equivalents — needed for overrides on 3b/3c routes
+        "cGCR": cGCR_ALT_V1,
+        "cPri": cPri_ALT_V1,
+        "cPSC": cPSC_ALT_V1,
     },
     "wording_v2": {
         "CAT": CAT_ALT_V2,
