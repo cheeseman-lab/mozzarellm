@@ -28,8 +28,9 @@ run:
   save_parsed_outputs: true
   save_traces: true
 
-routes:
-  include:
+architecture_benchmark:
+  enabled: true
+  base_routes:
     - 3a
     - 3a_mcp
     - 3b

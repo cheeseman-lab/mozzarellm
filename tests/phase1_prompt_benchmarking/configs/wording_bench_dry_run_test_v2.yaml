@@ -1,14 +1,10 @@
-# Order Benchmark Dry-Run Test Configuration (Phase 2)
-# Uses mock outputs to validate the order benchmarking infrastructure
-# without making any LLM API calls.
-
-experiment_id: order_bench_dry_run_test
+experiment_id: wording_bench_v2_dry_test
 
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
   evidence_bundles_dir: benchmark_evidence_bundles_uniprot
-  output_dir: benchmarking_outputs/2.order
+  output_dir: benchmarking_outputs/3.wording
 
 model:
   provider: anthropic
@@ -23,20 +19,24 @@ run:
   overwrite_outputs: true
   continue_on_error: true
   save_prompts: true
-  save_raw_outputs: true
-  save_parsed_outputs: true
+  save_raw_outputs: false
+  save_parsed_outputs: false
   save_traces: true
 
-# Order benchmarking (Phase 2)
-# When enabled, routes are built from base_routes × variants below.
-order_benchmark:
+wording_benchmark:
   enabled: true
   base_routes:
-    - 3b
-  variants:
-    - O
-    - O1
-    - O3
+    - 3a
+  # Selector options:
+  #   targets: all
+  #   targets: W1-W5
+  #   targets: [W1, W3, W5]
+  targets: all
+  # Optional source resolution overrides:
+  #   default_source: wording_v1 -> used by any target whose source is null
+  #   force_source: wording_v2 -> overrides every selected target's own source
+  default_source: null
+  force_source: null
 
 screens:
   include:
@@ -57,9 +57,9 @@ evaluation:
 
 timing:
   track_full_run: true
-  track_prompt_construction: true
+  track_prompt_construction: false
   track_model_latency: true
-  track_metrics: true
-  track_io: true
-  track_step_latencies: true
-  track_mcp_tool_latency: true
+  track_metrics: false
+  track_io: false
+  track_step_latencies: false
+  track_mcp_tool_latency: false
