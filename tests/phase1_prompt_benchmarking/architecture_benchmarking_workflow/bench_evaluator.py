@@ -801,7 +801,8 @@ def compute_coverage(
     full_expected = {(s, str(c).strip()): n for (s, c), n in expected_per_cluster.items()}
     rows = []
     for route, grp in preds.groupby("route", sort=True):
-        n_replicates = int(grp["replicate"].nunique())
+        # defense/future-proofing: use actual IDs rather than range(1, N+1)
+        replicate_ids = sorted(grp["replicate"].unique())
         per_cell = (
             grp.groupby(["screen_name", "cluster_id", "replicate"])["gene_symbol"]
             .nunique()
@@ -810,7 +811,7 @@ def compute_coverage(
         all_pairs = [
             (s, str(c).strip(), rep)
             for (s, c) in expected_per_cluster.index
-            for rep in range(1, n_replicates + 1)
+            for rep in replicate_ids
         ]
         all_df = pd.DataFrame(all_pairs, columns=["screen_name", "cluster_id", "replicate"])
         merged = all_df.merge(
@@ -833,7 +834,7 @@ def compute_coverage(
         rows.append(
             {
                 "route": route,
-                "n_replicates": n_replicates,
+                "n_replicates": len(replicate_ids),
                 "coverage_rate_all": round(total_pred_all / total_exp_all, 3)
                 if total_exp_all
                 else 0.0,
