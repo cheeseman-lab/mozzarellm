@@ -302,8 +302,7 @@ def compute_semantic_scores(
         for s in out["pathway_semantic_score"]
     ]
     out["pathway_semantic_match_loose"] = [
-        bool(s >= 0.60) if s == s else False
-        for s in out["pathway_semantic_score"]
+        bool(s >= 0.60) if s == s else False for s in out["pathway_semantic_score"]
     ]
     return out
 
@@ -773,9 +772,7 @@ def compute_coverage(
     """
     if not clusters_csv_path.exists():
         return pd.DataFrame()
-    clusters = pd.read_csv(
-        clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str}
-    )
+    clusters = pd.read_csv(clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str})
     if "sheet" in clusters.columns and "screen_name" not in clusters.columns:
         clusters = clusters.rename(columns={"sheet": "screen_name"})
     if not {"screen_name", "cluster_id", "gene_symbol"}.issubset(clusters.columns):
@@ -791,9 +788,7 @@ def compute_coverage(
         defined = {
             (s, str(c).strip())
             for s, c in ground_truth.dropna(subset=["benchmark_case_type"])
-            .drop_duplicates(["screen_name", "cluster_id"])[
-                ["screen_name", "cluster_id"]
-            ]
+            .drop_duplicates(["screen_name", "cluster_id"])[["screen_name", "cluster_id"]]
             .itertuples(index=False)
         }
         all_clusters = {(s, str(c).strip()) for (s, c) in expected_per_cluster.index}
@@ -814,9 +809,7 @@ def compute_coverage(
             for rep in replicate_ids
         ]
         all_df = pd.DataFrame(all_pairs, columns=["screen_name", "cluster_id", "replicate"])
-        merged = all_df.merge(
-            per_cell, on=["screen_name", "cluster_id", "replicate"], how="left"
-        )
+        merged = all_df.merge(per_cell, on=["screen_name", "cluster_id", "replicate"], how="left")
         merged["n_unique_pred"] = merged["n_unique_pred"].fillna(0)
         merged["expected"] = merged.apply(
             lambda r: full_expected.get((r["screen_name"], r["cluster_id"]), 0), axis=1
@@ -853,9 +846,7 @@ def compute_coverage(
     return pd.DataFrame(rows)
 
 
-def compute_output_fragility(
-    preds: pd.DataFrame, clusters_csv_path: Path
-) -> pd.DataFrame:
+def compute_output_fragility(preds: pd.DataFrame, clusters_csv_path: Path) -> pd.DataFrame:
     """Per-route diagnostic on the output_fragility cluster (jebel/0, 147 genes).
 
     No expert annotations exist for this cluster, so it is not scored on accuracy
@@ -863,22 +854,17 @@ def compute_output_fragility(
     output-structure failures on a large coherent input.
     """
     screen, cid = OUTPUT_FRAGILITY_CLUSTER
-    cell = preds[
-        (preds["screen_name"] == screen) & (preds["cluster_id"].astype(str) == cid)
-    ].copy()
+    cell = preds[(preds["screen_name"] == screen) & (preds["cluster_id"].astype(str) == cid)].copy()
     if cell.empty:
         return pd.DataFrame()
     expected = 0
     if clusters_csv_path.exists():
-        clusters = pd.read_csv(
-            clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str}
-        )
+        clusters = pd.read_csv(clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str})
         if "sheet" in clusters.columns and "screen_name" not in clusters.columns:
             clusters = clusters.rename(columns={"sheet": "screen_name"})
         expected = int(
             clusters[
-                (clusters["screen_name"] == screen)
-                & (clusters["cluster_id"].astype(str) == cid)
+                (clusters["screen_name"] == screen) & (clusters["cluster_id"].astype(str) == cid)
             ]
             .drop_duplicates("gene_symbol")
             .shape[0]
@@ -898,9 +884,7 @@ def compute_output_fragility(
             .apply(lambda s: "ribosom" in s or "translation" in s)
         )
         consistency_rate = (
-            float(per_rep_consistent["_ok"].mean())
-            if len(per_rep_consistent)
-            else 0.0
+            float(per_rep_consistent["_ok"].mean()) if len(per_rep_consistent) else 0.0
         )
         rows.append(
             {
