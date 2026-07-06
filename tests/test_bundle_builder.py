@@ -380,6 +380,69 @@ def test_add_functional_annotations_to_chunk_success(tmp_path, mock_uniprot_clie
     assert result.loc[1, "UniProt_functional_annotation"] == "Bystin-like protein"
 
 
+def test_add_functional_annotations_source_affinage_is_pure(
+    tmp_path, mock_uniprot_client, test_chunk
+):
+    """source='affinage' must NOT call UniProt's fetch_functional_annotations.
+
+    Pure-source guarantee for the cross-source A/B: the Affinage arm of the
+    benchmark cannot silently fall back to UniProt for genes Affinage missed.
+    """
+    mock_affinage_client = Mock()
+    mock_affinage_client.fetch_functional_annotations.return_value = pd.DataFrame(
+        {GENE_COLUMN: ["AATF"], "affinage_functional_annotation": ["affinage narrative for AATF"]}
+    )
+
+    result = add_functional_annotations_to_chunk(
+        chunk=test_chunk,
+        screen_name=TEST_SCREEN_NAME,
+        cluster_id_column=CLUSTER_ID_COLUMN,
+        gene_column=GENE_COLUMN,
+        stable_accession_col=DEFAULT_ACCESSION_COL,
+        source="affinage",
+        uniprot_client=mock_uniprot_client,
+        affinage_client=mock_affinage_client,
+        output_dir=tmp_path,
+    )
+
+    assert mock_uniprot_client.fetch_functional_annotations.call_count == 0
+    assert mock_affinage_client.fetch_functional_annotations.call_count == 1
+    assert "UniProt_functional_annotation" not in result.columns
+    assert "affinage_functional_annotation" in result.columns
+
+
+def test_add_functional_annotations_source_both_keeps_both_columns(
+    tmp_path, mock_uniprot_client, test_chunk
+):
+    """source='both' fetches both sources side-by-side; no nulling."""
+    mock_affinage_client = Mock()
+    mock_affinage_client.fetch_functional_annotations.return_value = pd.DataFrame(
+        {GENE_COLUMN: ["AATF"], "affinage_functional_annotation": ["affinage narrative for AATF"]}
+    )
+
+    result = add_functional_annotations_to_chunk(
+        chunk=test_chunk,
+        screen_name=TEST_SCREEN_NAME,
+        cluster_id_column=CLUSTER_ID_COLUMN,
+        gene_column=GENE_COLUMN,
+        stable_accession_col=DEFAULT_ACCESSION_COL,
+        source="both",
+        uniprot_client=mock_uniprot_client,
+        affinage_client=mock_affinage_client,
+        output_dir=tmp_path,
+    )
+
+    assert mock_uniprot_client.fetch_functional_annotations.call_count == 1
+    assert mock_affinage_client.fetch_functional_annotations.call_count == 1
+    assert "UniProt_functional_annotation" in result.columns
+    assert "affinage_functional_annotation" in result.columns
+    aatf_row = result[result[GENE_COLUMN] == "AATF"].iloc[0]
+    assert (
+        aatf_row["UniProt_functional_annotation"] == "Apoptosis-antagonizing transcription factor"
+    )
+    assert aatf_row["affinage_functional_annotation"] == "affinage narrative for AATF"
+
+
 def test_add_functional_annotations_handles_api_failure(tmp_path, mock_uniprot_client, test_chunk):
     """Test graceful handling when UniProt API fails - should return unmodified chunk with warning"""
     # Override the fixture's fetch_functional_annotations to raise an exception

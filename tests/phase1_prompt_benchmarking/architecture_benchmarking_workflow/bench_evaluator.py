@@ -104,7 +104,22 @@ _EVAL_OUTPUT_SUFFIXES = (
     "_per_gene.csv",
     "_per_route.csv",
     "_per_route_per_case_type.csv",
+    "_negative_abstention.csv",
+    "_coverage.csv",
+    "_output_fragility.csv",
 )
+
+# Shuffled clusters carry no expert pathway annotation by construction; scored
+# on whether the model correctly emits "no coherent pathway" + empty arrays.
+NEGATIVE_CLUSTERS = (
+    ("aconcagua_interphase_shuffled", "244", "no_coherent_pathway"),
+    ("aconcagua_interphase_shuffled", "3", "no_coherent_pathway"),
+    ("aconcagua_interphase_shuffled", "17", "no_coherent_pathway"),
+)
+
+# Output-fragility diagnostic: a large coherent cluster (jebel/0, 147 genes)
+# with no expert annotations. Reported separately from accuracy / abstention.
+OUTPUT_FRAGILITY_CLUSTER = ("jebel", "0")
 
 # Confidence ordering for tie-breaks (mode ties resolve toward higher confidence).
 _CONF_ORDER = {"high": 3, "medium": 2, "low": 1}
@@ -285,6 +300,9 @@ def compute_semantic_scores(
     out["pathway_semantic_match"] = [
         bool(s >= threshold) if s == s else False  # NaN check via self-equality
         for s in out["pathway_semantic_score"]
+    ]
+    out["pathway_semantic_match_loose"] = [
+        bool(s >= 0.60) if s == s else False for s in out["pathway_semantic_score"]
     ]
     return out
 
@@ -482,6 +500,10 @@ def aggregate_per_route(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.
             rec["pathway_semantic_match_rate"] = round(
                 float(grp["pathway_semantic_match"].mean()), 3
             )
+            if "pathway_semantic_match_loose" in grp.columns:
+                rec["pathway_semantic_match_loose_rate"] = round(
+                    float(grp["pathway_semantic_match_loose"].mean()), 3
+                )
         rows.append(rec)
     return pd.DataFrame(rows)
 
@@ -565,6 +587,9 @@ def write_report(
     per_route: pd.DataFrame,
     per_route_case_type: pd.DataFrame,
     concordance: dict[str, float],
+    negative_abstention: pd.DataFrame | None = None,
+    coverage: pd.DataFrame | None = None,
+    output_fragility: pd.DataFrame | None = None,
 ) -> None:
     n_genes = len(joined)
     n_routes = joined["route"].nunique()
@@ -635,7 +660,243 @@ def write_report(
     sections.append(_df_to_markdown(per_route_case_type))
     sections.append("")
 
+    if coverage is not None and not coverage.empty:
+        sections.append("## Coverage (unique gene symbols)")
+        sections.append(
+            "`coverage_rate_all` across every cluster; `_real` excludes shuffled "
+            "negative controls; `_categorized` also excludes clusters where "
+            "`benchmark_case_type` is NaN (PI consensus failed)."
+        )
+        sections.append(_df_to_markdown(coverage))
+        sections.append("")
+
+    if negative_abstention is not None and not negative_abstention.empty:
+        sections.append("## Negative-control abstention")
+        sections.append(
+            "Per-route abstention on the shuffled negative-control clusters. "
+            "`abstain` = dominant_process contains 'no coherent' AND confidence is "
+            "Low AND all three gene-classification arrays are empty."
+        )
+        sections.append(_df_to_markdown(negative_abstention))
+        sections.append("")
+
+    if output_fragility is not None and not output_fragility.empty:
+        sections.append("## Output-fragility diagnostic (jebel/0)")
+        sections.append(
+            "147-gene ribosome cluster with no expert annotations. Reports per-route "
+            "coverage and pathway-consistency (model output mentions ribosome or "
+            "translation) to surface output-structure failures on a large input."
+        )
+        sections.append(_df_to_markdown(output_fragility))
+        sections.append("")
+
     out_path.write_text("\n".join(sections), encoding="utf-8")
+
+
+def compute_negative_abstention(experiment_dir: Path) -> pd.DataFrame:
+    """Per-route abstention rate on the shuffled negative-control clusters.
+
+    Reads parsed_outputs.jsonl directly so cells with empty gene arrays (correct
+    abstention) are counted. Abstain iff `dominant_process` contains "no coherent"
+    AND `pathway_confidence` is Low AND all three gene-classification arrays are
+    empty.
+    """
+    parsed_path = experiment_dir / "parsed_outputs.jsonl"
+    if not parsed_path.exists():
+        return pd.DataFrame()
+    neg_lookup = {(s, str(c).strip()): ct for s, c, ct in NEGATIVE_CLUSTERS}
+    cell_rows: list[dict] = []
+    for line in parsed_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            d = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        run_id = d.get("run_id", "")
+        route = d.get("route", "")
+        parts = run_id.split("__")
+        if len(parts) < 5:
+            continue
+        screen = parts[-3]
+        cluster = parts[-2].replace("cluster_", "")
+        if (screen, cluster.strip()) not in neg_lookup:
+            continue
+        po = d.get("parsed_output") or {}
+        proc = _norm_lower(po.get("dominant_process") or "")
+        conf = _norm_lower(po.get("pathway_confidence") or "")
+        n_genes = (
+            len(po.get("established_genes") or [])
+            + len(po.get("novel_role_genes") or [])
+            + len(po.get("uncharacterized_genes") or [])
+        )
+        abstain = ("no coherent" in proc) and (conf == "low") and (n_genes == 0)
+        cell_rows.append(
+            {
+                "route": route,
+                "case_type": neg_lookup[(screen, cluster.strip())],
+                "abstain": abstain,
+            }
+        )
+    if not cell_rows:
+        return pd.DataFrame()
+    cells = pd.DataFrame(cell_rows)
+    rows = []
+    for (route, ct), grp in cells.groupby(["route", "case_type"]):
+        rate = float(grp["abstain"].mean())
+        rows.append(
+            {
+                "route": route,
+                "case_type": ct,
+                "n_cells": len(grp),
+                "abstain_rate": round(rate, 3),
+                "fabrication_rate": round(1 - rate, 3),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def compute_coverage(
+    preds: pd.DataFrame,
+    clusters_csv_path: Path,
+    ground_truth: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Per-route coverage on unique gene symbols.
+
+    Reports three rates so the "coverage drop" signal isn't confounded by the
+    shuffled-controls case where lower coverage is correct:
+    - coverage_rate_all: across every cluster in the benchmark
+    - coverage_rate_real: excludes the shuffled negative-control clusters
+    - coverage_rate_categorized: also excludes clusters with benchmark_case_type=NaN
+      (PI consensus failed; abstaining there is a defensible call)
+    """
+    if not clusters_csv_path.exists():
+        return pd.DataFrame()
+    clusters = pd.read_csv(clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str})
+    if "sheet" in clusters.columns and "screen_name" not in clusters.columns:
+        clusters = clusters.rename(columns={"sheet": "screen_name"})
+    if not {"screen_name", "cluster_id", "gene_symbol"}.issubset(clusters.columns):
+        return pd.DataFrame()
+    expected_per_cluster = (
+        clusters.drop_duplicates(["screen_name", "cluster_id", "gene_symbol"])
+        .groupby(["screen_name", "cluster_id"])
+        .size()
+    )
+    shuffled_keys = {(s, str(c).strip()) for s, c, _ in NEGATIVE_CLUSTERS}
+    uncategorized_keys: set[tuple[str, str]] = set()
+    if ground_truth is not None and "benchmark_case_type" in ground_truth.columns:
+        defined = {
+            (s, str(c).strip())
+            for s, c in ground_truth.dropna(subset=["benchmark_case_type"])
+            .drop_duplicates(["screen_name", "cluster_id"])[["screen_name", "cluster_id"]]
+            .itertuples(index=False)
+        }
+        all_clusters = {(s, str(c).strip()) for (s, c) in expected_per_cluster.index}
+        uncategorized_keys = all_clusters - defined - shuffled_keys
+    full_expected = {(s, str(c).strip()): n for (s, c), n in expected_per_cluster.items()}
+    rows = []
+    for route, grp in preds.groupby("route", sort=True):
+        # defense/future-proofing: use actual IDs rather than range(1, N+1)
+        replicate_ids = sorted(grp["replicate"].unique())
+        per_cell = (
+            grp.groupby(["screen_name", "cluster_id", "replicate"])["gene_symbol"]
+            .nunique()
+            .reset_index(name="n_unique_pred")
+        )
+        all_pairs = [
+            (s, str(c).strip(), rep)
+            for (s, c) in expected_per_cluster.index
+            for rep in replicate_ids
+        ]
+        all_df = pd.DataFrame(all_pairs, columns=["screen_name", "cluster_id", "replicate"])
+        merged = all_df.merge(per_cell, on=["screen_name", "cluster_id", "replicate"], how="left")
+        merged["n_unique_pred"] = merged["n_unique_pred"].fillna(0)
+        merged["expected"] = merged.apply(
+            lambda r: full_expected.get((r["screen_name"], r["cluster_id"]), 0), axis=1
+        )
+        merged["is_shuffled"] = merged.apply(
+            lambda r: (r["screen_name"], r["cluster_id"]) in shuffled_keys, axis=1
+        )
+        merged["is_uncategorized"] = merged.apply(
+            lambda r: (r["screen_name"], r["cluster_id"]) in uncategorized_keys, axis=1
+        )
+        total_pred_all = int(merged["n_unique_pred"].sum())
+        total_exp_all = int(merged["expected"].sum())
+        real = merged[~merged["is_shuffled"]]
+        cat = merged[~merged["is_shuffled"] & ~merged["is_uncategorized"]]
+        rows.append(
+            {
+                "route": route,
+                "n_replicates": len(replicate_ids),
+                "coverage_rate_all": round(total_pred_all / total_exp_all, 3)
+                if total_exp_all
+                else 0.0,
+                "coverage_rate_real": round(
+                    int(real["n_unique_pred"].sum()) / int(real["expected"].sum()), 3
+                )
+                if int(real["expected"].sum())
+                else 0.0,
+                "coverage_rate_categorized": round(
+                    int(cat["n_unique_pred"].sum()) / int(cat["expected"].sum()), 3
+                )
+                if int(cat["expected"].sum())
+                else 0.0,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def compute_output_fragility(preds: pd.DataFrame, clusters_csv_path: Path) -> pd.DataFrame:
+    """Per-route diagnostic on the output_fragility cluster (jebel/0, 147 genes).
+
+    No expert annotations exist for this cluster, so it is not scored on accuracy
+    or abstention. Reports per-route coverage and pathway-consistency to surface
+    output-structure failures on a large coherent input.
+    """
+    screen, cid = OUTPUT_FRAGILITY_CLUSTER
+    cell = preds[(preds["screen_name"] == screen) & (preds["cluster_id"].astype(str) == cid)].copy()
+    if cell.empty:
+        return pd.DataFrame()
+    expected = 0
+    if clusters_csv_path.exists():
+        clusters = pd.read_csv(clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str})
+        if "sheet" in clusters.columns and "screen_name" not in clusters.columns:
+            clusters = clusters.rename(columns={"sheet": "screen_name"})
+        expected = int(
+            clusters[
+                (clusters["screen_name"] == screen) & (clusters["cluster_id"].astype(str) == cid)
+            ]
+            .drop_duplicates("gene_symbol")
+            .shape[0]
+        )
+    rows = []
+    for route, grp in cell.groupby("route", sort=True):
+        n_replicates = int(grp["replicate"].nunique())
+        per_rep_counts = grp.groupby("replicate")["gene_symbol"].nunique()
+        median_per_cell = float(per_rep_counts.median()) if not per_rep_counts.empty else 0.0
+        total_pred = int(per_rep_counts.sum())
+        expected_total = expected * max(n_replicates, 1)
+        coverage = total_pred / expected_total if expected_total else 0.0
+        per_rep_consistent = grp.drop_duplicates("replicate").assign(
+            _ok=lambda d: d["pathway"]
+            .astype(str)
+            .str.lower()
+            .apply(lambda s: "ribosom" in s or "translation" in s)
+        )
+        consistency_rate = (
+            float(per_rep_consistent["_ok"].mean()) if len(per_rep_consistent) else 0.0
+        )
+        rows.append(
+            {
+                "route": route,
+                "n_replicates": n_replicates,
+                "median_genes_per_cell": round(median_per_cell, 1),
+                "n_expected_per_cell": expected,
+                "coverage_rate": round(float(coverage), 3),
+                "pathway_consistency_rate": round(consistency_rate, 3),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def main() -> int:
@@ -732,6 +993,11 @@ def main() -> int:
     per_route = aggregate_per_route(joined, reviewers)
     per_route_case_type = aggregate_per_route_per_case_type(joined, reviewers)
 
+    clusters_csv_path = PHASE_DIR / "benchmark_inputs" / "benchmark_clusters.csv"
+    negative_abstention = compute_negative_abstention(args.experiment_dir)
+    coverage = compute_coverage(preds, clusters_csv_path, ground_truth=gt)
+    output_fragility = compute_output_fragility(preds, clusters_csv_path)
+
     # Resolve output prefix: explicit --output-prefix wins; otherwise auto-derive
     # '<phase>_eval' from the experiment-dir phase folder, falling back to 'eval'.
     if args.output_prefix is not None:
@@ -743,11 +1009,20 @@ def main() -> int:
     per_gene_path = args.experiment_dir / f"{output_prefix}_per_gene.csv"
     per_route_path = args.experiment_dir / f"{output_prefix}_per_route.csv"
     per_case_type_path = args.experiment_dir / f"{output_prefix}_per_route_per_case_type.csv"
+    negative_path = args.experiment_dir / f"{output_prefix}_negative_abstention.csv"
+    coverage_path = args.experiment_dir / f"{output_prefix}_coverage.csv"
+    fragility_path = args.experiment_dir / f"{output_prefix}_output_fragility.csv"
     report_path = args.experiment_dir / f"{output_prefix}_report.md"
 
     joined.to_csv(per_gene_path, index=False)
     per_route.to_csv(per_route_path, index=False)
     per_route_case_type.to_csv(per_case_type_path, index=False)
+    if not negative_abstention.empty:
+        negative_abstention.to_csv(negative_path, index=False)
+    if not coverage.empty:
+        coverage.to_csv(coverage_path, index=False)
+    if not output_fragility.empty:
+        output_fragility.to_csv(fragility_path, index=False)
     write_report(
         report_path,
         args.experiment_dir,
@@ -757,11 +1032,20 @@ def main() -> int:
         per_route,
         per_route_case_type,
         concordance,
+        negative_abstention=negative_abstention if not negative_abstention.empty else None,
+        coverage=coverage if not coverage.empty else None,
+        output_fragility=output_fragility if not output_fragility.empty else None,
     )
 
     print(f"  per-gene:      {per_gene_path}")
     print(f"  per-route:     {per_route_path}")
     print(f"  per-case-type: {per_case_type_path}")
+    if not negative_abstention.empty:
+        print(f"  abstention:    {negative_path}")
+    if not coverage.empty:
+        print(f"  coverage:      {coverage_path}")
+    if not output_fragility.empty:
+        print(f"  fragility:     {fragility_path}")
     print(f"  report:        {report_path}")
     print(f"\n=== Inter-reviewer concordance (ceiling) ===\n  {concordance}")
     print("\n=== Per-route match rates ===")

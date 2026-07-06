@@ -145,39 +145,38 @@ def add_functional_annotations_to_chunk(
 ) -> pd.DataFrame:
     """Add annotation columns to a chunk of gene-level data.
 
-    source="uniprot" (default) fetches UniProt functional annotations; "affinage"
-    fetches Affinage narratives (alias-resolved, audit-gated) with UniProt as the
-    per-gene backup; "both" keeps both columns.
+    Each source is kept pure — no silent cross-source backfill:
+      - "uniprot": fetches UniProt only.
+      - "affinage": fetches Affinage only (alias-resolved, audit-gated).
+      - "both": fetches both side-by-side as separate columns.
+    Genes a source fails on stay empty for that source; the LLM sees the gap.
     """
     if stable_accession_col is None:
         stable_accession_col = DEFAULT_ACCESSION_COL
     chunk_annotated = chunk.copy()
     cluster_id = chunk_annotated[cluster_id_column].iloc[0]
 
-    # UniProt annotations — primary for uniprot/both, backup for affinage
-    if uniprot_client is None:
-        uniprot_client = UniProtClient()
-    try:
-        annotations = uniprot_client.fetch_functional_annotations(
-            chunk_annotated, stable_accession_col
-        )
-        chunk_annotated = chunk_annotated.merge(annotations, on=stable_accession_col, how="left")
-    except Exception as e:
-        warnings.warn(f"UniProt lookup failed for cluster '{cluster_id}': {e}", stacklevel=2)
-        if source == "uniprot":
-            return chunk_annotated
+    if source in ("uniprot", "both"):
+        if uniprot_client is None:
+            uniprot_client = UniProtClient()
+        try:
+            annotations = uniprot_client.fetch_functional_annotations(
+                chunk_annotated, stable_accession_col
+            )
+            chunk_annotated = chunk_annotated.merge(
+                annotations, on=stable_accession_col, how="left"
+            )
+        except Exception as e:
+            warnings.warn(f"UniProt lookup failed for cluster '{cluster_id}': {e}", stacklevel=2)
 
-    # Affinage narratives, with UniProt left as the per-gene backup
     if source in ("affinage", "both"):
         if affinage_client is None:
             affinage_client = AffinageClient()
-        affinage = affinage_client.fetch_functional_annotations(chunk_annotated, gene_column)
-        chunk_annotated = chunk_annotated.merge(affinage, on=gene_column, how="left")
-        if source == "affinage" and "UniProt_functional_annotation" in chunk_annotated.columns:
-            has_affinage = chunk_annotated[AFFINAGE_COL].notna() & chunk_annotated[AFFINAGE_COL].ne(
-                ""
-            )
-            chunk_annotated.loc[has_affinage, "UniProt_functional_annotation"] = pd.NA
+        try:
+            affinage = affinage_client.fetch_functional_annotations(chunk_annotated, gene_column)
+            chunk_annotated = chunk_annotated.merge(affinage, on=gene_column, how="left")
+        except Exception as e:
+            warnings.warn(f"Affinage lookup failed for cluster '{cluster_id}': {e}", stacklevel=2)
     # save as csv; output dir interface/output/
     OUTPUT_DIR = (
         Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"

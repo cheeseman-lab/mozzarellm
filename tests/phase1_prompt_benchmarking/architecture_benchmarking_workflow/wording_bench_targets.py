@@ -25,7 +25,6 @@ from .arch_bench_routes import ROUTE_REGISTRY, Route
 from .order_bench_orderings import resolve_variant_ids
 from .wording_bench_alternates import WORDING_ALTERNATE_SET_REGISTRY
 
-
 # =============================================================================
 # Target descriptor
 # =============================================================================
@@ -125,6 +124,184 @@ WORDING_OVERRIDE_TARGET_REGISTRY: dict[str, WordingOverrideTarget] = {
         description="Override only the pathway confidence criteria (PCC).",
         components=("PCC",),
         source="wording_v1",
+    ),
+    # =========================================================================
+    # Sequential build-up program (W6-W24). One target per stage arm.
+    #   Stage 0 (S0): W6            — schema-only floor
+    #   Stage 1 (S1): W7, W8, W9    — CAT (pathway / mechanism / guarded)
+    #                                 winner: W9 cat_guarded
+    #   Stage 2 (S2): W10, W11, W12 — GCR on CAT=guarded
+    #                                 winner: W11 gcr_decision_tree
+    #   Stage 3 (S3): W13, W14, W15 — NPR on GCR=decision_tree
+    #                                 winner: W13 npr_simple
+    #   Stage 4 (S4): W16, W17, W18 — UPR on NPR=simple
+    #                                 winner: W16 upr_simple
+    #   Stage 5 (S5): W19, W20, W21 — PCC on UPR=simple
+    #                                 winner: W19 pcc_simple
+    #   Stage 6 (S6): W22, W23, W24 — VER on PCC=simple
+    #                                 winner: W23 ver_precondition (= FINAL)
+    # =========================================================================
+    "W6": WordingOverrideTarget(
+        id="W6",
+        name="schema_only",
+        hypothesis=(
+            "Schema-only floor: excise every prose component (CAT, GCR, NPR, UPR, PCC) "
+            "but keep OUTPUT_FORMAT_JSON. Anchors the build-up program."
+        ),
+        description="Empty-string overrides for CAT/GCR/NPR/UPR/PCC; OUTPUT_FORMAT_JSON intact.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v4_floor",
+    ),
+    # ---- Stage 1 — CAT framings on the floor (W7-W9) -----------------------
+    "W7": WordingOverrideTarget(
+        id="W7",
+        name="cat_pathway",
+        hypothesis="CAT only, pathway frame — does identifying the dominant pathway as the goal help?",
+        description="W6 + CAT (pathway frame); wording_v4_cat_pathway.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v4_cat_pathway",
+    ),
+    "W8": WordingOverrideTarget(
+        id="W8",
+        name="cat_mechanism",
+        hypothesis="CAT only, mechanism frame — does reframing as molecular mechanism change behavior?",
+        description="W6 + CAT (mechanism frame); wording_v4_cat_mechanism.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v4_cat_mechanism",
+    ),
+    "W9": WordingOverrideTarget(
+        id="W9",
+        name="cat_guarded",
+        hypothesis="CAT only, guarded frame — does noting 'cluster may be noise' reduce fabrication?",
+        description="W6 + CAT (guarded frame); wording_v4_cat_guarded.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v4_cat_guarded",
+    ),
+    # ---- Stage 2 — GCR framings on CAT=cat_guarded (W10-W12) ---------------
+    "W10": WordingOverrideTarget(
+        id="W10",
+        name="stage2_gcr_simple",
+        hypothesis="W9 + GCR_simple — does adding bare GCR labels improve classification on top of locked CAT?",
+        description="Stage 2 arm A: cat_guarded + gcr_simple; wording_v6_stage2_gcr_simple.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage2_gcr_simple",
+    ),
+    "W11": WordingOverrideTarget(
+        id="W11",
+        name="stage2_gcr_decision_tree",
+        hypothesis="W9 + GCR_decision_tree — does the explicit gating procedure improve classification in context?",
+        description="Stage 2 arm B: cat_guarded + gcr_decision_tree; wording_v6_stage2_gcr_decision_tree.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage2_gcr_decision_tree",
+    ),
+    "W12": WordingOverrideTarget(
+        id="W12",
+        name="stage2_gcr_guarded",
+        hypothesis="W9 + GCR_guarded — does the default-NOVEL guard preserve accuracy + abstention in context?",
+        description="Stage 2 arm C: cat_guarded + gcr_guarded; wording_v6_stage2_gcr_guarded.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage2_gcr_guarded",
+    ),
+    # ---- Stage 3 — NPR framings on GCR=gcr_decision_tree (W13-W15) ---------
+    "W13": WordingOverrideTarget(
+        id="W13",
+        name="stage3_npr_simple",
+        hypothesis="W11 stack + NPR_simple — do bare NOVEL_ROLE sub-class definitions improve subclass_match on top of GCR?",
+        description="Stage 3 arm A: cat_guarded + gcr_decision_tree + npr_simple; wording_v6_stage3_npr_simple.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage3_npr_simple",
+    ),
+    "W14": WordingOverrideTarget(
+        id="W14",
+        name="stage3_npr_decision_tree",
+        hypothesis="W11 stack + NPR_decision_tree — does the ordered procedure further improve subclass_match?",
+        description="Stage 3 arm B: cat_guarded + gcr_decision_tree + npr_decision_tree; wording_v6_stage3_npr_decision_tree.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage3_npr_decision_tree",
+    ),
+    "W15": WordingOverrideTarget(
+        id="W15",
+        name="stage3_npr_guarded",
+        hypothesis="W11 stack + NPR_guarded — does 'prefer weaker level when uncertain' reduce over-promotion of NOVEL_ROLE sub-classes?",
+        description="Stage 3 arm C: cat_guarded + gcr_decision_tree + npr_guarded; wording_v6_stage3_npr_guarded.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage3_npr_guarded",
+    ),
+    # ---- Stage 4 — UPR framings on NPR=npr_simple (W16-W18) ----------------
+    "W16": WordingOverrideTarget(
+        id="W16",
+        name="stage4_upr_simple",
+        hypothesis="W13 stack + UPR_simple — do bare UNCHARACTERIZED sub-class definitions help on top of NPR?",
+        description="Stage 4 arm A: cat_guarded + gcr_decision_tree + npr_simple + upr_simple; wording_v6_stage4_upr_simple.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage4_upr_simple",
+    ),
+    "W17": WordingOverrideTarget(
+        id="W17",
+        name="stage4_upr_decision_tree",
+        hypothesis="W13 stack + UPR_decision_tree — does the ordered characterization-stage procedure help in context?",
+        description="Stage 4 arm B: cat_guarded + gcr_decision_tree + npr_simple + upr_decision_tree; wording_v6_stage4_upr_decision_tree.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage4_upr_decision_tree",
+    ),
+    "W18": WordingOverrideTarget(
+        id="W18",
+        name="stage4_upr_guarded",
+        hypothesis="W13 stack + UPR_guarded — does 'prefer lower-information sub-class' reduce over-characterization in context?",
+        description="Stage 4 arm C: cat_guarded + gcr_decision_tree + npr_simple + upr_guarded; wording_v6_stage4_upr_guarded.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage4_upr_guarded",
+    ),
+    # ---- Stage 5 — PCC framings on UPR=upr_simple (W19-W21) ----------------
+    "W19": WordingOverrideTarget(
+        id="W19",
+        name="stage5_pcc_simple",
+        hypothesis="W16 stack + PCC_simple — does brief confidence + off-ramp guidance restore abstention?",
+        description="Stage 5 arm A: full stack + pcc_simple; wording_v6_stage5_pcc_simple.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage5_pcc_simple",
+    ),
+    "W20": WordingOverrideTarget(
+        id="W20",
+        name="stage5_pcc_detailed",
+        hypothesis="W16 stack + PCC_detailed — do detailed per-level criteria help confidence calibration?",
+        description="Stage 5 arm B: full stack + pcc_detailed; wording_v6_stage5_pcc_detailed.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage5_pcc_detailed",
+    ),
+    "W21": WordingOverrideTarget(
+        id="W21",
+        name="stage5_pcc_guarded",
+        hypothesis="W16 stack + PCC_guarded — does 'prefer lower confidence + no coherent pathway is positive' restore abstention without breaking coverage?",
+        description="Stage 5 arm C: full stack + pcc_guarded; wording_v6_stage5_pcc_guarded.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage5_pcc_guarded",
+    ),
+    # ---- Stage 6 — VER framings on PCC=pcc_simple (W22-W24) ----------------
+    # W23 = the final locked optimal prompt.
+    "W22": WordingOverrideTarget(
+        id="W22",
+        name="stage6_ver_simple",
+        hypothesis="W19 stack + VER_simple — does bare verification rescue coverage on coherent clusters?",
+        description="Stage 6 arm A: full W19 stack + verification text appended to PCC; wording_v6_stage6_ver_simple.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage6_ver_simple",
+    ),
+    "W23": WordingOverrideTarget(
+        id="W23",
+        name="stage6_ver_precondition",
+        hypothesis="W19 stack + VER_precondition — does conditional verification preserve abstention while rescuing coverage?",
+        description="Stage 6 arm B: full W19 stack + conditional verification text; wording_v6_stage6_ver_precondition. Final optimal prompt.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage6_ver_precondition",
+    ),
+    "W24": WordingOverrideTarget(
+        id="W24",
+        name="stage6_ver_guarded",
+        hypothesis="W19 stack + VER_guarded — does prefer-leave-unclassified guard balance coverage rescue against overcrediting?",
+        description="Stage 6 arm C: full W19 stack + verification with guard against overcrediting; wording_v6_stage6_ver_guarded.",
+        components=("CAT", "GCR", "NPR", "UPR", "PCC"),
+        source="wording_v6_stage6_ver_guarded",
     ),
 }
 # NOTE: a base component (e.g. GCR) override WILL NOT propogate to a CoT component (e.g. cGCR) (embedded components are fixed at import time);

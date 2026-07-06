@@ -1,5 +1,6 @@
-"""Unit tests for bench_evaluator.py — 35 tests across 5 test classes."""
+"""Unit tests for bench_evaluator.py"""
 
+import json
 import sys
 from pathlib import Path
 
@@ -22,7 +23,12 @@ from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_e
     inter_reviewer_concordance,
     load_predictions,
     load_ground_truth,
+    compute_coverage,
+    compute_negative_abstention,
+    compute_output_fragility,
+    NEGATIVE_CLUSTERS,
     NULLABLE_METRICS,
+    OUTPUT_FRAGILITY_CLUSTER,
     PRED_COLS_REQUIRED,
     _EVAL_OUTPUT_SUFFIXES,
 )
@@ -348,7 +354,7 @@ class TestApplicabilityBug:
         ]
         df = base_joined_df(rows)
         result = annotate_matches(df, REVIEWERS)
-        # Current buggy behavior: blank experts → False (counted as wrong)
+        # Current buggy behavior: blank experts -> False (counted as wrong)
         for val in result["classification_match_either"]:
             assert val is False
 
@@ -483,19 +489,19 @@ class TestAggregation:
         df = base_joined_df(rows)
         annotated = annotate_matches(df, REVIEWERS)
         result = inter_reviewer_concordance(annotated, REVIEWERS)
-        # eric vs iain: agree on gene0, gene2 → 2/4 = 0.5 (but gene1 also agree!)
-        # gene0: E==E ✓, gene1: E==E ✓, gene2: N==N ✓, gene3: E!=N ✗ → 3/4
+        # eric vs iain: agree on gene0, gene2 -> 2/4 = 0.5 (but gene1 also agree!)
+        # gene0: E==E ok, gene1: E==E ok, gene2: N==N ok, gene3: E!=N x -> 3/4
         assert result["eric_vs_iain"] == pytest.approx(0.75)
-        # eric vs liz: gene0 E==E ✓, gene1 E!=N ✗, gene2 N==N ✓, gene3 E==E ✓ → 3/4
+        # eric vs liz: gene0 E==E ok, gene1 E!=N x, gene2 N==N ok, gene3 E==E ok -> 3/4
         assert result["eric_vs_liz"] == pytest.approx(0.75)
-        # iain vs liz: gene0 E==E ✓, gene1 E!=N ✗, gene2 N==N ✓, gene3 N!=E ✗ → 2/4
+        # iain vs liz: gene0 E==E ok, gene1 E!=N x, gene2 N==N ok, gene3 N!=E x -> 2/4
         assert result["iain_vs_liz"] == pytest.approx(0.5)
-        # unanimous: gene0 ✓, gene2 ✓ → 2/4 = 0.5
+        # unanimous: gene0 ok, gene2 ok -> 2/4 = 0.5
         assert result["unanimous"] == pytest.approx(0.5)
 
 
 # ===========================================================================
-# 3.5 Loading — use tmp_path
+# 3.5 Loading -- use tmp_path
 # ===========================================================================
 
 
@@ -579,3 +585,759 @@ class TestLoading:
         result = load_ground_truth(csv_path)
         assert "screen_name" in result.columns
         assert result.iloc[0]["screen_name"] == "screen1"
+
+
+# ===========================================================================
+# Helpers for new-addition tests
+# ===========================================================================
+
+
+def _write_jsonl(path: Path, records: list[dict]) -> None:
+    path.write_text(
+        "\n".join(json.dumps(r) for r in records),
+        encoding="utf-8",
+    )
+
+
+def _clusters_csv(tmp_path: Path, rows: list[dict]) -> Path:
+    p = tmp_path / "benchmark_clusters.csv"
+    pd.DataFrame(rows).to_csv(p, index=False)
+    return p
+
+
+# ===========================================================================
+# 3.6 compute_negative_abstention
+# ===========================================================================
+
+
+class TestComputeNegativeAbstention:
+    """Tests derived from docstring:
+
+    Per-route abstention rate on the shuffled negative-control clusters.
+    Reads parsed_outputs.jsonl directly so cells with empty gene arrays (correct
+    abstention) are counted. Abstain iff `dominant_process` contains "no coherent"
+    AND `pathway_confidence` is Low AND all three gene-classification arrays are
+    empty.
+    """
+
+    def test_returns_empty_when_no_file(self, tmp_path):
+        result = compute_negative_abstention(tmp_path)
+        assert result.empty
+
+    def test_correct_abstention_detected(self, tmp_path):
+        """A cell that meets all three abstention criteria should be scored as abstain=True."""
+        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
+        record = {
+            "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
+            "route": "route_A",
+            "parsed_output": {
+                "dominant_process": "no coherent pathway identified",
+                "pathway_confidence": "Low",
+                "established_genes": [],
+                "novel_role_genes": [],
+                "uncharacterized_genes": [],
+            },
+        }
+        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
+        result = compute_negative_abstention(tmp_path)
+        assert len(result) == 1
+        assert result.iloc[0]["abstain_rate"] == 1.0
+        assert result.iloc[0]["fabrication_rate"] == 0.0
+
+    def test_non_abstention_when_genes_present(self, tmp_path):
+        """If gene arrays are non-empty, abstention condition fails even with correct text."""
+        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
+        record = {
+            "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
+            "route": "route_A",
+            "parsed_output": {
+                "dominant_process": "no coherent pathway identified",
+                "pathway_confidence": "Low",
+                "established_genes": ["TP53"],
+                "novel_role_genes": [],
+                "uncharacterized_genes": [],
+            },
+        }
+        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
+        result = compute_negative_abstention(tmp_path)
+        assert result.iloc[0]["abstain_rate"] == 0.0
+        assert result.iloc[0]["fabrication_rate"] == 1.0
+
+    def test_non_abstention_when_confidence_not_low(self, tmp_path):
+        """If confidence is not Low, abstention condition fails."""
+        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
+        record = {
+            "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
+            "route": "route_A",
+            "parsed_output": {
+                "dominant_process": "no coherent pathway identified",
+                "pathway_confidence": "High",
+                "established_genes": [],
+                "novel_role_genes": [],
+                "uncharacterized_genes": [],
+            },
+        }
+        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
+        result = compute_negative_abstention(tmp_path)
+        assert result.iloc[0]["abstain_rate"] == 0.0
+
+    def test_non_abstention_when_dominant_process_missing_keyword(self, tmp_path):
+        """If dominant_process does not contain 'no coherent', it's not abstention."""
+        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
+        record = {
+            "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
+            "route": "route_A",
+            "parsed_output": {
+                "dominant_process": "cell cycle regulation",
+                "pathway_confidence": "Low",
+                "established_genes": [],
+                "novel_role_genes": [],
+                "uncharacterized_genes": [],
+            },
+        }
+        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
+        result = compute_negative_abstention(tmp_path)
+        assert result.iloc[0]["abstain_rate"] == 0.0
+
+    def test_ignores_non_negative_clusters(self, tmp_path):
+        """Records for clusters not in NEGATIVE_CLUSTERS should be ignored."""
+        record = {
+            "run_id": "exp__route_A__aconcagua_interphase__cluster_29__rep_1",
+            "route": "route_A",
+            "parsed_output": {
+                "dominant_process": "no coherent pathway",
+                "pathway_confidence": "Low",
+                "established_genes": [],
+                "novel_role_genes": [],
+                "uncharacterized_genes": [],
+            },
+        }
+        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
+        result = compute_negative_abstention(tmp_path)
+        assert result.empty
+
+    def test_multiple_routes_reported_separately(self, tmp_path):
+        """Each route should get its own row in the output."""
+        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
+        records = [
+            {
+                "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
+                "route": "route_A",
+                "parsed_output": {
+                    "dominant_process": "no coherent pathway",
+                    "pathway_confidence": "Low",
+                    "established_genes": [],
+                    "novel_role_genes": [],
+                    "uncharacterized_genes": [],
+                },
+            },
+            {
+                "run_id": f"exp__route_B__{screen}__cluster_{cluster}__rep_1",
+                "route": "route_B",
+                "parsed_output": {
+                    "dominant_process": "cell cycle",
+                    "pathway_confidence": "High",
+                    "established_genes": ["TP53"],
+                    "novel_role_genes": [],
+                    "uncharacterized_genes": [],
+                },
+            },
+        ]
+        _write_jsonl(tmp_path / "parsed_outputs.jsonl", records)
+        result = compute_negative_abstention(tmp_path)
+        assert len(result) == 2
+        route_a = result[result["route"] == "route_A"].iloc[0]
+        route_b = result[result["route"] == "route_B"].iloc[0]
+        assert route_a["abstain_rate"] == 1.0
+        assert route_b["abstain_rate"] == 0.0
+
+
+# ===========================================================================
+# 3.7 compute_coverage
+# ===========================================================================
+
+
+class TestComputeCoverage:
+    """Tests derived from docstring:
+
+    Per-route coverage on unique gene symbols.
+    Reports three rates so the "coverage drop" signal isn't confounded by the
+    shuffled-controls case where lower coverage is correct:
+    - coverage_rate_all: across every cluster in the benchmark
+    - coverage_rate_real: excludes the shuffled negative-control clusters
+    - coverage_rate_categorized: also excludes clusters with benchmark_case_type=NaN
+    """
+
+    def _make_preds(self, rows: list[dict]) -> pd.DataFrame:
+        base = {
+            "screen_name": "screen1",
+            "cluster_id": "c1",
+            "gene_symbol": "gene1",
+            "route": "route_A",
+            "replicate": 1,
+            "run_id": "run1",
+            "predicted_class": "ESTABLISHED",
+            "predicted_subclass": "",
+            "pathway": "some pathway",
+            "pathway_confidence": "High",
+        }
+        records = [{**base, **r} for r in rows]
+        return pd.DataFrame(records)
+
+    def test_returns_empty_when_clusters_file_missing(self, tmp_path):
+        preds = self._make_preds([{"gene_symbol": "A"}])
+        result = compute_coverage(preds, tmp_path / "nonexistent.csv")
+        assert result.empty
+
+    def test_returns_empty_when_clusters_missing_required_columns(self, tmp_path):
+        p = tmp_path / "clusters.csv"
+        pd.DataFrame({"bad_col": ["x"]}).to_csv(p, index=False)
+        preds = self._make_preds([{"gene_symbol": "A"}])
+        result = compute_coverage(preds, p)
+        assert result.empty
+
+    def test_full_coverage_all_genes_predicted(self, tmp_path):
+        """If predictions cover every gene in the clusters file, rate should be 1.0."""
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gB"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA", "replicate": 1},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gB", "replicate": 1},
+            ]
+        )
+        result = compute_coverage(preds, clusters_path)
+        assert len(result) == 1
+        assert result.iloc[0]["coverage_rate_all"] == 1.0
+
+    def test_partial_coverage(self, tmp_path):
+        """If only some genes are predicted, rate should reflect the fraction."""
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gB"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gC"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gD"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA", "replicate": 1},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gB", "replicate": 1},
+            ]
+        )
+        result = compute_coverage(preds, clusters_path)
+        assert result.iloc[0]["coverage_rate_all"] == 0.5
+
+    def test_shuffled_excluded_from_real_rate(self, tmp_path):
+        """coverage_rate_real should exclude NEGATIVE_CLUSTERS clusters."""
+        screen_neg, cluster_neg, _ = NEGATIVE_CLUSTERS[0]
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+                {"screen_name": screen_neg, "cluster_id": cluster_neg, "gene_symbol": "gX"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA", "replicate": 1},
+            ]
+        )
+        result = compute_coverage(preds, clusters_path)
+        assert result.iloc[0]["coverage_rate_all"] == 0.5
+        assert result.iloc[0]["coverage_rate_real"] == 1.0
+
+    def test_uncategorized_excluded_from_categorized_rate(self, tmp_path):
+        """coverage_rate_categorized should also exclude clusters with NaN benchmark_case_type."""
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+                {"screen_name": "s1", "cluster_id": "c2", "gene_symbol": "gB"},
+            ],
+        )
+        gt = pd.DataFrame(
+            [
+                {
+                    "screen_name": "s1",
+                    "cluster_id": "c1",
+                    "gene_symbol": "gA",
+                    "benchmark_case_type": "type_A",
+                },
+                {
+                    "screen_name": "s1",
+                    "cluster_id": "c2",
+                    "gene_symbol": "gB",
+                    "benchmark_case_type": None,
+                },
+            ]
+        )
+        preds = self._make_preds(
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA", "replicate": 1},
+            ]
+        )
+        result = compute_coverage(preds, clusters_path, ground_truth=gt)
+        assert result.iloc[0]["coverage_rate_all"] == 0.5
+        assert result.iloc[0]["coverage_rate_categorized"] == 1.0
+
+    def test_renames_sheet_to_screen_name(self, tmp_path):
+        """Clusters CSV with 'sheet' column should be auto-renamed to 'screen_name'."""
+        p = tmp_path / "clusters.csv"
+        pd.DataFrame(
+            [
+                {"sheet": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+            ]
+        ).to_csv(p, index=False)
+        preds = self._make_preds(
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA", "replicate": 1},
+            ]
+        )
+        result = compute_coverage(preds, p)
+        assert not result.empty
+        assert result.iloc[0]["coverage_rate_all"] == 1.0
+
+    def test_multiple_routes_reported(self, tmp_path):
+        """Each route should produce its own coverage row."""
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+            ],
+        )
+        preds = pd.DataFrame(
+            [
+                {
+                    "screen_name": "s1",
+                    "cluster_id": "c1",
+                    "gene_symbol": "gA",
+                    "route": "route_A",
+                    "replicate": 1,
+                    "run_id": "r1",
+                    "predicted_class": "E",
+                    "predicted_subclass": "",
+                    "pathway": "p",
+                    "pathway_confidence": "H",
+                },
+                {
+                    "screen_name": "s1",
+                    "cluster_id": "c1",
+                    "gene_symbol": "gA",
+                    "route": "route_B",
+                    "replicate": 1,
+                    "run_id": "r2",
+                    "predicted_class": "E",
+                    "predicted_subclass": "",
+                    "pathway": "p",
+                    "pathway_confidence": "H",
+                },
+            ]
+        )
+        result = compute_coverage(preds, clusters_path)
+        assert len(result) == 2
+        assert set(result["route"]) == {"route_A", "route_B"}
+
+
+# ===========================================================================
+# 3.8 compute_output_fragility
+# ===========================================================================
+
+
+class TestComputeOutputFragility:
+    """Tests derived from docstring:
+
+    Per-route diagnostic on the output_fragility cluster (jebel/0, 147 genes).
+    No expert annotations exist for this cluster, so it is not scored on accuracy
+    or abstention. Reports per-route coverage and pathway-consistency to surface
+    output-structure failures on a large coherent input.
+    """
+
+    def _make_preds(self, rows: list[dict]) -> pd.DataFrame:
+        screen, cid = OUTPUT_FRAGILITY_CLUSTER
+        base = {
+            "screen_name": screen,
+            "cluster_id": cid,
+            "gene_symbol": "gene1",
+            "route": "route_A",
+            "replicate": 1,
+            "run_id": "run1",
+            "predicted_class": "ESTABLISHED",
+            "predicted_subclass": "",
+            "pathway": "ribosome biogenesis",
+            "pathway_confidence": "High",
+        }
+        records = [{**base, **r} for r in rows]
+        return pd.DataFrame(records)
+
+    def test_returns_empty_when_cluster_absent(self, tmp_path):
+        """If the fragility cluster isn't in predictions, return empty."""
+        preds = pd.DataFrame(
+            [
+                {
+                    "screen_name": "other_screen",
+                    "cluster_id": "99",
+                    "gene_symbol": "gA",
+                    "route": "route_A",
+                    "replicate": 1,
+                    "run_id": "r1",
+                    "predicted_class": "E",
+                    "predicted_subclass": "",
+                    "pathway": "p",
+                    "pathway_confidence": "H",
+                }
+            ]
+        )
+        result = compute_output_fragility(preds, tmp_path / "clusters.csv")
+        assert result.empty
+
+    def test_coverage_computed_against_clusters_file(self, tmp_path):
+        """Coverage should be predictions / expected genes from the clusters CSV."""
+        screen, cid = OUTPUT_FRAGILITY_CLUSTER
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [{"screen_name": screen, "cluster_id": cid, "gene_symbol": f"g{i}"} for i in range(10)],
+        )
+        preds = self._make_preds([{"gene_symbol": f"g{i}", "replicate": 1} for i in range(5)])
+        result = compute_output_fragility(preds, clusters_path)
+        assert len(result) == 1
+        assert result.iloc[0]["coverage_rate"] == 0.5
+        assert result.iloc[0]["n_expected_per_cell"] == 10
+
+    def test_pathway_consistency_ribosome(self, tmp_path):
+        """Pathways mentioning 'ribosom' or 'translation' should count as consistent."""
+        screen, cid = OUTPUT_FRAGILITY_CLUSTER
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [{"screen_name": screen, "cluster_id": cid, "gene_symbol": f"g{i}"} for i in range(4)],
+        )
+        preds = self._make_preds(
+            [
+                {"gene_symbol": "g0", "replicate": 1, "pathway": "Ribosome biogenesis"},
+                {"gene_symbol": "g1", "replicate": 2, "pathway": "mRNA translation"},
+                {"gene_symbol": "g2", "replicate": 3, "pathway": "cell cycle"},
+            ]
+        )
+        result = compute_output_fragility(preds, clusters_path)
+        assert result.iloc[0]["pathway_consistency_rate"] == pytest.approx(2 / 3, abs=0.01)
+
+    def test_pathway_consistency_all_unrelated(self, tmp_path):
+        """If no replicate mentions ribosome/translation, consistency should be 0."""
+        screen, cid = OUTPUT_FRAGILITY_CLUSTER
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": screen, "cluster_id": cid, "gene_symbol": "g0"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"gene_symbol": "g0", "replicate": 1, "pathway": "cell cycle regulation"},
+                {"gene_symbol": "g0", "replicate": 2, "pathway": "DNA damage response"},
+            ]
+        )
+        result = compute_output_fragility(preds, clusters_path)
+        assert result.iloc[0]["pathway_consistency_rate"] == 0.0
+
+    def test_multiple_routes(self, tmp_path):
+        """Each route should get a separate diagnostic row."""
+        screen, cid = OUTPUT_FRAGILITY_CLUSTER
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": screen, "cluster_id": cid, "gene_symbol": "g0"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"gene_symbol": "g0", "replicate": 1, "route": "route_A", "pathway": "ribosome"},
+                {"gene_symbol": "g0", "replicate": 1, "route": "route_B", "pathway": "cell cycle"},
+            ]
+        )
+        result = compute_output_fragility(preds, clusters_path)
+        assert len(result) == 2
+        route_a = result[result["route"] == "route_A"].iloc[0]
+        route_b = result[result["route"] == "route_B"].iloc[0]
+        assert route_a["pathway_consistency_rate"] == 1.0
+        assert route_b["pathway_consistency_rate"] == 0.0
+
+
+# ===========================================================================
+# 3.9 aggregate_per_route -- pathway_semantic_match_loose_rate
+# ===========================================================================
+
+
+class TestAggregatePerRouteLooseSemanticMatch:
+    """Tests derived from docstring of compute_semantic_scores + aggregate_per_route:
+
+    compute_semantic_scores adds pathway_semantic_match_loose: score >= 0.60 (hardcoded).
+    aggregate_per_route should expose pathway_semantic_match_loose_rate when the
+    column is present.
+    """
+
+    def _make_joined(self, rows: list[dict]) -> pd.DataFrame:
+        base = {
+            "screen_name": "screen1",
+            "cluster_id": "c1",
+            "gene_symbol": "geneA",
+            "route": "route_1",
+            "replicate": "rep1",
+            "run_id": "run1",
+            "predicted_class": "ESTABLISHED",
+            "predicted_subclass": "",
+            "pathway": "some pathway",
+            "pathway_confidence": "High",
+            "benchmark_case_type": "type_A",
+            # Match metrics expected by _route_metric_cols
+            "classification_match_consensus": True,
+            "classification_match_either": True,
+            "pathway_match_substring": True,
+            "pathway_match_loose": True,
+            "confidence_consensus_match": True,
+            "subclass_match": True,
+            # Semantic columns
+            "pathway_semantic_score": 0.85,
+            "pathway_semantic_match": True,
+            "pathway_semantic_match_loose": True,
+        }
+        for r in REVIEWERS:
+            base[f"classification_match_{r}"] = True
+        records = [{**base, **r} for r in rows]
+        return pd.DataFrame(records)
+
+    def test_loose_rate_included_when_column_present(self):
+        """When pathway_semantic_match_loose column exists, the rate should appear."""
+        df = self._make_joined(
+            [
+                {"gene_symbol": "g1", "pathway_semantic_match_loose": True},
+                {"gene_symbol": "g2", "pathway_semantic_match_loose": False},
+            ]
+        )
+        result = aggregate_per_route(df, REVIEWERS)
+        assert "pathway_semantic_match_loose_rate" in result.columns
+        assert result.iloc[0]["pathway_semantic_match_loose_rate"] == 0.5
+
+    def test_loose_rate_absent_when_column_missing(self):
+        """When pathway_semantic_match_loose column is absent, no loose_rate column."""
+        df = self._make_joined(
+            [
+                {"gene_symbol": "g1"},
+                {"gene_symbol": "g2"},
+            ]
+        )
+        df = df.drop(columns=["pathway_semantic_match_loose"])
+        result = aggregate_per_route(df, REVIEWERS)
+        assert "pathway_semantic_match_loose_rate" not in result.columns
+
+    def test_loose_rate_is_mean_of_boolean_column(self):
+        """Rate should be the arithmetic mean of the boolean loose-match column."""
+        df = self._make_joined(
+            [{"gene_symbol": f"g{i}", "pathway_semantic_match_loose": (i < 3)} for i in range(5)]
+        )
+        result = aggregate_per_route(df, REVIEWERS)
+        assert result.iloc[0]["pathway_semantic_match_loose_rate"] == 0.6
+
+
+# ===========================================================================
+# 3.10 Multi-replicate stress tests
+# ===========================================================================
+
+
+class TestCoverageMultiReplicate:
+    """Stress tests for compute_coverage with multiple replicates.
+
+    The docstring says "Per-route coverage on unique gene symbols." The
+    implementation counts unique genes per (screen, cluster, replicate) cell,
+    then sums across all cells vs expected*n_replicates. These tests verify
+    that multi-replicate scenarios produce coherent numbers.
+    """
+
+    def _make_preds(self, rows: list[dict]) -> pd.DataFrame:
+        base = {
+            "screen_name": "s1",
+            "cluster_id": "c1",
+            "gene_symbol": "gene1",
+            "route": "route_A",
+            "replicate": 1,
+            "run_id": "run1",
+            "predicted_class": "ESTABLISHED",
+            "predicted_subclass": "",
+            "pathway": "some pathway",
+            "pathway_confidence": "High",
+        }
+        records = [{**base, **r} for r in rows]
+        return pd.DataFrame(records)
+
+    def test_full_coverage_across_two_replicates(self, tmp_path):
+        """All genes predicted in both replicates -> 1.0 coverage."""
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gB"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"gene_symbol": "gA", "replicate": 1},
+                {"gene_symbol": "gB", "replicate": 1},
+                {"gene_symbol": "gA", "replicate": 2},
+                {"gene_symbol": "gB", "replicate": 2},
+            ]
+        )
+        result = compute_coverage(preds, clusters_path)
+        assert result.iloc[0]["coverage_rate_all"] == 1.0
+
+    def test_one_replicate_missing_all_genes(self, tmp_path):
+        """If predictions only contain rep 1, the function can only see rep 1.
+        Coverage is computed over replicates present in the data, not over some
+        externally-known replicate count."""
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gB"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"gene_symbol": "gA", "replicate": 1},
+                {"gene_symbol": "gB", "replicate": 1},
+                # no replicate 2 in predictions at all
+            ]
+        )
+        result = compute_coverage(preds, clusters_path)
+        # Only 1 replicate visible -> grid is just [1], coverage = 2/2 = 1.0
+        assert result.iloc[0]["coverage_rate_all"] == 1.0
+        assert result.iloc[0]["n_replicates"] == 1
+
+    def test_partial_genes_each_replicate(self, tmp_path):
+        """Different genes predicted in each replicate."""
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gB"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gC"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gD"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"gene_symbol": "gA", "replicate": 1},
+                {"gene_symbol": "gB", "replicate": 1},
+                # rep 2 predicts different genes
+                {"gene_symbol": "gC", "replicate": 2},
+            ]
+        )
+        result = compute_coverage(preds, clusters_path)
+        # expected: (2 + 1) / (4 + 4) = 3/8 = 0.375
+        assert result.iloc[0]["coverage_rate_all"] == 0.375
+
+    def test_duplicate_gene_in_same_replicate_counted_once(self, tmp_path):
+        """Same gene predicted twice in one replicate should count as 1 unique."""
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gB"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"gene_symbol": "gA", "replicate": 1},
+                {"gene_symbol": "gA", "replicate": 1},  # duplicate
+                {"gene_symbol": "gB", "replicate": 1},
+            ]
+        )
+        result = compute_coverage(preds, clusters_path)
+        # 2 unique genes / 2 expected = 1.0 (not 1.5)
+        assert result.iloc[0]["coverage_rate_all"] == 1.0
+
+    def test_non_contiguous_replicate_ids(self, tmp_path):
+        """Replicates numbered [1, 3] (gap at 2) -- predictions from rep 3 must not be dropped."""
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [
+                {"screen_name": "s1", "cluster_id": "c1", "gene_symbol": "gA"},
+            ],
+        )
+        preds = self._make_preds(
+            [
+                {"gene_symbol": "gA", "replicate": 1},
+                {"gene_symbol": "gA", "replicate": 3},
+            ]
+        )
+        result = compute_coverage(preds, clusters_path)
+        assert result.iloc[0]["n_replicates"] == 2
+        # Both replicates predicted gA, so coverage should be 1.0 (not 0.5).
+        assert result.iloc[0]["coverage_rate_all"] == 1.0
+
+
+class TestOutputFragilityMultiGenePerReplicate:
+    """Stress test: multiple genes per replicate and pathway consistency."""
+
+    def test_consistency_uses_first_row_per_replicate(self, tmp_path):
+        """With multiple genes in one replicate, drop_duplicates('replicate') keeps
+        only the first row's pathway. This test documents that behavior."""
+        screen, cid = OUTPUT_FRAGILITY_CLUSTER
+        clusters_path = _clusters_csv(
+            tmp_path,
+            [{"screen_name": screen, "cluster_id": cid, "gene_symbol": f"g{i}"} for i in range(10)],
+        )
+        preds = pd.DataFrame(
+            [
+                {
+                    "screen_name": screen,
+                    "cluster_id": cid,
+                    "gene_symbol": "g0",
+                    "route": "route_A",
+                    "replicate": 1,
+                    "run_id": "r1",
+                    "predicted_class": "E",
+                    "predicted_subclass": "",
+                    "pathway": "ribosome biogenesis",
+                    "pathway_confidence": "H",
+                },
+                {
+                    "screen_name": screen,
+                    "cluster_id": cid,
+                    "gene_symbol": "g1",
+                    "route": "route_A",
+                    "replicate": 1,
+                    "run_id": "r1",
+                    "predicted_class": "E",
+                    "predicted_subclass": "",
+                    "pathway": "cell cycle",
+                    "pathway_confidence": "H",
+                },
+                {
+                    "screen_name": screen,
+                    "cluster_id": cid,
+                    "gene_symbol": "g2",
+                    "route": "route_A",
+                    "replicate": 2,
+                    "run_id": "r2",
+                    "predicted_class": "E",
+                    "predicted_subclass": "",
+                    "pathway": "DNA damage",
+                    "pathway_confidence": "H",
+                },
+            ]
+        )
+        result = compute_output_fragility(preds, clusters_path)
+        # Rep 1 has "ribosome biogenesis" as first row -> consistent
+        # Rep 2 has "DNA damage" -> not consistent
+        # Consistency = 1/2 = 0.5
+        # NOTE: rep 1 also has "cell cycle" for g1, but that's ignored because
+        # drop_duplicates keeps only the first row. This is questionable behavior
+        # (the cluster-level pathway should be the same for all genes in a
+        # replicate, but if it isn't, only the first is checked).
+        assert result.iloc[0]["pathway_consistency_rate"] == 0.5
