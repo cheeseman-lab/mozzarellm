@@ -196,19 +196,28 @@ def make_cluster_analysis_system_prompt(
     # =========================================================================
     elif mode == "standard":
         order = CANONICAL_ZERO_SHOT_MCP_ORDER if mcp else CANONICAL_ZERO_SHOT_ORDER
-        prompt = assemble_from_component_order(order, SCREEN_CONTEXT_TEXT, cot_mode=False)
+        prompt = assemble_from_component_order(
+            order, SCREEN_CONTEXT_TEXT, cot_mode=False, component_overrides=component_overrides
+        )
     elif mode == "cot":
         if override_CoT_steps:
             prompt = "\n\n".join(f"STEP {i + 1} - {s}" for i, s in enumerate(override_CoT_steps))
         else:
             order = CANONICAL_COT_MCP_ORDER if mcp else CANONICAL_COT_ORDER
-            prompt = assemble_from_component_order(order, SCREEN_CONTEXT_TEXT, cot_mode=True)
+            prompt = assemble_from_component_order(
+                order, SCREEN_CONTEXT_TEXT, cot_mode=True, component_overrides=component_overrides
+            )
     else:  # stepwise — system prompt holds TASK + screen context only; runner walks the rest as user turns
         if override_CoT_steps:
             prompt = "\n\n".join(override_CoT_steps[:2])
         else:
             order = CANONICAL_COT_MCP_ORDER if mcp else CANONICAL_COT_ORDER
-            prompt = assemble_from_component_order(order[:2], SCREEN_CONTEXT_TEXT, cot_mode=False)
+            prompt = assemble_from_component_order(
+                order[:2],
+                SCREEN_CONTEXT_TEXT,
+                cot_mode=False,
+                component_overrides=component_overrides,
+            )
     # Save system prompt to file if output_dir is provided
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)

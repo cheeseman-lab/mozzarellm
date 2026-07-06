@@ -37,11 +37,11 @@ order_benchmark:
     - 3b
 
   variants:
-    - canonical
-    - late_screen_context
-    - prioritization_before_classification
-    - early_output_format
-    - delayed_task_anchor
+    - O
+    - O1
+    - O2
+    - O3
+    - O4
 
 screens:
   include: 

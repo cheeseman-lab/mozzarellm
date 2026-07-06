@@ -36,12 +36,11 @@ order_benchmark:
   enabled: true
   base_routes:
     - 3b #adjust as needed
-  variants:
-    - canonical
-    - late_screen_context
-    - prioritization_before_classification
-    - early_output_format
-    - delayed_task_anchor
+  # Selector options:
+  #   variants: all
+  #   variants: O1-O4
+  #   variants: [O, O1, O3]
+  variants: all
 
 screens:
   include: all

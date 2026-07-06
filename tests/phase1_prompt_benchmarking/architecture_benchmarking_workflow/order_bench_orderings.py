@@ -11,6 +11,7 @@ Hypotheses this tests (more detail in MLLM Benchmarking Plan_2_10_26.docx --- se
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -44,13 +45,13 @@ class OrderVariant:
 
 
 ORDER_VARIANTS: dict[str, OrderVariant] = {
-    "canonical": OrderVariant(
+    "O": OrderVariant(
         name="canonical",
         hypothesis=None,
         description="Dependency-respecting baseline order.",
         perturbation_type="canonical",
     ),
-    "late_screen_context": OrderVariant(
+    "O1": OrderVariant(
         name="late_screen_context",
         hypothesis="H3",
         description=(
@@ -59,7 +60,7 @@ ORDER_VARIANTS: dict[str, OrderVariant] = {
         ),
         perturbation_type="late_screen_context",
     ),
-    "prioritization_before_classification": OrderVariant(
+    "O2": OrderVariant(
         name="prioritization_before_classification",
         hypothesis="H2",
         description=(
@@ -68,7 +69,7 @@ ORDER_VARIANTS: dict[str, OrderVariant] = {
         ),
         perturbation_type="prioritization_before_classification",
     ),
-    "early_output_format": OrderVariant(
+    "O3": OrderVariant(
         name="early_output_format",
         hypothesis="H4",
         description=(
@@ -77,7 +78,7 @@ ORDER_VARIANTS: dict[str, OrderVariant] = {
         ),
         perturbation_type="early_output_format",
     ),
-    "delayed_task_anchor": OrderVariant(
+    "O4": OrderVariant(
         name="delayed_task_anchor",
         hypothesis="H1",
         description=(
@@ -121,9 +122,9 @@ def _single_call_spec(component_order: tuple[str, ...]) -> dict:
 # fmt: off
 _ORDER_SPECS: dict[str, dict[tuple[str, bool], dict]] = {
     # ------------------------------------------------------------------
-    # CANONICAL
+    # O: CANONICAL
     # ------------------------------------------------------------------
-    "canonical": {
+    "O": {
         ("standard", False): _single_call_spec(("CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O")),
         ("standard", True):  _single_call_spec(("CAT", "SC", "GCR", "NPR", "UPR", "PCC", "LIT", "O")),
         ("cot", False):      _single_call_spec(("CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cO")),
@@ -141,9 +142,9 @@ _ORDER_SPECS: dict[str, dict[tuple[str, bool], dict]] = {
     },
 
     # ------------------------------------------------------------------
-    # PERTURBATION A: Late Screen Context  (H3)
+    # O1: Late Screen Context  (H3)
     # ------------------------------------------------------------------
-    "late_screen_context": {
+    "O1": {
         ("standard", False): _single_call_spec(("CAT", "GCR", "NPR", "UPR", "PCC", "SC", "O")),
         ("standard", True):  _single_call_spec(("CAT", "GCR", "NPR", "UPR", "PCC", "LIT", "SC", "O")),
         ("cot", False):      _single_call_spec(("CAT", "cPH", "cGCR", "cPri", "cPSC", "SC", "cVer", "cO")),
@@ -161,9 +162,9 @@ _ORDER_SPECS: dict[str, dict[tuple[str, bool], dict]] = {
     },
 
     # ------------------------------------------------------------------
-    # PERTURBATION B: Prioritization Before Classification  (H2)
+    # O2: Prioritization Before Classification  (H2)
     # ------------------------------------------------------------------
-    "prioritization_before_classification": {
+    "O2": {
         ("standard", False): _single_call_spec(("CAT", "SC", "NPR", "UPR", "GCR", "PCC", "O")),
         ("standard", True):  _single_call_spec(("CAT", "SC", "NPR", "UPR", "GCR", "PCC", "LIT", "O")),
         ("cot", False):      _single_call_spec(("CAT", "SC", "cPH", "cPri", "cGCR", "cPSC", "cVer", "cO")),
@@ -181,9 +182,9 @@ _ORDER_SPECS: dict[str, dict[tuple[str, bool], dict]] = {
     },
 
     # ------------------------------------------------------------------
-    # PERTURBATION C: Early Output Format  (H4)
+    # O3: Early Output Format  (H4)
     # ------------------------------------------------------------------
-    "early_output_format": {
+    "O3": {
         ("standard", False): _single_call_spec(("CAT", "O", "SC", "GCR", "NPR", "UPR", "PCC")),
         ("standard", True):  _single_call_spec(("CAT", "O", "SC", "GCR", "NPR", "UPR", "PCC", "LIT")),
         ("cot", False):      _single_call_spec(("CAT", "cO", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer")),
@@ -201,9 +202,9 @@ _ORDER_SPECS: dict[str, dict[tuple[str, bool], dict]] = {
     },
 
     # ------------------------------------------------------------------
-    # PERTURBATION D: Delayed Task Anchor  (H1)
+    # O4: Delayed Task Anchor  (H1)
     # ------------------------------------------------------------------
-    "delayed_task_anchor": {
+    "O4": {
         ("standard", False): _single_call_spec(("SC", "GCR", "NPR", "UPR", "PCC", "CAT", "O")),
         ("standard", True):  _single_call_spec(("SC", "GCR", "NPR", "UPR", "PCC", "LIT", "CAT", "O")),
         ("cot", False):      _single_call_spec(("SC", "cPH", "cGCR", "cPri", "cPSC", "CAT", "cVer", "cO")),
@@ -242,32 +243,104 @@ def validate_order_variant_names(names: list[str]) -> list[str]:
 
 
 # ============================================================================
+# Generic variant selector (shared with wording_bench_targets)
+# ============================================================================
+
+
+def resolve_variant_ids(
+    selector: str | list[str],
+    *,
+    prefix: str,
+    registry: dict[str, object],
+    canonical_key: str,
+    label: str = "variant",
+) -> list[str]:
+    """Expand a variant selector into an ordered, de-duplicated list of ids.
+
+    Supports:
+        - ``"all"``             -> every key in *registry* (insertion order)
+        - ``"{prefix}1-{prefix}4"`` -> inclusive numeric range
+        - ``["{prefix}1", "{prefix}3"]`` -> explicit list
+        - ``"{prefix}2"``       -> single id
+
+    *canonical_key* is always included first.
+    """
+    range_re = re.compile(rf"^{re.escape(prefix)}(\d+)-{re.escape(prefix)}(\d+)$")
+
+    if selector == "all":
+        ids = list(registry.keys())
+    elif isinstance(selector, str):
+        m = range_re.match(selector.strip())
+        if m:
+            lo, hi = int(m.group(1)), int(m.group(2))
+            if hi < lo:
+                raise ValueError(f"Invalid {label} range (hi < lo): {selector!r}")
+            ids = [f"{prefix}{i}" for i in range(lo, hi + 1)]
+        else:
+            ids = [selector.strip()]
+    else:
+        ids = [str(t).strip() for t in selector]
+
+    unknown = [t for t in ids if t not in registry]
+    if unknown:
+        raise ValueError(f"Unknown {label} id(s): {unknown}. Known: {sorted(registry)}")
+
+    ordered = [canonical_key] + [t for t in ids if t != canonical_key]
+    seen: set[str] = set()
+    result: list[str] = []
+    for t in ordered:
+        if t not in seen:
+            seen.add(t)
+            result.append(t)
+    return result
+
+
+def resolve_order_variant_ids(selector: str | list[str]) -> list[str]:
+    """Expand an order-variant selector into a de-duplicated list of O-keys.
+
+    Always includes ``"O"`` (canonical) first.  See :func:`resolve_variant_ids`
+    for supported selector formats.
+    """
+    return resolve_variant_ids(
+        selector,
+        prefix="O",
+        registry=ORDER_VARIANTS,
+        canonical_key="O",
+        label="order variant",
+    )
+
+
+# ============================================================================
 # Apply variant to a Route
 # ============================================================================
 
 
-def apply_order_variant(route: Route, variant_name: str) -> Route:
+def apply_order_variant(route: Route, variant_key: str) -> Route:
     """Create a new Route with the specified order variant applied.
+
+    Args:
+        route: Base Route to apply the variant to.
+        variant_key: Registry key (e.g. "O", "O1", "O2", "O3", "O4").
 
     Returns a frozen Route whose ``component_order``, ``system_components``,
     ``user_turns``, and order-metadata fields are set to the variant's spec.
     The ``mode``, ``mcp``, and ``delivery`` are preserved from the base route.
     """
-    if variant_name not in ORDER_VARIANTS:
+    if variant_key not in ORDER_VARIANTS:
         raise ValueError(
-            f"Unknown order variant: {variant_name!r}. "
+            f"Unknown order variant: {variant_key!r}. "
             f"Valid variants: {sorted(ORDER_VARIANTS.keys())}"
         )
 
-    variant = ORDER_VARIANTS[variant_name]
+    variant = ORDER_VARIANTS[variant_key]
     spec_key = (route.mode, route.mcp)
 
-    if spec_key not in _ORDER_SPECS[variant_name]:
+    if spec_key not in _ORDER_SPECS[variant_key]:
         raise ValueError(
-            f"No order spec for variant={variant_name!r}, mode={route.mode!r}, mcp={route.mcp}"
+            f"No order spec for variant={variant_key!r}, mode={route.mode!r}, mcp={route.mcp}"
         )
 
-    spec = _ORDER_SPECS[variant_name][spec_key]
+    spec = _ORDER_SPECS[variant_key][spec_key]
     new_component_order = spec["component_order"]
 
     # Build stepwise fields if present
@@ -282,33 +355,37 @@ def apply_order_variant(route: Route, variant_name: str) -> Route:
         )
 
     return Route(
-        name=f"{route.name}_order_{variant_name}",
+        name=f"{route.name}_{variant_key}_{variant.name}",
         mode=route.mode,
         mcp=route.mcp,
         delivery=route.delivery,
         component_order=new_component_order,
         system_components=new_system_components,
         user_turns=new_user_turns,
-        description=f"{route.description} [order variant: {variant_name}]",
+        description=f"{route.description} [order variant: {variant_key} {variant.name}]",
         base_route=route.name,
-        order_variant=variant_name,
+        order_variant=variant.name,
         order_hypothesis=variant.hypothesis or "",
     )
 
 
 def build_order_benchmark_routes(
     base_routes: list[Route],
-    order_variants: list[str],
+    order_variants: str | list[str],
 ) -> list[Route]:
-    """Build all order-variant routes from the given base routes and variant names.
+    """Build all order-variant routes from the given base routes and variant selector.
+
+    *order_variants* supports the same selector syntax as wording targets:
+    ``"all"``, ``"O1-O3"``, ``["O", "O1"]``, or a single ``"O2"``.
+    Canonical ``"O"`` is always included.
 
     Returns a flat list of Route objects: one per (base_route, variant) pair.
     """
-    validate_order_variant_names(order_variants)
+    variant_keys = resolve_order_variant_ids(order_variants)
     routes: list[Route] = []
     for base in base_routes:
-        for variant_name in order_variants:
-            routes.append(apply_order_variant(base, variant_name))
+        for key in variant_keys:
+            routes.append(apply_order_variant(base, key))
     return routes
 
 

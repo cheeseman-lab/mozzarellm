@@ -17,8 +17,9 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from typing import Any
 from pathlib import Path
 
 # Ensure repo root is on sys.path for imports
@@ -53,6 +54,7 @@ from .bench_dry_run import (
 from .bench_metricfns import compute_all_metrics
 from .bench_reportgen import generate_report
 from .order_bench_orderings import build_order_benchmark_routes, compose_stepwise_turns_from_route
+from .wording_bench_targets import build_wording_override_runs
 
 # =============================================================================
 # HELPERS
@@ -61,6 +63,20 @@ from .order_bench_orderings import build_order_benchmark_routes, compose_stepwis
 # Serializes shared-file writes (JSONL appends, cached system-prompt .txt) when
 # runs execute concurrently in the thread pool.
 _IO_LOCK = threading.Lock()
+
+
+@dataclass(frozen=True)
+class RunSpec:
+    """Phase-agnostic work item for the unified benchmark loop.
+
+    Both Phase 1+2 (architecture/order) and Phase 3 (wording) build a list of
+    RunSpecs, then hand them to ``_run_benchmark_loop``.
+    """
+
+    route: Route
+    condition_name: str
+    component_overrides: dict[str, str] = field(default_factory=dict)
+    extra_record_fields: dict[str, Any] = field(default_factory=dict)
 
 
 def _sha256(text: str) -> str:
@@ -140,10 +156,19 @@ def construct_prompts(
     bundle_path: Path,
     output_dir: Path,
     overwrite_outputs: bool = False,
+    component_overrides: dict[str, str] | None = None,
+    condition_name: str | None = None,
 ) -> dict:
     """Construct system and user prompts for a given route+cluster.
 
     Returns a dict with keys: system_prompt, user_prompt, stepwise_turns (or None).
+
+    Args:
+        component_overrides: Phase 3 wording overrides — {component_key: text}
+            passed through to ``make_cluster_analysis_system_prompt``.
+        condition_name: Stable label for cached prompt filenames. For wording runs
+            this is the per-condition run-route name so different wording conditions
+            on the same base route do not collide in the prompt cache.
     """
     # Build a pseudo cluster_to_bundle_path_map for the existing utility
     cluster_to_bundle_map = {str(cluster_id): bundle_path}
@@ -152,6 +177,8 @@ def construct_prompts(
     # path. Phase 1 routes (order_variant == "") use the original mode-based
     # default assembly to preserve backward compatibility exactly.
     is_order_variant = bool(route.order_variant)
+    # Label used for the on-disk prompt filename; defaults to the route name.
+    prompt_label = condition_name or route.name
 
     # For 3a/3b routes: save system prompt once with stable filename, reuse on subsequent calls.
     # For 3c (stepwise) routes: build system prompt in memory only
@@ -166,6 +193,7 @@ def construct_prompts(
                 mode="standard",
                 mcp=route.mcp,
                 component_order=list(route.system_components),
+                component_overrides=component_overrides,
                 output_dir=None,
             )
         else:
@@ -174,12 +202,14 @@ def construct_prompts(
                 screen_context_path=screen_context_path,
                 mode=route.mode,
                 mcp=route.mcp,
+                component_overrides=component_overrides,
                 output_dir=None,
             )
     else:
         # screen_name is part of the cache key: the system prompt embeds
-        # SCREEN_CONTEXT, so a route's prompt differs per screen.
-        prompt_filename = f"system_prompt_{route.name}_{route.mode}_{screen_name}"
+        # SCREEN_CONTEXT, so a route's prompt differs per screen. prompt_label
+        # distinguishes wording conditions on the same base route.
+        prompt_filename = f"system_prompt_{prompt_label}_{route.mode}_{screen_name}"
         prompt_file = output_dir / "prompts_used" / f"{prompt_filename}.txt"
         with _IO_LOCK:
             if prompt_file.exists() and not is_order_variant:
@@ -191,6 +221,7 @@ def construct_prompts(
                     mode=route.mode,
                     mcp=route.mcp,
                     component_order=(list(route.component_order) if is_order_variant else None),
+                    component_overrides=component_overrides,
                     output_dir=output_dir / "prompts_used",
                     prompt_filename=prompt_filename,
                 )
@@ -293,10 +324,25 @@ def execute_single_run(
     config: BenchmarkConfig,
     client,
     output_dir: Path,
+    component_overrides: dict[str, str] | None = None,
+    condition_name: str | None = None,
+    extra_record_fields: dict | None = None,
 ) -> dict:
-    """Execute a single benchmark run and return the full record."""
+    """Execute a single benchmark run and return the full record.
+
+    Args:
+        component_overrides: Phase 3 wording overrides passed to prompt construction.
+        condition_name: Per-condition label (e.g. wording run-route name). Used for
+            run_id, the record's "route" field, and prompt-cache filenames so that
+            distinct conditions on the same base route do not collide.
+        extra_record_fields: Extra key/values merged into the output record (e.g.
+            wording metadata).
+    """
     t_run_start = time.perf_counter()
-    run_id = _build_run_id(config.experiment_id, route.name, screen_name, cluster_id, replicate)
+    record_route_name = condition_name or route.name
+    run_id = _build_run_id(
+        config.experiment_id, record_route_name, screen_name, cluster_id, replicate
+    )
 
     # --- Prompt construction ---
     t0 = time.perf_counter()
@@ -308,6 +354,8 @@ def execute_single_run(
         bundle_path=bundle_path,
         output_dir=output_dir,
         overwrite_outputs=config.run.overwrite_outputs,
+        component_overrides=component_overrides,
+        condition_name=condition_name,
     )
     system_prompt = prompts["system_prompt"]
     user_prompt = prompts["user_prompt"]
@@ -381,7 +429,7 @@ def execute_single_run(
     record = {
         "run_id": run_id,
         "experiment_id": config.experiment_id,
-        "route": route.name,
+        "route": record_route_name,
         "mode": route.mode,
         "mcp": route.mcp,
         "delivery": route.delivery,
@@ -420,6 +468,10 @@ def execute_single_run(
         ),
     }
 
+    # Merge any caller-provided extra fields (e.g. Phase 3 wording metadata).
+    if extra_record_fields:
+        record.update(extra_record_fields)
+
     # --- IO writes ---
     t0 = time.perf_counter()
     _save_run_artifacts(
@@ -452,12 +504,14 @@ def _save_run_artifacts(
 ) -> None:
     """Persist all per-run artifacts to JSONL files and trace."""
     run_id = record["run_id"]
+    # Condition label (base route for Phase 1/2; wording run-route name for Phase 3).
+    route_label = record.get("route", route.name)
 
     # Prompts
     if config.run.save_prompts:
         prompt_record = {
             "run_id": run_id,
-            "route": route.name,
+            "route": route_label,
             "screen_name": record["screen_name"],
             "cluster_id": record["cluster_id"],
             "replicate": record["replicate"],
@@ -488,7 +542,7 @@ def _save_run_artifacts(
     if config.run.save_raw_outputs:
         raw_record = {
             "run_id": run_id,
-            "route": route.name,
+            "route": route_label,
             "raw_output": raw_outputs.get("response_text", ""),
             "tool_calls": raw_outputs.get("tool_calls", []),
             "steps": raw_outputs.get("steps", []),
@@ -500,13 +554,13 @@ def _save_run_artifacts(
     if config.run.save_parsed_outputs:
         parsed_record = {
             "run_id": run_id,
-            "route": route.name,
+            "route": route_label,
             "parsed_output": parsed,
         }
         _append_jsonl(output_dir / "parsed_outputs.jsonl", parsed_record)
 
     # Metrics
-    metrics_record = {"run_id": run_id, "route": route.name, **record["metrics"]}
+    metrics_record = {"run_id": run_id, "route": route_label, **record["metrics"]}
     _append_jsonl(output_dir / "metrics.jsonl", metrics_record)
 
     # Trace
@@ -515,7 +569,7 @@ def _save_run_artifacts(
         trace_dir.mkdir(parents=True, exist_ok=True)
         trace_data = {
             "run_id": run_id,
-            "route": route.name,
+            "route": route_label,
             "mode": route.mode,
             "mcp": route.mcp,
             "raw_response": raw_outputs.get("response_text", ""),
@@ -541,26 +595,58 @@ def _save_run_artifacts(
 # =============================================================================
 
 
-def run_benchmark(config: BenchmarkConfig) -> list[dict]:
-    """Main benchmark loop. Returns list of all run records."""
-    output_dir = config.experiment_output_dir
+def _maybe_truncate_outputs(output_dir: Path, config: BenchmarkConfig) -> None:
+    """Truncate JSONL files and clear trace/prompt caches if overwrite_outputs is enabled.
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    When the resolved output path is NOT under ``_workflow_testing``, prompts
+    for interactive confirmation before truncating non-empty files to prevent
+    accidental data loss on production experiment directories.
+    """
+    if not config.run.overwrite_outputs:
+        return
 
-    # When overwrite_outputs is enabled, truncate JSONL files so they start
-    # fresh instead of appending. Prompt .txt and trace .json files already
-    # use stable names and will simply be overwritten in place.
-    if config.run.overwrite_outputs:
-        for jsonl_file in output_dir.glob("*.jsonl"):
-            jsonl_file.write_text("", encoding="utf-8")
-        print(f"  [overwrite_outputs] Truncated JSONL files in {output_dir}")
+    is_testing_path = "_workflow_testing" in str(output_dir)
 
-    # Save config snapshot
-    config_snapshot = {
+    if not is_testing_path:
+        existing = list(output_dir.glob("*.jsonl"))
+        non_empty = [f for f in existing if f.stat().st_size > 0]
+        if non_empty:
+            print(
+                f"\n  [overwrite_outputs] WARNING: about to truncate "
+                f"{len(non_empty)} non-empty JSONL file(s) in:\n"
+                f"    {output_dir}\n"
+                f"  This path is NOT under _workflow_testing."
+            )
+            try:
+                answer = input("  Proceed? [y/N] ").strip().lower()
+            except EOFError:
+                answer = ""
+            if answer != "y":
+                print("  Aborted.")
+                raise SystemExit(1)
+
+    for jsonl_file in output_dir.glob("*.jsonl"):
+        jsonl_file.write_text("", encoding="utf-8")
+
+    traces_dir = output_dir / "traces"
+    if traces_dir.is_dir():
+        for trace_file in traces_dir.glob("*.json"):
+            trace_file.unlink()
+
+    prompts_dir = output_dir / "prompts_used"
+    if prompts_dir.is_dir():
+        for prompt_file in prompts_dir.glob("*.txt"):
+            prompt_file.unlink()
+
+    print(f"  [overwrite_outputs] Truncated JSONL files in {output_dir}")
+
+
+def _build_config_snapshot(config: BenchmarkConfig, **phase_fields: Any) -> dict:
+    """Build serialisable config snapshot, merging in phase-specific keys."""
+    snapshot: dict[str, Any] = {
         "experiment_id": config.experiment_id,
         "model": asdict(config.model),
         "run": asdict(config.run),
-        "routes_include": config.routes_include,
         "screens_include": config.screens_include,
         "clusters_include": (
             config.clusters_include
@@ -570,9 +656,30 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
         "mcp": asdict(config.mcp),
         "evaluation": asdict(config.evaluation),
         "timing": asdict(config.timing),
-        "order_benchmark": asdict(config.order_benchmark),
         "paths": {k: str(v) for k, v in asdict(config.paths).items()},
     }
+    snapshot.update(phase_fields)
+    return snapshot
+
+
+def _run_benchmark_loop(
+    config: BenchmarkConfig,
+    run_specs: list[RunSpec],
+    config_snapshot: dict,
+    phase_label: str = "benchmark",
+    manifest_extra: dict[str, Any] | None = None,
+) -> list[dict]:
+    """Shared execution loop for all benchmark phases.
+
+    Handles output-dir setup, MCP preflight, API-key resolution,
+    path resolution with skip logging, threaded execution,
+    manifest writing, and report generation.
+    """
+    output_dir = config.experiment_output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    _maybe_truncate_outputs(output_dir, config)
+
     (output_dir / "config_snapshot.yaml").write_text(
         json.dumps(config_snapshot, indent=2, default=str), encoding="utf-8"
     )
@@ -583,25 +690,12 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
     cluster_pairs = _filter_clusters(clusters_df, config)
     print(f"  {len(cluster_pairs)} (screen, cluster) pairs after filtering.")
 
-    # Build routes
-    if config.order_benchmark.enabled:
-        base_routes = build_routes_from_config(config.order_benchmark.base_routes)
-        routes = build_order_benchmark_routes(
-            base_routes=base_routes,
-            order_variants=config.order_benchmark.variants,
-        )
-        print(
-            f"  [Phase 2] {len(routes)} order-variant routes from "
-            f"{len(base_routes)} base route(s): {[r.name for r in routes]}"
-        )
-    else:
-        routes = build_routes_from_config(config.routes_include)
-        print(f"  {len(routes)} routes: {[r.name for r in routes]}")
+    print(f"  {len(run_specs)} conditions: {[s.condition_name for s in run_specs]}")
 
     # MCP preflight
-    mcp_routes = [r for r in routes if r.mcp]
+    mcp_specs = [s for s in run_specs if s.route.mcp]
     mcp_available = True
-    if mcp_routes and config.mcp.preflight and not config.run.dry_run:
+    if mcp_specs and config.mcp.preflight and not config.run.dry_run:
         print("  MCP preflight check...", end=" ")
         available_servers = get_available_mcp_servers()
         if "pubmed" not in available_servers:
@@ -627,10 +721,10 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
         print(f"  Client: {type(probe).__name__} ({config.model.model_name})")
 
     # Build the flat work list, resolving paths and applying skips up front.
-    work_items: list[tuple] = []
-    for route in routes:
-        if route.mcp and not mcp_available and not config.run.dry_run:
-            print(f"  [SKIP] Route {route.name} -- MCP unavailable")
+    work_items: list[tuple[RunSpec, str, str, Path, Path, int]] = []
+    for spec in run_specs:
+        if spec.route.mcp and not mcp_available and not config.run.dry_run:
+            print(f"  [SKIP] {spec.condition_name} -- MCP unavailable")
             continue
         for screen_name, cluster_id in cluster_pairs:
             bundle_path = _resolve_bundle_path(
@@ -638,7 +732,8 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
             )
             if bundle_path is None:
                 print(
-                    f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- bundle not found"
+                    f"  [SKIP] {spec.condition_name}/{screen_name}/cluster_{cluster_id}"
+                    " -- bundle not found"
                 )
                 continue
             screen_context_path = _resolve_screen_context_path(
@@ -646,28 +741,31 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
             )
             if screen_context_path is None:
                 print(
-                    f"  [SKIP] {route.name}/{screen_name}/cluster_{cluster_id} -- screen context not found"
+                    f"  [SKIP] {spec.condition_name}/{screen_name}/cluster_{cluster_id}"
+                    " -- screen context not found"
                 )
                 continue
             for rep in range(1, config.run.num_replicates + 1):
                 work_items.append(
-                    (route, screen_name, cluster_id, bundle_path, screen_context_path, rep)
+                    (spec, screen_name, cluster_id, bundle_path, screen_context_path, rep)
                 )
 
     total_runs = len(work_items)
     max_workers = 1 if config.run.dry_run else max(1, config.run.max_workers)
-    print(f"\nStarting benchmark: {total_runs} total runs (max_workers={max_workers})")
+    print(f"\nStarting {phase_label}: {total_runs} total runs (max_workers={max_workers})")
     print(f"  Output: {output_dir}\n")
 
-    def _run_one(item: tuple) -> dict:
-        route, screen_name, cluster_id, bundle_path, screen_context_path, rep = item
+    def _run_one(
+        item: tuple[RunSpec, str, str, Path, Path, int],
+    ) -> dict:
+        spec, screen_name, cluster_id, bundle_path, screen_context_path, rep = item
         run_client = (
             None
             if config.run.dry_run
             else create_client(model=config.model.model_name, api_key=api_key)
         )
         return execute_single_run(
-            route=route,
+            route=spec.route,
             screen_name=screen_name,
             cluster_id=cluster_id,
             bundle_path=bundle_path,
@@ -676,16 +774,21 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
             config=config,
             client=run_client,
             output_dir=output_dir,
+            component_overrides=spec.component_overrides or None,
+            condition_name=spec.condition_name,
+            extra_record_fields=spec.extra_record_fields or None,
         )
 
-    all_records = []
+    all_records: list[dict] = []
     run_counter = 0
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(_run_one, item): item for item in work_items}
         for future in as_completed(futures):
-            route, screen_name, cluster_id, _, _, rep = futures[future]
+            spec, screen_name, cluster_id, _, _, rep = futures[future]
             run_counter += 1
-            run_id = _build_run_id(config.experiment_id, route.name, screen_name, cluster_id, rep)
+            run_id = _build_run_id(
+                config.experiment_id, spec.condition_name, screen_name, cluster_id, rep
+            )
             try:
                 record = future.result()
             except Exception as e:
@@ -699,17 +802,19 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
             all_records.append(record)
             if record.get("error"):
                 print(f"  [{run_counter}/{total_runs}] {run_id} ERROR: {record['error'][:80]}")
+            elif config.run.dry_run:
+                print(f"  [{run_counter}/{total_runs}] {run_id} OK (dry run)")
             else:
-                full_t = record.get("timing", {}).get("full_run_time_seconds", 0)
-                model_lat = record.get("timing", {}).get("model_latency_seconds", 0)
-                cost = record.get("estimated_cost_usd", 0) or 0
+                full_t = record["timing"]["full_run_time_seconds"]
+                model_lat = record["timing"]["model_latency_seconds"]
+                cost = record["estimated_cost_usd"]
                 print(
                     f"  [{run_counter}/{total_runs}] {run_id} "
                     f"OK (full={full_t:.1f}s, model={model_lat:.1f}s, ${cost:.4f})"
                 )
 
     # Save run manifest
-    manifest = {
+    manifest: dict[str, Any] = {
         "experiment_id": config.experiment_id,
         "timestamp": datetime.now().isoformat(),
         "total_runs": len(all_records),
@@ -718,6 +823,8 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
         "clusters_executed": list({(r["screen_name"], r["cluster_id"]) for r in all_records}),
         "errors": sum(1 for r in all_records if r.get("error")),
     }
+    if manifest_extra:
+        manifest.update(manifest_extra)
     (output_dir / "run_manifest.json").write_text(
         json.dumps(manifest, indent=2, default=str), encoding="utf-8"
     )
@@ -729,6 +836,87 @@ def run_benchmark(config: BenchmarkConfig) -> list[dict]:
     print(f"  Done. {len(all_records)} analysis runs completed, {manifest['errors']} errors.")
 
     return all_records
+
+
+# =============================================================================
+# UNIFIED ENTRY POINT
+# =============================================================================
+
+
+def run_benchmark(config: BenchmarkConfig) -> list[dict]:
+    """Single entry point for all benchmark phases.
+
+    Dispatches based on config: wording_benchmark.enabled selects Phase 3,
+    order_benchmark.enabled selects Phase 2, otherwise Phase 1.
+    """
+    manifest_extra: dict[str, Any] = {}
+
+    if getattr(config, "wording_benchmark", None) and config.wording_benchmark.enabled:
+        # Phase 3: wording
+        wcfg = config.wording_benchmark
+        wording_runs = build_wording_override_runs(
+            base_route_names=wcfg.base_routes,
+            target_selector=wcfg.targets,
+            default_source=wcfg.default_source,
+            force_source=wcfg.force_source,
+        )
+        run_specs = [
+            RunSpec(
+                route=wrun.base_route,
+                condition_name=wrun.run_route_name,
+                component_overrides=wrun.component_overrides,
+                extra_record_fields={
+                    "wording_source": wrun.source,
+                    "wording_target_id": wrun.target_id,
+                    "wording_target_name": wrun.target_name,
+                    "wording_hypothesis": wrun.hypothesis,
+                    "wording_overridden_components": list(wrun.components),
+                    "wording_component_override_keys": list(wrun.component_overrides.keys()),
+                },
+            )
+            for wrun in wording_runs
+        ]
+        snapshot = _build_config_snapshot(
+            config, wording_benchmark=asdict(config.wording_benchmark)
+        )
+        phase_label = "wording benchmark"
+        manifest_extra["phase"] = "wording"
+
+    elif config.order_benchmark.enabled:
+        # Phase 2: order
+        base_routes = build_routes_from_config(config.order_benchmark.base_routes)
+        routes = build_order_benchmark_routes(
+            base_routes=base_routes,
+            order_variants=config.order_benchmark.variants,
+        )
+        run_specs = [RunSpec(route=r, condition_name=r.name) for r in routes]
+        snapshot = _build_config_snapshot(
+            config,
+            order_benchmark=asdict(config.order_benchmark),
+        )
+        phase_label = "order benchmark"
+        manifest_extra["phase"] = "order"
+
+    elif config.architecture_benchmark.enabled:
+        # Phase 1: architecture
+        routes = build_routes_from_config(config.architecture_benchmark.base_routes)
+        run_specs = [RunSpec(route=r, condition_name=r.name) for r in routes]
+        snapshot = _build_config_snapshot(
+            config, architecture_benchmark=asdict(config.architecture_benchmark)
+        )
+        phase_label = "architecture benchmark"
+        manifest_extra["phase"] = "architecture"
+
+    else:
+        raise ValueError(
+            "No benchmark phase enabled. Set one of "
+            "architecture_benchmark.enabled, order_benchmark.enabled, "
+            "or wording_benchmark.enabled to true."
+        )
+
+    return _run_benchmark_loop(
+        config, run_specs, snapshot, phase_label=phase_label, manifest_extra=manifest_extra or None
+    )
 
 
 # =============================================================================

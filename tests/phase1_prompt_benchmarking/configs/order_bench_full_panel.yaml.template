@@ -1,15 +1,11 @@
-# Order Benchmark — Full Panel (Phase 2)
-# All 14 clusters × [3a, 3b] base × 5 variants × 1 replicate = 140 LLM analysis runs.
-# experiment_id is `_panel_v1` (not `_full_v1`) to avoid collision with Alexa's
-# existing denali run.
-
-experiment_id: order_bench_full_panel_v1
+experiment_id: benchmark_full_template
 
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_clusters.csv
   evidence_bundles_dir: benchmark_evidence_bundles_uniprot
-  output_dir: benchmarking_outputs/2.order
+  output_dir: benchmarking_outputs/template
+  bundle_source: uniprot
 
 model:
   provider: anthropic
@@ -20,7 +16,8 @@ model:
   top_k: null
 
 run:
-  num_replicates: 1
+  num_replicates: 3
+  max_workers: 4
   dry_run: false
   workflow_testing: false
   overwrite_outputs: false
@@ -30,20 +27,50 @@ run:
   save_parsed_outputs: true
   save_traces: true
 
-# Order benchmarking (Phase 2)
-# When enabled, routes are built from base_routes × variants below.
-# The routes.include field is only used if order_benchmark.enabled = false.
-order_benchmark:
-  enabled: true
+architecture_benchmark:
+  enabled: false
   base_routes:
     - 3a
+    - 3a_mcp
     - 3b
+    - 3b_mcp
+    - 3c
+    - 3c_mcp
+
+order_benchmark:
+  enabled: false
+  base_routes:
+    - 3a
+    - 3a_mcp
+    - 3b
+    - 3b_mcp
+    - 3c
+    - 3c_mcp
   variants:
-    - canonical
-    - late_screen_context
-    - prioritization_before_classification
-    - early_output_format
-    - delayed_task_anchor
+    - O
+    - O1
+    - O2
+    - O3
+    - O4
+
+wording_benchmark:
+  enabled: false
+  base_routes:
+    - 3a
+    - 3a_mcp
+    - 3b
+    - 3b_mcp
+    - 3c
+    - 3c_mcp
+  targets:
+    - W0
+    - W1
+    - W2
+    - W3
+    - W4
+    - W5
+  default_source: null
+  force_source: null
 
 screens:
   include: all

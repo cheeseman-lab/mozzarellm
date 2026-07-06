@@ -36,8 +36,8 @@ from typing import Any
 # shorter variants to avoid ambiguity.
 TRACE_FILENAME_RE = re.compile(
     r"^(?P<experiment_id>.+?)__"
-    r"(?P<route>3[abc](?:_mcp)?(?:_order_[a-z_]+)?)__"
-    r"(?P<screen_name>.+?)__"
+    r"(?P<route>3[abc](?:(?!__).)*)"
+    r"__(?P<screen_name>.+?)__"
     r"cluster_(?P<cluster_id>.+?)__"
     r"rep_(?P<replicate>\d+)\.json$"
 )
