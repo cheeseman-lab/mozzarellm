@@ -241,7 +241,7 @@ class TestAnnotateMatches:
         )
         result = annotate_matches(df, REVIEWERS)
         row = result.iloc[0]
-        assert bool(row["classification_match_either"]) is False
+        assert row["classification_match_either"] is None
         assert bool(row["experts_agree"]) is False
 
     def test_confidence_match(self, base_joined_df):
@@ -338,10 +338,10 @@ class TestAnnotateMatches:
 
 
 class TestApplicabilityBug:
-    def test_all_blank_experts_produce_false_not_none(self, base_joined_df):
-        """Current behavior: when all expert fields are blank, classification_match_either
-        is False (not None). This documents the existing bug — after the applicability fix,
-        these rows should become None (not scored) instead of False (wrong)."""
+    def test_all_blank_experts_produce_none_not_false(self, base_joined_df):
+        """After the applicability fix: when all expert fields are blank, the gene has no
+        ground truth, so classification_match_either is None (not scored) rather than
+        False (counted as wrong)."""
         rows = [
             {
                 "gene_symbol": f"gene{i}",
@@ -354,13 +354,14 @@ class TestApplicabilityBug:
         ]
         df = base_joined_df(rows)
         result = annotate_matches(df, REVIEWERS)
-        # Current buggy behavior: blank experts -> False (counted as wrong)
+        # Fixed behavior: blank experts -> None (excluded from denominator)
         for val in result["classification_match_either"]:
-            assert val is False
+            assert val is None
 
-    def test_mixed_blank_dilutes_score(self, base_joined_df):
-        """3 genes with labels + 2 blank. The blank rows are counted in the denominator,
-        diluting the rate. This documents the current behavior."""
+    def test_mixed_blank_excluded_from_score(self, base_joined_df):
+        """3 genes with labels + 2 blank. After the applicability fix, the blank rows are
+        excluded from the denominator, so the rate reflects only the labeled genes
+        (3 correct / 3 applicable = 1.0) with n == 3."""
         labeled_rows = [
             {
                 "gene_symbol": f"gene{i}",
@@ -383,9 +384,9 @@ class TestApplicabilityBug:
         ]
         df = base_joined_df(labeled_rows + blank_rows)
         result = annotate_matches(df, REVIEWERS)
-        # Rate denominator includes blank rows: 3 correct / 5 total = 0.6
-        rate = result["classification_match_either"].mean()
-        assert rate == pytest.approx(0.6)
+        rate, n = _agg_rate(result, "classification_match_either")
+        assert n == 3
+        assert rate == pytest.approx(1.0)
 
 
 # ===========================================================================

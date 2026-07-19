@@ -361,18 +361,23 @@ def annotate_matches(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.Dat
     # --- Classification: per-reviewer, either, recomputed consensus ----------
     for r in reviewers:
         out[f"expert_class_{r}"] = out[f"expert_classification_{r}"].apply(_norm_class)
-        out[f"classification_match_{r}"] = (out[f"expert_class_{r}"] != "") & (
-            out["predicted_class_norm"] == out[f"expert_class_{r}"]
+        out[f"classification_match_{r}"] = out.apply(
+            lambda x, rv=r: None
+            if x[f"expert_class_{rv}"] == ""
+            else x["predicted_class_norm"] == x[f"expert_class_{rv}"],
+            axis=1,
         )
 
     def _expert_classes(row: pd.Series) -> list[str]:
         return [row[f"expert_class_{r}"] for r in reviewers if row[f"expert_class_{r}"]]
 
-    out["classification_match_either"] = out.apply(
-        lambda r: r["predicted_class_norm"] != ""
-        and r["predicted_class_norm"] in _expert_classes(r),
-        axis=1,
-    )
+    def _class_either(row: pd.Series) -> bool | None:
+        experts = _expert_classes(row)
+        if not experts:
+            return None  # no expert label -> not scored (excluded from denominator)
+        return row["predicted_class_norm"] != "" and row["predicted_class_norm"] in experts
+
+    out["classification_match_either"] = out.apply(_class_either, axis=1)
     out["experts_agree"] = out.apply(
         lambda r: len(_expert_classes(r)) >= 1
         and len(set(_expert_classes(r))) == 1
@@ -397,15 +402,17 @@ def annotate_matches(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.Dat
         lambda r: majority_confidence(r, reviewers), axis=1
     )
     for r in reviewers:
-        out[f"confidence_match_{r}"] = (out[f"pathway_confidence_{r}"].apply(_norm_lower) != "") & (
-            out["pathway_confidence"].apply(_norm_lower)
-            == out[f"pathway_confidence_{r}"].apply(_norm_lower)
+        out[f"confidence_match_{r}"] = out.apply(
+            lambda x, rv=r: None
+            if _norm_lower(x[f"pathway_confidence_{rv}"]) == ""
+            else _norm_lower(x["pathway_confidence"]) == _norm_lower(x[f"pathway_confidence_{rv}"]),
+            axis=1,
         )
-    out["confidence_consensus_match"] = (
-        out["majority_expert_confidence"].apply(_norm_lower) != ""
-    ) & (
-        out["pathway_confidence"].apply(_norm_lower)
-        == out["majority_expert_confidence"].apply(_norm_lower)
+    out["confidence_consensus_match"] = out.apply(
+        lambda x: None
+        if _norm_lower(x["majority_expert_confidence"]) == ""
+        else _norm_lower(x["pathway_confidence"]) == _norm_lower(x["majority_expert_confidence"]),
+        axis=1,
     )
 
     # --- Pathway: per-reviewer + any-reviewer --------------------------------
@@ -414,24 +421,37 @@ def annotate_matches(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.Dat
         vals = [row.get(f"nominated_pathway_{r}") for r in reviewers]
         return [v for v in vals if isinstance(v, str) and v.strip()]
 
+    def _has_pathway(val: Any) -> bool:
+        return isinstance(val, str) and bool(val.strip())
+
     for r in reviewers:
         out[f"pathway_match_substring_{r}"] = out.apply(
             lambda x, rv=r: pathway_substring_match(
                 x.get("pathway"), [x.get(f"nominated_pathway_{rv}")]
-            ),
+            )
+            if _has_pathway(x.get(f"nominated_pathway_{rv}"))
+            else None,
             axis=1,
         )
         out[f"pathway_match_loose_{r}"] = out.apply(
             lambda x, rv=r: pathway_loose_match(
                 x.get("pathway"), [x.get(f"nominated_pathway_{rv}")]
-            ),
+            )
+            if _has_pathway(x.get(f"nominated_pathway_{rv}"))
+            else None,
             axis=1,
         )
     out["pathway_match_substring"] = out.apply(
-        lambda r: pathway_substring_match(r.get("pathway"), _expert_pathways(r)), axis=1
+        lambda r: pathway_substring_match(r.get("pathway"), _expert_pathways(r))
+        if _expert_pathways(r)
+        else None,
+        axis=1,
     )
     out["pathway_match_loose"] = out.apply(
-        lambda r: pathway_loose_match(r.get("pathway"), _expert_pathways(r)), axis=1
+        lambda r: pathway_loose_match(r.get("pathway"), _expert_pathways(r))
+        if _expert_pathways(r)
+        else None,
+        axis=1,
     )
 
     # --- Subclass: gated on recomputed consensus for NOVEL_ROLE / UNCHARACTERIZED ---
@@ -452,8 +472,20 @@ def annotate_matches(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.Dat
     return out
 
 
-# Metric columns whose values may be None (scored only on applicable rows).
-NULLABLE_METRICS = ("classification_match_consensus", "subclass_match")
+# Metric columns whose values may be None (scored only on genes that carry the
+# relevant expert annotation). Genes lacking ground truth are excluded from the
+# denominator rather than counted as failures. Per-reviewer variants
+# (classification_match_{r}, confidence_match_{r}, pathway_match_*_{r}) are also
+# nullable; _agg_rate excludes None for every metric, so membership here is now
+# only documentation — aggregation no longer branches on it.
+NULLABLE_METRICS = (
+    "classification_match_consensus",
+    "classification_match_either",
+    "confidence_consensus_match",
+    "pathway_match_substring",
+    "pathway_match_loose",
+    "subclass_match",
+)
 
 
 def _route_metric_cols(reviewers: tuple[str, ...]) -> list[str]:
@@ -472,12 +504,16 @@ def _route_metric_cols(reviewers: tuple[str, ...]) -> list[str]:
 
 
 def _agg_rate(grp: pd.DataFrame, metric: str) -> tuple[float | None, int]:
-    """Mean of a boolean/None metric column over applicable rows; returns (rate, n)."""
-    if metric in NULLABLE_METRICS:
-        applicable = grp[grp[metric].notna()]
-        n = len(applicable)
-        return (round(applicable[metric].mean(), 3) if n else None), n
-    return round(grp[metric].mean(), 3), len(grp)
+    """Mean of a boolean/None metric column over applicable rows; returns (rate, n).
+
+    Rows whose metric value is null (no applicable ground truth) are always excluded
+    from both numerator and denominator, and n reports the applicable count. This
+    applies uniformly to every metric so that unlabeled genes are never scored as
+    failures.
+    """
+    applicable = grp[grp[metric].notna()]
+    n = len(applicable)
+    return (round(applicable[metric].mean(), 3) if n else None), n
 
 
 def aggregate_per_route(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.DataFrame:
@@ -490,8 +526,7 @@ def aggregate_per_route(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.
         for m in metric_cols:
             rate, n = _agg_rate(grp, m)
             rec[f"{m}_rate"] = rate
-            if m in NULLABLE_METRICS:
-                rec[f"{m}_n"] = n
+            rec[f"{m}_n"] = n
         if has_semantic:
             valid = grp["pathway_semantic_score"].dropna()
             rec["pathway_semantic_score_mean"] = (
@@ -524,8 +559,9 @@ def aggregate_per_route_per_case_type(
     for (route, case_type), grp in joined.groupby(["route", "benchmark_case_type"], sort=True):
         rec = {"route": route, "case_type": case_type, "n_genes": len(grp)}
         for m in metric_cols:
-            rate, _ = _agg_rate(grp, m)
+            rate, n = _agg_rate(grp, m)
             rec[f"{m}_rate"] = rate
+            rec[f"{m}_n"] = n
         if has_semantic:
             valid = grp["pathway_semantic_score"].dropna()
             rec["pathway_semantic_score_mean"] = (
