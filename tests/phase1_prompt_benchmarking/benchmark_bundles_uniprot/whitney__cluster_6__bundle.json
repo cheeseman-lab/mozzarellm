@@ -1,0 +1,131 @@
+{
+  "screen_name": "whitney",
+  "cluster_id": "6",
+  "cluster_genes": [
+    {
+      "gene_symbol": "PSMA1",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P25786"
+    },
+    {
+      "gene_symbol": "PSMC2",
+      "UniProt_functional_annotation": "Component of the 26S proteasome, a multiprotein complex involved in the ATP-dependent degradation of ubiquitinated proteins. This complex plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins, which could impair cellular functions, and by removing proteins whose functions are no longer required. Therefore, the proteasome participates in numerous cellular processes, including cell cycle progression, apoptosis, or DNA damage repair. PSMC2 belongs to the heterohexameric ring of AAA (ATPases associated with diverse cellular activities) proteins that unfolds ubiquitinated target proteins that are concurrently translocated into a proteolytic chamber and degraded into peptides",
+      "accession": "P35998"
+    },
+    {
+      "gene_symbol": "SNRNP27",
+      "UniProt_functional_annotation": "May play a role in mRNA splicing",
+      "accession": "Q8WVK2"
+    },
+    {
+      "gene_symbol": "ENSG00000256206",
+      "UniProt_functional_annotation": "",
+      "accession": ""
+    },
+    {
+      "gene_symbol": "ENSG00000256646",
+      "UniProt_functional_annotation": "",
+      "accession": ""
+    },
+    {
+      "gene_symbol": "PSMA4",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P25789"
+    },
+    {
+      "gene_symbol": "FNBP4",
+      "UniProt_functional_annotation": "",
+      "accession": "Q8N3X1"
+    },
+    {
+      "gene_symbol": "PSMB1",
+      "UniProt_functional_annotation": "Non-catalytic component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P20618"
+    },
+    {
+      "gene_symbol": "PSMB7",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex). Within the 20S core complex, PSMB7 displays a trypsin-like activity",
+      "accession": "Q99436"
+    },
+    {
+      "gene_symbol": "PSMB3",
+      "UniProt_functional_annotation": "Non-catalytic component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex)",
+      "accession": "P49720"
+    },
+    {
+      "gene_symbol": "PSMC4",
+      "UniProt_functional_annotation": "Component of the 26S proteasome, a multiprotein complex involved in the ATP-dependent degradation of ubiquitinated proteins. This complex plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins, which could impair cellular functions, and by removing proteins whose functions are no longer required. Therefore, the proteasome participates in numerous cellular processes, including cell cycle progression, apoptosis, or DNA damage repair. PSMC4 belongs to the heterohexameric ring of AAA (ATPases associated with diverse cellular activities) proteins that unfolds ubiquitinated target proteins that are concurrently translocated into a proteolytic chamber and degraded into peptides",
+      "accession": "P43686"
+    },
+    {
+      "gene_symbol": "PSMC5",
+      "UniProt_functional_annotation": "Component of the 26S proteasome, a multiprotein complex involved in the ATP-dependent degradation of ubiquitinated proteins. This complex plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins, which could impair cellular functions, and by removing proteins whose functions are no longer required. Therefore, the proteasome participates in numerous cellular processes, including cell cycle progression, apoptosis, or DNA damage repair. PSMC5 belongs to the heterohexameric ring of AAA (ATPases associated with diverse cellular activities) proteins that unfolds ubiquitinated target proteins that are concurrently translocated into a proteolytic chamber and degraded into peptides",
+      "accession": "P62195"
+    },
+    {
+      "gene_symbol": "NAE1",
+      "UniProt_functional_annotation": "Regulatory subunit of the dimeric UBA3-NAE1 E1 enzyme. E1 activates NEDD8 by first adenylating its C-terminal glycine residue with ATP, thereafter linking this residue to the side chain of the catalytic cysteine, yielding a NEDD8-UBA3 thioester and free AMP. E1 finally transfers NEDD8 to the catalytic cysteine of UBE2M. Necessary for cell cycle progression through the S-M checkpoint. Overexpression of NAE1 causes apoptosis through deregulation of NEDD8 conjugation. The covalent attachment of NEDD8 to target proteins is known as 'neddylation' and the process is involved in the regulation of cell growth, viability and development",
+      "accession": "Q13564"
+    },
+    {
+      "gene_symbol": "AKIRIN2",
+      "UniProt_functional_annotation": "Molecular adapter that acts as a bridge between a variety of multiprotein complexes, and which is involved in embryonic development, immunity, myogenesis and brain development (PubMed:34711951). Plays a key role in nuclear protein degradation by promoting import of proteasomes into the nucleus: directly binds to fully assembled 20S proteasomes at one end and to nuclear import receptor IPO9 at the other end, bridging them together and mediating the import of pre-assembled proteasome complexes through the nuclear pore (PubMed:34711951). Involved in innate immunity by regulating the production of interleukin-6 (IL6) downstream of Toll-like receptor (TLR): acts by bridging the NF-kappa-B inhibitor NFKBIZ and the SWI/SNF complex, leading to promote induction of IL6 (By similarity). Also involved in adaptive immunity by promoting B-cell activation (By similarity). Involved in brain development: required for the survival and proliferation of cerebral cortical progenitor cells (By similarity). Involved in myogenesis: required for skeletal muscle formation and skeletal development, possibly by regulating expression of muscle differentiation factors (By similarity). Also plays a role in facilitating interdigital tissue regression during limb development (By similarity)",
+      "accession": "Q53H80"
+    },
+    {
+      "gene_symbol": "FOXN3",
+      "UniProt_functional_annotation": "Acts as a transcriptional repressor. May be involved in DNA damage-inducible cell cycle arrests (checkpoints)",
+      "accession": "O00409"
+    },
+    {
+      "gene_symbol": "PSMD7",
+      "UniProt_functional_annotation": "Component of the 26S proteasome, a multiprotein complex involved in the ATP-dependent degradation of ubiquitinated proteins. This complex plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins, which could impair cellular functions, and by removing proteins whose functions are no longer required. Therefore, the proteasome participates in numerous cellular processes, including cell cycle progression, apoptosis, or DNA damage repair",
+      "accession": "P51665"
+    },
+    {
+      "gene_symbol": "SNRPE",
+      "UniProt_functional_annotation": "Plays a role in pre-mRNA splicing as a core component of the spliceosomal U1, U2, U4 and U5 small nuclear ribonucleoproteins (snRNPs), the building blocks of the spliceosome (PubMed:11991638, PubMed:18984161, PubMed:19325628, PubMed:23246290, PubMed:23333303, PubMed:25555158, PubMed:26912367, PubMed:28076346, PubMed:28502770, PubMed:28781166, PubMed:32494006). Component of both the pre-catalytic spliceosome B complex and activated spliceosome C complexes (PubMed:11991638, PubMed:28076346, PubMed:28502770, PubMed:28781166). As a component of the minor spliceosome, involved in the splicing of U12-type introns in pre-mRNAs (PubMed:15146077). As part of the U7 snRNP it is involved in histone 3'-end processing (PubMed:12975319)",
+      "accession": "P62304"
+    },
+    {
+      "gene_symbol": "NEDD8-MDP1",
+      "UniProt_functional_annotation": "",
+      "accession": "E9PL57"
+    },
+    {
+      "gene_symbol": "PSMC6",
+      "UniProt_functional_annotation": "Component of the 26S proteasome, a multiprotein complex involved in the ATP-dependent degradation of ubiquitinated proteins. This complex plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins, which could impair cellular functions, and by removing proteins whose functions are no longer required. Therefore, the proteasome participates in numerous cellular processes, including cell cycle progression, apoptosis, or DNA damage repair. PSMC6 belongs to the heterohexameric ring of AAA (ATPases associated with diverse cellular activities) proteins that unfolds ubiquitinated target proteins that are concurrently translocated into a proteolytic chamber and degraded into peptides",
+      "accession": "P62333"
+    },
+    {
+      "gene_symbol": "PSMC3",
+      "UniProt_functional_annotation": "Component of the 26S proteasome, a multiprotein complex involved in the ATP-dependent degradation of ubiquitinated proteins. This complex plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins, which could impair cellular functions, and by removing proteins whose functions are no longer required. Therefore, the proteasome participates in numerous cellular processes, including cell cycle progression, apoptosis, or DNA damage repair. PSMC3 belongs to the heterohexameric ring of AAA (ATPases associated with diverse cellular activities) proteins that unfolds ubiquitinated target proteins that are concurrently translocated into a proteolytic chamber and degraded into peptides",
+      "accession": "P17980"
+    },
+    {
+      "gene_symbol": "PSMB4",
+      "UniProt_functional_annotation": "Non-catalytic component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex). SMAD1/OAZ1/PSMB4 complex mediates the degradation of the CREBBP/EP300 repressor SNIP1",
+      "accession": "P28070"
+    },
+    {
+      "gene_symbol": "PSMD2",
+      "UniProt_functional_annotation": "Component of the 26S proteasome, a multiprotein complex involved in the ATP-dependent degradation of ubiquitinated proteins. This complex plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins, which could impair cellular functions, and by removing proteins whose functions are no longer required. Therefore, the proteasome participates in numerous cellular processes, including cell cycle progression, apoptosis, or DNA damage repair\nBinds to the intracellular domain of tumor necrosis factor type 1 receptor. The binding domain of TRAP1 and TRAP2 resides outside the death domain of TNFR1",
+      "accession": "Q13200"
+    },
+    {
+      "gene_symbol": "PSMA7",
+      "UniProt_functional_annotation": "Component of the 20S core proteasome complex involved in the proteolytic degradation of most intracellular proteins. This complex plays numerous essential roles within the cell by associating with different regulatory particles. Associated with two 19S regulatory particles, forms the 26S proteasome and thus participates in the ATP-dependent degradation of ubiquitinated proteins. The 26S proteasome plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins that could impair cellular functions, and by removing proteins whose functions are no longer required. Associated with the PA200 or PA28, the 20S proteasome mediates ubiquitin-independent protein degradation. This type of proteolysis is required in several pathways including spermatogenesis (20S-PA200 complex) or generation of a subset of MHC class I-presented antigenic peptides (20S-PA28 complex). Inhibits the transactivation function of HIF-1A under both normoxic and hypoxia-mimicking conditions. The interaction with EMAP2 increases the proteasome-mediated HIF-1A degradation under the hypoxic conditions. Plays a role in hepatitis C virus internal ribosome entry site-mediated translation. Mediates nuclear translocation of the androgen receptor (AR) and thereby enhances androgen-mediated transactivation. Promotes MAVS degradation and thereby negatively regulates MAVS-mediated innate immune response",
+      "accession": "O14818"
+    },
+    {
+      "gene_symbol": "NEDD8",
+      "UniProt_functional_annotation": "Ubiquitin-like protein which plays an important role in cell cycle control and embryogenesis via its conjugation to a limited number of cellular proteins, such as cullins or p53/TP53 (PubMed:10318914, PubMed:10597293, PubMed:11953428, PubMed:14690597, PubMed:15242646, PubMed:9694792, PubMed:38605244, PubMed:38316879). Attachment of NEDD8 to cullins is critical for the recruitment of E2 to the cullin-RING-based E3 ubiquitin-protein ligase complex, thus facilitating polyubiquitination and proteasomal degradation of cyclins and other regulatory proteins (PubMed:10318914, PubMed:10597293, PubMed:11953428, PubMed:20688984, PubMed:9694792, PubMed:38605244, PubMed:38316879). Attachment of NEDD8 to p53/TP53 inhibits p53/TP53 transcriptional activity (PubMed:15242646). Covalent attachment to its substrates requires prior activation by the E1 complex UBE1C-APPBP1 and linkage to the E2 enzyme UBE2M (PubMed:14690597). Neddylates EGFR resulting in protein stabilization and translocation to the cell membrane (PubMed:28891468)",
+      "accession": "Q15843"
+    },
+    {
+      "gene_symbol": "PSMC1",
+      "UniProt_functional_annotation": "Component of the 26S proteasome, a multiprotein complex involved in the ATP-dependent degradation of ubiquitinated proteins. This complex plays a key role in the maintenance of protein homeostasis by removing misfolded or damaged proteins, which could impair cellular functions, and by removing proteins whose functions are no longer required. Therefore, the proteasome participates in numerous cellular processes, including cell cycle progression, apoptosis, or DNA damage repair. PSMC1 belongs to the heterohexameric ring of AAA (ATPases associated with diverse cellular activities) proteins that unfolds ubiquitinated target proteins that are concurrently translocated into a proteolytic chamber and degraded into peptides",
+      "accession": "P62191"
+    }
+  ]
+}

@@ -21,9 +21,6 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
-    ROUTE_REGISTRY,
-)
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.wording_bench_alternates import (
     WORDING_ALTERNATE_SET_REGISTRY,
 )
@@ -165,7 +162,7 @@ class TestResolveTargetIds:
 
 class TestBuildWordingOverrideRuns:
     def test_canonical_always_included(self):
-        runs = build_wording_override_runs(["3a"], ["W1"])
+        runs = build_wording_override_runs(["single_call"], ["W1"])
         canon = [r for r in runs if r.target_id == "W0"]
         assert len(canon) == 1
         assert canon[0].component_overrides == {}
@@ -173,19 +170,19 @@ class TestBuildWordingOverrideRuns:
 
     def test_no_combinatorial_explosion(self):
         # 1 base route x (W0 + W1 + W3) = 3 runs, not 2**n combinations.
-        runs = build_wording_override_runs(["3a"], ["W1", "W3"])
+        runs = build_wording_override_runs(["single_call"], ["W1", "W3"])
         assert len(runs) == 3
         assert {r.target_id for r in runs} == {"W0", "W1", "W3"}
 
     def test_overrides_resolved_from_source(self):
-        runs = build_wording_override_runs(["3a"], ["W4"])
+        runs = build_wording_override_runs(["single_call"], ["W4"])
         w4 = next(r for r in runs if r.target_id == "W4")
         v1 = WORDING_ALTERNATE_SET_REGISTRY["wording_v1"]
         assert w4.component_overrides == {"NPR": v1["NPR"], "UPR": v1["UPR"]}
 
     def test_force_source_applies(self):
         # force_source=wording_v2 only defines CAT; W1 needs CAT -> ok.
-        runs = build_wording_override_runs(["3a"], ["W1"], force_source="wording_v2")
+        runs = build_wording_override_runs(["single_call"], ["W1"], force_source="wording_v2")
         w1 = next(r for r in runs if r.target_id == "W1")
         assert w1.source == "wording_v2"
         assert w1.component_overrides == {
@@ -195,21 +192,21 @@ class TestBuildWordingOverrideRuns:
     def test_force_source_missing_component_raises(self):
         # wording_v2 has no GCR; forcing it for W3 (GCR) must fail validation.
         with pytest.raises(ValueError):
-            build_wording_override_runs(["3a"], ["W3"], force_source="wording_v2")
+            build_wording_override_runs(["single_call"], ["W3"], force_source="wording_v2")
 
     def test_unknown_source_raises(self):
         with pytest.raises(ValueError):
-            build_wording_override_runs(["3a"], ["W1"], force_source="does_not_exist")
+            build_wording_override_runs(["single_call"], ["W1"], force_source="does_not_exist")
 
     def test_unknown_base_route_raises(self):
         with pytest.raises(ValueError):
             build_wording_override_runs(["nope"], ["W1"])
 
     def test_multiple_base_routes(self):
-        runs = build_wording_override_runs(["3a", "3b"], ["W1"])
+        runs = build_wording_override_runs(["single_call", "cot"], ["W1"])
         # (W0 + W1) x 2 routes = 4
         assert len(runs) == 4
-        assert {r.base_route.name for r in runs} == {"3a", "3b"}
+        assert {r.base_route.name for r in runs} == {"single_call", "cot"}
 
 
 # ============================================================================
@@ -219,14 +216,14 @@ class TestBuildWordingOverrideRuns:
 
 class TestRunRouteName:
     def test_canonical_name(self):
-        runs = build_wording_override_runs(["3a"], ["W1"])
+        runs = build_wording_override_runs(["single_call"], ["W1"])
         canon = next(r for r in runs if r.target_id == "W0")
-        assert canon.run_route_name == "3a_canonical_W0_canonical"
+        assert canon.run_route_name == "single_call_canonical_W0_canonical"
 
     def test_override_name(self):
-        runs = build_wording_override_runs(["3a"], ["W4"])
+        runs = build_wording_override_runs(["single_call"], ["W4"])
         w4 = next(r for r in runs if r.target_id == "W4")
-        assert w4.run_route_name == "3a_wording_v1_W4_terse_prioritization_rules"
+        assert w4.run_route_name == "single_call_wording_v1_W4_terse_prioritization_rules"
 
 
 # ============================================================================
@@ -236,7 +233,7 @@ class TestRunRouteName:
 
 class TestComponentOverridesPropagate:
     def test_override_changes_standard_prompt(self):
-        runs = build_wording_override_runs(["3a"], ["W3"])
+        runs = build_wording_override_runs(["single_call"], ["W3"])
         w3 = next(r for r in runs if r.target_id == "W3")
 
         base = make_cluster_analysis_system_prompt(
@@ -285,14 +282,14 @@ class TestWordingBenchmarkConfig:
             "wording_benchmark:\n"
             "  enabled: true\n"
             "  base_routes:\n"
-            "    - 3a\n"
+            "    - single_call\n"
             "  targets: W1-W3\n"
             "  default_source: wording_v1\n",
             encoding="utf-8",
         )
         cfg = load_config(cfg_file)
         assert cfg.wording_benchmark.enabled is True
-        assert cfg.wording_benchmark.base_routes == ["3a"]
+        assert cfg.wording_benchmark.base_routes == ["single_call"]
         assert cfg.wording_benchmark.targets == "W1-W3"
         assert cfg.wording_benchmark.default_source == "wording_v1"
         assert cfg.wording_benchmark.force_source is None
@@ -319,7 +316,7 @@ class TestWordingBenchSupplements:
     def test_cot_route_with_gcr_override_silent(self):
         # Currently no warning — override silently has no effect on CoT prompt
         # because CoT uses cGCR.
-        runs = build_wording_override_runs(["3b"], ["W3"])
+        runs = build_wording_override_runs(["cot"], ["W3"])
         w3 = next(r for r in runs if r.target_id == "W3")
         assert w3.component_overrides  # override was resolved without error
 
@@ -328,7 +325,7 @@ class TestWordingBenchSupplements:
             TRACE_FILENAME_RE,
         )
 
-        runs = build_wording_override_runs(["3a"], ["W3"])
+        runs = build_wording_override_runs(["single_call"], ["W3"])
         w3 = next(r for r in runs if r.target_id == "W3")
         filename = f"exp__{w3.run_route_name}__denali__cluster_21__rep_1.json"
         match = TRACE_FILENAME_RE.match(filename)

@@ -107,9 +107,9 @@ _MINIMAL_CONFIG = {
 class TestSummarizeRoute:
     def test_three_compliant_records(self):
         records = [
-            _make_record("3a", _base_metrics()),
-            _make_record("3a", _base_metrics()),
-            _make_record("3a", _base_metrics()),
+            _make_record("single_call", _base_metrics()),
+            _make_record("single_call", _base_metrics()),
+            _make_record("single_call", _base_metrics()),
         ]
         summary = _summarize_route(records)
         assert summary["n_runs"] == 3
@@ -118,9 +118,9 @@ class TestSummarizeRoute:
 
     def test_one_error_record(self):
         records = [
-            _make_record("3a", _base_metrics()),
-            _make_record("3a", _base_metrics(), error="fail"),
-            _make_record("3a", _base_metrics()),
+            _make_record("single_call", _base_metrics()),
+            _make_record("single_call", _base_metrics(), error="fail"),
+            _make_record("single_call", _base_metrics()),
         ]
         summary = _summarize_route(records)
         assert summary["n_errors"] == 1
@@ -133,13 +133,19 @@ class TestSummarizeRoute:
     def test_timing_stats(self):
         records = [
             _make_record(
-                "3a", _base_metrics(), timing={"full_run_time_seconds": 1.0, "n_api_calls": 1}
+                "single_call",
+                _base_metrics(),
+                timing={"full_run_time_seconds": 1.0, "n_api_calls": 1},
             ),
             _make_record(
-                "3a", _base_metrics(), timing={"full_run_time_seconds": 2.0, "n_api_calls": 1}
+                "single_call",
+                _base_metrics(),
+                timing={"full_run_time_seconds": 2.0, "n_api_calls": 1},
             ),
             _make_record(
-                "3a", _base_metrics(), timing={"full_run_time_seconds": 3.0, "n_api_calls": 1}
+                "single_call",
+                _base_metrics(),
+                timing={"full_run_time_seconds": 3.0, "n_api_calls": 1},
             ),
         ]
         summary = _summarize_route(records)
@@ -149,12 +155,12 @@ class TestSummarizeRoute:
     def test_derived_seconds_per_schema_ok(self):
         records = [
             _make_record(
-                "3a",
+                "single_call",
                 _base_metrics(schema_compliance=True),
                 timing={"full_run_time_seconds": 5.0},
             ),
             _make_record(
-                "3a",
+                "single_call",
                 _base_metrics(schema_compliance=True),
                 timing={"full_run_time_seconds": 5.0},
             ),
@@ -171,8 +177,8 @@ class TestSummarizeRoute:
 class TestReportGeneration:
     def test_generate_report_creates_files(self, tmp_path):
         records = [
-            _make_record("3a", _base_metrics()),
-            _make_record("3b", _base_metrics()),
+            _make_record("single_call", _base_metrics()),
+            _make_record("cot", _base_metrics()),
         ]
         report_path = generate_report(records, _MINIMAL_CONFIG, tmp_path)
         assert report_path.exists()
@@ -183,7 +189,7 @@ class TestReportGeneration:
         assert (tmp_path / "aggregate_summary.csv").stat().st_size > 0
 
     def test_report_contains_headers(self, tmp_path):
-        records = [_make_record("3a", _base_metrics())]
+        records = [_make_record("single_call", _base_metrics())]
         report_path = generate_report(records, _MINIMAL_CONFIG, tmp_path)
         text = report_path.read_text(encoding="utf-8")
         assert "Route Comparison" in text
@@ -194,7 +200,9 @@ class TestReportGeneration:
     def test_order_variant_section_present(self, tmp_path):
         records = [
             _make_record(
-                "3a_O1_late_screen_context", _base_metrics(), order_variant="late_screen_context"
+                "single_call_O1_late_screen_context",
+                _base_metrics(),
+                order_variant="late_screen_context",
             ),
         ]
         report_path = generate_report(records, _MINIMAL_CONFIG, tmp_path)
@@ -203,7 +211,7 @@ class TestReportGeneration:
 
     def test_order_variant_section_absent(self, tmp_path):
         records = [
-            _make_record("3a", _base_metrics(), order_variant="none"),
+            _make_record("single_call", _base_metrics(), order_variant="none"),
         ]
         report_path = generate_report(records, _MINIMAL_CONFIG, tmp_path)
         text = report_path.read_text(encoding="utf-8")
@@ -211,9 +219,9 @@ class TestReportGeneration:
 
     def test_csv_rows_match_routes(self, tmp_path):
         records = [
-            _make_record("3a", _base_metrics()),
-            _make_record("3b", _base_metrics()),
-            _make_record("3b", _base_metrics()),
+            _make_record("single_call", _base_metrics()),
+            _make_record("cot", _base_metrics()),
+            _make_record("cot", _base_metrics()),
         ]
         generate_report(records, _MINIMAL_CONFIG, tmp_path)
         csv_path = tmp_path / "aggregate_summary.csv"
@@ -221,5 +229,5 @@ class TestReportGeneration:
             reader = csv.DictReader(f)
             rows = list(reader)
         route_names = {row["route"] for row in rows}
-        assert route_names == {"3a", "3b"}
+        assert route_names == {"single_call", "cot"}
         assert len(rows) == 2

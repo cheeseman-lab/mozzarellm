@@ -73,6 +73,17 @@ DEFAULT_GROUND_TRUTH = PHASE_DIR / "benchmark_inputs" / "benchmark_combined_expe
 DEFAULT_REVIEWERS = ("eric", "iain", "liz")
 JOIN_KEYS = ("screen_name", "cluster_id", "gene_symbol")
 
+# Readthrough-fusion transcripts: run through the pipeline (predictions still
+# generated) but excluded from scoring. They are not real gene records —
+# Affinage has no entry and UniProt inherits one parent's function, so neither
+# source nor reviewer labels are meaningful for them.
+READTHROUGH_FUSION_EXCLUDE = (
+    "RPL17-C18orf32",
+    "ISY1-RAB43",
+    "NEDD8-MDP1",
+    "TMEM189-UBE2V1",
+)
+
 # Phase prefixes derived from the experiment-dir path so eval outputs from each
 # benchmark phase (architecture / order / wording) are distinguishable. Keyed by
 # a substring matched against the path components of --experiment-dir.
@@ -953,6 +964,15 @@ def main() -> int:
         return 1
 
     preds = load_predictions(args.experiment_dir)
+
+    n_readthrough = int(preds["gene_symbol"].isin(READTHROUGH_FUSION_EXCLUDE).sum())
+    if n_readthrough:
+        preds = preds[~preds["gene_symbol"].isin(READTHROUGH_FUSION_EXCLUDE)].reset_index(drop=True)
+        print(
+            f"Excluded {n_readthrough} readthrough-fusion prediction row(s) from scoring: "
+            f"{', '.join(READTHROUGH_FUSION_EXCLUDE)}"
+        )
+
     gt = load_ground_truth(args.ground_truth)
 
     missing_gt = [

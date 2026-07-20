@@ -30,23 +30,20 @@ run:
 architecture_benchmark:
   enabled: true
   base_routes:
-    - 3a
-    - 3a_mcp
-    - 3b
-    - 3b_mcp
-    - 3c
-    - 3c_mcp
+    - single_call
+    - cot
+    - stepwise
 
 order_benchmark:
   enabled: false
   base_routes:
-    - 3a
+    - single_call
   variants: O1-O2
 
 wording_benchmark:
   enabled: false
   base_routes:
-    - 3a
+    - single_call
   targets: "W1"
   default_source: null
   force_source: null

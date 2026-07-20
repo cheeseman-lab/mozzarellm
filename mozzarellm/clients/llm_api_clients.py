@@ -22,6 +22,64 @@ from anthropic.types.messages.batch_create_params import Request
 logger = logging.getLogger(__name__)
 
 
+# Models that reject a non-default `temperature` (deprecated on newer Claude
+# models). Populated reactively the first time a model rejects it, so new models
+# are handled without a hardcoded list.
+_MODELS_REJECTING_TEMPERATURE: set[str] = set()
+
+# Models that reject an explicit `thinking` param. Populated reactively so old
+# models that predate the param still work when thinking control is requested.
+_MODELS_REJECTING_THINKING: set[str] = set()
+
+
+class AnthropicNoTextError(RuntimeError):
+    """Anthropic returned no usable text block (e.g. a safety-classifier refusal).
+
+    Carries the API's stop_reason so callers can distinguish a refusal from other
+    empty responses. Not retryable: the same prompt yields the same result.
+    """
+
+    retryable = False
+
+    def __init__(
+        self, stop_reason: str | None, input_tokens: int | None, output_tokens: int | None
+    ):
+        self.stop_reason = stop_reason
+        hint = " (safety-classifier refusal)" if stop_reason == "refusal" else ""
+        super().__init__(
+            f"Anthropic returned no text{hint}: stop_reason={stop_reason!r}, "
+            f"input_tokens={input_tokens}, output_tokens={output_tokens}"
+        )
+
+
+def _is_temperature_deprecated(exc: Exception) -> bool:
+    """True if the error is the 'temperature is deprecated for this model' 400."""
+    msg = str(exc).lower()
+    return "temperature" in msg and "deprecat" in msg
+
+
+def _is_thinking_unsupported(exc: Exception) -> bool:
+    """True if the error complains about the `thinking` param (old models)."""
+    return "thinking" in str(exc).lower()
+
+
+def _extract_anthropic_text(response) -> str:
+    """Join all text blocks from a messages response, tolerating thinking blocks.
+
+    Raises AnthropicNoTextError on a refusal or any response with no text block,
+    rather than blindly indexing content[0].
+    """
+    usage = getattr(response, "usage", None)
+    in_tok = getattr(usage, "input_tokens", None)
+    out_tok = getattr(usage, "output_tokens", None)
+    if response.stop_reason == "refusal":
+        raise AnthropicNoTextError(response.stop_reason, in_tok, out_tok)
+    texts = [b.text for b in response.content if getattr(b, "type", None) == "text"]
+    if not texts:
+        raise AnthropicNoTextError(response.stop_reason, in_tok, out_tok)
+    return "".join(texts)
+
+
 class LLMClientBase(ABC):
     """Abstract base class for LLM providers."""
 
@@ -34,6 +92,7 @@ class LLMClientBase(ABC):
         top_k: int | None = None,
         stop_sequences: list[str] | None = None,
         api_key: str | None = None,
+        thinking: bool | None = None,
     ):
         """
         Initialize LLM provider.
@@ -46,6 +105,8 @@ class LLMClientBase(ABC):
             top_k: Top-K sampling parameter (optional, Claude/Gemini only)
             stop_sequences: List of stop sequences (optional)
             api_key: API key (if None, reads from environment)
+            thinking: Extended-thinking control (Claude only). None = model default,
+                False = disabled, True = enabled with a budget under max_tokens.
         """
         self.model = model
         self.temperature = temperature
@@ -53,6 +114,7 @@ class LLMClientBase(ABC):
         self.top_p = top_p
         self.top_k = top_k
         self.stop_sequences = stop_sequences
+        self.thinking = thinking
         self.api_key = api_key or self._get_api_key_from_env()
         self._validate_api_key()
 
@@ -127,6 +189,11 @@ class LLMClientBase(ABC):
                     f"Attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}: {error_str}"
                 )
                 logger.warning(f"{self.__class__.__name__}: {error_msg}")
+
+                if not getattr(e, "retryable", True):
+                    # Deterministic failure (e.g. safety refusal) — retrying the
+                    # same prompt cannot help; return immediately.
+                    return None, f"{type(e).__name__}: {e}"
 
                 if attempt < max_retries - 1:
                     wait_time = 2**attempt  # Exponential backoff
@@ -214,7 +281,6 @@ class AnthropicClient(LLMClientBase):
         kwargs = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
             "system": [
                 {
                     "type": "text",
@@ -243,13 +309,9 @@ class AnthropicClient(LLMClientBase):
             ],
         }
 
-        # Add optional sampling parameters
-        if self.top_p is not None:
-            kwargs["top_p"] = self.top_p
-        if self.top_k is not None:
-            kwargs["top_k"] = self.top_k
-        if self.stop_sequences:
-            kwargs["stop_sequences"] = self.stop_sequences
+        # Add optional sampling + thinking params (omitted for models that reject them)
+        kwargs.update(self._sampling_kwargs())
+        kwargs.update(self._thinking_kwarg())
 
         cluster_request = Request(
             custom_id=f"{cluster_id}_analysis_request",
@@ -273,33 +335,77 @@ class AnthropicClient(LLMClientBase):
         return requests
 
     ### Endpoint access functions ###
-    def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
-        """
-        Makes a single request to the Anthropic messages API.
-        https://platform.claude.com/docs/en/api/python/messages/create
-        """
-
-        client = anthropic.Anthropic(api_key=self.api_key)
-
-        # Build kwargs with optional parameters
-        kwargs = {
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "system": system_prompt,
-            # "thinking": {"type": "enabled"},  # can eventually set a token budget here
-            "messages": [{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
-        }
-
-        # Add optional sampling parameters
+    def _sampling_kwargs(self) -> dict:
+        """Optional sampling params, omitting temperature for models that reject it."""
+        kwargs: dict = {}
+        if self.model not in _MODELS_REJECTING_TEMPERATURE:
+            kwargs["temperature"] = self.temperature
         if self.top_p is not None:
             kwargs["top_p"] = self.top_p
         if self.top_k is not None:
             kwargs["top_k"] = self.top_k
         if self.stop_sequences:
             kwargs["stop_sequences"] = self.stop_sequences
+        return kwargs
 
-        response = client.messages.create(**kwargs)
+    def _thinking_kwarg(self) -> dict:
+        """Extended-thinking param, omitted when unset or unsupported by the model."""
+        if self.thinking is None or self.model in _MODELS_REJECTING_THINKING:
+            return {}
+        if self.thinking is False:
+            return {"thinking": {"type": "disabled"}}
+        # enabled: budget must stay under max_tokens to leave room for the answer
+        budget = max(1024, min(self.max_tokens // 2, 8000))
+        return {"thinking": {"type": "enabled", "budget_tokens": budget}}
+
+    def _create_message(self, client, base: dict):
+        """messages.create with reactive param compat (temperature / thinking)."""
+        last_exc: Exception | None = None
+        for _ in range(3):  # allow stripping temperature and/or thinking, then retry
+            try:
+                return client.messages.create(
+                    **base, **self._sampling_kwargs(), **self._thinking_kwarg()
+                )
+            except anthropic.BadRequestError as e:
+                last_exc = e
+                # Retry whenever the error names a param we can strip, even if
+                # another concurrent thread already recorded the model as
+                # rejecting it — the next _sampling_kwargs/_thinking_kwarg call
+                # omits it, so retrying is always safe. (Gating the retry on
+                # set-membership races 12 parallel workers into spurious raises.)
+                if _is_temperature_deprecated(e):
+                    if self.model not in _MODELS_REJECTING_TEMPERATURE:
+                        _MODELS_REJECTING_TEMPERATURE.add(self.model)
+                        logger.info(f"{self.model}: temperature deprecated; retrying without it")
+                    continue
+                if _is_thinking_unsupported(e):
+                    if self.model not in _MODELS_REJECTING_THINKING:
+                        _MODELS_REJECTING_THINKING.add(self.model)
+                        logger.info(f"{self.model}: thinking param unsupported; retrying without it")
+                    continue
+                raise
+        raise last_exc  # pragma: no cover
+
+    def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
+        """
+        Makes a single request to the Anthropic messages API.
+        https://platform.claude.com/docs/en/api/python/messages/create
+
+        Backward compatible across models: omits `temperature` / `thinking` for
+        models that reject them (reactively, on the first 400), tolerates thinking
+        blocks in the response, and raises AnthropicNoTextError on refusal / empty.
+        """
+
+        client = anthropic.Anthropic(api_key=self.api_key)
+
+        base = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
+        }
+
+        response = self._create_message(client, base)
 
         # Store usage for cost tracking by callers
         if hasattr(response, "usage"):
@@ -313,7 +419,7 @@ class AnthropicClient(LLMClientBase):
         else:
             self.last_usage = {}
 
-        return response.content[0].text
+        return _extract_anthropic_text(response)
 
     def _make_batch_api_call(
         self,
@@ -897,6 +1003,7 @@ def create_client(
     top_k: int | None = None,
     stop_sequences: list[str] | None = None,
     api_key: str | None = None,
+    thinking: bool | None = None,
 ):
     """
     Factory function to create the appropriate client based on model name.
@@ -909,6 +1016,7 @@ def create_client(
         top_k: Top-K sampling parameter (optional, Claude/Gemini only)
         stop_sequences: List of stop sequences (optional)
         api_key: Optional API key (reads from env if None)
+        thinking: Extended-thinking control (Claude only; None/False/True)
 
     Returns:
         Appropriate LLMProvider instance
@@ -925,7 +1033,7 @@ def create_client(
     # Anthropic models
     elif model_lower.startswith("claude"):
         return AnthropicClient(
-            model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key
+            model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key, thinking
         )
 
     # Google models

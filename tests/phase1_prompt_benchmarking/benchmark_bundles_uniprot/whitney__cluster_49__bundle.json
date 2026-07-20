@@ -1,0 +1,62 @@
+{
+  "screen_name": "whitney",
+  "cluster_id": "49",
+  "cluster_genes": [
+    {
+      "gene_symbol": "nontargeting_intergenic_CTCGGTCAGACG",
+      "UniProt_functional_annotation": ""
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_CTCCAACTCGGG",
+      "UniProt_functional_annotation": ""
+    },
+    {
+      "gene_symbol": "NDUFAF4",
+      "UniProt_functional_annotation": "Involved in the assembly of mitochondrial NADH:ubiquinone oxidoreductase complex (complex I) (PubMed:18179882, PubMed:28853723). May be involved in cell proliferation and survival of hormone-dependent tumor cells. May be a regulator of breast tumor cell invasion. {ECO:0000269|PubMed:14871833, ECO:0000269|PubMed:17001319, ECO:0000269|PubMed:18179882, ECO:0000269|PubMed:28853723}."
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GCAATTCTGTCG",
+      "UniProt_functional_annotation": ""
+    },
+    {
+      "gene_symbol": "ETV4",
+      "UniProt_functional_annotation": "Transcriptional activator (PubMed:19307308, PubMed:31552090). May play a role in keratinocyte differentiation (PubMed:31552090). {ECO:0000269|PubMed:19307308, ECO:0000269|PubMed:31552090}.; (Microbial infection) Binds to the enhancer of the adenovirus E1A gene and acts as a transcriptional activator; the core-binding sequence is 5'-[AC]GGA[AT]GT-3'. {ECO:0000269|PubMed:8441666}."
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GAGGGTCGCTTC",
+      "UniProt_functional_annotation": ""
+    },
+    {
+      "gene_symbol": "NEFM",
+      "UniProt_functional_annotation": "Neurofilaments usually contain three intermediate filament proteins: NEFL, NEFM, and NEFH which are involved in the maintenance of neuronal caliber. May additionally cooperate with the neuronal intermediate filament proteins PRPH and INA to form neuronal filamentous networks (By similarity). {ECO:0000250|UniProtKB:P08553}."
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GACACTCTCCTT",
+      "UniProt_functional_annotation": ""
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GATGAATCTAAC",
+      "UniProt_functional_annotation": ""
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_CGTTAGGAGATA",
+      "UniProt_functional_annotation": ""
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GCACAAGGTCAT",
+      "UniProt_functional_annotation": ""
+    },
+    {
+      "gene_symbol": "BTG1",
+      "UniProt_functional_annotation": "Anti-proliferative protein. {ECO:0000269|PubMed:1373383}."
+    },
+    {
+      "gene_symbol": "MYO9B",
+      "UniProt_functional_annotation": "Myosins are actin-based motor molecules with ATPase activity. Unconventional myosins serve in intracellular movements. Binds actin with high affinity both in the absence and presence of ATP and its mechanochemical activity is inhibited by calcium ions (PubMed:9490638). Also acts as a GTPase activator for RHOA (PubMed:26529257, PubMed:9490638). Plays a role in the regulation of cell migration via its role as RHOA GTPase activator. This is regulated by its interaction with the SLIT2 receptor ROBO1; interaction with ROBO1 impairs interaction with RHOA and subsequent activation of RHOA GTPase activity, and thereby leads to increased levels of active, GTP-bound RHOA (PubMed:26529257). {ECO:0000269|PubMed:26529257, ECO:0000269|PubMed:9490638}."
+    },
+    {
+      "gene_symbol": "RELT",
+      "UniProt_functional_annotation": "May play a role in apoptosis (PubMed:19969290, PubMed:28688764). Induces activation of MAPK14/p38 and MAPK8/JNK MAPK cascades, when overexpressed (PubMed:16530727). Involved in dental enamel formation (PubMed:30506946). {ECO:0000269|PubMed:16530727, ECO:0000269|PubMed:19969290, ECO:0000269|PubMed:28688764, ECO:0000269|PubMed:30506946}."
+    }
+  ]
+}

@@ -65,6 +65,20 @@ from .wording_bench_targets import build_wording_override_runs
 _IO_LOCK = threading.Lock()
 
 
+def _client_from_config(config: BenchmarkConfig, api_key: str | None):
+    """Build an LLM client from the full model config (temperature, thinking, etc.)."""
+    m = config.model
+    return create_client(
+        model=m.model_name,
+        temperature=m.temperature,
+        max_tokens=m.max_tokens,
+        top_p=m.top_p,
+        top_k=m.top_k,
+        api_key=api_key,
+        thinking=m.thinking,
+    )
+
+
 @dataclass(frozen=True)
 class RunSpec:
     """Phase-agnostic work item for the unified benchmark loop.
@@ -454,6 +468,7 @@ def execute_single_run(
         "estimated_cost_usd": raw_outputs.get("cost_usd"),
         "schema_warnings": raw_outputs.get("schema_warnings", []),
         "mcp_tool_calls": raw_outputs.get("tool_calls", []),
+        "mcp_gapfill": raw_outputs.get("mcp_gapfill", []),
         "error": error,
         # Order benchmarking metadata (Phase 2)
         "base_route": route.base_route or route.name,
@@ -545,6 +560,7 @@ def _save_run_artifacts(
             "route": route_label,
             "raw_output": raw_outputs.get("response_text", ""),
             "tool_calls": raw_outputs.get("tool_calls", []),
+            "mcp_gapfill": raw_outputs.get("mcp_gapfill", []),
             "steps": raw_outputs.get("steps", []),
             "error": raw_outputs.get("error"),
         }
@@ -717,7 +733,7 @@ def _run_benchmark_loop(
             or os.getenv("OPENAI_API_KEY")
             or os.getenv("GOOGLE_API_KEY")
         )
-        probe = create_client(model=config.model.model_name, api_key=api_key)
+        probe = _client_from_config(config, api_key)
         print(f"  Client: {type(probe).__name__} ({config.model.model_name})")
 
     # Build the flat work list, resolving paths and applying skips up front.
@@ -759,11 +775,7 @@ def _run_benchmark_loop(
         item: tuple[RunSpec, str, str, Path, Path, int],
     ) -> dict:
         spec, screen_name, cluster_id, bundle_path, screen_context_path, rep = item
-        run_client = (
-            None
-            if config.run.dry_run
-            else create_client(model=config.model.model_name, api_key=api_key)
-        )
+        run_client = None if config.run.dry_run else _client_from_config(config, api_key)
         return execute_single_run(
             route=spec.route,
             screen_name=screen_name,

@@ -1,0 +1,106 @@
+{
+  "screen_name": "denali",
+  "cluster_id": "43",
+  "cluster_genes": [
+    {
+      "gene_symbol": "COMT",
+      "UniProt_functional_annotation": "Catalyzes the O-methylation, and thereby the inactivation, of catecholamine neurotransmitters and catechol hormones. Also shortens the biological half-lives of certain neuroactive drugs, like L-DOPA, alpha-methyl DOPA and isoproterenol",
+      "accession": "P21964"
+    },
+    {
+      "gene_symbol": "ZRSR2",
+      "UniProt_functional_annotation": "Pre-mRNA-binding protein required for splicing of both U2- and U12-type introns. Selectively interacts with the 3'-splice site of U2- and U12-type pre-mRNAs and promotes different steps in U2 and U12 intron splicing. Recruited to U12 pre-mRNAs in an ATP-dependent manner and is required for assembly of the pre-spliceosome, a precursor to other spliceosomal complexes. For U2-type introns, it is selectively and specifically required for the second step of splicing",
+      "accession": "Q15696"
+    },
+    {
+      "gene_symbol": "TSPYL1",
+      "UniProt_functional_annotation": "",
+      "accession": "Q9H0U9"
+    },
+    {
+      "gene_symbol": "HNRNPH1",
+      "UniProt_functional_annotation": "This protein is a component of the heterogeneous nuclear ribonucleoprotein (hnRNP) complexes which provide the substrate for the processing events that pre-mRNAs undergo before becoming functional, translatable mRNAs in the cytoplasm. Mediates pre-mRNA alternative splicing regulation. Inhibits, together with CUGBP1, insulin receptor (IR) pre-mRNA exon 11 inclusion in myoblast. Binds to the IR RNA. Binds poly(RG)",
+      "accession": "P31943"
+    },
+    {
+      "gene_symbol": "PPP4R2",
+      "UniProt_functional_annotation": "Regulatory subunit of serine/threonine-protein phosphatase 4 (PP4). May regulate the activity of PPP4C at centrosomal microtubule organizing centers. Its interaction with the SMN complex leads to enhance the temporal localization of snRNPs, suggesting a role of PPP4C in maturation of spliceosomal snRNPs. The PPP4C-PPP4R2-PPP4R3A PP4 complex specifically dephosphorylates H2AX phosphorylated on 'Ser-140' (gamma-H2AX) generated during DNA replication and required for DNA double strand break repair. Mediates RPA2 dephosphorylation by recruiting PPP4C to RPA2 in a DNA damage-dependent manner. RPA2 dephosphorylation is required for the efficient RPA2-mediated recruitment of RAD51 to chromatin following double strand breaks, an essential step for DNA repair",
+      "accession": "Q9NY27"
+    },
+    {
+      "gene_symbol": "GOLGA2",
+      "UniProt_functional_annotation": "Peripheral membrane component of the cis-Golgi stack that acts as a membrane skeleton that maintains the structure of the Golgi apparatus, and as a vesicle thether that facilitates vesicle fusion to the Golgi membrane (Probable) (PubMed:16489344). Required for normal protein transport from the endoplasmic reticulum to the Golgi apparatus and the cell membrane (By similarity). Together with p115/USO1 and STX5, involved in vesicle tethering and fusion at the cis-Golgi membrane to maintain the stacked and inter-connected structure of the Golgi apparatus. Plays a central role in mitotic Golgi disassembly: phosphorylation at Ser-37 by CDK1 at the onset of mitosis inhibits the interaction with p115/USO1, preventing tethering of COPI vesicles and thereby inhibiting transport through the Golgi apparatus during mitosis (By similarity). Also plays a key role in spindle pole assembly and centrosome organization (PubMed:26165940). Promotes the mitotic spindle pole assembly by activating the spindle assembly factor TPX2 to nucleate microtubules around the Golgi and capture them to couple mitotic membranes to the spindle: upon phosphorylation at the onset of mitosis, GOLGA2 interacts with importin-alpha via the nuclear localization signal region, leading to recruit importin-alpha to the Golgi membranes and liberate the spindle assembly factor TPX2 from importin-alpha. TPX2 then activates AURKA kinase and stimulates local microtubule nucleation. Upon filament assembly, nascent microtubules are further captured by GOLGA2, thus linking Golgi membranes to the spindle (PubMed:19242490, PubMed:26165940). Regulates the meiotic spindle pole assembly, probably via the same mechanism (By similarity). Also regulates the centrosome organization (PubMed:18045989, PubMed:19109421). Also required for the Golgi ribbon formation and glycosylation of membrane and secretory proteins (PubMed:16489344, PubMed:17314401)",
+      "accession": "Q08379"
+    },
+    {
+      "gene_symbol": "PDCD7",
+      "UniProt_functional_annotation": "Promotes apoptosis when overexpressed",
+      "accession": "Q8N8D1"
+    },
+    {
+      "gene_symbol": "RNPC3",
+      "UniProt_functional_annotation": "Participates in pre-mRNA U12-dependent splicing, performed by the minor spliceosome which removes U12-type introns. U12-type introns comprises less than 1% of all non-coding sequences. Binds to the 3'-stem-loop of m(7)G-capped U12 snRNA",
+      "accession": "Q96LT9"
+    },
+    {
+      "gene_symbol": "SNRNP25",
+      "UniProt_functional_annotation": "",
+      "accession": "Q9BV90"
+    },
+    {
+      "gene_symbol": "SNRNP48",
+      "UniProt_functional_annotation": "Likely involved in U12-type 5' splice site recognition",
+      "accession": "Q6IEG0"
+    },
+    {
+      "gene_symbol": "SNAPC4",
+      "UniProt_functional_annotation": "Part of the SNAPc complex required for the transcription of both RNA polymerase II and III small-nuclear RNA genes. Binds to the proximal sequence element (PSE), a non-TATA-box basal promoter element common to these 2 types of genes. Recruits TBP and BRF2 to the U6 snRNA TATA box",
+      "accession": "Q5SXM2"
+    },
+    {
+      "gene_symbol": "WDR61",
+      "UniProt_functional_annotation": "Component of the PAF1 complex (PAF1C) which has multiple functions during transcription by RNA polymerase II and is implicated in regulation of development and maintenance of embryonic stem cell pluripotency (PubMed:16307923, PubMed:19952111, PubMed:20178742). PAF1C associates with RNA polymerase II through interaction with POLR2A CTD non-phosphorylated and 'Ser-2'- and 'Ser-5'-phosphorylated forms and is involved in transcriptional elongation, acting both independently and synergistically with TCEA1 and in cooperation with the DSIF complex and HTATSF1 (PubMed:16307923, PubMed:19952111, PubMed:20178742). PAF1C is required for transcription of Hox and Wnt target genes (PubMed:16307923, PubMed:19952111, PubMed:20178742). PAF1C is involved in hematopoiesis and stimulates transcriptional activity of KMT2A/MLL1; it promotes leukemogenesis through association with KMT2A/MLL1-rearranged oncoproteins, such as KMT2A/MLL1-MLLT3/AF9 and KMT2A/MLL1-MLLT1/ENL (PubMed:16307923, PubMed:19952111, PubMed:20178742). PAF1C is involved in histone modifications such as ubiquitination of histone H2B and methylation on histone H3 'Lys-4' (H3K4me3) (PubMed:16307923, PubMed:19952111, PubMed:20178742). PAF1C recruits the RNF20/40 E3 ubiquitin-protein ligase complex and the E2 enzyme UBE2A or UBE2B to chromatin which mediate monoubiquitination of 'Lys-120' of histone H2B (H2BK120ub1); UB2A/B-mediated H2B ubiquitination is proposed to be coupled to transcription (PubMed:16307923, PubMed:19952111, PubMed:20178742). PAF1C is involved in mRNA 3' end formation probably through association with cleavage and poly(A) factors (PubMed:16307923, PubMed:19952111, PubMed:20178742). In case of infection by influenza A strain H3N2, PAF1C associates with viral NS1 protein, thereby regulating gene transcription (PubMed:16307923, PubMed:19952111, PubMed:20178742). Required for mono- and trimethylation on histone H3 'Lys-4' (H3K4me3), dimethylation on histone H3 'Lys-79' (H3K4me3). Required for Hox gene transcription (PubMed:16307923, PubMed:19952111, PubMed:20178742). Also acts as a component of the SKI complex, a multiprotein complex that assists the RNA-degrading exosome during the mRNA decay and quality-control pathways (PubMed:16024656, PubMed:32006463, PubMed:35120588). The SKI complex catalyzes mRNA extraction from 80S ribosomal complexes in the 3'-5' direction and channels mRNA to the cytosolic exosome for degradation (PubMed:32006463, PubMed:35120588). SKI-mediated extraction of mRNA from stalled ribosomes allow binding of the Pelota-HBS1L complex and subsequent ribosome disassembly by ABCE1 for ribosome recycling (PubMed:32006463)",
+      "accession": "Q9GZS3"
+    },
+    {
+      "gene_symbol": "DDX6",
+      "UniProt_functional_annotation": "Essential for the formation of P-bodies, cytosolic membrane-less ribonucleoprotein granules involved in RNA metabolism through the coordinated storage of mRNAs encoding regulatory functions (PubMed:25995375, PubMed:27342281, PubMed:31422817). Plays a role in P-bodies to coordinate the storage of translationally inactive mRNAs in the cytoplasm and prevent their degradation (PubMed:27342281). In the process of mRNA degradation, plays a role in mRNA decapping (PubMed:16364915). Blocks autophagy in nutrient-rich conditions by repressing the expression of ATG-related genes through degradation of their transcripts (PubMed:26098573)",
+      "accession": "P26196"
+    },
+    {
+      "gene_symbol": "ZMAT5",
+      "UniProt_functional_annotation": "",
+      "accession": "Q9UDW3"
+    },
+    {
+      "gene_symbol": "WDR25",
+      "UniProt_functional_annotation": "",
+      "accession": "Q64LD2"
+    },
+    {
+      "gene_symbol": "RBM48",
+      "UniProt_functional_annotation": "As a component of the minor spliceosome, involved in the splicing of U12-type introns in pre-mRNAs",
+      "accession": "Q5RL73"
+    },
+    {
+      "gene_symbol": "ZC3H18",
+      "UniProt_functional_annotation": "",
+      "accession": "Q86VM9"
+    },
+    {
+      "gene_symbol": "DOT1L",
+      "UniProt_functional_annotation": "Histone methyltransferase that methylates 'Lys-79' of histone H3 (PubMed:12123582, PubMed:38503750, PubMed:38129415). Histones in nucleosomes are preferred as substrate compared to free histones (PubMed:12123582, PubMed:38503750). Binds to DNA (PubMed:12628190, PubMed:38503750). Together with MLLT3/AF9, is involved in SCNN1A transcriptional repression following H3K79 hypermethylation at the promoter (By similarity)",
+      "accession": "Q8TEK3"
+    },
+    {
+      "gene_symbol": "ARMC7",
+      "UniProt_functional_annotation": "As a component of the minor spliceosome, involved in the splicing of U12-type introns in pre-mRNAs",
+      "accession": "Q9H6L4"
+    },
+    {
+      "gene_symbol": "SRSF2",
+      "UniProt_functional_annotation": "Necessary for the splicing of pre-mRNA. It is required for formation of the earliest ATP-dependent splicing complex and interacts with spliceosomal components bound to both the 5'- and 3'-splice sites during spliceosome assembly. It also is required for ATP-dependent interactions of both U1 and U2 snRNPs with pre-mRNA. Interacts with other spliceosomal components, via the RS domains, to form a bridge between the 5'- and 3'-splice site binding components, U1 snRNP and U2AF. Binds to purine-rich RNA sequences, either 5'-AGSAGAGTA-3' (S=C or G) or 5'-GTTCGAGTA-3'. Can bind to beta-globin mRNA and commit it to the splicing pathway. The phosphorylated form (by SRPK2) is required for cellular apoptosis in response to cisplatin treatment",
+      "accession": "Q01130"
+    }
+  ]
+}

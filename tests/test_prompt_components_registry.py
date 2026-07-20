@@ -2,6 +2,10 @@
 
 Validates that the component registry, canonical orders, and route definitions
 stay consistent as the codebase evolves.
+
+Inline-MCP route tests (3b_mcp) were removed when MCP became the
+single_call_mcp enrichment; CANONICAL_COT_MCP_ORDER no longer has a live
+route to compare against.
 """
 
 import sys
@@ -19,7 +23,7 @@ from mozzarellm.prompt_components import (
     GENE_CATEGORIZATION_RULES,
 )
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
-    ROUTE_REGISTRY,
+    MODE_REGISTRY,
 )
 
 
@@ -52,17 +56,14 @@ class TestPromptComponentsRegistry:
                 "cGCR should be longer than GCR if it doesn't literally embed the baseline text"
             )
 
-    def test_canonical_zero_shot_matches_3a(self):
-        assert tuple(CANONICAL_ZERO_SHOT_ORDER) == ROUTE_REGISTRY["3a"].component_order
+    def test_canonical_zero_shot_matches_single_call(self):
+        assert tuple(CANONICAL_ZERO_SHOT_ORDER) == MODE_REGISTRY["single_call"].component_order
 
-    def test_canonical_cot_matches_3b(self):
-        assert tuple(CANONICAL_COT_ORDER) == ROUTE_REGISTRY["3b"].component_order
-
-    def test_canonical_cot_mcp_matches_3b_mcp(self):
-        assert tuple(CANONICAL_COT_MCP_ORDER) == ROUTE_REGISTRY["3b_mcp"].component_order
+    def test_canonical_cot_matches_cot(self):
+        assert tuple(CANONICAL_COT_ORDER) == MODE_REGISTRY["cot"].component_order
 
     def test_mcp_orders_include_lit(self):
-        for route_name, route in ROUTE_REGISTRY.items():
+        for route_name, route in MODE_REGISTRY.items():
             if route.mcp:
                 assert "LIT" in route.component_order, (
                     f"MCP route {route_name!r} is missing 'LIT' in its component_order"

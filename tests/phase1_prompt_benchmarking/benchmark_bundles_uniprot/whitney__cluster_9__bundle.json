@@ -1,0 +1,116 @@
+{
+  "screen_name": "whitney",
+  "cluster_id": "9",
+  "cluster_genes": [
+    {
+      "gene_symbol": "CHP2",
+      "UniProt_functional_annotation": "Functions as an integral cofactor in cell pH regulation by controlling plasma membrane-type Na(+)/H(+) exchange activity. Binds to and activates SLC9A1/NHE1 in a serum-independent manner, thus increasing pH and protecting cells from serum deprivation-induced death. Also plays a role in the regulation of cell proliferation and tumor growth by increasing the phosphatase activity of PPP3CA in a calcium-dependent manner. Activator of the calcineurin/NFAT signaling pathway. Involved in the cytoplasmic translocation of the transcription factor NFATC3 to the nucleus",
+      "accession": "O43745"
+    },
+    {
+      "gene_symbol": "CSNK2B",
+      "UniProt_functional_annotation": "Regulatory subunit of casein kinase II/CK2. As part of the kinase complex regulates the basal catalytic activity of the alpha subunit a constitutively active serine/threonine-protein kinase that phosphorylates a large number of substrates containing acidic residues C-terminal to the phosphorylated serine or threonine (PubMed:11239457, PubMed:16818610). Participates in Wnt signaling (By similarity)\n(Microbial infection) Upon infection with Epstein-Barr virus (EBV), the interaction with viral EBNA1 increases the association of CK2 with PML proteins, which increases PML phosphorylation by CK2, triggering the polyubiquitylation and degradation of PML (PubMed:20719947, PubMed:24216761). Seems to also suppress EBV reactivation by mediating ARK2N and JUN at the Z promoter which inhibits BZLF1 transcrition (PubMed:31341047)",
+      "accession": "P67870"
+    },
+    {
+      "gene_symbol": "CYB5B",
+      "UniProt_functional_annotation": "Cytochrome b5 is a membrane-bound hemoprotein functioning as an electron carrier for several membrane-bound oxygenases",
+      "accession": "O43169"
+    },
+    {
+      "gene_symbol": "DNAJC11",
+      "UniProt_functional_annotation": "Required for mitochondrial inner membrane organization. Seems to function through its association with the MICOS complex and the mitochondrial outer membrane sorting assembly machinery (SAM) complex",
+      "accession": "Q9NVH1"
+    },
+    {
+      "gene_symbol": "DNM1L",
+      "UniProt_functional_annotation": "Functions in mitochondrial and peroxisomal division (PubMed:11514614, PubMed:12499366, PubMed:17301055, PubMed:17460227, PubMed:17553808, PubMed:18695047, PubMed:18838687, PubMed:19342591, PubMed:19411255, PubMed:19638400, PubMed:23283981, PubMed:23530241, PubMed:23921378, PubMed:26992161, PubMed:27145208, PubMed:27145933, PubMed:27301544, PubMed:27328748, PubMed:29478834, PubMed:32439975, PubMed:32484300, PubMed:9570752, PubMed:9786947). Mediates membrane fission through oligomerization into membrane-associated tubular structures that wrap around the scission site to constrict and sever the mitochondrial membrane through a GTP hydrolysis-dependent mechanism (PubMed:23530241, PubMed:23584531, PubMed:33850055). The specific recruitment at scission sites is mediated by membrane receptors like MFF, MIEF1 and MIEF2 for mitochondrial membranes (PubMed:23283981, PubMed:23921378, PubMed:29899447). While the recruitment by the membrane receptors is GTP-dependent, the following hydrolysis of GTP induces the dissociation from the receptors and allows DNM1L filaments to curl into closed rings that are probably sufficient to sever a double membrane (PubMed:29899447). Acts downstream of PINK1 to promote mitochondrial fission in a PRKN-dependent manner (PubMed:32484300). Plays an important role in mitochondrial fission during mitosis (PubMed:19411255, PubMed:26992161, PubMed:27301544, PubMed:27328748). Through its function in mitochondrial division, ensures the survival of at least some types of postmitotic neurons, including Purkinje cells, by suppressing oxidative damage (By similarity). Required for normal brain development, including that of cerebellum (PubMed:17460227, PubMed:26992161, PubMed:27145208, PubMed:27301544, PubMed:27328748). Facilitates developmentally regulated apoptosis during neural tube formation (By similarity). Required for a normal rate of cytochrome c release and caspase activation during apoptosis; this requirement may depend upon the cell type and the physiological apoptotic cues (By similarity). Required for formation of endocytic vesicles (PubMed:20688057, PubMed:23792689, PubMed:9570752). Proposed to regulate synaptic vesicle membrane dynamics through association with BCL2L1 isoform Bcl-X(L) which stimulates its GTPase activity in synaptic vesicles; the function may require its recruitment by MFF to clathrin-containing vesicles (PubMed:17015472, PubMed:23792689). Required for programmed necrosis execution (PubMed:22265414). Rhythmic control of its activity following phosphorylation at Ser-637 is essential for the circadian control of mitochondrial ATP production (PubMed:29478834)\nInhibits peroxisomal division when overexpressed\nInhibits peroxisomal division when overexpressed",
+      "accession": "O00429"
+    },
+    {
+      "gene_symbol": "EEF2",
+      "UniProt_functional_annotation": "Catalyzes the GTP-dependent ribosomal translocation step during translation elongation (PubMed:26593721). During this step, the ribosome changes from the pre-translocational (PRE) to the post-translocational (POST) state as the newly formed A-site-bound peptidyl-tRNA and P-site-bound deacylated tRNA move to the P and E sites, respectively (PubMed:26593721). Catalyzes the coordinated movement of the two tRNA molecules, the mRNA and conformational changes in the ribosome (PubMed:26593721)",
+      "accession": "P13639"
+    },
+    {
+      "gene_symbol": "GPAT4",
+      "UniProt_functional_annotation": "Converts glycerol-3-phosphate to 1-acyl-sn-glycerol-3-phosphate (lysophosphatidic acid or LPA) by incorporating an acyl moiety at the sn-1 position of the glycerol backbone (PubMed:18238778). Active against both saturated and unsaturated long-chain fatty acyl-CoAs (PubMed:18238778). Protects cells against lipotoxicity (PubMed:30846318)",
+      "accession": "Q86UL3"
+    },
+    {
+      "gene_symbol": "LSM2",
+      "UniProt_functional_annotation": "Plays a role in pre-mRNA splicing as component of the U4/U6-U5 tri-snRNP complex that is involved in spliceosome assembly, and as component of the precatalytic spliceosome (spliceosome B complex) (PubMed:28781166). The heptameric LSM2-8 complex binds specifically to the 3'-terminal U-tract of U6 snRNA (PubMed:10523320)",
+      "accession": "Q9Y333"
+    },
+    {
+      "gene_symbol": "MARCHF6",
+      "UniProt_functional_annotation": "Endoplasmic reticulum membrane-associated E3 ubiquitin ligase that plays a critical role in mitigating endoplasmic reticulum stress, the regulation of cholesterol and lipid homeostasis, and ferroptosis (PubMed:25088257, PubMed:35941365, PubMed:39216628). Acts as a pivotal component of both the Ac/N-degron pathway (targeting the N-terminal acetyl group of substrates) and the ER-associated protein degradation-cytosol (ERAD-C) pathway (targeting misfolded substrates) (PubMed:30425097, PubMed:35941365). For instance, mediates the degradation of Ac/N-degron-bearing proteins such as the G protein regulator RGS2 and the lipid droplet protein PLIN2 (PubMed:39216628). Suppresses endoplasmic reticulum stress and ferroptosis through cytosolic POMC degradation (By similarity). Prevents ferroptosis by acting as a NADPH sensor during lipid peroxidation through its C-terminal regulatory region (PubMed:35941365). Facilitates also the degradation of selected endoplasmic reticulum proteins by associating with signal peptide peptidase for the turnover of endogenous tail-anchored proteins (PubMed:29519897). Promotes ubiquitination of DIO2, leading to its degradation (PubMed:19651899). By ubiquitinating and thereby modulating the stability of many proteins of the cholesterol pathway including SQLE, CYP51A1, CYP11A1 and HMGCR, acts as a crucial post-translational regulator of cholesterol synthesis (PubMed:24449766, PubMed:31904814, PubMed:36958722)",
+      "accession": "O60337"
+    },
+    {
+      "gene_symbol": "MFN2",
+      "UniProt_functional_annotation": "Mitochondrial outer membrane GTPase that mediates mitochondrial clustering and fusion (PubMed:11181170, PubMed:11950885, PubMed:19889647, PubMed:26214738, PubMed:28114303). Mitochondria are highly dynamic organelles, and their morphology is determined by the equilibrium between mitochondrial fusion and fission events (PubMed:28114303). Overexpression induces the formation of mitochondrial networks (PubMed:28114303). Membrane clustering requires GTPase activity and may involve a major rearrangement of the coiled coil domains (Probable). Plays a central role in mitochondrial metabolism and may be associated with obesity and/or apoptosis processes (By similarity). Plays an important role in the regulation of vascular smooth muscle cell proliferation (By similarity). Involved in the clearance of damaged mitochondria via selective autophagy (mitophagy) (PubMed:23620051). Is required for PRKN recruitment to dysfunctional mitochondria (PubMed:23620051). Involved in the control of unfolded protein response (UPR) upon ER stress including activation of apoptosis and autophagy during ER stress (By similarity). Acts as an upstream regulator of EIF2AK3 and suppresses EIF2AK3 activation under basal conditions (By similarity)",
+      "accession": "O95140"
+    },
+    {
+      "gene_symbol": "PCYT1A",
+      "UniProt_functional_annotation": "Catalyzes the key rate-limiting step in the CDP-choline pathway for phosphatidylcholine biosynthesis",
+      "accession": "P49585"
+    },
+    {
+      "gene_symbol": "RHOT2",
+      "UniProt_functional_annotation": "Atypical mitochondrial nucleoside-triphosphatase (NTPase) involved in mitochondrial trafficking (PubMed:16630562, PubMed:22396657, PubMed:30513825). Probably involved in control of anterograde transport of mitochondria and their subcellular distribution (PubMed:22396657). Can hydrolyze GTP (By similarity). Can hydrolyze ATP and UTP (PubMed:30513825)",
+      "accession": "Q8IXI1"
+    },
+    {
+      "gene_symbol": "SCD",
+      "UniProt_functional_annotation": "Stearoyl-CoA desaturase that utilizes O(2) and electrons from reduced cytochrome b5 to introduce the first double bond into saturated fatty acyl-CoA substrates (PubMed:15907797, PubMed:18765284). Catalyzes the insertion of a cis double bond at the delta-9 position into fatty acyl-CoA substrates including palmitoyl-CoA and stearoyl-CoA (PubMed:15907797, PubMed:18765284). Gives rise to a mixture of 16:1 and 18:1 unsaturated fatty acids (PubMed:15610069). Plays an important role in lipid biosynthesis. Plays an important role in regulating the expression of genes that are involved in lipogenesis and in regulating mitochondrial fatty acid oxidation (By similarity). Plays an important role in body energy homeostasis (By similarity). Contributes to the biosynthesis of membrane phospholipids, cholesterol esters and triglycerides (By similarity)",
+      "accession": "O00767"
+    },
+    {
+      "gene_symbol": "SLC25A1",
+      "UniProt_functional_annotation": "Mitochondrial electroneutral antiporter that exports citrate from the mitochondria into the cytosol in exchange for malate (PubMed:26870663, PubMed:29031613, PubMed:29238895, PubMed:39881208, PubMed:38937634). Also able to mediate the exchange of citrate for isocitrate, phosphoenolpyruvate, cis-aconitate and to a lesser extent trans-aconitate, maleate and succinate (PubMed:29031613). Substrate exchange across the membrane occurs consecutively with one substrate being transported first, then dissociating from the substrate binding site before the second substrate binds for transport in the opposite direction (PubMed:38937634). In the cytoplasm, citrate plays important roles in fatty acid and sterol synthesis, regulation of glycolysis, protein acetylation, and other physiopathological processes (PubMed:29031613, PubMed:29238895, PubMed:39881208)",
+      "accession": "P53007"
+    },
+    {
+      "gene_symbol": "SMIM12",
+      "UniProt_functional_annotation": "",
+      "accession": "Q96EX1"
+    },
+    {
+      "gene_symbol": "SREBF2",
+      "UniProt_functional_annotation": "Precursor of the transcription factor form (Processed sterol regulatory element-binding protein 2), which is embedded in the endoplasmic reticulum membrane (PubMed:32322062). Low sterol concentrations promote processing of this form, releasing the transcription factor form that translocates into the nucleus and activates transcription of genes involved in cholesterol biosynthesis (PubMed:32322062)\nKey transcription factor that regulates expression of genes involved in cholesterol biosynthesis (PubMed:12177166, PubMed:32322062). Binds to the sterol regulatory element 1 (SRE-1) (5'-ATCACCCCAC-3'). Has dual sequence specificity binding to both an E-box motif (5'-ATCACGTGA-3') and to SRE-1 (5'-ATCACCCCAC-3') (PubMed:12177166, PubMed:7903453). Regulates transcription of genes related to cholesterol synthesis pathway (PubMed:12177166, PubMed:32322062)",
+      "accession": "Q12772"
+    },
+    {
+      "gene_symbol": "TMEM11",
+      "UniProt_functional_annotation": "Plays a role in mitochondrial morphogenesis",
+      "accession": "P17152"
+    },
+    {
+      "gene_symbol": "TMPO",
+      "UniProt_functional_annotation": "May be involved in the structural organization of the nucleus and in the post-mitotic nuclear assembly. Plays an important role, together with LMNA, in the nuclear anchorage of RB1\nTP and TP5 may play a role in T-cell development and function. TP5 is an immunomodulating pentapeptide",
+      "accession": "P42166"
+    },
+    {
+      "gene_symbol": "VHL",
+      "UniProt_functional_annotation": "Involved in the ubiquitination and subsequent proteasomal degradation via the von Hippel-Lindau ubiquitination complex (PubMed:10944113, PubMed:17981124, PubMed:19584355). Seems to act as a target recruitment subunit in the E3 ubiquitin ligase complex and recruits hydroxylated hypoxia-inducible factor (HIF) under normoxic conditions (PubMed:10944113, PubMed:17981124). Involved in transcriptional repression through interaction with HIF1A, HIF1AN and histone deacetylases (PubMed:10944113, PubMed:17981124). Ubiquitinates, in an oxygen-responsive manner, ADRB2 (PubMed:19584355). Acts as a negative regulator of mTORC1 by promoting ubiquitination and degradation of RPTOR (PubMed:34290272)",
+      "accession": "P40337"
+    },
+    {
+      "gene_symbol": "VKORC1L1",
+      "UniProt_functional_annotation": "Involved in vitamin K metabolism. Can reduce inactive vitamin K 2,3-epoxide to active vitamin K, and may contribute to vitamin K-mediated protection against oxidative stress. Plays a role in vitamin K-dependent gamma-carboxylation of Glu residues in target proteins",
+      "accession": "Q8N0U8"
+    },
+    {
+      "gene_symbol": "VPS13D",
+      "UniProt_functional_annotation": "Mediates the transfer of lipids between membranes at organelle contact sites (By similarity). Functions in promoting mitochondrial clearance by mitochondrial autophagy (mitophagy), also possibly by positively regulating mitochondrial fission (PubMed:29307555, PubMed:29604224). Mitophagy plays an important role in regulating cell health and mitochondrial size and homeostasis",
+      "accession": "Q5THJ4"
+    },
+    {
+      "gene_symbol": "ZMYM4",
+      "UniProt_functional_annotation": "Required for regulation of cell morphology and cytoskeletal organization",
+      "accession": "Q5VZL5"
+    }
+  ]
+}

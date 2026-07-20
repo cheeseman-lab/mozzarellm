@@ -10,10 +10,10 @@ phase1_prompt_benchmarking/
     benchmarking_info.md
     prompt-assembly-routes-info.md
     phase1_benchmark_preprocess.py
-    benchmark_clusters_ground_truth.csv
 
     benchmark_inputs/
         benchmark_clusters.csv
+        benchmark_combined_expert_annotations.csv    # ground-truth (reviewer labels)
         aconcagua_interphase_screen_context.json
         denali_screen_context.json
         jebel_screen_context.json

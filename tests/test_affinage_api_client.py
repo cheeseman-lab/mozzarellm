@@ -12,6 +12,7 @@ import requests
 
 from mozzarellm.clients.affinage_api_client import (
     ANNOTATION_COL,
+    AUDIT_NOTE_COL,
     AffinageClient,
 )
 
@@ -53,13 +54,33 @@ def test_get_annotation_404_returns_none_and_warns(client):
         assert client.get_annotation("NOTAREALGENE") is None
 
 
-def test_get_annotation_audit_flagged_returns_none_and_warns(client):
+def test_get_annotation_audit_flagged_surfaces_narrative_and_warns(client):
+    # Audit flags are advisory: the narrative is surfaced, not dropped.
     payload = {"gene": "X", "mechanistic_narrative": "anything", "audit_flag": True}
     with (
         patch.object(client._session, "get", return_value=_mock_response(json_data=payload)),
         pytest.warns(UserWarning, match="audit-flagged"),
     ):
-        assert client.get_annotation("X") is None
+        assert client.get_annotation("X") == "anything"
+
+
+def test_get_annotation_record_carries_audit_note(client):
+    audit = {"rules_fired": "R7", "issue": "R7: fabricated (no corpus paper): 40596795"}
+    payload = {"gene": "KIF18A", "mechanistic_narrative": "real narrative", "audit_flag": audit}
+    with (
+        patch.object(client._session, "get", return_value=_mock_response(json_data=payload)),
+        pytest.warns(UserWarning, match="audit-flagged"),
+    ):
+        record = client.get_annotation_record("KIF18A")
+    assert record["narrative"] == "real narrative"
+    assert record["audit_note"] == "R7: fabricated (no corpus paper): 40596795"
+
+
+def test_get_annotation_record_clean_has_empty_note(client):
+    payload = {"gene": "TP53", "mechanistic_narrative": "narrative", "audit_flag": None}
+    with patch.object(client._session, "get", return_value=_mock_response(json_data=payload)):
+        record = client.get_annotation_record("TP53")
+    assert record == {"narrative": "narrative", "audit_note": ""}
 
 
 def test_get_annotation_refusal_prefix_returns_none_and_warns(client):
@@ -152,8 +173,34 @@ def test_fetch_functional_annotations_returns_only_usable(client):
         pytest.warns(UserWarning),
     ):
         result = client.fetch_functional_annotations(chunk, GENE_COL)
-    assert list(result.columns) == [GENE_COL, ANNOTATION_COL]
+    assert list(result.columns) == [GENE_COL, ANNOTATION_COL, AUDIT_NOTE_COL]
     assert result[GENE_COL].tolist() == ["TP53"]
+
+
+def test_fetch_functional_annotations_carries_audit_note_column(client):
+    audit = {"issue": "R7: fabricated (no corpus paper): 40596795"}
+    payloads = {
+        "KIF18A": _mock_response(
+            json_data={"mechanistic_narrative": "flagged narrative", "audit_flag": audit}
+        ),
+        "TP53": _mock_response(
+            json_data={"mechanistic_narrative": "clean narrative", "audit_flag": None}
+        ),
+    }
+
+    def side_effect(url, **_):
+        return payloads[url.rsplit("/", 1)[-1]]
+
+    chunk = pd.DataFrame({GENE_COL: ["KIF18A", "TP53"]})
+    with (
+        patch.object(client._session, "get", side_effect=side_effect),
+        pytest.warns(UserWarning, match="audit-flagged"),
+    ):
+        result = client.fetch_functional_annotations(chunk, GENE_COL)
+    kif = result[result[GENE_COL] == "KIF18A"].iloc[0]
+    tp53 = result[result[GENE_COL] == "TP53"].iloc[0]
+    assert kif[AUDIT_NOTE_COL] == "R7: fabricated (no corpus paper): 40596795"
+    assert tp53[AUDIT_NOTE_COL] == ""
 
 
 def test_fetch_functional_annotations_raises_when_all_missing(client):
