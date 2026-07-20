@@ -51,16 +51,14 @@ def score_run(
     gt: dict,
     cluster_coherence: dict | None = None,
     route_excludes: str = "mcp",
-    route_includes: str | None = None,
     route_equals: str | None = None,
 ) -> MetricPanel:
     """Score one run directory's parsed_outputs.jsonl against consensus ground truth.
 
-    Route filtering precedence (first that is set wins): route_equals keeps only
-    rows whose route matches exactly (used to isolate one variant when several
-    share a prefix, e.g. W5 vs W51); route_includes keeps rows whose route
-    contains it (convenience for the mcp cell, a superset of the non-mcp name);
-    otherwise skip rows matching the route_excludes substring.
+    Route filtering: route_equals (if set) keeps only rows whose route matches
+    exactly -- isolates one cell when several share a prefix (e.g. single_call vs
+    single_call_mcp, or W5 vs W51); otherwise skip rows matching the
+    route_excludes substring.
     """
     run_dir = Path(run_dir)
 
@@ -78,9 +76,6 @@ def score_run(
             route = cell.get("route", "")
             if route_equals is not None:
                 if route != route_equals:
-                    continue
-            elif route_includes is not None:
-                if route_includes not in route:
                     continue
             elif route_excludes and route_excludes in route:
                 continue
@@ -202,23 +197,14 @@ def score_decoys(
     run_dir: Path,
     decoy_specs: dict[tuple, str],
     route_equals: str | None = None,
-    route_includes: str | None = None,
     route_excludes: str = "mcp",
 ) -> list[DecoyResult]:
     """Validate negative-control decoy clusters (not consensus-scored).
 
-    decoy_specs maps (screen, cluster) -> expectation:
-      - "abstain"    (nonsense / control-heavy clusters): PASS when the model
-        returns a valid answer whose modal pathway_confidence is "Low" -- it
-        recognized there is no discernible cluster. A parse failure is a crash,
-        not abstention, so it does NOT pass.
-      - "functional" (large coherent cluster, e.g. jebel/0): PASS when every
-        replicate returned a valid answer (no error / truncation) AND modal
-        confidence is High or Medium -- it handled the big cluster without
-        erroring out.
-
-    Route filtering mirrors score_run (route_equals > route_includes >
-    route_excludes).
+    decoy_specs maps (screen, cluster) -> expectation. Both require valid replies
+    (no crash) across reps: "abstain" passes on modal confidence Low (recognized
+    no cluster); "functional" passes on modal High/Medium (handled the big
+    cluster without erroring out). Route filtering mirrors score_run.
     """
     run_dir = Path(run_dir)
     reps: dict[tuple, int] = defaultdict(int)
@@ -234,9 +220,6 @@ def score_decoys(
             route = cell.get("route", "")
             if route_equals is not None:
                 if route != route_equals:
-                    continue
-            elif route_includes is not None:
-                if route_includes not in route:
                     continue
             elif route_excludes and route_excludes in route:
                 continue
@@ -262,12 +245,12 @@ def score_decoys(
         n_reps = reps[key]
         n_fail = failures[key]
         if expectation == "abstain":
-            passed = modal == "Low"
+            # A crash is not abstention: require valid replies (no failures)
+            # whose modal confidence is Low.
+            passed = n_reps > 0 and n_fail == 0 and modal == "Low"
         elif expectation == "functional":
             passed = n_reps > 0 and n_fail == 0 and modal in ("High", "Medium")
         else:
             raise ValueError(f"unknown decoy expectation {expectation!r} for {key}")
-        results.append(
-            DecoyResult(screen, cluster, expectation, n_reps, n_fail, modal, passed)
-        )
+        results.append(DecoyResult(screen, cluster, expectation, n_reps, n_fail, modal, passed))
     return results

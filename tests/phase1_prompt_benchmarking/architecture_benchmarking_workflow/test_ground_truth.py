@@ -8,7 +8,7 @@ from architecture_benchmarking_workflow.ground_truth import (
     load_consensus_gt,
 )
 
-ROOT = Path("/lab/barcheese01/mdiberna/mozzarellm")
+ROOT = Path(__file__).resolve().parents[3]
 P = ROOT / "tests/phase1_prompt_benchmarking"
 GT = P / "ground_truth"
 

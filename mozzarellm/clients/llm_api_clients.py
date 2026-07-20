@@ -355,7 +355,8 @@ class AnthropicClient(LLMClientBase):
         if self.thinking is False:
             return {"thinking": {"type": "disabled"}}
         # enabled: budget must stay under max_tokens to leave room for the answer
-        budget = max(1024, min(self.max_tokens // 2, 8000))
+        # (the max_tokens-1 cap protects small-budget callers from the 1024 floor)
+        budget = min(max(1024, min(self.max_tokens // 2, 8000)), self.max_tokens - 1)
         return {"thinking": {"type": "enabled", "budget_tokens": budget}}
 
     def _create_message(self, client, base: dict):
@@ -368,11 +369,9 @@ class AnthropicClient(LLMClientBase):
                 )
             except anthropic.BadRequestError as e:
                 last_exc = e
-                # Retry whenever the error names a param we can strip, even if
-                # another concurrent thread already recorded the model as
-                # rejecting it — the next _sampling_kwargs/_thinking_kwarg call
-                # omits it, so retrying is always safe. (Gating the retry on
-                # set-membership races 12 parallel workers into spurious raises.)
+                # Retry whenever the error names a strippable param, even if another
+                # thread already recorded the model (the next call omits it anyway);
+                # gating the retry on set-membership races parallel workers into raises.
                 if _is_temperature_deprecated(e):
                     if self.model not in _MODELS_REJECTING_TEMPERATURE:
                         _MODELS_REJECTING_TEMPERATURE.add(self.model)
@@ -381,7 +380,9 @@ class AnthropicClient(LLMClientBase):
                 if _is_thinking_unsupported(e):
                     if self.model not in _MODELS_REJECTING_THINKING:
                         _MODELS_REJECTING_THINKING.add(self.model)
-                        logger.info(f"{self.model}: thinking param unsupported; retrying without it")
+                        logger.info(
+                            f"{self.model}: thinking param unsupported; retrying without it"
+                        )
                     continue
                 raise
         raise last_exc  # pragma: no cover

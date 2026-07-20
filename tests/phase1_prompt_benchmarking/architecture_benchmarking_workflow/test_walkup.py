@@ -1,12 +1,7 @@
-"""Tests for the prompt walkup driver (pure logic, no API calls)."""
+"""Tests for the winner-selection primitives (pure logic, no API calls)."""
 
 from architecture_benchmarking_workflow.scorer import MetricPanel
-from architecture_benchmarking_workflow.walkup import (
-    StageSpec,
-    run_walkup,
-    select_holistic,
-    select_winner,
-)
+from architecture_benchmarking_workflow.walkup import select_holistic, select_winner
 
 
 def P(cat, nov=(29, 50), unc=(3, 6), coh=(1, 4)):  # noqa: N802
@@ -70,7 +65,9 @@ def test_holistic_picks_argmax_primary_among_survivors():
 def test_holistic_excludes_dominated_even_with_high_primary():
     cells = {
         "dominant": _panel(0.86, 0.60, 0.60, 0.60),
-        "dominated_high_cat": _panel(0.90, 0.50, 0.50, 0.50),  # top cat but beaten on nothing it wins
+        "dominated_high_cat": _panel(
+            0.90, 0.50, 0.50, 0.50
+        ),  # top cat but beaten on nothing it wins
     }
     # 'dominated_high_cat' is NOT dominated (it wins on category), so it should win.
     winner, dominated = select_holistic(cells, "category", _HOLISTIC_METRICS)
@@ -81,29 +78,3 @@ def test_holistic_excludes_dominated_even_with_high_primary():
     winner, dominated = select_holistic(cells, "category", _HOLISTIC_METRICS)
     assert winner == "dominant"
     assert "dominated_high_cat" in dominated
-
-
-def test_run_walkup_carries_winners_forward():
-    # two stages; stage1 has a winner, stage2 has none (baseline kept)
-    stages = (
-        StageSpec("GCR", "category", ("novel_subclass",)),
-        StageSpec("NPR", "novel_subclass", ("category",)),
-    )
-    panels = {
-        ("GCR", "W1"): P(0.90),
-        ("NPR", "W2"): P(0.90, nov=(20, 50)),
-    }  # NPR variant regresses its own primary
-
-    def variants_for(stage):
-        return {"GCR": ["W1"], "NPR": ["W2"]}[stage.name]
-
-    def generate_fn(stage, variant, carried):
-        return (stage.name, variant)
-
-    def score_fn(run_dir):
-        return panels[run_dir]
-
-    res = run_walkup(stages, P(0.80), variants_for, generate_fn, score_fn)
-    assert res.carried == ["W1"]  # GCR winner carried, NPR kept baseline
-    assert res.final_panel.category == 0.90
-    assert len(res.stage_rows) == 2

@@ -1,0 +1,7 @@
+# Benchmark data (regenerable via build_v3_bundles.py / ground_truth.py).
+# Mark as generated so GitHub collapses it in PR diffs and drops it from
+# language stats — keeps the review focused on code, not data blobs.
+tests/phase1_prompt_benchmarking/benchmark_bundles_*/*.json linguist-generated=true
+tests/phase1_prompt_benchmarking/ground_truth/*.csv linguist-generated=true
+tests/phase1_prompt_benchmarking/benchmark_inputs_v3/*.csv linguist-generated=true
+tests/phase1_prompt_benchmarking/benchmark_inputs_v3/*_screen_context.json linguist-generated=true

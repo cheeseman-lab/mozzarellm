@@ -3,13 +3,19 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from architecture_benchmarking_workflow.ground_truth import build_consensus_gt, load_consensus_gt
 from architecture_benchmarking_workflow.scorer import score_decoys, score_run
 
-ROOT = Path("/lab/barcheese01/mdiberna/mozzarellm")
+ROOT = Path(__file__).resolve().parents[3]
 P = ROOT / "tests/phase1_prompt_benchmarking"
 GT = P / "ground_truth"
+# Cached runs live in the benchmarking_outputs git submodule.
 B = P / "benchmarking_outputs/8.source_mcp_3x2"
+needs_cached_runs = pytest.mark.skipif(
+    not B.exists(), reason="cached runs require the benchmarking_outputs submodule"
+)
 COH = {
     ("denali", "43"): "Medium",
     ("whitney", "6"): "Medium",
@@ -33,6 +39,7 @@ def _gt(tmp_path):
     return load_consensus_gt(out)
 
 
+@needs_cached_runs
 def test_reproduces_3x2_panel(tmp_path):
     gt = _gt(tmp_path)
     aff = score_run(B / "phase4_3x2_affinage_uniprot_20260716_115019", gt, cluster_coherence=COH)
@@ -49,23 +56,12 @@ def test_reproduces_3x2_panel(tmp_path):
     assert both.coherence == (3, 4)
 
 
-def test_route_includes_isolates_mcp_cell(tmp_path):
-    gt = _gt(tmp_path)
-    d = B / "phase4_3x2_affinage_uniprot_20260716_115019"
-    # Default excludes the mcp cell; route_includes selects only it. The cached
-    # affinage mcp cell has 2 unparsed replies (the known over-call failures).
-    non_mcp = score_run(d, gt, cluster_coherence=COH)
-    mcp = score_run(d, gt, cluster_coherence=COH, route_includes="mcp")
-    assert non_mcp.failures == 0
-    assert mcp.failures == 2
-    assert mcp.n > 0
-
-
+@needs_cached_runs
 def test_route_equals_exact_match(tmp_path):
     gt = _gt(tmp_path)
     d = B / "phase4_3x2_affinage_uniprot_20260716_115019"
     # Exact match on the non-mcp cell's route reproduces the default-exclude panel;
-    # exact match on the mcp route isolates the mcp cell (2 failures).
+    # exact match on the mcp route isolates the mcp cell (2 over-call failures).
     exact_non_mcp = score_run(d, gt, cluster_coherence=COH, route_equals="3a")
     exact_mcp = score_run(d, gt, cluster_coherence=COH, route_equals="3a_mcp_gap")
     assert exact_non_mcp.category == 115 / 133
@@ -122,3 +118,19 @@ def test_score_decoys_functional_fails_on_error(tmp_path):
     (res,) = score_decoys(d, {("jebel", "0"): "functional"})
     assert res.failures == 1
     assert res.passed is False
+
+
+def test_score_decoys_abstain_fails_on_crash(tmp_path):
+    # A crash is not abstention: 2 valid "Low" + 1 crash must NOT pass.
+    rows = [
+        _decoy_cell("single_call", "whitney", "49", 1, "Low"),
+        _decoy_cell("single_call", "whitney", "49", 2, None, valid=False),
+        _decoy_cell("single_call", "whitney", "49", 3, "Low"),
+    ]
+    d = tmp_path / "run"
+    d.mkdir()
+    (d / "parsed_outputs.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    (res,) = score_decoys(d, {("whitney", "49"): "abstain"})
+    assert res.modal_confidence == "Low"
+    assert res.failures == 1
+    assert res.passed is False  # crash masks abstention

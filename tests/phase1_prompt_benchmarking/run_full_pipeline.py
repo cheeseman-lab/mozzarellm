@@ -1,22 +1,13 @@
 #!/usr/bin/env python
 """Integrated source -> prompt -> mode optimization driver.
 
-Runs the three benchmark axes as chained stages, scoring every cell against
-reviewer-consensus ground truth and carrying the per-stage winner forward:
-
+Three chained stages over the 8-cluster slate, each scored against
+reviewer-consensus GT and carrying the winner forward:
     Stage 1 SOURCE  {uniprot,affinage,both} x {single_call, single_call_mcp}
-    Stage 2 PROMPT  W0..W24 wording variants on the winning source
-    Stage 3 MODE    single_call / cot / stepwise on the winning source+prompt
-
-Each stage reuses the existing orchestrator (Phase 1 architecture for the
-source/mode axes, Phase 3 wording for the prompt axis), scores each cell with
-scorer.score_run (isolating cells by exact route), and selects with
-walkup.select_winner (category primary, do-no-harm guards). Selections are
-written to pipeline_state.json so stages are independently launchable
-(--stage {1,2,3}) and a human can confirm or edit the carried winner between
-stages -- the holistic call the doc reserves for a person.
-
-Validate the whole plumbing with --dry-run (mock outputs, zero API cost).
+    Stage 2 PROMPT  W0..W24 wording variants
+    Stage 3 MODE    single_call / cot / stepwise
+Selections land in pipeline_state.json so stages are independently launchable
+(--stage {1,2,3}). --dry-run exercises the plumbing with mock outputs (no API).
 """
 
 from __future__ import annotations
@@ -39,10 +30,8 @@ from architecture_benchmarking_workflow.walkup import metric_value, select_holis
 
 HOLISTIC_METRICS = ["category", "novel_subclass", "unchar_subclass", "coherence"]
 
-# Negative-control decoys and what a correct model does with each (validation,
-# not consensus-scored): nonsense/control clusters must abstain (Low confidence,
-# "no discernible cluster"); the large coherent cluster must stay functional
-# (valid output, no truncation/error).
+# Negative-control decoys: nonsense/control clusters must abstain (Low), the
+# large coherent cluster must stay functional (valid output, no truncation).
 DECOY_SPECS = {
     ("aconcagua_interphase_shuffled", "17"): "abstain",
     ("whitney", "49"): "abstain",
@@ -52,10 +41,8 @@ DECOY_SPECS = {
 SCRIPT_DIR = Path(__file__).resolve().parent
 GT_DIR = SCRIPT_DIR / "ground_truth"
 CONFIGS = SCRIPT_DIR / "configs"
-# Stage 1 runs the full slate (5 real + 3 decoys, from the source configs) so
-# decoy abstention/robustness is measured per source. Stages 2-3 tune prompt and
-# mode on the real clusters only -- decoys don't inform those and cost 60% more.
-CLUSTERS_REAL = SCRIPT_DIR / "benchmark_inputs_v3" / "benchmark_clusters_5real.csv"
+# The 8-cluster slate rides every stage: real clusters drive selection (the
+# scorer skips decoys), decoys are validated per source/prompt/mode.
 PIPE_DIR = SCRIPT_DIR / "benchmarking_outputs" / "pipeline"
 STATE_PATH = PIPE_DIR / "pipeline_state.json"
 GT_PATH = PIPE_DIR / "consensus_gt.csv"
@@ -101,6 +88,22 @@ def score_cells(run_dir: Path, gt: dict, coh: dict) -> dict[str, MetricPanel]:
     }
 
 
+def _decoy_results(run_dir: Path, route_equals: str | None = None) -> list[dict]:
+    """Validate the 3 decoys in a run dir (optionally isolating one route)."""
+    return [
+        {
+            "screen": r.screen,
+            "cluster": r.cluster,
+            "expectation": r.expectation,
+            "reps": r.reps,
+            "failures": r.failures,
+            "modal_confidence": r.modal_confidence,
+            "passed": r.passed,
+        }
+        for r in score_decoys(run_dir, DECOY_SPECS, route_equals=route_equals)
+    ]
+
+
 def _panel_json(panel: MetricPanel) -> dict:
     return {
         "category": panel.category,
@@ -134,8 +137,7 @@ def _prepare(config, experiment_id: str, dry_run: bool):
     config.paths.output_dir = PIPE_DIR
     config.run.overwrite_outputs = True  # deterministic dir: PIPE_DIR/experiment_id
     config.run.dry_run = dry_run
-    # We own PIPE_DIR: clear this experiment's stale dir so the orchestrator
-    # writes fresh (avoids its interactive truncate-confirm prompt).
+    # Clear our stale dir so the orchestrator writes fresh (skips its truncate prompt).
     out = config.experiment_output_dir
     if out.is_relative_to(PIPE_DIR):
         shutil.rmtree(out, ignore_errors=True)
@@ -163,26 +165,14 @@ def stage1(dry_run: bool) -> dict:
         for route, panel in score_cells(out, gt, coh).items():
             cells[f"{source}::{route}"] = panel
         # Decoy validation on the plain single_call route (route_excludes drops mcp).
-        decoys[source] = [
-            {
-                "screen": r.screen,
-                "cluster": r.cluster,
-                "expectation": r.expectation,
-                "reps": r.reps,
-                "failures": r.failures,
-                "modal_confidence": r.modal_confidence,
-                "passed": r.passed,
-            }
-            for r in score_decoys(out, DECOY_SPECS)
-        ]
+        decoys[source] = _decoy_results(out)
 
     print("\n[stage1] cell panels:")
     for label in sorted(cells):
         _print_panel(label, cells[label])
 
-    # Source is a holistic axis (eliminate dominated, then argmax category),
-    # NOT the guarded prompt walkup -- richer sources legitimately trade one
-    # panel metric for another, which a do-no-harm guard would wrongly veto.
+    # Source is holistic (eliminate-dominated + argmax category), not the guarded
+    # walkup: richer sources legitimately trade one metric for another.
     winner_key, dominated = select_holistic(cells, PRIMARY, HOLISTIC_METRICS)
     winner_source = winner_key.split("::")[0]
     print(f"\n[stage1] holistic winner: {winner_key}  ->  source={winner_source}")
@@ -211,21 +201,22 @@ def stage1(dry_run: bool) -> dict:
 def stage2(dry_run: bool, source: str) -> dict:
     gt, coh = load_gt_and_coherence()
     config = _prepare(load_config(CONFIGS / f"source_{source}.yaml"), "s2_prompt", dry_run)
-    config.paths.benchmark_clusters_csv = CLUSTERS_REAL  # prompt walkup on real clusters only
     config.architecture_benchmark.enabled = False
     config.wording_benchmark.enabled = True
     config.wording_benchmark.base_routes = ["single_call"]
     config.wording_benchmark.targets = "all"
-    # Evidence source is fixed by the bundle dir; wording targets resolve their
-    # own alternate text set, so force_source must stay unset here.
+    # Source is fixed by the bundle dir; wording targets resolve their own text.
     print(f"\n[stage2] prompt walkup W0..W24 on source={source} -> {config.experiment_id}")
     run_benchmark(config)
 
+    out = config.experiment_output_dir
     by_wid: dict[str, MetricPanel] = {}
-    for route, panel in score_cells(config.experiment_output_dir, gt, coh).items():
+    wid_route: dict[str, str] = {}
+    for route, panel in score_cells(out, gt, coh).items():
         m = _WID_RE.search(route)
         if m:
             by_wid[m.group(1)] = panel
+            wid_route[m.group(1)] = route
 
     print("\n[stage2] variant panels:")
     for wid in sorted(by_wid, key=lambda w: int(w[1:])):
@@ -239,10 +230,18 @@ def stage2(dry_run: bool, source: str) -> dict:
     winner_prompt = "W0" if winner == "baseline" else winner
     print(f"\n[stage2] recommended winner: {winner_prompt}")
 
+    # Decoy validation per prompt: confirm no wording variant breaks abstention.
+    decoys_by_prompt = {
+        wid: _decoy_results(out, route_equals=route) for wid, route in wid_route.items()
+    }
+    broke = [wid for wid, ds in decoys_by_prompt.items() if any(not d["passed"] for d in ds)]
+    print(f"[stage2] decoys: {len(by_wid) - len(broke)}/{len(by_wid)} prompts pass all decoys")
+
     return {
         "source": source,
         "cells": {k: _panel_json(v) for k, v in by_wid.items()},
         "winner_prompt": winner_prompt,
+        "decoys": decoys_by_prompt,
     }
 
 
@@ -254,15 +253,14 @@ def stage2(dry_run: bool, source: str) -> dict:
 def stage3(dry_run: bool, source: str, prompt: str) -> dict:
     gt, coh = load_gt_and_coherence()
     config = _prepare(load_config(CONFIGS / f"source_{source}.yaml"), "s3_mode", dry_run)
-    config.paths.benchmark_clusters_csv = CLUSTERS_REAL  # mode axis on real clusters only
+    # Full 8-cluster slate: the mode axis (incl the final cot) is decoy-validated.
     if prompt == "W0":
         # No wording override: run the three modes as a plain architecture axis.
         config.architecture_benchmark.enabled = True
         config.architecture_benchmark.base_routes = list(MODES)
         config.wording_benchmark.enabled = False
     else:
-        # Carry the winning prompt into each mode via the wording override system
-        # (it always emits the W0 baseline per mode alongside the chosen target).
+        # Carry the winning prompt into each mode via the wording override (emits W0 too).
         config.architecture_benchmark.enabled = False
         config.wording_benchmark.enabled = True
         config.wording_benchmark.base_routes = list(MODES)
@@ -272,9 +270,11 @@ def stage3(dry_run: bool, source: str, prompt: str) -> dict:
     )
     run_benchmark(config)
 
-    cells = score_cells(config.experiment_output_dir, gt, coh)
-    # Keep only the chosen prompt's cell per mode; key by mode.
+    out = config.experiment_output_dir
+    cells = score_cells(out, gt, coh)
+    # Keep only the chosen prompt's cell per mode; track mode -> (panel, route).
     by_mode: dict[str, MetricPanel] = {}
+    mode_route: dict[str, str] = {}
     for route, panel in cells.items():
         wid = _WID_RE.search(route)
         if prompt != "W0" and (wid is None or wid.group(1) != prompt):
@@ -282,11 +282,21 @@ def stage3(dry_run: bool, source: str, prompt: str) -> dict:
         for mode in MODES:
             if route.startswith(mode):
                 by_mode[mode] = panel
+                mode_route[mode] = route
 
     print("\n[stage3] mode panels:")
     for mode in MODES:
         if mode in by_mode:
             _print_panel(mode, by_mode[mode])
+
+    # Decoy validation per mode -- confirms the final cot config abstains + stays functional.
+    decoys_by_mode = {
+        mode: _decoy_results(out, route_equals=route) for mode, route in mode_route.items()
+    }
+    for mode in MODES:
+        if mode in decoys_by_mode:
+            passes = sum(1 for d in decoys_by_mode[mode] if d["passed"])
+            print(f"[stage3] decoys {mode}: {passes}/{len(decoys_by_mode[mode])} passed")
 
     if "single_call" not in by_mode:
         raise RuntimeError("single_call baseline missing from stage-3 outputs")
@@ -302,6 +312,7 @@ def stage3(dry_run: bool, source: str, prompt: str) -> dict:
         "cells": {k: _panel_json(v) for k, v in by_mode.items()},
         "dominated": dominated,
         "winner_mode": winner_mode,
+        "decoys": decoys_by_mode,
     }
 
 
@@ -311,8 +322,7 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true", help="mock outputs, zero API cost")
     args = ap.parse_args()
 
-    # Dry-runs write mock data to an isolated dir so they can never clobber real
-    # run outputs, state, or figures.
+    # Dry-runs write to an isolated dir so mock data can't clobber real outputs.
     if args.dry_run:
         global PIPE_DIR, STATE_PATH, GT_PATH
         PIPE_DIR = PIPE_DIR / "_dryrun"
