@@ -11,14 +11,14 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from mozzarellm.prompt_components import (
-    COMPONENT_REGISTRY,
-    CANONICAL_ZERO_SHOT_ORDER,
-    CANONICAL_COT_ORDER,
+from mozzarellm.prompt_components import (  # noqa: E402
     CANONICAL_COT_MCP_ORDER,
+    CANONICAL_COT_ORDER,
+    CANONICAL_ZERO_SHOT_ORDER,
+    COMPONENT_REGISTRY,
     GENE_CATEGORIZATION_RULES,
 )
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
+from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (  # noqa: E402
     ROUTE_REGISTRY,
 )
 
@@ -71,6 +71,15 @@ class TestPromptComponentsRegistry:
                 assert "LIT" not in route.component_order, (
                     f"Non-MCP route {route_name!r} should not contain 'LIT'"
                 )
+
+    def test_both_literature_variants_registered(self):
+        # Two selectable MCP literature prompts: category-gated ("LIT") and
+        # blank-annotation gap-fill ("LITB").
+        category = COMPONENT_REGISTRY["LIT"]
+        blank = COMPONENT_REGISTRY["LITB"]
+        assert "NOVEL_ROLE and UNCHARACTERIZED" in category
+        assert "GAP-FILL" in blank and "mcp_gapfill" in blank
+        assert category != blank
 
     def test_feature_interp_orders(self):
         assert "cFC" in COMPONENT_REGISTRY, "cFC (Feature Coherence) should be defined"

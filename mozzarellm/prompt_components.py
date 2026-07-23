@@ -159,8 +159,10 @@ Provide a concise analysis in this exact JSON format:
 """
 
 # =============================================================================
-# LITERATURE VALIDATION (mode-agnostic MCP step)
-# Used in single_mcp / cot_mcp / stepwise_mcp — exactly 2 MCP tool calls.
+# LITERATURE VALIDATION (mode-agnostic MCP step) — two selectable variants:
+#   "LIT"  STEP_LITERATURE_VALIDATION    — category-gated (NOVEL_ROLE/UNCHARACTERIZED genes)
+#   "LITB" STEP_LITERATURE_GAPFILL_BLANK — evidence-gated (blank-annotation genes only)
+# Both used in single_mcp / cot_mcp / stepwise_mcp — exactly 2 MCP tool calls.
 # =============================================================================
 
 LITERATURE_VALIDATION_OUTPUT_FORMAT = """
@@ -199,6 +201,27 @@ In the final output, include:
 {LITERATURE_VALIDATION_OUTPUT_FORMAT}
 - A top-level `literature_informed_reclassifications` array listing every gene whose category changed from your pre-literature categorization to post-validation. Each entry: {{"gene": "...", "initial_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "final_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "driving_pmids": ["..."], "rationale": "one sentence — what literature justified the move"}}. If nothing changed, use an empty array.
 - A top-level `literature_informed_pathway_revision` object: {{"pre_literature_pathway": "your tentative pathway BEFORE literature validation", "post_literature_pathway": "your final pathway AFTER literature validation (may be the same)", "pathway_changed": true/false, "rationale": "one sentence — what literature drove the change, or why it stayed the same"}}."""
+
+STEP_LITERATURE_GAPFILL_BLANK = """LITERATURE GAP-FILL (evidence-gated MCP):
+Some genes in the evidence bundle have NO functional annotation provided (the annotation field is empty, or absent entirely). For those genes ONLY, use the attached PubMed MCP tools to retrieve functional evidence. Genes that already have annotation text MUST NOT be looked up, regardless of how you classify them.
+
+BEFORE ANY TOOL USE — count the GAP set: genes whose functional-annotation field is empty or absent. This count fixes your ENTIRE tool budget:
+- GAP set EMPTY (zero blank genes) → make ZERO tool calls. Do not search anything at all. Go straight to classification. Most clusters land here.
+- GAP set NON-EMPTY → make EXACTLY TWO tool calls, no more: (1) ONE `search_articles` with all gap genes OR'd together `(GAP1[tiab] OR GAP2[tiab] OR ...)`, max_results=30, [tiab] on every symbol; (2) ONE `get_article_metadata` on the returned PMIDs. Then STOP calling tools permanently.
+
+ABSOLUTE tool rules (violating any of these breaks the run):
+- The 2-call cap is HARD. Never exceed it under any circumstance.
+- Issue the search EXACTLY ONCE. NEVER repeat, re-word, refine, or re-run a search — not even if it returns few results, zero results, or nothing useful. If the search returns nothing for a gene, record "no literature found" for that gene and move on. Re-searching for any reason is FORBIDDEN.
+- NEVER search a gene that already has annotation text — only the blank/GAP genes.
+- Do NOT search per-gene, and do NOT use the tools to explore or brainstorm pathways.
+
+For each GAP gene, extract a one-line functional summary from the retrieved literature, or record "no literature found".
+
+Classify GAP genes on equal footing with the pre-annotated genes using the retrieved evidence: a GAP gene with direct pathway literature → ESTABLISHED/NOVEL_ROLE as warranted; a GAP gene with no retrievable literature → UNCHARACTERIZED (DARK_GENE).
+
+In the final output, add a top-level `mcp_gapfill` array — one entry per GAP gene: {"gene": "...", "evidence_found": true|false, "driving_pmids": ["..."], "retrieved_summary": "..."}. Empty array if there were no GAP genes.
+
+CRITICAL OUTPUT CONSTRAINT: Your entire response MUST be a single valid JSON object and nothing else. Start with `{` and end with `}`. Do NOT write any preamble, plan, or commentary about your searches — no "Based on my analysis...", no "According to PubMed...", no restating of the query. Do NOT write any text before the opening brace or after the closing brace. Report every literature finding ONLY inside JSON fields (rationale, mcp_gapfill), never as prose."""
 
 # =============================================================================
 # FEATURE COHERENCE + PATHWAY CONSISTENCY (feature-interp mode)
@@ -375,6 +398,7 @@ COMPONENT_REGISTRY = {
     "PCC": PATHWAY_CONFIDENCE_CRITERIA,
     "O": OUTPUT_FORMAT_JSON,
     "LIT": STEP_LITERATURE_VALIDATION,
+    "LITB": STEP_LITERATURE_GAPFILL_BLANK,
     "cPH": COT_STEP_PATHWAY_HYPOTHESIS,
     "cGCR": COT_STEP_GENE_CATEGORIZATION,
     "cPri": COT_STEP_SUBCLASSIFICATION,
