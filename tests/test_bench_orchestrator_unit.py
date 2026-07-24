@@ -33,7 +33,7 @@ try:
         RunConfig,
         TimingConfig,
     )
-    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
+    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
         MODE_REGISTRY,
         Route,
     )
@@ -419,7 +419,7 @@ class TestDryRunExecution:
 
     def test_dry_run_order_variant_metadata(self, tmp_path):
         """Phase 2: order variant metadata appears in the record."""
-        from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (
+        from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_order import (
             apply_order_variant,
         )
 

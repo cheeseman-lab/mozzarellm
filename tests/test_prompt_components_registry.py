@@ -22,7 +22,7 @@ from mozzarellm.prompt_components import (
     CANONICAL_COT_MCP_ORDER,
     GENE_CATEGORIZATION_RULES,
 )
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
+from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
     MODE_REGISTRY,
 )
 
@@ -78,7 +78,7 @@ class TestPromptComponentsRegistry:
         assert "cPC" in COMPONENT_REGISTRY, "cPC (Pathway Consistency) should be defined"
 
     def test_wording_v2_cat_references_correct_component(self):
-        from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.wording_bench_alternates import (
+        from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_wording_alternates import (
             WORDING_ALTERNATE_SET_REGISTRY,
         )
 

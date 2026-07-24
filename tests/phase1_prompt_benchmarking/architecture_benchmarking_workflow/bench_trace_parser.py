@@ -26,7 +26,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .arch_bench_routes import MODE_REGISTRY
+from .bench_routes import MODE_REGISTRY
 
 # ---------------------------------------------------------------------------
 # Filename parser

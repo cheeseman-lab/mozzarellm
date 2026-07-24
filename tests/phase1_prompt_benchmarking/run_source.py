@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import argparse
 
-from architecture_benchmarking_workflow.arch_bench_routes import MODE_REGISTRY
+from architecture_benchmarking_workflow.bench_routes import MODE_REGISTRY
 from architecture_benchmarking_workflow.bench_configparse import load_config
 from architecture_benchmarking_workflow.bench_evaluator import (
     pathway_diagnostics,

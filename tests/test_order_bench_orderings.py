@@ -1,4 +1,4 @@
-"""Tests for order_bench_orderings — Phase 2 order variant generation and validation.
+"""Tests for bench_order — Phase 2 order variant generation and validation.
 
 Inline-MCP route tests (3c_mcp) were removed when MCP became the
 single_call_mcp enrichment; no remaining mode has route.mcp=True.
@@ -14,13 +14,13 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
+from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
     Route,
     StepwiseTurn,
     build_routes_from_config,
     MODE_REGISTRY,
 )
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (
+from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_order import (
     ORDER_VARIANTS,
     _ORDER_SPECS,
     OrderVariant,

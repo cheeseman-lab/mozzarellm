@@ -56,7 +56,7 @@ python run_walkup.py --stage GCR            # next stage builds on the carried w
 python run_walkup.py --finalize             # assemble the final prompt + render the figure
 ```
 
-- **reads:** `carry.source` (or `--source`, else affinage), the candidate banks in `walkup_candidates.py`
+- **reads:** `carry.source` (or `--source`, else affinage), the candidate banks in `bench_walkup_candidates.py`
 - **writes:** `benchmarking_outputs/walkup/walkup_state.json` with the carried per-component winning text
 
 ### 3. `run_mode.py` — pick the delivery format
@@ -133,22 +133,19 @@ phase1_prompt_benchmarking/
         bench_evaluator.py            -- THE metric generator: consensus GT + scoring + diagnostics + pathway
         bench_pipeline_common.py      -- shared paths, GT loading, state envelope, holistic selection
         bench_figures.py              -- figures rendered from the state files
-        walkup_candidates.py          -- per-component candidate banks for the walkup (step 2)
+        bench_walkup_candidates.py    -- per-component candidate banks for the walkup (step 2)
         # --- shared orchestrator engine ---
-        arch_bench_routes.py          -- Route dataclass + mode registry
+        bench_routes.py               -- Route dataclass + mode registry
         bench_orchestrator.py         -- main loop, prompt construction, execution
         bench_configparse.py          -- YAML config loader + dataclass sections
         bench_metricfns.py            -- structural / MCP / logical / efficiency metrics
         bench_reportgen.py            -- markdown report + CSV/JSON aggregates
         bench_dry_run.py              -- deterministic mock outputs for dry-run
-        order_bench_orderings.py      -- component-order variant definitions + route builder
-        wording_bench_targets.py      -- wording-ablation targets
+        bench_order.py                -- component-order variant definitions + route builder
+        bench_wording_alternates.py   -- wording alternate-text registry (walkup dep)
 
     configs/
         source_{uniprot,affinage,both}.yaml   -- one per source (run_source)
-        arch_bench_default.yaml               -- engine reference config (all routes)
-        order_bench_default.yaml              -- engine reference config (order variants)
-        integration_test.yaml                 -- dry-run integration test
 
     benchmarking_outputs/             -- git submodule
         source/source_state.json      -- step 1 decision + carry
@@ -160,7 +157,7 @@ phase1_prompt_benchmarking/
 
 # Engine reference
 
-Everything below documents the shared orchestrator the pipeline runners sit on — the route/mode model, per-run output layout, config schema, and trace parser. The `source → walkup → mode` runners drive this engine; you normally invoke them, not the orchestrator CLI directly.
+Everything below documents the shared orchestrator the pipeline runners sit on — the route/mode model, per-run output layout, config schema, and trace parser. The `source → walkup → mode` runners are the entry points; they build their RunSpecs and drive the orchestrator's run loop directly (there is no separate orchestrator CLI).
 
 ## Output Structure (benchmarking_outputs/ Submodule)
 
@@ -197,52 +194,27 @@ Each **experiment directory** contains:
 - **mode** -- how the prompt is structured: *standard* (flat concatenation), *cot* (numbered chain-of-thought steps, single call), or *stepwise* (multi-turn, one API call per step).
 - **delivery** -- *single_call* or *multi_turn*. Stepwise routes use multi_turn; standard and cot use single_call.
 - **component_order** -- the ordered tuple of shorthand keys (CAT, SC, GCR, NPR, UPR, PCC, O, cPH, cGCR, cPri, cPSC, cVer, cO, LIT) that defines what goes into the prompt and in what sequence.
-- **variant** -- a named perturbation of component_order relative to the canonical baseline (order axis only). Defined in `order_bench_orderings.py`.
+- **variant** -- a named perturbation of component_order relative to the canonical baseline (order axis only). Defined in `bench_order.py`.
 - **base route** -- the route (e.g. 3a, 3b) from which an order variant is derived. The canonical variant preserves the base route's original component_order.
 - **replicate** -- repeated execution of the same prompt on the same input. Used to measure reasoning stability at a given temperature.
 
-## Engine benchmark axes
+## Component libraries (order / wording)
 
-Besides the pipeline, the orchestrator supports two standalone benchmark axes run directly via its
-CLI (not through the pipeline runners). They are independent of the `source → walkup → mode` phases:
-
-- **architecture** — compares flat / CoT / stepwise delivery, MCP on/off, across the route registry (`arch_bench_default.yaml`).
-- **order** — holds mode and MCP constant and permutes `component_order` to test positional sensitivity (`order_bench_default.yaml`).
-
-## Running the engine directly
-
-The engine axes are run via the orchestrator CLI:
-
-**Usage:**
-```bash
-python architecture_benchmarking_workflow/bench_orchestrator.py --config configs/<config_file>.yaml [--dry-run]
-```
-
-**Parameters:**
-- **--config** (required) -- path to YAML config file
-- **--dry-run** (optional) -- override config to enable dry-run mode; uses mock outputs instead of API calls
-
-**Example:**
-```bash
-# Live run with full architecture benchmark
-python architecture_benchmarking_workflow/bench_orchestrator.py --config configs/arch_bench_default.yaml
-
-# Dry-run validation of the order axis
-python architecture_benchmarking_workflow/bench_orchestrator.py --config configs/order_bench_default.yaml --dry-run
-```
+`bench_order.py` (component-order variant definitions) and `bench_wording_alternates.py` (alternate
+component text) are libraries reused by the pipeline — `bench_order` by the order phase,
+`bench_wording_alternates` by the walkup. There is no standalone engine CLI: the `run_*` pipeline
+scripts are the only entry points, and they build their RunSpecs and drive `_run_benchmark_loop`
+directly.
 
 ## Config files
 
 - **source_{uniprot,affinage,both}.yaml** -- per-source configs for `run_source.py` (the pipeline)
-- **arch_bench_default.yaml** -- engine architecture axis (all routes, all screens, 3 replicates)
-- **order_bench_default.yaml** -- engine order axis (single base route, all variants)
-- **integration_test.yaml** -- dry-run integration test
 
 ## Config Parameters
 
 All parameters below are YAML keys. Defaults are shown in parentheses. Parsed by `bench_configparse.py`.
 
-**experiment_id** (arch_bench_v1) -- unique name for this run. Determines the output subdirectory name. Please include either `arch_bench_` or `order_bench_` in the name to keep things organized.
+**experiment_id** (source_affinage) -- unique name for this run. Determines the output subdirectory name. The pipeline runners set this automatically (e.g. `run_source` sets it to the source name); it must stay slash-free.
 
 **paths:**
 
@@ -321,7 +293,7 @@ python -m tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.be
 ```
 
 **Parameters:**
-- **--traces-dir** -- path to the `traces/` directory from a benchmark run (e.g. `benchmarking_outputs/2.order/order_bench_full_v1/traces/`)
+- **--traces-dir** -- path to the `traces/` directory from a benchmark run (e.g. `runs/source/<stamp>/affinage/traces/`)
 - **--output-dir** -- where to write the gene-level CSVs (usually the same directory as the traces)
 - **--experiment-id** -- optional; auto-detected from trace filenames if not provided
 - **--overwrite** -- overwrite existing CSVs; otherwise appends date to filename

@@ -15,7 +15,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from mozzarellm.prompt_components import COMPONENT_REGISTRY
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.wording_bench_alternates import (
+from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_wording_alternates import (
     WORDING_ALTERNATE_SET_REGISTRY,
 )
 

@@ -89,7 +89,7 @@ class WordingBenchmarkConfig:
 
     Selects which W-numbered targets to run and how alternate-text sources are
     resolved. The alternate text lives outside this config
-    (wording_bench_alternates.py).
+    (bench_wording_alternates.py).
     """
 
     enabled: bool = False

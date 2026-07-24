@@ -15,12 +15,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
+from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
     Route,
     StepwiseTurn,
     MODE_REGISTRY,
 )
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (
+from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_order import (
     apply_order_variant,
 )
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_orchestrator import (
