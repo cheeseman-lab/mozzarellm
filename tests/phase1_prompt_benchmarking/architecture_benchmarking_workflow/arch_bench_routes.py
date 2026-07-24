@@ -4,8 +4,9 @@ Each Route is a frozen dataclass encoding a unique prompt-delivery configuration
 mode (standard / cot / stepwise), MCP toggle, delivery mechanism, and the ordered list of prompt components.
 More details on each component can be found in the README and prompt-assembly-routes-info.md.
 
-ROUTE_REGISTRY maps short names (3a, 3a_mcp, 3b, ...) to Route objects used by the orchestrator for prompt
-construction, model dispatch, and output tagging.
+MODE_REGISTRY maps mode names (single_call, cot, stepwise, single_call_mcp) to Route objects
+used by the orchestrator for prompt construction, model dispatch, and output tagging. MCP is the
+single_call_mcp route (inline PubMed search, prompt-gated on blank-annotation genes).
 
 Phase 2 order-benchmarking extends Route with metadata fields (base_route,
 order_variant, order_hypothesis) so perturbed orderings can be traced back
@@ -50,44 +51,38 @@ class Route:
 
 
 # =============================================================================
-# ROUTE REGISTRY
+# MODE REGISTRY
 # =============================================================================
 
-ROUTE_REGISTRY: dict[str, Route] = {
-    "3a": Route(
-        name="3a",
+MODE_REGISTRY: dict[str, Route] = {
+    "single_call": Route(
+        name="single_call",
         mode="standard",
         mcp=False,
         delivery="single_call",
         component_order=("CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"),
         description="Standard flat prompt, no MCP.",
     ),
-    "3a_mcp": Route(
-        name="3a_mcp",
+    "single_call_mcp": Route(
+        name="single_call_mcp",
         mode="standard",
         mcp=True,
         delivery="single_call",
         component_order=("CAT", "SC", "GCR", "NPR", "UPR", "PCC", "LIT", "O"),
-        description="Standard flat prompt with PubMed MCP literature validation.",
+        description="Standard flat prompt with inline blank-gated PubMed MCP: for genes with no "
+        "functional evidence (blank annotation), do a quick PubMed search — not gated on whether "
+        "they are novel or uncharacterized. Only the MCP prompt differs from single_call.",
     ),
-    "3b": Route(
-        name="3b",
+    "cot": Route(
+        name="cot",
         mode="cot",
         mcp=False,
         delivery="single_call",
         component_order=("CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cO"),
         description="Chain-of-thought numbered steps, single call, no MCP.",
     ),
-    "3b_mcp": Route(
-        name="3b_mcp",
-        mode="cot",
-        mcp=True,
-        delivery="single_call",
-        component_order=("CAT", "SC", "cPH", "cGCR", "cPri", "LIT", "cPSC", "cVer", "cO"),
-        description="Chain-of-thought numbered steps with PubMed MCP.",
-    ),
-    "3c": Route(
-        name="3c",
+    "stepwise": Route(
+        name="stepwise",
         mode="stepwise",
         mcp=False,
         delivery="multi_turn",
@@ -103,41 +98,21 @@ ROUTE_REGISTRY: dict[str, Route] = {
         ),
         description="Stepwise multi-turn, no MCP.",
     ),
-    "3c_mcp": Route(
-        name="3c_mcp",
-        mode="stepwise",
-        mcp=True,
-        delivery="multi_turn",
-        component_order=("CAT", "SC", "cPH", "cGCR", "cPri", "LIT", "cPSC", "cVer", "cO"),
-        system_components=("CAT", "SC"),
-        user_turns=(
-            StepwiseTurn("cPH", mcp=False),
-            StepwiseTurn("cGCR", mcp=False),
-            StepwiseTurn("cPri", mcp=False),
-            StepwiseTurn("LIT", mcp=True),
-            StepwiseTurn("cPSC", mcp=False),
-            StepwiseTurn("cVer", mcp=False),
-            StepwiseTurn("cO", mcp=False),
-        ),
-        description="Stepwise multi-turn with MCP on literature turn only.",
-    ),
 }
 
 
-def validate_route_names(names: list[str]) -> list[str]:
-    """Validate that all requested route names exist in the registry.
+def validate_mode_names(names: list[str]) -> list[str]:
+    """Validate that all requested mode names exist in the registry.
 
     Returns the validated list unchanged if all are valid; raises ValueError otherwise.
     """
-    invalid = [n for n in names if n not in ROUTE_REGISTRY]
+    invalid = [n for n in names if n not in MODE_REGISTRY]
     if invalid:
-        raise ValueError(
-            f"Unknown route(s): {invalid}. Valid routes: {sorted(ROUTE_REGISTRY.keys())}"
-        )
+        raise ValueError(f"Unknown mode(s): {invalid}. Valid modes: {sorted(MODE_REGISTRY.keys())}")
     return names
 
 
 def build_routes_from_config(route_names: list[str]) -> list[Route]:
-    """Build an ordered list of Route objects from a list of route names."""
-    validate_route_names(route_names)
-    return [ROUTE_REGISTRY[name] for name in route_names]
+    """Build an ordered list of Route objects from a list of mode names."""
+    validate_mode_names(route_names)
+    return [MODE_REGISTRY[name] for name in route_names]

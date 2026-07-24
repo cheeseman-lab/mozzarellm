@@ -3,6 +3,10 @@
 Calls run_benchmark end-to-end with dry_run=True for each phase (architecture,
 order, wording). Verifies that the unified runner correctly dispatches, builds
 RunSpecs, and produces records/manifests/traces without any live API calls.
+
+Inline-MCP routes (3a_mcp, 3b_mcp, 3c_mcp) were removed when MCP became the
+single_call_mcp enrichment; integration_test.yaml's architecture_benchmark
+now lists only the 3 live modes.
 """
 
 import json
@@ -128,10 +132,10 @@ def _load_and_patch(tmp_path: Path) -> "BenchmarkConfig":
 
 
 class TestPhase1Architecture:
-    # 6 routes × 2 clusters × 1 rep = 12 records
-    EXPECTED_ROUTES = {"3a", "3a_mcp", "3b", "3b_mcp", "3c", "3c_mcp"}
+    # 3 routes × 2 clusters × 1 rep = 6 records
+    EXPECTED_ROUTES = {"single_call", "cot", "stepwise"}
     EXPECTED_CLUSTERS = {"21", "77"}
-    EXPECTED_COUNT = len(EXPECTED_ROUTES) * len(EXPECTED_CLUSTERS)  # 12
+    EXPECTED_COUNT = len(EXPECTED_ROUTES) * len(EXPECTED_CLUSTERS)  # 6
 
     def test_produces_records(self, tmp_path):
         config = _load_and_patch(tmp_path)
@@ -209,7 +213,7 @@ class TestPhase2Order:
             assert rec.get("error") is None
             assert "order_variant" in rec
             assert "base_route" in rec
-            assert rec["base_route"] == "3a"
+            assert rec["base_route"] == "single_call"
 
     def test_manifest_has_phase(self, tmp_path):
         config = _load_and_patch(tmp_path)
@@ -263,7 +267,7 @@ class TestPhase3Wording:
         for rec in records:
             assert rec.get("error") is None
             route = rec["route"]
-            assert route.startswith("3a_")
+            assert route.startswith("single_call_")
             assert "__" not in route
 
     def test_manifest_has_phase(self, tmp_path):

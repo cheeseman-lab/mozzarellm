@@ -26,17 +26,22 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .arch_bench_routes import MODE_REGISTRY
+
 # ---------------------------------------------------------------------------
 # Filename parser
 # ---------------------------------------------------------------------------
 
 # Trace filenames use double-underscore separators:
 #   {experiment_id}__{route}__{screen_name}__cluster_{cluster_id}__rep_{replicate}.json
-# Route names with underscores (e.g. 3a_mcp) must be matched greedily before
-# shorter variants to avoid ambiguity.
+# Mode names (e.g. single_call_mcp) must be matched greedily before shorter
+# variants (e.g. single_call) to avoid ambiguity; longest-first covers it, and
+# also covers order/wording condition names built as f"{mode}_..." suffixes.
+_MODE_NAMES_LONGEST_FIRST = sorted(MODE_REGISTRY, key=len, reverse=True)
+_ROUTE_ALTERNATION = "|".join(re.escape(m) for m in _MODE_NAMES_LONGEST_FIRST)
 TRACE_FILENAME_RE = re.compile(
     r"^(?P<experiment_id>.+?)__"
-    r"(?P<route>3[abc](?:(?!__).)*)"
+    rf"(?P<route>(?:{_ROUTE_ALTERNATION})(?:(?!__).)*)"
     r"__(?P<screen_name>.+?)__"
     r"cluster_(?P<cluster_id>.+?)__"
     r"rep_(?P<replicate>\d+)\.json$"

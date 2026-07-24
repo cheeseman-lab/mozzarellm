@@ -1,0 +1,43 @@
+experiment_id: source_both
+paths:
+  benchmark_inputs_dir: benchmark_inputs
+  benchmark_clusters_csv: benchmark_inputs/benchmark_input.csv
+  evidence_bundles_dir: benchmark_bundles_both
+  output_dir: benchmarking_outputs/10.clean_3x2
+model:
+  provider: anthropic
+  model_name: claude-sonnet-5
+  temperature: 0.2
+  max_tokens: 16000
+  top_p: null
+  top_k: null
+  thinking: false
+run:
+  num_replicates: 3
+  dry_run: false
+  workflow_testing: false
+  overwrite_outputs: false
+  continue_on_error: true
+  save_prompts: true
+  save_raw_outputs: true
+  save_parsed_outputs: true
+  save_traces: true
+  max_workers: 12
+routes:
+  include:
+    - single_call
+    - single_call_mcp
+screens:
+  include: all
+clusters:
+  include: all
+mcp:
+  preflight: true
+  fail_if_unavailable: false
+wording_benchmark:
+  enabled: false
+evaluation:
+  structural: true
+  logical_consistency: true
+  efficiency: true
+  robustness: true

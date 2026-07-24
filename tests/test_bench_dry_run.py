@@ -1,6 +1,9 @@
 """Unit tests for bench_dry_run.py.
 
 No API calls; uses tmp_path and synthetic data only.
+
+Inline-MCP route tests (3a_mcp) were removed when MCP became the
+single_call_mcp enrichment; no remaining mode has route.mcp=True.
 """
 
 import json
@@ -19,27 +22,21 @@ from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_d
     generate_mock_raw_outputs,
 )
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
-    ROUTE_REGISTRY,
+    MODE_REGISTRY,
 )
 
 
 class TestMockOutputs:
     def test_mock_parsed_non_mcp(self):
         genes = ["A", "B", "C", "D", "E"]
-        parsed = generate_mock_parsed_output("21", genes, ROUTE_REGISTRY["3a"])
+        parsed = generate_mock_parsed_output("21", genes, MODE_REGISTRY["single_call"])
         assert parsed["cluster_id"] == "21"
         assert parsed["pathway_confidence"] == "Low"
         assert set(parsed["established_genes"]) == set(genes)
         assert len(parsed["established_genes"]) == 5
 
-    def test_mock_parsed_mcp(self):
-        genes = ["X", "Y"]
-        parsed = generate_mock_parsed_output("5", genes, ROUTE_REGISTRY["3a_mcp"])
-        assert "literature_informed_reclassifications" in parsed
-        assert "literature_informed_pathway_revision" in parsed
-
     def test_mock_raw_outputs(self):
-        raw = generate_mock_raw_outputs(ROUTE_REGISTRY["3a"])
+        raw = generate_mock_raw_outputs(MODE_REGISTRY["single_call"])
         for key in ("response_text", "tool_calls", "input_tokens", "elapsed_s", "error", "steps"):
             assert key in raw
 

@@ -68,3 +68,6 @@ Thumbs.db
 # Development artifacts
 dev/
 screen_context.json
+
+# Local working notes (methodology + plans; not part of the tree)
+docs/

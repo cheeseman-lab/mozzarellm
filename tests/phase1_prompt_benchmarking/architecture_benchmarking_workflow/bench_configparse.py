@@ -18,6 +18,7 @@ class ModelConfig:
     max_tokens: int = 4000
     top_p: float | None = None
     top_k: int | None = None
+    thinking: bool | None = None  # None = model default, False = off, True = on
 
 
 @dataclass
@@ -71,9 +72,7 @@ class TimingConfig:
 @dataclass
 class ArchitectureBenchmarkConfig:
     enabled: bool = True
-    base_routes: list[str] = field(
-        default_factory=lambda: ["3a", "3a_mcp", "3b", "3b_mcp", "3c", "3c_mcp"]
-    )
+    base_routes: list[str] = field(default_factory=lambda: ["single_call", "cot", "stepwise"])
 
 
 @dataclass
@@ -94,7 +93,7 @@ class WordingBenchmarkConfig:
     """
 
     enabled: bool = False
-    base_routes: list[str] = field(default_factory=lambda: ["3a"])
+    base_routes: list[str] = field(default_factory=lambda: ["single_call"])
     # "all", a range string like "W1-W5", or an explicit list like ["W1", "W3"].
     targets: str | list[str] = "all"
     default_source: str | None = None
@@ -199,6 +198,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
             max_tokens=m.get("max_tokens", cfg.model.max_tokens),
             top_p=m.get("top_p"),
             top_k=m.get("top_k"),
+            thinking=m.get("thinking"),
         )
 
     # Run
@@ -295,7 +295,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
         wb = raw["wording_benchmark"]
         cfg.wording_benchmark = WordingBenchmarkConfig(
             enabled=wb.get("enabled", False),
-            base_routes=wb.get("base_routes", ["3a"]),
+            base_routes=wb.get("base_routes", ["single_call"]),
             targets=wb.get("targets", "all"),
             default_source=wb.get("default_source"),
             force_source=wb.get("force_source"),

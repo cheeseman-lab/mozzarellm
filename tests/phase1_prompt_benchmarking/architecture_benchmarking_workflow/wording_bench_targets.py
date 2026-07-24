@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .arch_bench_routes import ROUTE_REGISTRY, Route
+from .arch_bench_routes import MODE_REGISTRY, Route
 from .order_bench_orderings import resolve_variant_ids
 from .wording_bench_alternates import WORDING_ALTERNATE_SET_REGISTRY
 
@@ -419,9 +419,9 @@ def build_wording_override_runs(
     runs: list[WordingOverrideRun] = []
 
     for route_name in base_route_names:
-        if route_name not in ROUTE_REGISTRY:
-            raise ValueError(f"Unknown base route {route_name!r}. Known: {sorted(ROUTE_REGISTRY)}")
-        route = ROUTE_REGISTRY[route_name]
+        if route_name not in MODE_REGISTRY:
+            raise ValueError(f"Unknown base route {route_name!r}. Known: {sorted(MODE_REGISTRY)}")
+        route = MODE_REGISTRY[route_name]
 
         for tid in target_ids:
             target = WORDING_OVERRIDE_TARGET_REGISTRY[tid]

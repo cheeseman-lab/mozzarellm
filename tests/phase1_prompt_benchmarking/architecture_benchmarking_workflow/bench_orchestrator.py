@@ -19,8 +19,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 # Ensure repo root is on sys.path for imports
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -63,6 +63,20 @@ from .wording_bench_targets import build_wording_override_runs
 # Serializes shared-file writes (JSONL appends, cached system-prompt .txt) when
 # runs execute concurrently in the thread pool.
 _IO_LOCK = threading.Lock()
+
+
+def _client_from_config(config: BenchmarkConfig, api_key: str | None):
+    """Build an LLM client from the full model config (temperature, thinking, etc.)."""
+    m = config.model
+    return create_client(
+        model=m.model_name,
+        temperature=m.temperature,
+        max_tokens=m.max_tokens,
+        top_p=m.top_p,
+        top_k=m.top_k,
+        api_key=api_key,
+        thinking=m.thinking,
+    )
 
 
 @dataclass(frozen=True)
@@ -226,8 +240,15 @@ def construct_prompts(
                     prompt_filename=prompt_filename,
                 )
 
+    # Features reach the model only when a feature-interpretation component
+    # (cFC / cPC) is in the route; otherwise they are stripped from the bundle so
+    # the prompt carries no uninterpreted feature data.
+    route_components = set(route.component_order or ()) | set(
+        getattr(route, "system_components", None) or ()
+    )
+    include_features = bool(route_components & {"cFC", "cPC"})
     user_prompt = make_single_cluster_analysis_user_prompt(
-        cluster_id, screen_name, cluster_to_bundle_map
+        cluster_id, screen_name, cluster_to_bundle_map, include_features=include_features
     )
 
     stepwise_turns = None
@@ -454,6 +475,7 @@ def execute_single_run(
         "estimated_cost_usd": raw_outputs.get("cost_usd"),
         "schema_warnings": raw_outputs.get("schema_warnings", []),
         "mcp_tool_calls": raw_outputs.get("tool_calls", []),
+        "mcp_gapfill": raw_outputs.get("mcp_gapfill", []),
         "error": error,
         # Order benchmarking metadata (Phase 2)
         "base_route": route.base_route or route.name,
@@ -545,6 +567,7 @@ def _save_run_artifacts(
             "route": route_label,
             "raw_output": raw_outputs.get("response_text", ""),
             "tool_calls": raw_outputs.get("tool_calls", []),
+            "mcp_gapfill": raw_outputs.get("mcp_gapfill", []),
             "steps": raw_outputs.get("steps", []),
             "error": raw_outputs.get("error"),
         }
@@ -717,7 +740,7 @@ def _run_benchmark_loop(
             or os.getenv("OPENAI_API_KEY")
             or os.getenv("GOOGLE_API_KEY")
         )
-        probe = create_client(model=config.model.model_name, api_key=api_key)
+        probe = _client_from_config(config, api_key)
         print(f"  Client: {type(probe).__name__} ({config.model.model_name})")
 
     # Build the flat work list, resolving paths and applying skips up front.
@@ -759,11 +782,7 @@ def _run_benchmark_loop(
         item: tuple[RunSpec, str, str, Path, Path, int],
     ) -> dict:
         spec, screen_name, cluster_id, bundle_path, screen_context_path, rep = item
-        run_client = (
-            None
-            if config.run.dry_run
-            else create_client(model=config.model.model_name, api_key=api_key)
-        )
+        run_client = None if config.run.dry_run else _client_from_config(config, api_key)
         return execute_single_run(
             route=spec.route,
             screen_name=screen_name,

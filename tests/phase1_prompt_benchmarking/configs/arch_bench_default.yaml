@@ -1,5 +1,5 @@
 # Architecture Benchmark Configuration
-# Tests LLM Analysis across all six prompt-delivery routes.
+# Tests LLM Analysis across the three prompt-delivery modes.
 
 experiment_id: arch_bench_v1
 
@@ -31,12 +31,9 @@ run:
 architecture_benchmark:
   enabled: true
   base_routes:
-    - 3a
-    - 3a_mcp
-    - 3b
-    - 3b_mcp
-    - 3c
-    - 3c_mcp
+    - single_call
+    - cot
+    - stepwise
 
 screens:
   include: all

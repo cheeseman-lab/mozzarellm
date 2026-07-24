@@ -1,1057 +1,1011 @@
-"""Cross-field evaluator: join prediction CSVs against the ground-truth CSV
-and compute per-route / per-case-type match rates.
+"""Full benchmark metric generator.
 
-Consumes the gene-level prediction CSVs produced by `bench_trace_parser.py`
-(one CSV per route in an experiment directory) and joins them against
-`benchmark_inputs/benchmark_combined_expert_annotations.csv` on (screen_name,
-cluster_id, gene_symbol).
+Scores a run's parsed_outputs.jsonl against reviewer-consensus ground truth and
+produces the complete metric set for any run in the pipeline (source / walkup /
+mode):
 
-Match flags are computed against human reviewers; operon is excluded by default
-because it is an LLM annotator. Consensus is recomputed from the active reviewers
-so the scored reviewer set can be changed if needed via --reviewers.
+- consensus ground truth from the raw per-reviewer annotations
+  (>=2-of-3 majority classification, ordinal-median subclass, majority coherence);
+- per-run scoring: category coverage-weighted recall (primary), novel/uncharacterized
+  subclass, cluster coherence, and decoy abstain/functional validation
+  (modal vote across replicates; a hedged gene resolves to the less-high call);
+- source diagnostics: per-consensus-class recall, lenient any-reviewer recall,
+  inter-reviewer concordance (pairwise / Fleiss / by level), and the reviewers'
+  de-blinded source-preference tally;
+- pathway heuristics: substring / bidirectional-substring match of the model's
+  dominant process against reviewers' nominated pathways.
 
-With three reviewers, classification is scored three ways so concordance is
-visible:
-- classification_match_{r}: vs each reviewer individually
-- classification_match_either: matches at least one reviewer (ceiling 100%)
-- classification_match_consensus: matches the agreed label, scored only on genes
-  where all active reviewers agree (None elsewhere; ceiling 100% on that subset)
-- experts_agree: do the active reviewers unanimously agree (the per-gene ceiling)
-
-Aggregates per route and per (route x case_type), emits (the prefix auto-derives
-from the experiment-dir phase folder: arch/ord/word/comp -> '<phase>_eval', e.g.
-arch_eval_*; falls back to 'eval' if no phase is detected, or override with
---output-prefix):
-- <prefix>_per_gene.csv
-- <prefix>_per_route.csv
-- <prefix>_per_route_per_case_type.csv
-- <prefix>_report.md
-
-Ground-truth CSV column conventions (benchmark_combined_expert_annotations.csv):
-- Reviewer classification:  expert_classification_{r}
-- Reviewer pathway:         nominated_pathway_{r}
-- Reviewer confidence:      pathway_confidence_{r}
-- Case type column:         benchmark_case_type
-- Screen name column:       sheet  (renamed to screen_name on load)
-
-Usage:
-    python -m architecture_benchmarking_workflow.bench_evaluator \\
-        --experiment-dir benchmarking_outputs/1.arch/<experiment_id> \\
-        --ground-truth benchmark_inputs/benchmark_combined_expert_annotations.csv \\
-        --reviewers eric,iain,liz
+Consensus ground truth is computed here, not baked into the dataset (see
+docs/METHODOLOGY.md). Roles and exclusions come from the dataset's `role` column.
 """
 
 from __future__ import annotations
 
-import argparse
+import csv
 import json
-from collections import Counter
+import re
+from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-import pandas as pd
+# Coherent-cluster gene total: the 4 coherent real clusters. The Low-coherence
+# denali/24 is demoted to abstain-only, so it and its genes are excluded here.
+N_REAL_GENES = 103
 
-# Optional semantic pathway scoring via sentence-transformers.
-# Degrades gracefully: if not installed, semantic columns are omitted and
-# a single informational message is printed.
-try:
-    import numpy as _np
-    from sentence_transformers import SentenceTransformer
 
-    _SEMANTIC_AVAILABLE = True
-except ImportError:
-    _SEMANTIC_AVAILABLE = False
+# =========================================================================
+# Consensus ground truth (from raw per-reviewer annotations)
+# =========================================================================
+# Ordinal evidence ladders per category (rank ascending = more support for the
+# call). CONTRADICTORY_EVIDENCE sits at the bottom of the NOVEL_ROLE ladder --
+# most skeptical -- so a CONTRADICTORY majority is respected by the median while
+# scattered votes resolve to the conservative middle. DARK_GENE < ANNOTATED_ONLY.
+NOVEL_LADDER = {
+    "CONTRADICTORY_EVIDENCE": 0,
+    "NO_EVIDENCE": 1,
+    "INDIRECT_EVIDENCE": 2,
+    "PARTIAL_EVIDENCE": 3,
+}
+UNCHAR_LADDER = {"DARK_GENE": 0, "ANNOTATED_ONLY": 1}
+_SUBCLASS_LADDERS = {"NOVEL_ROLE": NOVEL_LADDER, "UNCHARACTERIZED": UNCHAR_LADDER}
+
+REAL_COLUMNS = [
+    "screen",
+    "cluster",
+    "cluster_role",
+    "gene",
+    "consensus_class",
+    "unanimous",
+    "n_agree",
+    "consensus_subclass",
+    "pref_affinage",
+    "pref_uniprot",
+    "pref_both",
+    "pref_neither",
+]
+
+
+def _deblind(preferred_source: str, key_row: dict) -> str:
+    """Map a reviewer's blinded 'a'/'b' pick to its real source via the key row."""
+    choice = preferred_source.strip().lower()
+    if choice == "a":
+        return key_row["srcA_src"].strip().lower()
+    if choice == "b":
+        return key_row["srcB_src"].strip().lower()
+    return choice
+
+
+def _consensus_class(classifications: list[str]) -> tuple[str, bool, int]:
+    """Strict >=2-of-3 majority over classification labels: (winner, unanimous, n_agree).
+
+    Returns ("", False, top_count) when no label reaches a >=2 majority (a 1-1-1
+    three-way split) -- the gene is then unresolved and excluded from consensus
+    scoring. On the 133-gene benchmark there are no such splits.
+    """
+    present = [c for c in classifications if c]
+    if not present:
+        return "", False, 0
+    counts = Counter(present)
+    winner, n_agree = counts.most_common(1)[0]
+    if n_agree < 2:
+        return "", False, n_agree
+    return winner, len(counts) == 1, n_agree
+
+
+def _consensus_subclass(subclasses: list[str], consensus_class: str) -> str:
+    """Ordinal-median subclass over votes on the consensus category's ladder.
+
+    Only NOVEL_ROLE / UNCHARACTERIZED carry a subclass. Votes off the relevant
+    ladder (e.g. a NOVEL_ROLE subclass on an UNCHARACTERIZED-consensus gene) are
+    dropped; the median of the remaining ranks is taken with the lower median on
+    even counts (the more conservative call). Empty if no on-ladder vote exists.
+    """
+    ladder = _SUBCLASS_LADDERS.get(consensus_class)
+    if ladder is None:
+        return ""
+    ranks = sorted(ladder[s] for s in subclasses if s in ladder)
+    if not ranks:
+        return ""
+    median_rank = ranks[(len(ranks) - 1) // 2]
+    return {v: k for k, v in ladder.items()}[median_rank]
+
+
+def _coherence_label(coherence_text: str) -> str | None:
+    """Map a reviewer's free-text coherence to High/Medium/Low, or None."""
+    text = coherence_text.lower()
+    for level in ("high", "medium", "low"):
+        if level in text:
+            return level.capitalize()
+    return None
+
+
+def consensus_coherence(reviewer_csvs: dict[str, Path]) -> dict[tuple, str]:
+    """Majority-vote per-cluster coherence (High/Medium/Low) across reviewers.
+
+    Reads the cluster-level `coherence` free text from each reviewer's rows,
+    maps it to a level, and returns {(screen, cluster): level} for clusters with
+    a strict majority. Ties (e.g. one High, one Medium, one Low) are excluded.
+    """
+    per_cluster: dict[tuple, list[str]] = defaultdict(list)
+    for path in reviewer_csvs.values():
+        with open(path, newline="") as fh:
+            seen: set[tuple] = set()
+            for row in csv.DictReader(fh):
+                cluster_key = (row["screen"].strip(), row["cluster"].strip())
+                if cluster_key in seen:
+                    continue  # one coherence vote per reviewer per cluster
+                seen.add(cluster_key)
+                label = _coherence_label(row["coherence"])
+                if label:
+                    per_cluster[cluster_key].append(label)
+
+    result: dict[tuple, str] = {}
+    for cluster_key, labels in per_cluster.items():
+        counts = Counter(labels)
+        winner, top = counts.most_common(1)[0]
+        if sum(1 for c in counts.values() if c == top) == 1:
+            result[cluster_key] = winner
+    return result
+
+
+def build_consensus_gt(
+    reviewer_csvs: dict[str, Path],
+    key_csv: Path,
+    decoy_specs: list[dict],
+    out_csv: Path,
+) -> None:
+    """Build the consensus ground-truth CSV from reviewer annotations + blinding key.
+
+    Args:
+        reviewer_csvs: mapping of reviewer name -> path to their annotation CSV.
+        key_csv: path to the blinding key (screen, cluster, gene, srcA_src,
+            srcB_src).
+        decoy_specs: list of {"screen", "cluster", "decoy_type", "genes"} dicts;
+            each gene becomes a blank negative-control row.
+        out_csv: destination path for the consensus ground-truth CSV.
+    """
+    key: dict[tuple, dict] = {}
+    with open(key_csv, newline="") as fh:
+        for row in csv.DictReader(fh):
+            key[(row["screen"].strip(), row["cluster"].strip(), row["gene"].strip())] = row
+
+    per_gene: dict[tuple, list[dict]] = defaultdict(list)
+    for path in reviewer_csvs.values():
+        with open(path, newline="") as fh:
+            for row in csv.DictReader(fh):
+                gene_key = (row["screen"].strip(), row["cluster"].strip(), row["gene"].strip())
+                per_gene[gene_key].append(row)
+
+    rows = []
+    for (screen, cluster, gene), revs in per_gene.items():
+        key_row = key[(screen, cluster, gene)]
+
+        consensus_class, unanimous, n_agree = _consensus_class(
+            [r["classification"].strip() for r in revs]
+        )
+        consensus_subclass = _consensus_subclass(
+            [r["subclass"].strip() for r in revs], consensus_class
+        )
+
+        pref_counts = Counter(_deblind(r["preferred_source"], key_row) for r in revs)
+
+        rows.append(
+            {
+                "screen": screen,
+                "cluster": cluster,
+                "cluster_role": "real",
+                "gene": gene,
+                "consensus_class": consensus_class,
+                "unanimous": unanimous,
+                "n_agree": n_agree,
+                "consensus_subclass": consensus_subclass,
+                "pref_affinage": pref_counts.get("affinage", 0),
+                "pref_uniprot": pref_counts.get("uniprot", 0),
+                "pref_both": pref_counts.get("both", 0),
+                "pref_neither": pref_counts.get("neither", 0),
+            }
+        )
+
+    for spec in decoy_specs:
+        for gene in spec["genes"]:
+            rows.append(
+                {
+                    "screen": spec["screen"],
+                    "cluster": spec["cluster"],
+                    "cluster_role": "decoy",
+                    "gene": gene,
+                    "consensus_class": "",
+                    "unanimous": "",
+                    "n_agree": "",
+                    "consensus_subclass": "",
+                    "pref_affinage": "",
+                    "pref_uniprot": "",
+                    "pref_both": "",
+                    "pref_neither": "",
+                }
+            )
+
+    out_csv = Path(out_csv)
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_csv, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=REAL_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def load_consensus_gt(csv_path: Path) -> dict[tuple, dict]:
+    """Load a consensus ground-truth CSV into {(screen, cluster, gene): row_dict}."""
+    result = {}
+    with open(csv_path, newline="") as fh:
+        for row in csv.DictReader(fh):
+            result[(row["screen"], row["cluster"], row["gene"])] = row
+    return result
+
+
+# =========================================================================
+# Per-run scoring (parsed_outputs.jsonl -> MetricPanel)
+# =========================================================================
+
+_RUN_ID_RE = re.compile(r"^(?P<screen>.+)__cluster_(?P<cluster>[^_]+)__rep_(?P<rep>.+)$")
+
+# A gene hedged across category lists resolves to the LESS-HIGH (more conservative)
+# category -- if the model won't commit, don't reward the more-established call.
+# (The output floor enforces single-labeling; this is the fallback for residuals.)
+_HEDGE_PRIORITY = {"UNCHARACTERIZED": 0, "NOVEL_ROLE": 1, "ESTABLISHED": 2}
+
+
+@dataclass
+class MetricPanel:
+    category: float
+    novel_subclass: tuple
+    unchar_subclass: tuple
+    coherence: tuple
+    n: int
+    failures: int
+
+
+def _parse_run_id(run_id: str, route: str) -> tuple[str, str]:
+    """Extract (screen, cluster) from a run_id, anchored on the cell's own route."""
+    marker = f"__{route}__"
+    idx = run_id.find(marker)
+    if idx == -1:
+        raise ValueError(f"route {route!r} not found in run_id {run_id!r}")
+    remainder = run_id[idx + len(marker) :]
+    match = _RUN_ID_RE.match(remainder)
+    if not match:
+        raise ValueError(f"could not parse screen/cluster from run_id {run_id!r}")
+    return match.group("screen"), match.group("cluster")
+
+
+def _gene_symbol(item) -> str:
+    """Normalize an established_genes entry to a bare gene symbol."""
+    if isinstance(item, dict):
+        return next(iter(item))
+    return item
+
+
+def _accumulate_votes(
+    run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> tuple[dict, dict, dict, int]:
+    """Fold parsed_outputs.jsonl into per-gene / per-cluster vote tallies.
+
+    Shared by score_run and gene_modal_categories so both apply the identical
+    route filter and self-contradiction drop rule. Returns
+    (gene_votes, subclass_votes, cluster_confidence_votes, failures).
+    """
+    gene_votes: dict[tuple, Counter] = defaultdict(Counter)
+    subclass_votes: dict[tuple, dict] = defaultdict(lambda: defaultdict(Counter))
+    cluster_confidence_votes: dict[tuple, Counter] = defaultdict(Counter)
+    failures = 0
+
+    with open(Path(run_dir) / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
+
+            parsed = cell.get("parsed_output")
+            if parsed is None or parsed.get("dominant_process") is None:
+                failures += 1
+                continue
+
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            cluster_key = (screen, cluster)
+
+            # A gene in more than one category list within a reply is a hedge; it
+            # resolves to the less-high category (see _HEDGE_PRIORITY). Collect this
+            # cell's per-gene category->subclass mapping first.
+            cell_categories: dict[str, dict[str, str]] = defaultdict(dict)
+
+            for item in parsed.get("established_genes") or []:
+                gene = _gene_symbol(item)
+                cell_categories[gene]["ESTABLISHED"] = ""
+
+            for item in parsed.get("novel_role_genes") or []:
+                cell_categories[item["gene"]]["NOVEL_ROLE"] = item.get("class", "")
+
+            for item in parsed.get("uncharacterized_genes") or []:
+                cell_categories[item["gene"]]["UNCHARACTERIZED"] = item.get("class", "")
+
+            for gene, categories in cell_categories.items():
+                # hedged genes resolve to the less-high category (UNCHAR > NOVEL > EST)
+                category = min(categories, key=lambda c: _HEDGE_PRIORITY.get(c, 99))
+                subclass = categories[category]
+                gene_votes[(screen, cluster, gene)][category] += 1
+                if subclass:
+                    subclass_votes[(screen, cluster, gene)][category][subclass] += 1
+
+            confidence = parsed.get("pathway_confidence")
+            if confidence:
+                cluster_confidence_votes[cluster_key][confidence] += 1
+
+    return gene_votes, subclass_votes, cluster_confidence_votes, failures
+
+
+def gene_modal_categories(
+    run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> dict[tuple, str]:
+    """Return {(screen, cluster, gene): modal category} for one condition.
+
+    The modal (most-voted) category per gene across replicates -- the same
+    per-gene call score_run scores, exposed for source-diagnostic metrics.
+    """
+    gene_votes, _, _, _ = _accumulate_votes(run_dir, route_equals, route_excludes)
+    return {k: v.most_common(1)[0][0] for k, v in gene_votes.items()}
+
+
+def score_run(
+    run_dir: Path,
+    gt: dict,
+    cluster_coherence: dict | None = None,
+    route_excludes: str = "mcp",
+    route_equals: str | None = None,
+) -> MetricPanel:
+    """Score one run directory's parsed_outputs.jsonl against consensus ground truth.
+
+    Route filtering: route_equals (if set) keeps only rows whose route matches
+    exactly -- isolates one cell when several share a prefix (e.g. single_call vs
+    single_call_mcp, or W5 vs W51); otherwise skip rows matching the
+    route_excludes substring.
+    """
+    run_dir = Path(run_dir)
+    gene_votes, subclass_votes, cluster_confidence_votes, failures = _accumulate_votes(
+        run_dir, route_equals, route_excludes
+    )
+
+    category_correct = 0
+    category_n = 0
+    novel_correct = 0
+    novel_n = 0
+    unchar_correct = 0
+    unchar_n = 0
+
+    for (screen, cluster, gene), votes in gene_votes.items():
+        row = gt.get((screen, cluster, gene))
+        if row is None or row.get("cluster_role") != "real":
+            continue
+
+        modal_category = votes.most_common(1)[0][0]
+        category_n += 1
+        consensus_class = row.get("consensus_class", "")
+        if modal_category == consensus_class:
+            category_correct += 1
+
+        consensus_subclass = row.get("consensus_subclass", "")
+
+        if (
+            consensus_class == "NOVEL_ROLE"
+            and consensus_subclass
+            and modal_category == "NOVEL_ROLE"
+        ):
+            sub_counter = subclass_votes[(screen, cluster, gene)]["NOVEL_ROLE"]
+            modal_subclass = sub_counter.most_common(1)[0][0] if sub_counter else None
+            novel_n += 1
+            if modal_subclass == consensus_subclass:
+                novel_correct += 1
+
+        if (
+            consensus_class == "UNCHARACTERIZED"
+            and consensus_subclass
+            and modal_category == "UNCHARACTERIZED"
+        ):
+            sub_counter = subclass_votes[(screen, cluster, gene)]["UNCHARACTERIZED"]
+            modal_subclass = sub_counter.most_common(1)[0][0] if sub_counter else None
+            unchar_n += 1
+            if modal_subclass == consensus_subclass:
+                unchar_correct += 1
+
+    category_score = category_correct / category_n if category_n else 0.0
+
+    coherence_correct = 0
+    coherence_n = 0
+    if cluster_coherence:
+        for cluster_key, confidence_votes in cluster_confidence_votes.items():
+            if cluster_key not in cluster_coherence:
+                continue
+            modal_confidence = confidence_votes.most_common(1)[0][0]
+            coherence_n += 1
+            if modal_confidence == cluster_coherence[cluster_key]:
+                coherence_correct += 1
+
+    return MetricPanel(
+        category=category_score,
+        novel_subclass=(novel_correct, novel_n),
+        unchar_subclass=(unchar_correct, unchar_n),
+        coherence=(coherence_correct, coherence_n),
+        n=category_n,
+        failures=failures,
+    )
+
+
+@dataclass
+class DecoyResult:
+    screen: str
+    cluster: str
+    expectation: str  # "abstain" | "functional"
+    reps: int
+    failures: int
+    modal_confidence: str | None
+    passed: bool
+    genes_per_rep: list[int]  # genes classified each rep (output completeness)
+    median_genes: float
+    expected_genes: int | None  # cluster's true gene count, when known
+    completion: float | None  # median_genes / expected_genes (1.0 = perfect; >1 = over-produced)
+
+
+def _median(xs: list[int]) -> float:
+    s = sorted(xs)
+    m = len(s)
+    if not m:
+        return 0.0
+    return float(s[m // 2] if m % 2 else (s[m // 2 - 1] + s[m // 2]) / 2)
+
+
+def score_decoys(
+    run_dir: Path,
+    decoy_specs: dict[tuple, str],
+    route_equals: str | None = None,
+    route_excludes: str = "mcp",
+    expected_counts: dict[tuple, int] | None = None,
+) -> list[DecoyResult]:
+    """Validate negative-control decoy clusters (not consensus-scored).
+
+    decoy_specs maps (screen, cluster) -> expectation. Both require valid replies
+    (no crash) across reps: "abstain" passes on modal confidence Low (recognized
+    no cluster); "functional" passes on modal High/Medium (handled the big
+    cluster without erroring out). Route filtering mirrors score_run. Also reports
+    output completeness (genes classified per rep vs the cluster's expected gene
+    count) so output fragility -- dropping or hallucinating genes on the large
+    functional decoy -- is visible even when confidence passes.
+    """
+    run_dir = Path(run_dir)
+    reps: dict[tuple, int] = defaultdict(int)
+    failures: dict[tuple, int] = defaultdict(int)
+    conf_votes: dict[tuple, Counter] = defaultdict(Counter)
+    gene_counts: dict[tuple, list[int]] = defaultdict(list)
+
+    with open(run_dir / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
+
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            key = (screen, cluster)
+            if key not in decoy_specs:
+                continue
+            reps[key] += 1
+            parsed = cell.get("parsed_output")
+            if parsed is None or parsed.get("dominant_process") is None:
+                failures[key] += 1
+                continue
+            gene_counts[key].append(
+                len(parsed.get("established_genes") or [])
+                + len(parsed.get("novel_role_genes") or [])
+                + len(parsed.get("uncharacterized_genes") or [])
+            )
+            confidence = parsed.get("pathway_confidence")
+            if confidence:
+                conf_votes[key][confidence] += 1
+
+    results = []
+    for key, expectation in decoy_specs.items():
+        screen, cluster = key
+        votes = conf_votes[key]
+        modal = votes.most_common(1)[0][0] if votes else None
+        n_reps = reps[key]
+        n_fail = failures[key]
+        if expectation == "abstain":
+            # A crash is not abstention: require valid replies (no failures)
+            # whose modal confidence is Low.
+            passed = n_reps > 0 and n_fail == 0 and modal == "Low"
+        elif expectation == "functional":
+            passed = n_reps > 0 and n_fail == 0 and modal in ("High", "Medium")
+        else:
+            raise ValueError(f"unknown decoy expectation {expectation!r} for {key}")
+        counts = gene_counts[key]
+        median_g = _median(counts)
+        expected = (expected_counts or {}).get(key)
+        completion = round(median_g / expected, 3) if expected else None
+        results.append(
+            DecoyResult(
+                screen, cluster, expectation, n_reps, n_fail, modal, passed,
+                genes_per_rep=counts, median_genes=median_g,
+                expected_genes=expected, completion=completion,
+            )
+        )
+    return results
+
+
+# =========================================================================
+# Source diagnostics (why a source wins)
+# =========================================================================
+
+CLASSES = ("ESTABLISHED", "NOVEL_ROLE", "UNCHARACTERIZED")
+
+# The NOVEL_ROLE evidence sub-labels form an ordinal ladder of how much evidence a
+# reviewer credits (NO < INDIRECT < PARTIAL < CONTRADICTORY at the far/off-axis
+# end); reviewers differ in calibration along it, so exact-match understates their
+# agreement. Ordering here defines the ordinal levels used for the calibration stat.
+NOVEL_ORDER = ("NO_EVIDENCE", "INDIRECT_EVIDENCE", "PARTIAL_EVIDENCE", "CONTRADICTORY_EVIDENCE")
+
+# Generic words stripped before testing whether reviewers' free-text pathway
+# labels share a content keyword (approximate cluster-level concordance).
+_PATHWAY_STOPWORDS = frozenset(
+    (
+        "and", "the", "through", "function", "related", "cell", "cellular",
+        "process", "complex", "pathway", "regulation", "activity", "protein",
+        "genes", "gene", "role", "roles", "involved",
+    )
+)
+
+
+def reviewer_label_sets(reviewer_csvs: dict[str, Path]) -> dict[tuple, set[str]]:
+    """Per-gene set of individual reviewer classifications (the lenient GT)."""
+    labels: dict[tuple, set[str]] = defaultdict(set)
+    for path in reviewer_csvs.values():
+        with open(path) as fh:
+            for row in csv.DictReader(fh):
+                cls = row.get("classification", "").strip()
+                if cls:
+                    key = (row["screen"].strip(), str(row["cluster"]).strip(), row["gene"].strip())
+                    labels[key].add(cls)
+    return dict(labels)
+
+
+def _pathway_keywords(text: str) -> set[str]:
+    """5-char stems of content words (minus generic terms) from a free-text pathway.
+
+    Stemming to a 5-char prefix lets morphological variants match (mitochondria /
+    mitochondrial, splice / splicing) so cluster-level pathway concordance isn't
+    lost to wording differences.
+    """
+    toks = set(re.findall(r"[a-z]{4,}", text.lower())) - _PATHWAY_STOPWORDS
+    return {t[:5] for t in toks}
+
+
+def _fleiss_kappa(rating_rows: list[Counter], categories) -> float:
+    """Fleiss' kappa over items rated by a fixed number of raters into `categories`."""
+    n_items = len(rating_rows)
+    n_raters = sum(rating_rows[0].values()) if rating_rows else 0
+    if not n_items or n_raters < 2:
+        return 0.0
+    p_j = {c: sum(r[c] for r in rating_rows) / (n_items * n_raters) for c in categories}
+    p_bar = sum(
+        (sum(r[c] ** 2 for c in categories) - n_raters) / (n_raters * (n_raters - 1))
+        for r in rating_rows
+    ) / n_items
+    p_e = sum(v**2 for v in p_j.values())
+    return (p_bar - p_e) / (1 - p_e) if p_e < 1 else 1.0
+
+
+def _read_annotations(reviewer_csvs, gt):
+    """Per real (gene / cluster) reviewer classification, subclass, pathway, web use."""
+    cat: dict[tuple, dict] = defaultdict(dict)
+    sub: dict[tuple, dict] = defaultdict(dict)
+    pathway: dict[tuple, dict] = defaultdict(dict)
+    web_rows: list[tuple[str, bool]] = []  # (consensus_class, used_web) per annotation
+    for name, path in reviewer_csvs.items():
+        with open(path) as fh:
+            for x in csv.DictReader(fh):
+                gk = (x["screen"].strip(), str(x["cluster"]).strip(), x["gene"].strip())
+                if gt.get(gk, {}).get("cluster_role") != "real":
+                    continue
+                if x.get("classification", "").strip():
+                    cat[gk][name] = x["classification"].strip()
+                if x.get("subclass", "").strip():
+                    sub[gk][name] = x["subclass"].strip()
+                pathway[(gk[0], gk[1])][name] = x.get("pathway", "").strip()
+                web_rows.append(
+                    (gt[gk].get("consensus_class", ""), x.get("used_web", "").strip().lower() == "yes")
+                )
+    return cat, sub, pathway, web_rows
+
+
+def reviewer_concordance(reviewer_csvs: dict[str, Path], gt: dict) -> dict:
+    """Characterize inter-reviewer agreement at every level (the incoming data).
+
+    Category level: pairwise agreement, all-reviewer unanimity + Fleiss' kappa, and
+    unanimity by consensus class (the pairwise range is the human ceiling). Also
+    concordance at the pathway (cluster) and sub-class levels, and reviewers' web
+    usage by class -- how self-sufficient the evidence bundles were (few web lookups
+    => inline literature / MCP is only needed for the rare dark genes).
+    """
+    names = list(reviewer_csvs.keys())
+    cat, sub, pathway, web_rows = _read_annotations(reviewer_csvs, gt)
+
+    genes = [(k, v) for k, v in cat.items() if len(v) == len(names)]
+    n = len(genes)
+    pairwise = {}
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            a, b = names[i], names[j]
+            agree = sum(1 for _, v in genes if v[a] == v[b])
+            pairwise[f"{a}-{b}"] = agree / n if n else 0.0
+    unanimous = sum(1 for _, v in genes if len(set(v.values())) == 1)
+    by_class = {}
+    for cls in CLASSES:
+        sg = [(k, v) for k, v in genes if gt[k].get("consensus_class") == cls]
+        un = sum(1 for _, v in sg if len(set(v.values())) == 1)
+        by_class[cls] = {"n": len(sg), "unanimous": un, "frac": un / len(sg) if sg else 0.0}
+    pw = list(pairwise.values())
+    kappa = _fleiss_kappa([Counter(v.values()) for _, v in genes], CLASSES)
+
+    # sub-class concordance: genes where all reviewers agree on category AND all gave a sub-class
+    sub_genes = [
+        (k, v)
+        for k, v in sub.items()
+        if len(v) == len(names) and k in cat and len(set(cat[k].values())) == 1
+    ]
+    sub_unan = sum(1 for _, v in sub_genes if len(set(v.values())) == 1)
+    # pathway concordance: clusters where all reviewers share a content keyword
+    path_clusters = [v for v in pathway.values() if len(v) == len(names)]
+    path_agree = sum(
+        1 for v in path_clusters if set.intersection(*(_pathway_keywords(t) for t in v.values()))
+    )
+
+    web_n = len(web_rows)
+    web_yes = sum(1 for _, w in web_rows if w)
+    web_by_class = {}
+    for cls in CLASSES:
+        rows = [w for c, w in web_rows if c == cls]
+        web_by_class[cls] = {"n": len(rows), "frac": (sum(rows) / len(rows)) if rows else 0.0}
+
+    # --- sub-class detail: UNCHAR (categorical, agrees) vs the ordinal NOVEL ladder ---
+    def _cond(family):
+        return [
+            (k, v)
+            for k, v in sub.items()
+            if len(v) == len(names)
+            and k in cat
+            and len(set(cat[k].values())) == 1
+            and next(iter(cat[k].values())) == family
+        ]
+
+    unchar_cond, novel_cond = _cond("UNCHARACTERIZED"), _cond("NOVEL_ROLE")
+    unchar_agree = sum(1 for _, v in unchar_cond if len(set(v.values())) == 1)
+    novel_exact = sum(1 for _, v in novel_cond if len(set(v.values())) == 1)
+    lvl = {lab: i for i, lab in enumerate(NOVEL_ORDER)}
+    means = {
+        r: (sum(lvl[v[r]] for _, v in novel_cond) / len(novel_cond)) if novel_cond else 0.0
+        for r in names
+    }
+    order = sorted(names, key=lambda r: means[r])
+    mono = (
+        sum(1 for _, v in novel_cond if lvl[v[order[0]]] <= lvl[v[order[1]]] <= lvl[v[order[2]]])
+        if len(names) == 3 and novel_cond
+        else 0
+    )
+    within1 = within1_n = 0
+    for _, v in novel_cond:
+        vals = [lvl[v[r]] for r in names]
+        if 3 in vals:  # off-axis CONTRADICTORY excluded from the within-1 check
+            continue
+        within1_n += 1
+        within1 += max(vals) - min(vals) <= 1
+    marginals = {
+        r: {lab: sum(1 for _, v in novel_cond if v[r] == lab) for lab in NOVEL_ORDER} for r in names
+    }
+    median_r = order[len(order) // 2] if order else ""
+    maj = med_match = 0
+    for _, v in novel_cond:
+        top, cnt = Counter(v.values()).most_common(1)[0]
+        if cnt >= 2:
+            maj += 1
+            med_match += v[median_r] == top
+    subclass = {
+        "unchar": {"agree": unchar_agree, "n": len(unchar_cond)},
+        "novel": {"exact": novel_exact, "n": len(novel_cond),
+                  "monotone": mono, "within1": within1, "within1_n": within1_n},
+        "calibration": {"order": order, "means": means, "marginals": marginals,
+                        "labels": list(NOVEL_ORDER)},
+        "consensus_is_median": {"match": med_match, "n": maj, "reviewer": median_r},
+    }
+
+    return {
+        "n_genes": n,
+        "reviewers": names,
+        "pairwise": pairwise,
+        "unanimous": unanimous,
+        "unanimous_frac": unanimous / n if n else 0.0,
+        "fleiss_kappa": kappa,
+        "by_class": by_class,
+        "ceiling": [min(pw), max(pw)] if pw else [0.0, 0.0],
+        "levels": {
+            "pathway": {"agree": path_agree, "n": len(path_clusters),
+                        "frac": path_agree / len(path_clusters) if path_clusters else 0.0},
+            "category": {"agree": unanimous, "n": n, "frac": unanimous / n if n else 0.0},
+            "subcategory": {"agree": sub_unan, "n": len(sub_genes),
+                            "frac": sub_unan / len(sub_genes) if sub_genes else 0.0},
+        },
+        "web": {
+            "overall": {"yes": web_yes, "n": web_n, "frac": web_yes / web_n if web_n else 0.0},
+            "by_class": web_by_class,
+        },
+        "subclass": subclass,
+    }
+
+
+def source_preference_tally(gt: dict) -> dict:
+    """Sum the reviewers' de-blinded source-preference votes over real genes."""
+    overall: Counter = Counter()
+    by_class = {c: Counter() for c in CLASSES}
+    seen: set[tuple] = set()
+    for (screen, cluster, gene), row in gt.items():
+        if row.get("cluster_role") != "real":
+            continue
+        key = (screen, cluster, gene)
+        if key in seen:
+            continue
+        seen.add(key)
+        cc = row.get("consensus_class", "")
+        for src in ("affinage", "uniprot", "both", "neither"):
+            n = int(row.get(f"pref_{src}", 0) or 0)
+            overall[src] += n
+            if cc in by_class:
+                by_class[cc][src] += n
+    return {"overall": dict(overall), "by_class": {c: dict(by_class[c]) for c in CLASSES}}
+
+
+def source_diagnostics(
+    run_dir: Path,
+    gt: dict,
+    reviewer_labels: dict[tuple, set[str]],
+    condition: str,
+    n_real: int = N_REAL_GENES,
+) -> dict:
+    """Per-class + lenient recall for one source condition (e.g. affinage__single_call)."""
+    modal = gene_modal_categories(run_dir, route_equals=condition)
+    confusion = {c: Counter() for c in CLASSES}
+    strata = {c: {"consensus": 0, "any": 0, "n": 0} for c in CLASSES}
+    per_cluster: dict[tuple, list[int]] = defaultdict(lambda: [0, 0])  # (correct, n)
+    consensus_correct = any_correct = n = forgiven = 0
+
+    for (screen, cluster, gene), modal_call in modal.items():
+        row = gt.get((screen, cluster, gene))
+        if not row or row.get("cluster_role") != "real":
+            continue
+        consensus_class = row.get("consensus_class", "")
+        if not consensus_class:
+            continue
+        labels = reviewer_labels.get((screen, cluster, gene), set())
+        n += 1
+        ok_consensus = modal_call == consensus_class
+        ok_any = modal_call in labels
+        consensus_correct += ok_consensus
+        any_correct += ok_any
+        if ok_any and not ok_consensus:
+            forgiven += 1
+        confusion[consensus_class][modal_call] += 1
+        s = strata[consensus_class]
+        s["n"] += 1
+        s["consensus"] += ok_consensus
+        s["any"] += ok_any
+        pc = per_cluster[(screen, cluster)]
+        pc[0] += ok_consensus
+        pc[1] += 1
+
+    def _recall(correct: int, total: int) -> float:
+        return correct / total if total else 0.0
+
+    def _prf(c: str) -> dict:
+        """Precision / recall / F1 for class c from the full confusion matrix."""
+        tp = confusion[c].get(c, 0)
+        fn = strata[c]["n"] - tp
+        fp = sum(confusion[o].get(c, 0) for o in CLASSES if o != c)
+        prec = tp / (tp + fp) if tp + fp else 0.0
+        rec = tp / (tp + fn) if tp + fn else 0.0
+        f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
+        return {
+            "tp": tp, "fp": fp, "fn": fn,
+            "precision": round(prec, 3), "recall": round(rec, 3), "f1": round(f1, 3),
+        }
+
+    return {
+        "condition": condition,
+        "n_scored": n,
+        "consensus_recall": _recall(consensus_correct, n),
+        "any_recall": _recall(any_correct, n),
+        "consensus_cw": consensus_correct / n_real,
+        "any_cw": any_correct / n_real,
+        "leniency_gain": _recall(any_correct, n) - _recall(consensus_correct, n),
+        "forgiven": forgiven,
+        "per_class": {
+            c: {
+                "n": strata[c]["n"],
+                "recall_consensus": _recall(strata[c]["consensus"], strata[c]["n"]),
+                "recall_any": _recall(strata[c]["any"], strata[c]["n"]),
+                "confusion": dict(confusion[c]),
+                **_prf(c),
+            }
+            for c in CLASSES
+        },
+        "per_cluster": {
+            f"{s}/{cl}": {"correct": v[0], "n": v[1], "recall": round(_recall(v[0], v[1]), 3)}
+            for (s, cl), v in sorted(per_cluster.items())
+        },
+    }
+
+# =========================================================================
+# Pathway agreement (model dominant process vs reviewers' nominated pathways)
+# =========================================================================
+#
+# Cluster-level: the model's modal dominant_process is compared to the reviewers'
+# free-text pathway nominations three ways -- substring, bidirectional substring,
+# and (optionally) semantic cosine similarity via a sentence-transformer. Model
+# pathway names are verbose and expert names terse, so the substring heuristics
+# under-count agreement; the semantic score is the robust measure when the
+# sentence-transformers extra is installed.
 
 _SEMANTIC_MODEL_NAME = "all-MiniLM-L6-v2"
-_semantic_model: Any = None  # lazy-loaded on first use
-
-PHASE_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_GROUND_TRUTH = PHASE_DIR / "benchmark_inputs" / "benchmark_combined_expert_annotations.csv"
-
-# Human reviewers used for scoring. operon is intentionally excluded — it is an
-# LLM annotator, so including it makes the benchmark LLM-evaluating-LLM.
-DEFAULT_REVIEWERS = ("eric", "iain", "liz")
-JOIN_KEYS = ("screen_name", "cluster_id", "gene_symbol")
-
-# Phase prefixes derived from the experiment-dir path so eval outputs from each
-# benchmark phase (architecture / order / wording) are distinguishable. Keyed by
-# a substring matched against the path components of --experiment-dir.
-_PHASE_PREFIX_MARKERS = (
-    ("arch", "arch"),
-    ("order", "ord"),
-    ("word", "word"),
-    ("comp", "comp"),
-)
-
-
-def _detect_phase_prefix(experiment_dir: Path) -> str:
-    """Infer a phase prefix (arch/ord/word/comp) from the experiment-dir path.
-
-    Scans the parent path components (excluding the experiment-id leaf, which may
-    itself contain phase-like tokens). Returns "" if no phase folder is matched.
-    """
-    parts = [p.lower() for p in experiment_dir.resolve().parts[:-1]]
-    for part in parts:
-        for marker, prefix in _PHASE_PREFIX_MARKERS:
-            if marker in part:
-                return prefix
-    return ""
-
-
-# Stable suffixes of evaluator output CSVs (independent of the phase prefix), used
-# to exclude them when globbing prediction CSVs so re-runs don't re-ingest them.
-_EVAL_OUTPUT_SUFFIXES = (
-    "_per_gene.csv",
-    "_per_route.csv",
-    "_per_route_per_case_type.csv",
-    "_negative_abstention.csv",
-    "_coverage.csv",
-    "_output_fragility.csv",
-)
-
-# Shuffled clusters carry no expert pathway annotation by construction; scored
-# on whether the model correctly emits "no coherent pathway" + empty arrays.
-NEGATIVE_CLUSTERS = (
-    ("aconcagua_interphase_shuffled", "244", "no_coherent_pathway"),
-    ("aconcagua_interphase_shuffled", "3", "no_coherent_pathway"),
-    ("aconcagua_interphase_shuffled", "17", "no_coherent_pathway"),
-)
-
-# Output-fragility diagnostic: a large coherent cluster (jebel/0, 147 genes)
-# with no expert annotations. Reported separately from accuracy / abstention.
-OUTPUT_FRAGILITY_CLUSTER = ("jebel", "0")
-
-# Confidence ordering for tie-breaks (mode ties resolve toward higher confidence).
-_CONF_ORDER = {"high": 3, "medium": 2, "low": 1}
-
-# Columns in the prediction CSVs we always expect (from bench_trace_parser.py)
-PRED_COLS_REQUIRED = (
-    "screen_name",
-    "cluster_id",
-    "gene_symbol",
-    "route",
-    "replicate",
-    "run_id",
-    "predicted_class",
-    "predicted_subclass",
-    "pathway",
-    "pathway_confidence",
-)
-
-
-def _norm_str(x: Any) -> str:
-    if pd.isna(x):
-        return ""
-    return str(x).strip()
-
-
-def _norm_lower(x: Any) -> str:
-    return _norm_str(x).lower()
-
-
-def _norm_class(x: Any) -> str:
-    """Classification labels: trim + uppercase. Empty stays empty."""
-    return _norm_str(x).upper()
-
-
-def consensus_of(values: list[str]) -> str:
-    """Consensus over present (non-empty) values: the agreed value if all present
-    values are equal, else "" (no consensus). Requires at least one present value."""
-    present = [v for v in values if v]
-    if not present:
-        return ""
-    return present[0] if len(set(present)) == 1 else ""
-
-
-def majority_confidence(row: pd.Series, reviewers: tuple[str, ...]) -> str:
-    """Most-frequent pathway_confidence_{r} across active reviewers. Ties resolve
-    toward higher confidence. Empty if no votes."""
-    votes = [_norm_str(row.get(f"pathway_confidence_{r}")) for r in reviewers]
-    votes = [v for v in votes if v]
-    if not votes:
-        return ""
-    counter = Counter(votes)
-    top_count = max(counter.values())
-    top = [v for v, c in counter.items() if c == top_count]
-    if len(top) == 1:
-        return top[0]
-    return max(top, key=lambda v: _CONF_ORDER.get(v.lower(), 0))
+_semantic_model = None  # lazy-loaded on first use
 
 
 def pathway_substring_match(predicted: str, experts: list[str]) -> bool:
     """Any expert pathway is a case-insensitive substring of the prediction."""
-    pred = _norm_lower(predicted)
+    pred = (predicted or "").strip().lower()
     if not pred:
         return False
-    for exp in experts:
-        exp_lower = _norm_lower(exp)
-        if exp_lower and exp_lower in pred:
-            return True
-    return False
+    return any((e or "").strip().lower() and (e or "").strip().lower() in pred for e in experts)
 
 
 def pathway_loose_match(predicted: str, experts: list[str]) -> bool:
     """Bidirectional substring: prediction in expert OR expert in prediction."""
-    pred = _norm_lower(predicted)
+    pred = (predicted or "").strip().lower()
     if not pred:
         return False
     for exp in experts:
-        exp_lower = _norm_lower(exp)
-        if not exp_lower:
-            continue
-        if exp_lower in pred or pred in exp_lower:
+        e = (exp or "").strip().lower()
+        if e and (e in pred or pred in e):
             return True
     return False
 
 
-def _get_semantic_model() -> Any:
-    """Lazy-load the sentence-transformer model (~80 MB download on first use)."""
+def _semantic_available() -> bool:
+    """Whether sentence-transformers is importable (checked without importing torch)."""
+    import importlib.util
+
+    return importlib.util.find_spec("sentence_transformers") is not None
+
+
+def _get_semantic_model():
+    """Lazy-load the sentence-transformer (~80 MB download + torch import on first use)."""
     global _semantic_model
     if _semantic_model is None:
-        print(f"  [semantic] Loading {_SEMANTIC_MODEL_NAME} (downloads ~80 MB on first use)...")
+        from sentence_transformers import SentenceTransformer
+
         _semantic_model = SentenceTransformer(_SEMANTIC_MODEL_NAME)
     return _semantic_model
 
 
-def compute_semantic_scores(
-    joined: pd.DataFrame,
-    reviewers: tuple[str, ...],
+def _max_cosine(predicted: str, experts: list[str], model) -> float | None:
+    """Max cosine similarity of the prediction to any expert pathway, or None."""
+    import numpy as np
+
+    exp = [e.strip() for e in experts if e and e.strip()]
+    pred = (predicted or "").strip()
+    if not pred or not exp:
+        return None
+    emb = model.encode([pred, *exp], convert_to_tensor=False, show_progress_bar=False)
+    emb = np.asarray(emb)
+    emb = emb / np.maximum(np.linalg.norm(emb, axis=1, keepdims=True), 1e-9)
+    sims = emb[1:] @ emb[0]
+    return round(float(sims.max()), 3)
+
+
+def cluster_dominant_process(
+    run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> dict[tuple, str]:
+    """Modal `dominant_process` per (screen, cluster) across replicates for one condition.
+
+    Route filtering mirrors score_run.
+    """
+    votes: dict[tuple, Counter] = defaultdict(Counter)
+    with open(Path(run_dir) / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
+            parsed = cell.get("parsed_output")
+            if parsed is None:
+                continue
+            process = parsed.get("dominant_process")
+            if not process:
+                continue
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            votes[(screen, cluster)][process] += 1
+    return {k: v.most_common(1)[0][0] for k, v in votes.items()}
+
+
+def pathway_diagnostics(
+    run_dir: Path,
+    gt: dict,
+    reviewer_csvs: dict[str, Path],
+    condition: str,
     threshold: float = 0.70,
-) -> pd.DataFrame:
-    """Batch-encode all pathway strings and annotate with per-gene semantic similarity.
+    use_semantic: bool | None = None,
+) -> dict:
+    """Per-cluster pathway agreement for one condition: substring / loose / semantic.
 
-    Adds two columns to the returned DataFrame:
-    - pathway_semantic_score: max cosine similarity to any active reviewer's
-      nominated_pathway (float, NaN when either side is empty)
-    - pathway_semantic_match: score >= threshold (bool)
-
-    All unique non-empty pathway strings (predicted + all reviewer nominations)
-    are encoded in a single batch call — one model forward pass regardless of
-    the number of routes or rows.
-
-    Returns joined unchanged (NaN/False semantic columns) when sentence-transformers
-    is not installed.
+    The model's modal dominant_process for each real cluster is compared to the
+    reviewers' nominated pathways. `use_semantic` defaults to whether
+    sentence-transformers is installed; pass False to skip the model load (tests).
     """
-    out = joined.copy()
-    nan_fill = [float("nan")] * len(out)
-    false_fill = [False] * len(out)
+    if use_semantic is None:
+        use_semantic = _semantic_available()
+    model = _get_semantic_model() if use_semantic else None
 
-    if not _SEMANTIC_AVAILABLE:
-        out["pathway_semantic_score"] = nan_fill
-        out["pathway_semantic_match"] = false_fill
-        return out
+    model_pw = cluster_dominant_process(run_dir, route_equals=condition)
+    _, _, reviewer_pw, _ = _read_annotations(reviewer_csvs, gt)  # {(screen, cluster): {rev: text}}
 
-    model = _get_semantic_model()
-    expert_cols = [f"nominated_pathway_{r}" for r in reviewers]
-
-    # Collect all unique non-empty strings across predictions + all expert columns.
-    all_strings: set[str] = set()
-    for s in out["pathway"].dropna():
-        s = str(s).strip()
-        if s:
-            all_strings.add(s)
-    for col in expert_cols:
-        if col in out.columns:
-            for s in out[col].dropna():
-                s = str(s).strip()
-                if s:
-                    all_strings.add(s)
-
-    if not all_strings:
-        out["pathway_semantic_score"] = nan_fill
-        out["pathway_semantic_match"] = false_fill
-        return out
-
-    str_list = sorted(all_strings)
-    str_to_idx = {s: i for i, s in enumerate(str_list)}
-
-    print(
-        f"  [semantic] Encoding {len(str_list)} unique pathway strings "
-        f"with {_SEMANTIC_MODEL_NAME}..."
-    )
-    # numpy arrays (n_strings, d) — avoids torch tensor handling entirely.
-    embeddings = model.encode(str_list, convert_to_tensor=False, show_progress_bar=False)
-    # Pre-normalise all rows once so similarity = dot product.
-    norms = _np.linalg.norm(embeddings, axis=1, keepdims=True)
-    embeddings = embeddings / _np.maximum(norms, 1e-9)
-
-    scores: list[float] = []
-    for _, row in out.iterrows():
-        pred = str(row.get("pathway") or "").strip()
-        if not pred or pred not in str_to_idx:
-            scores.append(float("nan"))
-            continue
-
-        expert_indices = [
-            str_to_idx[str(row.get(col) or "").strip()]
-            for col in expert_cols
-            if str(row.get(col) or "").strip() in str_to_idx
-        ]
-        if not expert_indices:
-            scores.append(float("nan"))
-            continue
-
-        pred_vec = embeddings[str_to_idx[pred]]  # (d,) normalised
-        exp_vecs = embeddings[expert_indices]  # (n, d) normalised
-        sims = exp_vecs @ pred_vec  # (n,) dot products = cosine sims
-        scores.append(round(float(_np.max(sims)), 3))
-
-    out["pathway_semantic_score"] = scores
-    out["pathway_semantic_match"] = [
-        bool(s >= threshold) if s == s else False  # NaN check via self-equality
-        for s in out["pathway_semantic_score"]
-    ]
-    out["pathway_semantic_match_loose"] = [
-        bool(s >= 0.60) if s == s else False for s in out["pathway_semantic_score"]
-    ]
-    return out
-
-
-def load_predictions(experiment_dir: Path) -> pd.DataFrame:
-    """Stack every prediction CSV in the experiment dir into one frame.
-
-    Excludes eval_*.csv (evaluator outputs) and aggregate_summary.csv.
-    """
-    csvs = sorted(experiment_dir.glob("*.csv"))
-    # Exclude evaluator outputs (any prefix, e.g. eval_*, arch_eval_*) by their
-    # stable suffixes, plus the aggregate summary, so re-runs never re-ingest them.
-    csvs = [
-        c
-        for c in csvs
-        if not c.name.startswith("eval_")
-        and not c.name.endswith(_EVAL_OUTPUT_SUFFIXES)
-        and c.name != "aggregate_summary.csv"
-    ]
-    if not csvs:
-        raise FileNotFoundError(
-            f"No per-route prediction CSVs in {experiment_dir}. "
-            f"Run bench_trace_parser.py first to generate them."
-        )
-    frames = []
-    for c in csvs:
-        df = pd.read_csv(c, dtype={"cluster_id": str, "gene_symbol": str})
-        missing = [col for col in PRED_COLS_REQUIRED if col not in df.columns]
-        if missing:
-            raise ValueError(f"{c.name} missing required columns: {missing}")
-        frames.append(df)
-    out = pd.concat(frames, ignore_index=True)
-    for k in JOIN_KEYS:
-        out[k] = out[k].astype(str).str.strip()
-    return out
-
-
-def load_ground_truth(path: Path) -> pd.DataFrame:
-    """Load the ground-truth CSV.
-
-    Renames `sheet` → `screen_name` to match the prediction CSV join key.
-    """
-    gt = pd.read_csv(path, dtype={"cluster_id": str, "gene_symbol": str})
-    if "sheet" in gt.columns and "screen_name" not in gt.columns:
-        gt = gt.rename(columns={"sheet": "screen_name"})
-    for k in JOIN_KEYS:
-        gt[k] = gt[k].astype(str).str.strip()
-    return gt
-
-
-def annotate_matches(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.DataFrame:
-    """Add per-row match flag columns scored against the active reviewers."""
-    out = joined.copy()
-    out["predicted_class_norm"] = out["predicted_class"].apply(_norm_class)
-
-    # --- Classification: per-reviewer, either, recomputed consensus ----------
-    for r in reviewers:
-        out[f"expert_class_{r}"] = out[f"expert_classification_{r}"].apply(_norm_class)
-        out[f"classification_match_{r}"] = (out[f"expert_class_{r}"] != "") & (
-            out["predicted_class_norm"] == out[f"expert_class_{r}"]
-        )
-
-    def _expert_classes(row: pd.Series) -> list[str]:
-        return [row[f"expert_class_{r}"] for r in reviewers if row[f"expert_class_{r}"]]
-
-    out["classification_match_either"] = out.apply(
-        lambda r: r["predicted_class_norm"] != ""
-        and r["predicted_class_norm"] in _expert_classes(r),
-        axis=1,
-    )
-    out["experts_agree"] = out.apply(
-        lambda r: len(_expert_classes(r)) >= 1
-        and len(set(_expert_classes(r))) == 1
-        and len(_expert_classes(r)) == len([rv for rv in reviewers if r[f"expert_class_{rv}"]]),
-        axis=1,
-    )
-    out["consensus_class"] = out.apply(
-        lambda r: consensus_of([r[f"expert_class_{rv}"] for rv in reviewers]), axis=1
-    )
-
-    def _class_consensus(row: pd.Series) -> bool | None:
-        if not row["consensus_class"]:
-            return None  # reviewers disagree → not scored under consensus rule
-        return row["predicted_class_norm"] == row["consensus_class"]
-
-    out["classification_match_consensus"] = out.apply(_class_consensus, axis=1)
-
-    # --- Confidence: per-reviewer + majority (ties → higher) ----------------
-    # NOTE: ground truth uses pathway_confidence_{r}; predictions use pathway_confidence.
-    # After the merge, pathway_confidence = model output; pathway_confidence_{r} = expert.
-    out["majority_expert_confidence"] = out.apply(
-        lambda r: majority_confidence(r, reviewers), axis=1
-    )
-    for r in reviewers:
-        out[f"confidence_match_{r}"] = (out[f"pathway_confidence_{r}"].apply(_norm_lower) != "") & (
-            out["pathway_confidence"].apply(_norm_lower)
-            == out[f"pathway_confidence_{r}"].apply(_norm_lower)
-        )
-    out["confidence_consensus_match"] = (
-        out["majority_expert_confidence"].apply(_norm_lower) != ""
-    ) & (
-        out["pathway_confidence"].apply(_norm_lower)
-        == out["majority_expert_confidence"].apply(_norm_lower)
-    )
-
-    # --- Pathway: per-reviewer + any-reviewer --------------------------------
-    # Ground truth uses nominated_pathway_{r} for expert pathway nominations.
-    def _expert_pathways(row: pd.Series) -> list[str]:
-        vals = [row.get(f"nominated_pathway_{r}") for r in reviewers]
-        return [v for v in vals if isinstance(v, str) and v.strip()]
-
-    for r in reviewers:
-        out[f"pathway_match_substring_{r}"] = out.apply(
-            lambda x, rv=r: pathway_substring_match(
-                x.get("pathway"), [x.get(f"nominated_pathway_{rv}")]
-            ),
-            axis=1,
-        )
-        out[f"pathway_match_loose_{r}"] = out.apply(
-            lambda x, rv=r: pathway_loose_match(
-                x.get("pathway"), [x.get(f"nominated_pathway_{rv}")]
-            ),
-            axis=1,
-        )
-    out["pathway_match_substring"] = out.apply(
-        lambda r: pathway_substring_match(r.get("pathway"), _expert_pathways(r)), axis=1
-    )
-    out["pathway_match_loose"] = out.apply(
-        lambda r: pathway_loose_match(r.get("pathway"), _expert_pathways(r)), axis=1
-    )
-
-    # --- Subclass: gated on recomputed consensus for NOVEL_ROLE / UNCHARACTERIZED ---
-    def _subclass_match(row: pd.Series) -> bool | None:
-        if row["consensus_class"] not in {"NOVEL_ROLE", "UNCHARACTERIZED"}:
-            return None  # not applicable
-        pred_sc = _norm_class(row.get("predicted_subclass"))
-        if not pred_sc:
-            return False
-        experts = [_norm_class(row.get(f"expert_subclass_{r}")) for r in reviewers]
-        experts = [e for e in experts if e]
-        if not experts:
-            return None
-        return pred_sc in experts
-
-    out["subclass_match"] = out.apply(_subclass_match, axis=1)
-
-    return out
-
-
-# Metric columns whose values may be None (scored only on applicable rows).
-NULLABLE_METRICS = ("classification_match_consensus", "subclass_match")
-
-
-def _route_metric_cols(reviewers: tuple[str, ...]) -> list[str]:
-    cols = [
-        "classification_match_consensus",
-        "classification_match_either",
-    ]
-    cols += [f"classification_match_{r}" for r in reviewers]
-    cols += [
-        "pathway_match_substring",
-        "pathway_match_loose",
-        "confidence_consensus_match",
-        "subclass_match",
-    ]
-    return cols
-
-
-def _agg_rate(grp: pd.DataFrame, metric: str) -> tuple[float | None, int]:
-    """Mean of a boolean/None metric column over applicable rows; returns (rate, n)."""
-    if metric in NULLABLE_METRICS:
-        applicable = grp[grp[metric].notna()]
-        n = len(applicable)
-        return (round(applicable[metric].mean(), 3) if n else None), n
-    return round(grp[metric].mean(), 3), len(grp)
-
-
-def aggregate_per_route(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.DataFrame:
-    """Per-route match rates across all genes."""
-    metric_cols = _route_metric_cols(reviewers)
-    has_semantic = "pathway_semantic_score" in joined.columns
-    rows = []
-    for route, grp in joined.groupby("route", sort=True):
-        rec: dict[str, Any] = {"route": route, "n_genes": len(grp)}
-        for m in metric_cols:
-            rate, n = _agg_rate(grp, m)
-            rec[f"{m}_rate"] = rate
-            if m in NULLABLE_METRICS:
-                rec[f"{m}_n"] = n
-        if has_semantic:
-            valid = grp["pathway_semantic_score"].dropna()
-            rec["pathway_semantic_score_mean"] = (
-                round(float(valid.mean()), 3) if len(valid) else float("nan")
-            )
-            rec["pathway_semantic_match_rate"] = round(
-                float(grp["pathway_semantic_match"].mean()), 3
-            )
-            if "pathway_semantic_match_loose" in grp.columns:
-                rec["pathway_semantic_match_loose_rate"] = round(
-                    float(grp["pathway_semantic_match_loose"].mean()), 3
-                )
-        rows.append(rec)
-    return pd.DataFrame(rows)
-
-
-def aggregate_per_route_per_case_type(
-    joined: pd.DataFrame, reviewers: tuple[str, ...]
-) -> pd.DataFrame:
-    """Per-route per-case-type match rates."""
-    metric_cols = [
-        "classification_match_consensus",
-        "classification_match_either",
-        "pathway_match_substring",
-        "pathway_match_loose",
-        "confidence_consensus_match",
-    ]
-    has_semantic = "pathway_semantic_score" in joined.columns
-    rows = []
-    for (route, case_type), grp in joined.groupby(["route", "benchmark_case_type"], sort=True):
-        rec = {"route": route, "case_type": case_type, "n_genes": len(grp)}
-        for m in metric_cols:
-            rate, _ = _agg_rate(grp, m)
-            rec[f"{m}_rate"] = rate
-        if has_semantic:
-            valid = grp["pathway_semantic_score"].dropna()
-            rec["pathway_semantic_score_mean"] = (
-                round(float(valid.mean()), 3) if len(valid) else float("nan")
-            )
-            rec["pathway_semantic_match_rate"] = round(
-                float(grp["pathway_semantic_match"].mean()), 3
-            )
-        rows.append(rec)
-    return pd.DataFrame(rows)
-
-
-def inter_reviewer_concordance(
-    joined: pd.DataFrame, reviewers: tuple[str, ...]
-) -> dict[str, float]:
-    """Pairwise + unanimous classification agreement among reviewers (the ceiling).
-
-    Computed on the unique gene set (one route) to avoid inflating by route count.
-    """
-    one_route = joined[joined["route"] == joined["route"].iloc[0]]
-    stats: dict[str, float] = {}
-    revs = list(reviewers)
-    for i in range(len(revs)):
-        for j in range(i + 1, len(revs)):
-            a, b = revs[i], revs[j]
-            both = (one_route[f"expert_class_{a}"] != "") & (one_route[f"expert_class_{b}"] != "")
-            agree = both & (one_route[f"expert_class_{a}"] == one_route[f"expert_class_{b}"])
-            stats[f"{a}_vs_{b}"] = round(agree.sum() / max(both.sum(), 1), 3)
-    stats["unanimous"] = round(one_route["experts_agree"].mean(), 3)
-    return stats
-
-
-def _df_to_markdown(df: pd.DataFrame) -> str:
-    """Render a DataFrame as a Markdown table without requiring `tabulate`."""
-    if df.empty:
-        return "_(empty)_"
-
-    def _fmt(v: Any) -> str:
-        if isinstance(v, float):
-            return f"{v:.3f}" if not pd.isna(v) else "—"
-        if pd.isna(v):
-            return "—"
-        return str(v)
-
-    cols = list(df.columns)
-    rows = [[_fmt(v) for v in row] for row in df.itertuples(index=False)]
-    header = "| " + " | ".join(cols) + " |"
-    sep = "| " + " | ".join(["---"] * len(cols)) + " |"
-    body = ["| " + " | ".join(row) + " |" for row in rows]
-    return "\n".join([header, sep, *body])
-
-
-def write_report(
-    out_path: Path,
-    experiment_dir: Path,
-    ground_truth_path: Path,
-    reviewers: tuple[str, ...],
-    joined: pd.DataFrame,
-    per_route: pd.DataFrame,
-    per_route_case_type: pd.DataFrame,
-    concordance: dict[str, float],
-    negative_abstention: pd.DataFrame | None = None,
-    coverage: pd.DataFrame | None = None,
-    output_fragility: pd.DataFrame | None = None,
-) -> None:
-    n_genes = len(joined)
-    n_routes = joined["route"].nunique()
-    n_clusters = joined[["screen_name", "cluster_id"]].drop_duplicates().shape[0]
-    rev_str = " + ".join(reviewers)
-    sections = []
-    sections.append(f"# Evaluation report — `{experiment_dir.name}`\n")
-    sections.append(f"- Experiment dir: `{experiment_dir}`")
-    sections.append(f"- Ground truth: `{ground_truth_path}`")
-    sections.append(f"- Reviewers scored: **{rev_str}** (operon excluded — LLM annotator)")
-    sections.append(f"- Joined rows: {n_genes}  ({n_routes} routes × {n_clusters} clusters)\n")
-
-    sections.append("## Inter-reviewer concordance (scoring ceiling)")
-    sections.append(
-        "Classification agreement among reviewers — a model cannot exceed this when "
-        "scored against a consensus that requires agreement."
-    )
-    sections.append(_df_to_markdown(pd.DataFrame([concordance])))
-    sections.append("")
-
-    sections.append("## How classification is scored")
-    for r in reviewers:
-        sections.append(f"- `classification_match_{r}`: vs reviewer {r} individually.")
-    sections.append(
-        "- `classification_match_either`: prediction matches at least one reviewer (ceiling 100%)."
-    )
-    sections.append(
-        "- `classification_match_consensus`: matches the agreed label, scored ONLY on genes "
-        "where all active reviewers agree (`_n` column gives the applicable count; ceiling 100% "
-        "on that subset)."
-    )
-    sections.append("")
-
-    sections.append("## Heuristics (caveats)")
-    sections.append(
-        "- `pathway_match_substring`: any active expert's `nominated_pathway` is a "
-        "case-insensitive substring of the predicted `pathway`. Model names are typically "
-        "verbose; expert names short. Imperfect."
-    )
-    sections.append("- `pathway_match_loose`: bidirectional substring (catches inverse cases).")
-    sections.append(
-        f"- `confidence_consensus_match`: mode of `pathway_confidence_*` over {rev_str}; "
-        "ties broken toward higher confidence."
-    )
-    sections.append(
-        "- `subclass_match`: counted only for genes whose recomputed consensus is "
-        "NOVEL_ROLE or UNCHARACTERIZED."
-    )
-    if "pathway_semantic_match_rate" in per_route.columns:
-        sections.append(
-            f"- `pathway_semantic_score` / `pathway_semantic_match`: cosine similarity "
-            f"between predicted pathway and each active reviewer's `nominated_pathway`, "
-            f"encoded with `{_SEMANTIC_MODEL_NAME}`. `pathway_semantic_match` = score ≥ "
-            f"threshold (see CLI `--semantic-threshold`). NaN when either side is empty."
-        )
-    else:
-        sections.append(
-            "- Semantic pathway scoring skipped (install `sentence-transformers` and "
-            "omit `--no-semantic` to enable)."
-        )
-    sections.append("")
-
-    sections.append("## Per-route match rates")
-    sections.append(_df_to_markdown(per_route))
-    sections.append("")
-
-    sections.append("## Per-route × per-case-type match rates")
-    sections.append(_df_to_markdown(per_route_case_type))
-    sections.append("")
-
-    if coverage is not None and not coverage.empty:
-        sections.append("## Coverage (unique gene symbols)")
-        sections.append(
-            "`coverage_rate_all` across every cluster; `_real` excludes shuffled "
-            "negative controls; `_categorized` also excludes clusters where "
-            "`benchmark_case_type` is NaN (PI consensus failed)."
-        )
-        sections.append(_df_to_markdown(coverage))
-        sections.append("")
-
-    if negative_abstention is not None and not negative_abstention.empty:
-        sections.append("## Negative-control abstention")
-        sections.append(
-            "Per-route abstention on the shuffled negative-control clusters. "
-            "`abstain` = dominant_process contains 'no coherent' AND confidence is "
-            "Low AND all three gene-classification arrays are empty."
-        )
-        sections.append(_df_to_markdown(negative_abstention))
-        sections.append("")
-
-    if output_fragility is not None and not output_fragility.empty:
-        sections.append("## Output-fragility diagnostic (jebel/0)")
-        sections.append(
-            "147-gene ribosome cluster with no expert annotations. Reports per-route "
-            "coverage and pathway-consistency (model output mentions ribosome or "
-            "translation) to surface output-structure failures on a large input."
-        )
-        sections.append(_df_to_markdown(output_fragility))
-        sections.append("")
-
-    out_path.write_text("\n".join(sections), encoding="utf-8")
-
-
-def compute_negative_abstention(experiment_dir: Path) -> pd.DataFrame:
-    """Per-route abstention rate on the shuffled negative-control clusters.
-
-    Reads parsed_outputs.jsonl directly so cells with empty gene arrays (correct
-    abstention) are counted. Abstain iff `dominant_process` contains "no coherent"
-    AND `pathway_confidence` is Low AND all three gene-classification arrays are
-    empty.
-    """
-    parsed_path = experiment_dir / "parsed_outputs.jsonl"
-    if not parsed_path.exists():
-        return pd.DataFrame()
-    neg_lookup = {(s, str(c).strip()): ct for s, c, ct in NEGATIVE_CLUSTERS}
-    cell_rows: list[dict] = []
-    for line in parsed_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            d = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        run_id = d.get("run_id", "")
-        route = d.get("route", "")
-        parts = run_id.split("__")
-        if len(parts) < 5:
-            continue
-        screen = parts[-3]
-        cluster = parts[-2].replace("cluster_", "")
-        if (screen, cluster.strip()) not in neg_lookup:
-            continue
-        po = d.get("parsed_output") or {}
-        proc = _norm_lower(po.get("dominant_process") or "")
-        conf = _norm_lower(po.get("pathway_confidence") or "")
-        n_genes = (
-            len(po.get("established_genes") or [])
-            + len(po.get("novel_role_genes") or [])
-            + len(po.get("uncharacterized_genes") or [])
-        )
-        abstain = ("no coherent" in proc) and (conf == "low") and (n_genes == 0)
-        cell_rows.append(
-            {
-                "route": route,
-                "case_type": neg_lookup[(screen, cluster.strip())],
-                "abstain": abstain,
-            }
-        )
-    if not cell_rows:
-        return pd.DataFrame()
-    cells = pd.DataFrame(cell_rows)
-    rows = []
-    for (route, ct), grp in cells.groupby(["route", "case_type"]):
-        rate = float(grp["abstain"].mean())
-        rows.append(
-            {
-                "route": route,
-                "case_type": ct,
-                "n_cells": len(grp),
-                "abstain_rate": round(rate, 3),
-                "fabrication_rate": round(1 - rate, 3),
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-def compute_coverage(
-    preds: pd.DataFrame,
-    clusters_csv_path: Path,
-    ground_truth: pd.DataFrame | None = None,
-) -> pd.DataFrame:
-    """Per-route coverage on unique gene symbols.
-
-    Reports three rates so the "coverage drop" signal isn't confounded by the
-    shuffled-controls case where lower coverage is correct:
-    - coverage_rate_all: across every cluster in the benchmark
-    - coverage_rate_real: excludes the shuffled negative-control clusters
-    - coverage_rate_categorized: also excludes clusters with benchmark_case_type=NaN
-      (PI consensus failed; abstaining there is a defensible call)
-    """
-    if not clusters_csv_path.exists():
-        return pd.DataFrame()
-    clusters = pd.read_csv(clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str})
-    if "sheet" in clusters.columns and "screen_name" not in clusters.columns:
-        clusters = clusters.rename(columns={"sheet": "screen_name"})
-    if not {"screen_name", "cluster_id", "gene_symbol"}.issubset(clusters.columns):
-        return pd.DataFrame()
-    expected_per_cluster = (
-        clusters.drop_duplicates(["screen_name", "cluster_id", "gene_symbol"])
-        .groupby(["screen_name", "cluster_id"])
-        .size()
-    )
-    shuffled_keys = {(s, str(c).strip()) for s, c, _ in NEGATIVE_CLUSTERS}
-    uncategorized_keys: set[tuple[str, str]] = set()
-    if ground_truth is not None and "benchmark_case_type" in ground_truth.columns:
-        defined = {
-            (s, str(c).strip())
-            for s, c in ground_truth.dropna(subset=["benchmark_case_type"])
-            .drop_duplicates(["screen_name", "cluster_id"])[["screen_name", "cluster_id"]]
-            .itertuples(index=False)
+    per_cluster: dict[str, dict] = {}
+    for key, experts_map in reviewer_pw.items():
+        pred = model_pw.get(key, "")
+        experts = [v for v in experts_map.values() if v]
+        score = _max_cosine(pred, experts, model) if model else None
+        per_cluster[f"{key[0]}/{key[1]}"] = {
+            "predicted": pred,
+            "substring": pathway_substring_match(pred, experts),
+            "loose": pathway_loose_match(pred, experts),
+            "semantic_score": score,
+            "semantic_match": score is not None and score >= threshold,
         }
-        all_clusters = {(s, str(c).strip()) for (s, c) in expected_per_cluster.index}
-        uncategorized_keys = all_clusters - defined - shuffled_keys
-    full_expected = {(s, str(c).strip()): n for (s, c), n in expected_per_cluster.items()}
-    rows = []
-    for route, grp in preds.groupby("route", sort=True):
-        # defense/future-proofing: use actual IDs rather than range(1, N+1)
-        replicate_ids = sorted(grp["replicate"].unique())
-        per_cell = (
-            grp.groupby(["screen_name", "cluster_id", "replicate"])["gene_symbol"]
-            .nunique()
-            .reset_index(name="n_unique_pred")
-        )
-        all_pairs = [
-            (s, str(c).strip(), rep)
-            for (s, c) in expected_per_cluster.index
-            for rep in replicate_ids
-        ]
-        all_df = pd.DataFrame(all_pairs, columns=["screen_name", "cluster_id", "replicate"])
-        merged = all_df.merge(per_cell, on=["screen_name", "cluster_id", "replicate"], how="left")
-        merged["n_unique_pred"] = merged["n_unique_pred"].fillna(0)
-        merged["expected"] = merged.apply(
-            lambda r: full_expected.get((r["screen_name"], r["cluster_id"]), 0), axis=1
-        )
-        merged["is_shuffled"] = merged.apply(
-            lambda r: (r["screen_name"], r["cluster_id"]) in shuffled_keys, axis=1
-        )
-        merged["is_uncategorized"] = merged.apply(
-            lambda r: (r["screen_name"], r["cluster_id"]) in uncategorized_keys, axis=1
-        )
-        total_pred_all = int(merged["n_unique_pred"].sum())
-        total_exp_all = int(merged["expected"].sum())
-        real = merged[~merged["is_shuffled"]]
-        cat = merged[~merged["is_shuffled"] & ~merged["is_uncategorized"]]
-        rows.append(
-            {
-                "route": route,
-                "n_replicates": len(replicate_ids),
-                "coverage_rate_all": round(total_pred_all / total_exp_all, 3)
-                if total_exp_all
-                else 0.0,
-                "coverage_rate_real": round(
-                    int(real["n_unique_pred"].sum()) / int(real["expected"].sum()), 3
-                )
-                if int(real["expected"].sum())
-                else 0.0,
-                "coverage_rate_categorized": round(
-                    int(cat["n_unique_pred"].sum()) / int(cat["expected"].sum()), 3
-                )
-                if int(cat["expected"].sum())
-                else 0.0,
-            }
-        )
-    return pd.DataFrame(rows)
 
+    n = len(per_cluster)
+    scores = [c["semantic_score"] for c in per_cluster.values() if c["semantic_score"] is not None]
 
-def compute_output_fragility(preds: pd.DataFrame, clusters_csv_path: Path) -> pd.DataFrame:
-    """Per-route diagnostic on the output_fragility cluster (jebel/0, 147 genes).
+    def _rate(field: str) -> float:
+        return sum(1 for c in per_cluster.values() if c[field]) / n if n else 0.0
 
-    No expert annotations exist for this cluster, so it is not scored on accuracy
-    or abstention. Reports per-route coverage and pathway-consistency to surface
-    output-structure failures on a large coherent input.
-    """
-    screen, cid = OUTPUT_FRAGILITY_CLUSTER
-    cell = preds[(preds["screen_name"] == screen) & (preds["cluster_id"].astype(str) == cid)].copy()
-    if cell.empty:
-        return pd.DataFrame()
-    expected = 0
-    if clusters_csv_path.exists():
-        clusters = pd.read_csv(clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str})
-        if "sheet" in clusters.columns and "screen_name" not in clusters.columns:
-            clusters = clusters.rename(columns={"sheet": "screen_name"})
-        expected = int(
-            clusters[
-                (clusters["screen_name"] == screen) & (clusters["cluster_id"].astype(str) == cid)
-            ]
-            .drop_duplicates("gene_symbol")
-            .shape[0]
-        )
-    rows = []
-    for route, grp in cell.groupby("route", sort=True):
-        n_replicates = int(grp["replicate"].nunique())
-        per_rep_counts = grp.groupby("replicate")["gene_symbol"].nunique()
-        median_per_cell = float(per_rep_counts.median()) if not per_rep_counts.empty else 0.0
-        total_pred = int(per_rep_counts.sum())
-        expected_total = expected * max(n_replicates, 1)
-        coverage = total_pred / expected_total if expected_total else 0.0
-        per_rep_consistent = grp.drop_duplicates("replicate").assign(
-            _ok=lambda d: d["pathway"]
-            .astype(str)
-            .str.lower()
-            .apply(lambda s: "ribosom" in s or "translation" in s)
-        )
-        consistency_rate = (
-            float(per_rep_consistent["_ok"].mean()) if len(per_rep_consistent) else 0.0
-        )
-        rows.append(
-            {
-                "route": route,
-                "n_replicates": n_replicates,
-                "median_genes_per_cell": round(median_per_cell, 1),
-                "n_expected_per_cell": expected,
-                "coverage_rate": round(float(coverage), 3),
-                "pathway_consistency_rate": round(consistency_rate, 3),
-            }
-        )
-    return pd.DataFrame(rows)
+    return {
+        "condition": condition,
+        "n_clusters": n,
+        "substring_rate": round(_rate("substring"), 3),
+        "loose_rate": round(_rate("loose"), 3),
+        "semantic_mean": round(sum(scores) / len(scores), 3) if scores else None,
+        "semantic_match_rate": round(_rate("semantic_match"), 3),
+        "semantic_available": bool(model),
+        "per_cluster": per_cluster,
+    }
 
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate prediction CSVs against ground truth.")
-    parser.add_argument(
-        "--experiment-dir",
-        type=Path,
-        required=True,
-        help="Directory containing per-route prediction CSVs (e.g. benchmarking_outputs/1.arch/<id>)",
-    )
-    parser.add_argument(
-        "--ground-truth",
-        type=Path,
-        default=DEFAULT_GROUND_TRUTH,
-        help=f"Path to ground-truth CSV (default: {DEFAULT_GROUND_TRUTH.name})",
-    )
-    parser.add_argument(
-        "--reviewers",
-        default=",".join(DEFAULT_REVIEWERS),
-        help=(
-            f"Comma-separated reviewers to score against "
-            f"(default '{','.join(DEFAULT_REVIEWERS)}'; operon excluded — LLM annotator)."
-        ),
-    )
-    parser.add_argument(
-        "--output-prefix",
-        default=None,
-        help=(
-            "Prefix for output files. Default auto-derives from the experiment-dir "
-            "phase folder → '<phase>_eval' (arch/ord/word/comp), e.g. "
-            "arch_eval_per_gene.csv; falls back to 'eval' if no phase is detected."
-        ),
-    )
-    parser.add_argument(
-        "--semantic-threshold",
-        type=float,
-        default=0.70,
-        help=(
-            "Cosine similarity threshold for pathway_semantic_match (default 0.70). "
-            "Requires sentence-transformers."
-        ),
-    )
-    parser.add_argument(
-        "--no-semantic",
-        action="store_true",
-        default=False,
-        help="Disable semantic pathway scoring even if sentence-transformers is installed.",
-    )
-    args = parser.parse_args()
-
-    reviewers = tuple(r.strip() for r in args.reviewers.split(",") if r.strip())
-    if not reviewers:
-        print("  [ERROR] No reviewers specified.")
-        return 1
-
-    preds = load_predictions(args.experiment_dir)
-    gt = load_ground_truth(args.ground_truth)
-
-    missing_gt = [
-        f"expert_classification_{r}"
-        for r in reviewers
-        if f"expert_classification_{r}" not in gt.columns
-    ]
-    if missing_gt:
-        print(f"  [ERROR] Ground truth missing reviewer columns: {missing_gt}")
-        return 1
-
-    joined = preds.merge(gt, on=list(JOIN_KEYS), how="inner", suffixes=("", "_gt"))
-    if len(joined) == 0:
-        print(
-            f"  [WARN] No rows joined. predictions={len(preds)} ground_truth={len(gt)}\n"
-            f"  Check that (screen_name, cluster_id, gene_symbol) match between sources."
-        )
-        return 1
-
-    print(
-        f"Joined {len(joined)} rows ({preds['route'].nunique()} routes × "
-        f"{joined[['screen_name', 'cluster_id']].drop_duplicates().shape[0]} clusters). "
-        f"Reviewers: {', '.join(reviewers)}."
-    )
-
-    joined = annotate_matches(joined, reviewers)
-
-    use_semantic = _SEMANTIC_AVAILABLE and not args.no_semantic
-    if use_semantic:
-        joined = compute_semantic_scores(joined, reviewers, threshold=args.semantic_threshold)
-    elif not _SEMANTIC_AVAILABLE and not args.no_semantic:
-        print(
-            "  [semantic] sentence-transformers not installed; "
-            "semantic scoring skipped. Install with: pip install sentence-transformers"
-        )
-
-    concordance = inter_reviewer_concordance(joined, reviewers)
-    per_route = aggregate_per_route(joined, reviewers)
-    per_route_case_type = aggregate_per_route_per_case_type(joined, reviewers)
-
-    clusters_csv_path = PHASE_DIR / "benchmark_inputs" / "benchmark_clusters.csv"
-    negative_abstention = compute_negative_abstention(args.experiment_dir)
-    coverage = compute_coverage(preds, clusters_csv_path, ground_truth=gt)
-    output_fragility = compute_output_fragility(preds, clusters_csv_path)
-
-    # Resolve output prefix: explicit --output-prefix wins; otherwise auto-derive
-    # '<phase>_eval' from the experiment-dir phase folder, falling back to 'eval'.
-    if args.output_prefix is not None:
-        output_prefix = args.output_prefix
-    else:
-        phase_prefix = _detect_phase_prefix(args.experiment_dir)
-        output_prefix = f"{phase_prefix}_eval" if phase_prefix else "eval"
-
-    per_gene_path = args.experiment_dir / f"{output_prefix}_per_gene.csv"
-    per_route_path = args.experiment_dir / f"{output_prefix}_per_route.csv"
-    per_case_type_path = args.experiment_dir / f"{output_prefix}_per_route_per_case_type.csv"
-    negative_path = args.experiment_dir / f"{output_prefix}_negative_abstention.csv"
-    coverage_path = args.experiment_dir / f"{output_prefix}_coverage.csv"
-    fragility_path = args.experiment_dir / f"{output_prefix}_output_fragility.csv"
-    report_path = args.experiment_dir / f"{output_prefix}_report.md"
-
-    joined.to_csv(per_gene_path, index=False)
-    per_route.to_csv(per_route_path, index=False)
-    per_route_case_type.to_csv(per_case_type_path, index=False)
-    if not negative_abstention.empty:
-        negative_abstention.to_csv(negative_path, index=False)
-    if not coverage.empty:
-        coverage.to_csv(coverage_path, index=False)
-    if not output_fragility.empty:
-        output_fragility.to_csv(fragility_path, index=False)
-    write_report(
-        report_path,
-        args.experiment_dir,
-        args.ground_truth,
-        reviewers,
-        joined,
-        per_route,
-        per_route_case_type,
-        concordance,
-        negative_abstention=negative_abstention if not negative_abstention.empty else None,
-        coverage=coverage if not coverage.empty else None,
-        output_fragility=output_fragility if not output_fragility.empty else None,
-    )
-
-    print(f"  per-gene:      {per_gene_path}")
-    print(f"  per-route:     {per_route_path}")
-    print(f"  per-case-type: {per_case_type_path}")
-    if not negative_abstention.empty:
-        print(f"  abstention:    {negative_path}")
-    if not coverage.empty:
-        print(f"  coverage:      {coverage_path}")
-    if not output_fragility.empty:
-        print(f"  fragility:     {fragility_path}")
-    print(f"  report:        {report_path}")
-    print(f"\n=== Inter-reviewer concordance (ceiling) ===\n  {concordance}")
-    print("\n=== Per-route match rates ===")
-    print(per_route.to_string(index=False))
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
