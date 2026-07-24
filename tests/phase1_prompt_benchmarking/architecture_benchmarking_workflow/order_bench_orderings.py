@@ -243,7 +243,7 @@ def validate_order_variant_names(names: list[str]) -> list[str]:
 
 
 # ============================================================================
-# Generic variant selector (shared with wording_bench_targets)
+# Generic variant selector (shared across benchmark axes)
 # ============================================================================
 
 

@@ -88,8 +88,8 @@ class WordingBenchmarkConfig:
     """Phase 3 wording benchmark selector (compact, hypothesis-driven).
 
     Selects which W-numbered targets to run and how alternate-text sources are
-    resolved. The override targets and alternate text live outside this config
-    (wording_bench_targets.py / wording_bench_alternates.py).
+    resolved. The alternate text lives outside this config
+    (wording_bench_alternates.py).
     """
 
     enabled: bool = False

@@ -1,15 +1,13 @@
-"""Architecture benchmark orchestrator -- main loop and CLI entry point.
+"""Benchmark orchestrator -- the shared run loop.
 
-Runs the LLM Analysis architecture benchmark across configured routes, clusters,
-and replicates. Produces JSONL outputs, traces, and a Markdown report.
-
-Usage:
-    python arch_bench_orchestrator.py --config ../configs/arch_bench_default.yaml
+Runs the LLM Analysis benchmark across configured routes, clusters, and
+replicates. Produces JSONL outputs, traces, and a Markdown report. This is a
+library: the pipeline entry points (``run_source.py`` and the other ``run_*``
+scripts) build their RunSpecs and drive ``_run_benchmark_loop`` directly.
 """
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import os
@@ -44,8 +42,8 @@ from mozzarellm.utils.prompt_factory import (
     make_single_cluster_analysis_user_prompt,
 )
 
-from .arch_bench_routes import Route, build_routes_from_config
-from .bench_configparse import BenchmarkConfig, TimingConfig, load_config
+from .arch_bench_routes import Route
+from .bench_configparse import BenchmarkConfig, TimingConfig
 from .bench_dry_run import (
     _load_bundle_genes,
     generate_mock_parsed_output,
@@ -53,8 +51,7 @@ from .bench_dry_run import (
 )
 from .bench_metricfns import compute_all_metrics
 from .bench_reportgen import generate_report
-from .order_bench_orderings import build_order_benchmark_routes, compose_stepwise_turns_from_route
-from .wording_bench_targets import build_wording_override_runs
+from .order_bench_orderings import compose_stepwise_turns_from_route
 
 # =============================================================================
 # HELPERS
@@ -867,124 +864,3 @@ def _run_benchmark_loop(
     print(f"  Done. {len(all_records)} analysis runs completed, {manifest['errors']} errors.")
 
     return all_records
-
-
-# =============================================================================
-# UNIFIED ENTRY POINT
-# =============================================================================
-
-
-def run_benchmark(config: BenchmarkConfig) -> list[dict]:
-    """Single entry point for all benchmark phases.
-
-    Dispatches based on config: wording_benchmark.enabled selects Phase 3,
-    order_benchmark.enabled selects Phase 2, otherwise Phase 1.
-    """
-    manifest_extra: dict[str, Any] = {}
-
-    if getattr(config, "wording_benchmark", None) and config.wording_benchmark.enabled:
-        # Phase 3: wording
-        wcfg = config.wording_benchmark
-        wording_runs = build_wording_override_runs(
-            base_route_names=wcfg.base_routes,
-            target_selector=wcfg.targets,
-            default_source=wcfg.default_source,
-            force_source=wcfg.force_source,
-        )
-        run_specs = [
-            RunSpec(
-                route=wrun.base_route,
-                condition_name=wrun.run_route_name,
-                component_overrides=wrun.component_overrides,
-                extra_record_fields={
-                    "wording_source": wrun.source,
-                    "wording_target_id": wrun.target_id,
-                    "wording_target_name": wrun.target_name,
-                    "wording_hypothesis": wrun.hypothesis,
-                    "wording_overridden_components": list(wrun.components),
-                    "wording_component_override_keys": list(wrun.component_overrides.keys()),
-                },
-            )
-            for wrun in wording_runs
-        ]
-        snapshot = _build_config_snapshot(
-            config, wording_benchmark=asdict(config.wording_benchmark)
-        )
-        phase_label = "wording benchmark"
-        manifest_extra["phase"] = "wording"
-
-    elif config.order_benchmark.enabled:
-        # Phase 2: order
-        base_routes = build_routes_from_config(config.order_benchmark.base_routes)
-        routes = build_order_benchmark_routes(
-            base_routes=base_routes,
-            order_variants=config.order_benchmark.variants,
-        )
-        run_specs = [RunSpec(route=r, condition_name=r.name) for r in routes]
-        snapshot = _build_config_snapshot(
-            config,
-            order_benchmark=asdict(config.order_benchmark),
-        )
-        phase_label = "order benchmark"
-        manifest_extra["phase"] = "order"
-
-    elif config.architecture_benchmark.enabled:
-        # Phase 1: architecture
-        routes = build_routes_from_config(config.architecture_benchmark.base_routes)
-        run_specs = [RunSpec(route=r, condition_name=r.name) for r in routes]
-        snapshot = _build_config_snapshot(
-            config, architecture_benchmark=asdict(config.architecture_benchmark)
-        )
-        phase_label = "architecture benchmark"
-        manifest_extra["phase"] = "architecture"
-
-    else:
-        raise ValueError(
-            "No benchmark phase enabled. Set one of "
-            "architecture_benchmark.enabled, order_benchmark.enabled, "
-            "or wording_benchmark.enabled to true."
-        )
-
-    return _run_benchmark_loop(
-        config, run_specs, snapshot, phase_label=phase_label, manifest_extra=manifest_extra or None
-    )
-
-
-# =============================================================================
-# CLI
-# =============================================================================
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Architecture benchmark runner for LLM Analysis.")
-    parser.add_argument(
-        "--config",
-        type=Path,
-        required=True,
-        help="Path to YAML config file.",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=None,
-        help="Override config to enable dry-run mode.",
-    )
-    parser.add_argument(
-        "--max-workers",
-        type=int,
-        default=None,
-        help="Override config run.max_workers (concurrent runs).",
-    )
-    args = parser.parse_args()
-
-    config = load_config(args.config)
-    if args.dry_run:
-        config.run.dry_run = True
-    if args.max_workers is not None:
-        config.run.max_workers = args.max_workers
-
-    run_benchmark(config)
-
-
-if __name__ == "__main__":
-    main()

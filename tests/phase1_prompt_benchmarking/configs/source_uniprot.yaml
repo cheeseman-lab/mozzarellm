@@ -1,10 +1,10 @@
-experiment_id: source_uniprot
+experiment_id: source_uniprot  # overridden per-source by run_source.py
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_input.csv
   evidence_bundles_dir: benchmark_bundles
   bundle_source: uniprot  # the master-bundle view assembled into prompts
-  output_dir: benchmarking_outputs/10.clean_3x2
+  # output_dir is set by run_source.py to benchmarking_outputs/source/<source>_<stamp>; any value here is ignored
 model:
   provider: anthropic
   model_name: claude-sonnet-5

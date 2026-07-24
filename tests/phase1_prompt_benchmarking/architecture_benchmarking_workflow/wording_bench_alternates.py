@@ -5,8 +5,8 @@ component-registry keys. A version set answers:
     "For a given wording version, what alternate text is available for each
      prompt component?"
 
-It does NOT decide which experiments to run (see ``wording_bench_targets.py``)
-and it does NOT contain any runner (see ``bench_orchestrator.py``).
+It is a text registry only: it does NOT decide which experiments to run and
+does NOT contain any runner (see ``bench_orchestrator.py``).
 
 
 ``WORDING_ALTERNATE_SET_REGISTRY`` maps ``source_name -> {component_key: text}``.
