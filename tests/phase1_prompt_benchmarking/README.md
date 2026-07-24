@@ -1,16 +1,17 @@
 # Phase 1 Prompt Benchmarking
 
-Benchmarks MozzareLLM cluster classification against reviewer-consensus ground truth. The benchmark runs as a three-step **pipeline** — `source → walkup → mode` — that decides the evidence source, assembles the prompt, and picks the delivery format. Each step is a runner script: it scores model output against the consensus ground truth and hands its decision to the next step through a small state file. The runners sit on a shared orchestrator engine (routes, config schema, trace parser) documented under **Engine reference** below.
+Benchmarks MozzareLLM cluster classification against reviewer-consensus ground truth. The benchmark runs as a four-step **pipeline** — `source → walkup → mode → order` — that decides the evidence source, assembles the prompt, picks the delivery format, and checks positional sensitivity. Each step is a runner script: it scores model output against the consensus ground truth and hands its decision to the next step through a small state file. The runners sit on a shared orchestrator engine (routes, config schema, trace parser) documented under **Engine reference** below.
 
-## The benchmark pipeline (source → walkup → mode)
+## The benchmark pipeline (source → walkup → mode → order)
 
-The pipeline answers three questions in order, each on the previous step's winner:
+The pipeline answers four questions in order, each on the previous step's winner:
 
 1. **source** — which evidence source (`uniprot` / `affinage` / `both`) gives the best classification recall?
 2. **walkup** — starting from a blank prompt, which framing of each component (CAT → GCR → NPR → UPR → PCC) to adopt, added one at a time?
 3. **mode** — which delivery format (`single_call` / `cot` / `stepwise`) for the final assembled prompt?
+4. **order** — does the component *order* matter? Permute it on the tuned prompt and measure positional sensitivity.
 
-> **Status:** step 1 (`run_source.py`) and the shared evaluator are implemented. Steps 2–3 (`run_walkup.py`, `run_mode.py`) are the next runners; they consume the same evaluator and state envelope described here.
+> **Status:** all four runners (`run_source.py`, `run_walkup.py`, `run_mode.py`, `run_order.py`) and the shared evaluator are implemented; they consume the same evaluator and state envelope described here.
 
 ### 0. Data prep (one-time, upstream of the runners)
 
@@ -42,7 +43,7 @@ python run_source.py --score-only   # re-score existing run dirs, no API
 Each cell is scored by `bench_evaluator` and the source is picked **holistically on coverage-weighted recall** (correct categories / 103 real genes) so a source can't win by dropping hard genes to inflate raw category. The evaluator's diagnostics (per-class precision/recall/F1, per-cluster recall, reviewer source-preference, inter-reviewer concordance) explain *why* a source wins.
 
 - **reads:** `benchmark_bundles/` (master bundles; each run's source view is derived at prompt assembly via `strip_source_fields`), reviewer annotations, `configs/source_{source}.yaml`
-- **writes:** `benchmarking_outputs/source/source_state.json` with `carry = {"source": <winner>}`
+- **writes:** `runs/source/source_state.json` with `carry = {"source": <winner>}`
 
 ### 2. `run_walkup.py` — assemble the prompt (human-gated)
 
@@ -57,14 +58,21 @@ python run_walkup.py --finalize             # assemble the final prompt + render
 ```
 
 - **reads:** `carry.source` (or `--source`, else affinage), the candidate banks in `bench_walkup_candidates.py`
-- **writes:** `benchmarking_outputs/walkup/walkup_state.json` with the carried per-component winning text
+- **writes:** `runs/walkup/walkup_state.json` with the carried per-component winning text
 
 ### 3. `run_mode.py` — pick the delivery format
 
 Runs `{single_call, cot, stepwise}` on the walkup's final assembled prompt (8-slate, n=3) and picks the mode holistically. `single_call` runs the full tuned prompt; `cot`/`stepwise` use different component keys, so they carry only the shared tuned `CAT` lens and keep canonical text elsewhere — a fair mode comparison, not a verbatim transplant.
 
 - **reads:** the walkup carry (source + assembled prompt)
-- **writes:** `benchmarking_outputs/mode/mode_state.json`
+- **writes:** `runs/mode/mode_state.json`
+
+### 4. `run_order.py` — component order (positional sensitivity)
+
+Holds source, mode, and component *content* fixed and permutes the `component_order` across the order variants `[O, O1, O2, O3, O4]` (8-slate, n=3). Picks the order holistically and reports the **cw-recall spread** — how much order alone moves the result. V1 applies order to the `single_call` route with the walkup's assembled texts injected (the keys the walkup tuned); a `cot`/`stepwise` order transplant is out of scope for now.
+
+- **reads:** the mode carry (source + winning mode) + the walkup's component texts
+- **writes:** `runs/order/order_state.json` with the order winner + the cw-recall spread
 
 ### How the steps chain (the state envelope)
 
@@ -116,6 +124,7 @@ phase1_prompt_benchmarking/
     run_source.py                     -- pipeline step 1: pick the evidence source
     run_walkup.py                     -- pipeline step 2: assemble the prompt (human-gated)
     run_mode.py                       -- pipeline step 3: pick the delivery format
+    run_order.py                      -- pipeline step 4: permute component order
     merge_reviewers.py                -- data prep: reviewer annotations -> combined GT table
     build_bundles.py                  -- data prep: benchmark_input.csv -> evidence bundles
 
