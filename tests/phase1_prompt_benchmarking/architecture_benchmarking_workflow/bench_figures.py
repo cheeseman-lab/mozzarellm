@@ -454,7 +454,7 @@ def figure_walkup_buildup(state_path: Path, out_png: Path) -> None:
         family="monospace",
     )
     fig.suptitle(
-        "Figure 2 — Build-up prompt walkup (★ = component adopted)",
+        "Figure 2 — Build-up prompt walkup (a star marks each adopted component)",
         fontsize=13,
         fontweight="bold",
     )

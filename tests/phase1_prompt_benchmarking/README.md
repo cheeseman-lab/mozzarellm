@@ -156,31 +156,32 @@ phase1_prompt_benchmarking/
     configs/
         source_{uniprot,affinage,both}.yaml   -- one per source (run_source)
 
-    benchmarking_outputs/             -- git submodule
+    runs/                             -- git submodule (decoupled; nothing overwritten)
         source/source_state.json      -- step 1 decision + carry
         walkup/walkup_state.json      -- step 2 assembled prompt + carry
         mode/mode_state.json          -- step 3 decision
+        order/order_state.json        -- step 4 decision + cw-recall spread
 ```
 
 ---
 
 # Engine reference
 
-Everything below documents the shared orchestrator the pipeline runners sit on — the route/mode model, per-run output layout, config schema, and trace parser. The `source → walkup → mode` runners are the entry points; they build their RunSpecs and drive the orchestrator's run loop directly (there is no separate orchestrator CLI).
+Everything below documents the shared orchestrator the pipeline runners sit on — the route/mode model, per-run output layout, config schema, and trace parser. The `source → walkup → mode → order` runners are the entry points; they build their RunSpecs and drive the orchestrator's run loop directly (there is no separate orchestrator CLI).
 
-## Output Structure (benchmarking_outputs/ Submodule)
+## Output structure (`runs/` submodule)
 
-Outputs are organized by phase, then by experiment. When `workflow_testing: true` in the config, outputs nest under a `_workflow_testing/` subdirectory to keep dev runs separate from final results.
+Every runner writes into the decoupled `runs/` submodule under `runs/<step>/`. Each run gets its own **timestamped** directory so nothing is ever overwritten, plus a stable `<step>_state.json` latest-pointer; the whole run is auto-committed and pushed (`bench_pipeline_common.push_run`).
 
 ```
-benchmarking_outputs/
-    1.arch/
-        _workflow_testing/
-            {experiment_id}/          -- one dir per experiment run
-                ...
-    2.order/
-        {experiment_id}/
-            ...
+runs/
+    source/
+        source_state.json             -- latest-pointer (read by read_carry / the figures)
+        <stamp>/                      -- one per run, e.g. 20260724_133059
+            source_state.json         -- archived copy of the state for this run
+            <experiment_id>/          -- e.g. affinage / uniprot / both  (or "mode", "order")
+                ...                   -- the per-run outputs below
+    walkup/  mode/  order/            -- same shape, one <step>_state.json + timestamped runs
 ```
 
 Each **experiment directory** contains:
@@ -204,7 +205,7 @@ Each **experiment directory** contains:
 - **delivery** -- *single_call* or *multi_turn*. Stepwise routes use multi_turn; standard and cot use single_call.
 - **component_order** -- the ordered tuple of shorthand keys (CAT, SC, GCR, NPR, UPR, PCC, O, cPH, cGCR, cPri, cPSC, cVer, cO, LIT) that defines what goes into the prompt and in what sequence.
 - **variant** -- a named perturbation of component_order relative to the canonical baseline (order axis only). Defined in `bench_order.py`.
-- **base route** -- the route (e.g. 3a, 3b) from which an order variant is derived. The canonical variant preserves the base route's original component_order.
+- **base route** -- the route (e.g. `single_call`) from which an order variant is derived. The canonical variant preserves the base route's original component_order.
 - **replicate** -- repeated execution of the same prompt on the same input. Used to measure reasoning stability at a given temperature.
 
 ## Component libraries (order / wording)
@@ -233,7 +234,7 @@ All parameters below are YAML keys. Defaults are shown in parentheses. Parsed by
 - **evidence_bundles_dir** (benchmark_evidence_bundles) -- directory of pre-built evidence bundle JSONs
 
 ----important to adjust as needed----
-- **output_dir** (benchmarking_outputs/1.arch) -- root output directory. 
+- **output_dir** (runs) -- root output directory. The pipeline runners set this to `runs/<step>/<stamp>` automatically; the config value is only a fallback.
 
 **model:**
 - **provider** (anthropic) -- LLM provider
@@ -253,10 +254,6 @@ All parameters below are YAML keys. Defaults are shown in parentheses. Parsed by
 - **save_raw_outputs** (true) -- write raw_outputs.jsonl
 - **save_parsed_outputs** (true) -- write parsed_outputs.jsonl
 - **save_traces** (true) -- write per-run trace JSONs
-
-
-**routes:** (architecture axis)
-- **include** (all 6) -- list of route names to run: 3a, 3a_mcp, 3b, 3b_mcp, 3c, 3c_mcp. 
 
 **screens:** 
 - **include** ("all" or list) -- which screens to include. Use "all" or a list like `[denali, whitney]`.
@@ -282,11 +279,6 @@ All parameters below are YAML keys. Defaults are shown in parentheses. Parsed by
 - **track_io** (true) -- time writing artifacts
 - **track_step_latencies** (true) -- per-step timing for stepwise routes
 - **track_mcp_tool_latency** (true) -- MCP tool call timing
-
-**order_benchmark:** (order axis)
-- **enabled** (false) -- when true, ignores `routes.include` and instead builds routes from base_routes x variants
-- **base_routes** -- list of route names to permute (e.g. [3a, 3b])
-- **variants** -- list of variant names: canonical, late_screen_context, prioritization_before_classification, early_output_format, delayed_task_anchor
 
 ## Running the Trace Parser
 
