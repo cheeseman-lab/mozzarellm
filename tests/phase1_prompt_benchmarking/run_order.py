@@ -6,9 +6,9 @@ carries) and permutes the component_order to measure positional sensitivity.
 Runs the order variants resolve_order_variant_ids("all") = [O, O1, O2, O3, O4]
 on the 8-cluster slate (real clusters drive selection, the 3 decoys validate),
 n=3, picks the order holistically, and reports the cw-recall spread across
-variants (how much order alone moves the result). Writes runs/order/
-order_state.json, archives alongside the timestamped run, and pushes to the runs
-submodule.
+variants (how much order alone moves the result). Writes the latest-pointer
+benchmarking_outputs/order/order_state.json; each run archives in place under
+benchmarking_outputs/order/<source>_<stamp>/ (nothing overwritten).
 
 Scope (V1): the walkup tunes the single_call component keys, so order is applied
 to the single_call route with the walkup's assembled texts injected -- even if
@@ -46,7 +46,6 @@ from architecture_benchmarking_workflow.bench_pipeline_common import (
     panel_json,
     prepare,
     print_panel,
-    push_run,
     read_carry,
     run_stamp,
     score_cell,
@@ -61,16 +60,12 @@ BASE_MODE = "single_call"
 
 
 def _config_for(source: str, stamp: str, dry_run: bool, score_only: bool):
-    """Fresh (run) or non-destructive (score-only) config in runs/order/<stamp>/order/.
-    experiment_id stays flat ("order") so run_id / trace paths never contain slashes."""
+    """Config for the order run. Runs archive under benchmarking_outputs/order/
+    <source>_<stamp>/; score-only just loads (dir found via latest_run_dir)."""
     cfg = load_config(CONFIGS / f"source_{source}.yaml")
-    out_root = OUTPUTS / "order" / stamp
     if score_only:
-        cfg.experiment_id = "order"
-        cfg.paths.output_dir = out_root
-        cfg.run.overwrite_outputs = True  # we only read it, no wipe
         return cfg
-    return prepare(cfg, "order", dry_run, out_root=out_root)
+    return prepare(cfg, f"{source}_{stamp}", dry_run, out_root=OUTPUTS / "order")
 
 
 def run_order(dry_run: bool, source: str | None = None, score_only: bool = False) -> None:
@@ -87,15 +82,7 @@ def run_order(dry_run: bool, source: str | None = None, score_only: bool = False
         f"(order applied to {BASE_MODE}); variants={variant_ids}"
     )
 
-    if score_only:
-        prev = latest_run_dir("order")
-        if prev is None:
-            raise SystemExit("[order] no prior run under runs/order/ to score")
-        stamp = prev.name
-        print(f"[order] --score-only: re-scoring run {stamp}")
-    else:
-        stamp = run_stamp()
-
+    stamp = run_stamp()
     gt, coh = load_gt_and_coherence()
     cfg = _config_for(source, stamp, dry_run, score_only)
     base_route = MODE_REGISTRY[BASE_MODE]
@@ -113,8 +100,12 @@ def run_order(dry_run: bool, source: str | None = None, score_only: bool = False
         )
         print(f"[order] {variant_ids} -> {cfg.experiment_id}")
         _run_benchmark_loop(cfg, specs, snapshot, phase_label="order")
+        out = cfg.experiment_output_dir
+    else:
+        out = latest_run_dir("order", source)
+        if out is None:
+            raise SystemExit(f"[order] no prior run for {source} under {OUTPUTS / 'order'}")
 
-    out = cfg.experiment_output_dir
     cells = {vid: score_cell(out, gt, coh, vid) for vid in variant_ids}
     decoys = {vid: decoy_results(out, condition=vid) for vid in variant_ids}
 
@@ -145,11 +136,6 @@ def run_order(dry_run: bool, source: str | None = None, score_only: bool = False
         spread=round(spread, 4),
         dominated=dominated,
     )
-    archive = OUTPUTS / "order" / stamp / "order_state.json"
-    archive.parent.mkdir(parents=True, exist_ok=True)
-    archive.write_text(STATE_PATH.read_text())
-    if not dry_run:
-        push_run("order", f"order run {stamp}: winner {winner_order}")
 
 
 def main() -> None:

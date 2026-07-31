@@ -3,10 +3,10 @@
 
 Runs {single_call, cot, stepwise} on the 8-cluster slate (real clusters drive
 selection, the 3 decoys validate the final config), n=3, on the source and
-assembled prompt carried from the walkup (runs/walkup). Picks the mode
-holistically (delivery format legitimately trades metrics off). Writes the
-latest-pointer runs/mode/mode_state.json, archives the state alongside the
-timestamped run dir, and pushes the run into the runs submodule.
+assembled prompt carried from the walkup. Picks the mode holistically (delivery
+format legitimately trades metrics off). Writes the latest-pointer
+benchmarking_outputs/mode/mode_state.json; each run archives in place under
+benchmarking_outputs/mode/<source>_<stamp>/ (nothing overwritten).
 
 Component-mapping caveat: the walkup tunes the single_call components
 (CAT/GCR/NPR/UPR/PCC). cot/stepwise use different component keys
@@ -41,7 +41,6 @@ from architecture_benchmarking_workflow.bench_pipeline_common import (
     panel_json,
     prepare,
     print_panel,
-    push_run,
     read_carry,
     run_stamp,
     score_cell,
@@ -61,16 +60,12 @@ def _overrides_for(mode: str, final: dict[str, str]) -> dict[str, str]:
 
 
 def _config_for(source: str, stamp: str, dry_run: bool, score_only: bool):
-    """Fresh (run) or non-destructive (score-only) config in runs/mode/<stamp>/mode/.
-    experiment_id stays flat ("mode") so run_id / trace paths never contain slashes."""
+    """Config for the mode run. Runs archive under benchmarking_outputs/mode/
+    <source>_<stamp>/; score-only just loads (dir found via latest_run_dir)."""
     cfg = load_config(CONFIGS / f"source_{source}.yaml")
-    out_root = OUTPUTS / "mode" / stamp
     if score_only:
-        cfg.experiment_id = "mode"
-        cfg.paths.output_dir = out_root
-        cfg.run.overwrite_outputs = True  # we only read it, no wipe
         return cfg
-    return prepare(cfg, "mode", dry_run, out_root=out_root)
+    return prepare(cfg, f"{source}_{stamp}", dry_run, out_root=OUTPUTS / "mode")
 
 
 def run_mode(dry_run: bool, source: str | None = None, score_only: bool = False) -> None:
@@ -80,15 +75,7 @@ def run_mode(dry_run: bool, source: str | None = None, score_only: bool = False)
     if not source:
         raise SystemExit("run_mode needs a source; run run_walkup.py first (or pass --source).")
     filled = carry.get("components_filled", [])
-
-    if score_only:
-        prev = latest_run_dir("mode")
-        if prev is None:
-            raise SystemExit("[mode] no prior run under runs/mode/ to score")
-        stamp = prev.name
-        print(f"[mode] --score-only: re-scoring run {stamp}")
-    else:
-        stamp = run_stamp()
+    stamp = run_stamp()
     print(f"[mode] source={source} carrying walkup build: {'+'.join(filled) or 'blank W0'}")
 
     gt, coh = load_gt_and_coherence()
@@ -105,8 +92,12 @@ def run_mode(dry_run: bool, source: str | None = None, score_only: bool = False)
         snapshot = _build_config_snapshot(cfg, mode={"source": source, "carried": filled})
         print(f"[mode] {list(MODES)} -> {cfg.experiment_id}")
         _run_benchmark_loop(cfg, specs, snapshot, phase_label="mode")
+        out = cfg.experiment_output_dir
+    else:
+        out = latest_run_dir("mode", source)
+        if out is None:
+            raise SystemExit(f"[mode] no prior run for {source} under {OUTPUTS / 'mode'}")
 
-    out = cfg.experiment_output_dir
     cells = {mode: score_cell(out, gt, coh, mode) for mode in MODES}
     decoys = {mode: decoy_results(out, condition=mode) for mode in MODES}
 
@@ -133,11 +124,6 @@ def run_mode(dry_run: bool, source: str | None = None, score_only: bool = False)
         cells={k: panel_json(v) for k, v in cells.items()},
         dominated=dominated,
     )
-    archive = OUTPUTS / "mode" / stamp / "mode_state.json"
-    archive.parent.mkdir(parents=True, exist_ok=True)
-    archive.write_text(STATE_PATH.read_text())
-    if not dry_run:
-        push_run("mode", f"mode run {stamp}: winner {winner_mode}")
 
 
 def main() -> None:

@@ -43,7 +43,7 @@ python run_source.py --score-only   # re-score existing run dirs, no API
 Each cell is scored by `bench_evaluator` and the source is picked **holistically on coverage-weighted recall** (correct categories / 103 real genes) so a source can't win by dropping hard genes to inflate raw category. The evaluator's diagnostics (per-class precision/recall/F1, per-cluster recall, reviewer source-preference, inter-reviewer concordance) explain *why* a source wins.
 
 - **reads:** `benchmark_bundles/` (master bundles; each run's source view is derived at prompt assembly via `strip_source_fields`), reviewer annotations, `configs/source_{source}.yaml`
-- **writes:** `runs/source/source_state.json` with `carry = {"source": <winner>}`
+- **writes:** `benchmarking_outputs/source/source_state.json` with `carry = {"source": <winner>}`
 
 ### 2. `run_walkup.py` — assemble the prompt (human-gated)
 
@@ -58,21 +58,21 @@ python run_walkup.py --finalize             # assemble the final prompt + render
 ```
 
 - **reads:** `carry.source` (or `--source`, else affinage), the candidate banks in `bench_walkup_candidates.py`
-- **writes:** `runs/walkup/walkup_state.json` with the carried per-component winning text
+- **writes:** `benchmarking_outputs/walkup/walkup_state.json` with the carried per-component winning text
 
 ### 3. `run_mode.py` — pick the delivery format
 
 Runs `{single_call, cot, stepwise}` on the walkup's final assembled prompt (8-slate, n=3) and picks the mode holistically. `single_call` runs the full tuned prompt; `cot`/`stepwise` use different component keys, so they carry only the shared tuned `CAT` lens and keep canonical text elsewhere — a fair mode comparison, not a verbatim transplant.
 
 - **reads:** the walkup carry (source + assembled prompt)
-- **writes:** `runs/mode/mode_state.json`
+- **writes:** `benchmarking_outputs/mode/mode_state.json`
 
 ### 4. `run_order.py` — component order (positional sensitivity)
 
 Holds source, mode, and component *content* fixed and permutes the `component_order` across the order variants `[O, O1, O2, O3, O4]` (8-slate, n=3). Picks the order holistically and reports the **cw-recall spread** — how much order alone moves the result. V1 applies order to the `single_call` route with the walkup's assembled texts injected (the keys the walkup tuned); a `cot`/`stepwise` order transplant is out of scope for now.
 
 - **reads:** the mode carry (source + winning mode) + the walkup's component texts
-- **writes:** `runs/order/order_state.json` with the order winner + the cw-recall spread
+- **writes:** `benchmarking_outputs/order/order_state.json` with the order winner + the cw-recall spread
 
 ### How the steps chain (the state envelope)
 
@@ -156,7 +156,7 @@ phase1_prompt_benchmarking/
     configs/
         source_{uniprot,affinage,both}.yaml   -- one per source (run_source)
 
-    runs/                             -- git submodule (decoupled; nothing overwritten)
+    benchmarking_outputs/             -- git submodule (runs archive here; nothing overwritten)
         source/source_state.json      -- step 1 decision + carry
         walkup/walkup_state.json      -- step 2 assembled prompt + carry
         mode/mode_state.json          -- step 3 decision
@@ -169,19 +169,17 @@ phase1_prompt_benchmarking/
 
 Everything below documents the shared orchestrator the pipeline runners sit on — the route/mode model, per-run output layout, config schema, and trace parser. The `source → walkup → mode → order` runners are the entry points; they build their RunSpecs and drive the orchestrator's run loop directly (there is no separate orchestrator CLI).
 
-## Output structure (`runs/` submodule)
+## Output structure (`benchmarking_outputs/` submodule)
 
-Every runner writes into the decoupled `runs/` submodule under `runs/<step>/`. Each run gets its own **timestamped** directory so nothing is ever overwritten, plus a stable `<step>_state.json` latest-pointer; the whole run is auto-committed and pushed (`bench_pipeline_common.push_run`).
+Every runner writes into the `benchmarking_outputs/` submodule under `benchmarking_outputs/<step>/`. Each run gets its own **timestamped** directory — `<label>_<stamp>/`, where the stamp is baked into the run's `experiment_id` so nothing is ever overwritten — plus a stable `<step>_state.json` latest-pointer that `read_carry` and the figures read.
 
 ```
-runs/
+benchmarking_outputs/
     source/
         source_state.json             -- latest-pointer (read by read_carry / the figures)
-        <stamp>/                      -- one per run, e.g. 20260724_133059
-            source_state.json         -- archived copy of the state for this run
-            <experiment_id>/          -- e.g. affinage / uniprot / both  (or "mode", "order")
-                ...                   -- the per-run outputs below
-    walkup/  mode/  order/            -- same shape, one <step>_state.json + timestamped runs
+        <source>_<stamp>/             -- one archived run per source, e.g. affinage_20260731_101500
+            ...                       -- the per-run outputs below
+    walkup/  mode/  order/            -- same shape: one <step>_state.json + timestamped run dirs
 ```
 
 Each **experiment directory** contains:
@@ -234,7 +232,7 @@ All parameters below are YAML keys. Defaults are shown in parentheses. Parsed by
 - **evidence_bundles_dir** (benchmark_evidence_bundles) -- directory of pre-built evidence bundle JSONs
 
 ----important to adjust as needed----
-- **output_dir** (runs) -- root output directory. The pipeline runners set this to `runs/<step>/<stamp>` automatically; the config value is only a fallback.
+- **output_dir** (benchmarking_outputs) -- root output directory. The pipeline runners point this at `benchmarking_outputs/<step>` and bake a `<stamp>` into experiment_id; the config value is only a fallback.
 
 **model:**
 - **provider** (anthropic) -- LLM provider
@@ -294,7 +292,7 @@ python -m tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.be
 ```
 
 **Parameters:**
-- **--traces-dir** -- path to the `traces/` directory from a benchmark run (e.g. `runs/source/<stamp>/affinage/traces/`)
+- **--traces-dir** -- path to the `traces/` directory from a benchmark run (e.g. `benchmarking_outputs/source/affinage_<stamp>/traces/`)
 - **--output-dir** -- where to write the gene-level CSVs (usually the same directory as the traces)
 - **--experiment-id** -- optional; auto-detected from trace filenames if not provided
 - **--overwrite** -- overwrite existing CSVs; otherwise appends date to filename
