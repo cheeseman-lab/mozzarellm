@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import csv
 import json
-import shutil
+from datetime import datetime
 from pathlib import Path
 
 from architecture_benchmarking_workflow.bench_evaluator import (
@@ -151,15 +151,31 @@ def load_gt_and_coherence():
     return _apply_coherence_abstain(gt, coh), coh
 
 
-def prepare(config, step: str, dry_run: bool):
-    """Point a config at OUTPUTS/<step>, force a fresh dir, set dry-run."""
-    config.experiment_id = step
-    config.paths.output_dir = OUTPUTS
-    config.run.overwrite_outputs = True  # deterministic dir: OUTPUTS/<step>
+def run_stamp() -> str:
+    """Timestamp baked into each run's dir name so runs archive in place and
+    previous runs are never overwritten. Computed once per run by the caller --
+    unlike ``experiment_output_dir``, which recomputes on every access."""
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def latest_run_dir(step: str, label: str) -> Path | None:
+    """Newest archived run dir under OUTPUTS/<step>/<label>_<stamp>/, or None.
+    Used by --score-only to locate the most recent run to re-score."""
+    base = OUTPUTS / step
+    runs = sorted(base.glob(f"{label}_*")) if base.exists() else []
+    return runs[-1] if runs else None
+
+
+def prepare(config, experiment_id: str, dry_run: bool, out_root: Path = OUTPUTS):
+    """Point a config at out_root/<experiment_id>, set dry-run.
+
+    experiment_id carries a run stamp (e.g. ``affinage_20260731_101500``): with
+    overwrite_outputs the resolved dir is stable across accesses AND unique per
+    run, so previous runs archive in place and nothing is wiped."""
+    config.experiment_id = experiment_id
+    config.paths.output_dir = out_root
+    config.run.overwrite_outputs = True
     config.run.dry_run = dry_run
-    out = config.experiment_output_dir
-    if out.is_relative_to(OUTPUTS):
-        shutil.rmtree(out, ignore_errors=True)
     return config
 
 

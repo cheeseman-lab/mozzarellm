@@ -42,11 +42,13 @@ from architecture_benchmarking_workflow.bench_pipeline_common import (
     PRIMARY,
     SOURCES,
     decoy_results,
+    latest_run_dir,
     load_gt_and_coherence,
     panel_json,
     prepare,
     print_panel,
     reviewer_csvs,
+    run_stamp,
     score_cell,
     select_holistic,
     validation_specs,
@@ -61,27 +63,27 @@ ROUTES = ("single_call",)
 # (output schema) keep their registry defaults, matching run_walkup's start.
 BLANK_W0 = dict.fromkeys(("CAT", "GCR", "NPR", "UPR", "PCC"), "")
 STATE_PATH = OUTPUTS / "source" / "source_state.json"
+OUT_ROOT = OUTPUTS / "source"  # runs archive under benchmarking_outputs/source/<source>_<stamp>/
 
 
-def _config_for(source: str, dry_run: bool, score_only: bool):
-    """Fresh (run) or non-destructive (score-only) config for one source."""
+def _config_for(source: str, stamp: str, dry_run: bool, score_only: bool):
+    """Config for one source. Runs write to OUT_ROOT/<source>_<stamp>/ (archived,
+    never overwritten); score-only just loads (the dir is found via latest_run_dir)."""
     cfg = load_config(CONFIGS / f"source_{source}.yaml")
     if score_only:
-        cfg.experiment_id = f"source__{source}"
-        cfg.paths.output_dir = OUTPUTS
-        cfg.run.overwrite_outputs = True  # deterministic dir name; we only read it, no wipe
         return cfg
-    return prepare(cfg, f"source__{source}", dry_run)
+    return prepare(cfg, f"{source}_{stamp}", dry_run, out_root=OUT_ROOT)
 
 
 def run_source(dry_run: bool, score_only: bool = False) -> None:
+    stamp = run_stamp()
     gt, coh = load_gt_and_coherence()
     reviewer_labels = reviewer_label_sets(reviewer_csvs())
     controls = validation_specs(gt)  # 3 decoys + coherence-derived abstains (denali/24)
     cells, decoys, diagnostics, pathway = {}, {}, {}, {}
 
     for source in SOURCES:
-        cfg = _config_for(source, dry_run, score_only)
+        cfg = _config_for(source, stamp, dry_run, score_only)
         if not score_only:
             specs = [
                 RunSpec(
@@ -94,8 +96,11 @@ def run_source(dry_run: bool, score_only: bool = False) -> None:
             snapshot = _build_config_snapshot(cfg, source={"source": source, "prompt": "W0_blank"})
             print(f"\n[source] {source}: {[s.condition_name for s in specs]} -> {cfg.experiment_id}")
             _run_benchmark_loop(cfg, specs, snapshot, phase_label=f"source:{source}")
-
-        out = cfg.experiment_output_dir
+            out = cfg.experiment_output_dir
+        else:
+            out = latest_run_dir("source", source)
+            if out is None:
+                raise SystemExit(f"[source] no prior run for {source} under {OUT_ROOT}")
         for route in ROUTES:
             cells[f"{source}::{route}"] = score_cell(out, gt, coh, f"{source}__{route}")
         decoys[source] = decoy_results(out, condition=f"{source}__single_call", specs=controls)
