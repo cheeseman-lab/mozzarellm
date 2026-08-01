@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 
-from architecture_benchmarking_workflow.bench_routes import MODE_REGISTRY
 from architecture_benchmarking_workflow.bench_configparse import load_config
 from architecture_benchmarking_workflow.bench_evaluator import (
     pathway_diagnostics,
@@ -54,6 +53,7 @@ from architecture_benchmarking_workflow.bench_pipeline_common import (
     validation_specs,
     write_state,
 )
+from architecture_benchmarking_workflow.bench_routes import MODE_REGISTRY
 
 # Plain single_call only -- the regime the walkup and mode steps run. MCP is a
 # delivery mode (it recovers coverage at 3-4x cost, no category gain) and is
