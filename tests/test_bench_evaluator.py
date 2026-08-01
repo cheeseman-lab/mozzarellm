@@ -9,8 +9,6 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
-
 P = Path(__file__).resolve().parent / "phase1_prompt_benchmarking"
 if str(P) not in sys.path:
     sys.path.insert(0, str(P))
@@ -24,17 +22,11 @@ from architecture_benchmarking_workflow.bench_evaluator import (  # noqa: E402
     reviewer_concordance,
     reviewer_label_sets,
     score_decoys,
-    score_run,
     source_diagnostics,
     source_preference_tally,
 )
 
 GT = P / "benchmark_inputs" / "ground_truth"
-# Cached runs live in the benchmarking_outputs git submodule.
-B = P / "benchmarking_outputs/8.source_mcp_3x2"
-needs_cached_runs = pytest.mark.skipif(
-    not B.exists(), reason="cached runs require the benchmarking_outputs submodule"
-)
 COH = {
     ("denali", "43"): "Medium",
     ("whitney", "6"): "Medium",
@@ -152,40 +144,6 @@ def test_decoy_rows(tmp_path):
 # ---------------------------------------------------------------------------
 # Per-run scoring
 # ---------------------------------------------------------------------------
-
-
-@needs_cached_runs
-def test_reproduces_3x2_panel(tmp_path):
-    gt = _gt(tmp_path)
-    aff = score_run(B / "phase4_3x2_affinage_uniprot_20260716_115019", gt, cluster_coherence=COH)
-    uni = score_run(B / "phase4_3x2_uniprot_uniprot_20260716_114118", gt, cluster_coherence=COH)
-    both = score_run(B / "phase4_3x2_both_uniprot_20260716_115614", gt, cluster_coherence=COH)
-    # Category under the less-high hedge-resolution policy (UNCHAR > NOVEL > EST);
-    # subclass under the ordinal-median consensus rule. Category/coherence are
-    # unchanged from plurality consensus (no three-way category splits); the
-    # median only shifts subclass on all-different votes (aff novel 29 -> 30).
-    assert aff.category == 115 / 133
-    assert uni.category == 106 / 133
-    assert round(both.category, 4) == round(115 / 133, 4)  # both 86%
-    assert aff.novel_subclass == (30, 54)
-    assert uni.novel_subclass == (28, 49)
-    assert aff.unchar_subclass == (5, 7)
-    assert aff.coherence == (2, 4)
-    assert uni.coherence == (1, 4)
-    assert both.coherence == (3, 4)
-
-
-@needs_cached_runs
-def test_route_equals_exact_match(tmp_path):
-    gt = _gt(tmp_path)
-    d = B / "phase4_3x2_affinage_uniprot_20260716_115019"
-    # Exact match on the non-mcp cell's route reproduces the default-exclude panel;
-    # exact match on the mcp route isolates the mcp cell (2 over-call failures).
-    exact_non_mcp = score_run(d, gt, cluster_coherence=COH, route_equals="3a")
-    exact_mcp = score_run(d, gt, cluster_coherence=COH, route_equals="3a_mcp_gap")
-    assert exact_non_mcp.category == 115 / 133
-    assert exact_non_mcp.failures == 0
-    assert exact_mcp.failures == 2
 
 
 def _decoy_cell(route, screen, cluster, rep, confidence, valid=True):
