@@ -172,6 +172,7 @@ def construct_prompts(
     overwrite_outputs: bool = False,
     component_overrides: dict[str, str] | None = None,
     condition_name: str | None = None,
+    source: str = "both",
 ) -> dict:
     """Construct system and user prompts for a given route+cluster.
 
@@ -248,7 +249,11 @@ def construct_prompts(
     )
     include_features = bool(route_components & {"cFC", "cPC"})
     user_prompt = make_single_cluster_analysis_user_prompt(
-        cluster_id, screen_name, cluster_to_bundle_map, include_features=include_features
+        cluster_id,
+        screen_name,
+        cluster_to_bundle_map,
+        include_features=include_features,
+        source=source,
     )
 
     stepwise_turns = None
@@ -377,6 +382,7 @@ def execute_single_run(
         overwrite_outputs=config.run.overwrite_outputs,
         component_overrides=component_overrides,
         condition_name=condition_name,
+        source=config.paths.bundle_source,
     )
     system_prompt = prompts["system_prompt"]
     user_prompt = prompts["user_prompt"]

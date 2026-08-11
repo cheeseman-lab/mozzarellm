@@ -2,7 +2,8 @@ experiment_id: source_uniprot
 paths:
   benchmark_inputs_dir: benchmark_inputs
   benchmark_clusters_csv: benchmark_inputs/benchmark_input.csv
-  evidence_bundles_dir: benchmark_bundles_uniprot
+  evidence_bundles_dir: benchmark_bundles
+  bundle_source: uniprot  # the master-bundle view assembled into prompts
   output_dir: benchmarking_outputs/10.clean_3x2
 model:
   provider: anthropic

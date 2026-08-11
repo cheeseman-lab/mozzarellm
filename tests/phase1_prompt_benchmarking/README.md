@@ -21,7 +21,7 @@ The dataset lives in `benchmark_inputs/` (see `benchmark_inputs/README.md`). Two
 python merge_reviewers.py
 
 # benchmark_input.csv (roles + per-gene features) -> evidence bundles per source
-python build_bundles.py            # writes benchmark_bundles_{uniprot,affinage,both}/
+python build_bundles.py            # writes benchmark_bundles/ (master superset bundles)
 ```
 
 Ground truth is **not** baked into the dataset — it is computed at scoring time from the raw per-reviewer annotations by `bench_evaluator` (`build_consensus_gt`):
@@ -41,7 +41,7 @@ python run_source.py --score-only   # re-score existing run dirs, no API
 
 Each cell is scored by `bench_evaluator` and the source is picked **holistically on coverage-weighted recall** (correct categories / 103 real genes) so a source can't win by dropping hard genes to inflate raw category. The evaluator's diagnostics (per-class precision/recall/F1, per-cluster recall, reviewer source-preference, inter-reviewer concordance) explain *why* a source wins.
 
-- **reads:** `benchmark_bundles_{source}/`, reviewer annotations, `configs/source_{source}.yaml`
+- **reads:** `benchmark_bundles/` (master bundles; each run's source view is derived at prompt assembly via `strip_source_fields`), reviewer annotations, `configs/source_{source}.yaml`
 - **writes:** `benchmarking_outputs/source/source_state.json` with `carry = {"source": <winner>}`
 
 ### 2. `run_walkup.py` — assemble the prompt (human-gated)
@@ -126,7 +126,7 @@ phase1_prompt_benchmarking/
         ground_truth/                 -- annotation_{eric,liz,iain}.csv + survey_key.csv
         {screen}_screen_context.json  -- per-screen context
 
-    benchmark_bundles_{uniprot,affinage,both}/   -- pre-built evidence bundles per source
+    benchmark_bundles/                -- master evidence bundles (superset; filtered per source at assembly)
 
     architecture_benchmarking_workflow/
         # --- pipeline (source/walkup/mode) ---
