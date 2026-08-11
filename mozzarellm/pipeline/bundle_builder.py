@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 from mozzarellm.clients.affinage_api_client import ANNOTATION_COL as AFFINAGE_COL
+from mozzarellm.clients.affinage_api_client import AUDIT_NOTE_COL as AFFINAGE_AUDIT_COL
 from mozzarellm.clients.affinage_api_client import AffinageClient
 from mozzarellm.clients.uniprot_api_client import UniProtClient
 from mozzarellm.utils.cluster_utils import cluster_chunker, compute_feature_coherence
@@ -272,7 +273,7 @@ def build_evidence_bundles(
         # for affinage/both, drop the empty backup-source key so each gene shows only its source
         if source in ("affinage", "both"):
             for gene in cluster_as_json:
-                for col in ("UniProt_functional_annotation", AFFINAGE_COL):
+                for col in ("UniProt_functional_annotation", AFFINAGE_COL, AFFINAGE_AUDIT_COL):
                     if gene.get(col) == "":
                         gene.pop(col, None)
 

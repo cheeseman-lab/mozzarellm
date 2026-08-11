@@ -12,6 +12,7 @@ import requests
 
 from mozzarellm.clients.affinage_api_client import (
     ANNOTATION_COL,
+    AUDIT_NOTE_COL,
     AffinageClient,
 )
 
@@ -53,13 +54,13 @@ def test_get_annotation_404_returns_none_and_warns(client):
         assert client.get_annotation("NOTAREALGENE") is None
 
 
-def test_get_annotation_audit_flagged_returns_none_and_warns(client):
+def test_get_annotation_audit_flagged_surfaces_narrative_and_warns(client):
     payload = {"gene": "X", "mechanistic_narrative": "anything", "audit_flag": True}
     with (
         patch.object(client._session, "get", return_value=_mock_response(json_data=payload)),
         pytest.warns(UserWarning, match="audit-flagged"),
     ):
-        assert client.get_annotation("X") is None
+        assert client.get_annotation("X") == "anything"
 
 
 def test_get_annotation_refusal_prefix_returns_none_and_warns(client):
@@ -152,7 +153,7 @@ def test_fetch_functional_annotations_returns_only_usable(client):
         pytest.warns(UserWarning),
     ):
         result = client.fetch_functional_annotations(chunk, GENE_COL)
-    assert list(result.columns) == [GENE_COL, ANNOTATION_COL]
+    assert list(result.columns) == [GENE_COL, ANNOTATION_COL, AUDIT_NOTE_COL]
     assert result[GENE_COL].tolist() == ["TP53"]
 
 
