@@ -232,11 +232,30 @@ def make_cluster_analysis_system_prompt(
     return prompt
 
 
-def make_single_cluster_analysis_user_prompt(cluster_id, screen_name, cluster_to_bundle_path_map):
+# Screen-derived per-gene feature data plus the aggregate. Stripped from the
+# bundle before it reaches the model unless a feature-interpretation component is
+# active, so features never enter the prompt as uninterpreted noise.
+FEATURE_FIELDS = ("up_features", "down_features", "phenotypic_strength")
+
+
+def strip_feature_fields(bundle_obj: dict) -> None:
+    """Remove screen-derived feature data from an evidence bundle in place."""
+    bundle_obj.pop("feature_coherence", None)
+    for gene in bundle_obj.get("cluster_genes", []):
+        if isinstance(gene, dict):
+            for field in FEATURE_FIELDS:
+                gene.pop(field, None)
+
+
+def make_single_cluster_analysis_user_prompt(
+    cluster_id, screen_name, cluster_to_bundle_path_map, include_features=False
+):
     BUNDLE_PATH = cluster_to_bundle_path_map[str(cluster_id)]
 
     # Build a user prompt from the bundle JSON
     bundle_obj = json.loads(Path(BUNDLE_PATH).read_text(encoding="utf-8"))
+    if not include_features:
+        strip_feature_fields(bundle_obj)  # no feature-interp component => no feature leak
     bundle_text = json.dumps(bundle_obj, ensure_ascii=False)
 
     output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
