@@ -63,6 +63,38 @@ def test_get_annotation_audit_flagged_surfaces_narrative_and_warns(client):
         assert client.get_annotation("X") == "anything"
 
 
+def test_audit_note_renders_api_human_readable_fields():
+    from mozzarellm.clients.affinage_api_client import _audit_note
+
+    # Real API payload shape: verdict + subtype are the human-facing fields;
+    # the rule-coded `issue` string must NOT be the rendered note.
+    flag = {
+        "gene": "PSMA4",
+        "tier": "GROUNDING",
+        "verdict": "Evidence-grounding concern",
+        "subtype": "uncited_synthesis",
+        "uniprot_band": "medium",
+        "rules_fired": "R6,R8",
+        "issue": "R6: narrative-cited PMIDs vs gene2pubmed overlap = 0.00%; R8: 1/3 claims uncited",
+    }
+    assert _audit_note(flag) == "Evidence-grounding concern: some claims lack citations"
+    assert _audit_note({"verdict": "Identity concern", "subtype": "paralog"}) == (
+        "Identity concern: narrative may describe a different gene (paralog/alias)"
+    )
+    # The map is complete against the R1-R10 rulebook's subtype vocabulary.
+    from mozzarellm.clients.affinage_api_client import _AUDIT_SUBTYPES
+
+    assert len(_AUDIT_SUBTYPES) == 14
+    assert _audit_note({"verdict": "Model-behavior concern", "subtype": "parse_failure"}) == (
+        "Model-behavior concern: no usable narrative (output could not be parsed)"
+    )
+    # Unknown subtype falls back to the verbatim value; no subtype falls back to issue.
+    assert _audit_note({"verdict": "V", "subtype": "new_kind"}) == "V: new_kind"
+    assert _audit_note({"issue": "raw detail"}) == "raw detail"
+    assert _audit_note(True) == "audit-flagged"
+    assert _audit_note(None) == ""
+
+
 def test_get_annotation_refusal_prefix_returns_none_and_warns(client):
     payload = {"gene": "X", "mechanistic_narrative": "Insufficient data to build a narrative."}
     with (

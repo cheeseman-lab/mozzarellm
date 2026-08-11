@@ -16,12 +16,48 @@ AUDIT_NOTE_COL = "affinage_audit_note"
 REFUSAL_PREFIXES = ("Parse failed", "No mechanistic", "Insufficient")
 
 
+# The API's audit subtypes rendered as plain language, complete against the
+# R1-R10 rulebook (cheeseman-lab/affinage, affinage/audit_rules.py: IDENTITY
+# R1-R4, GROUNDING R5-R8, BEHAVIOR R9-R10). Unknown subtypes fall back to the
+# verbatim value; the API's other fields (tier, uniprot_band, rules_fired,
+# issue) stay machine-side for future policy use.
+_AUDIT_SUBTYPES = {
+    # IDENTITY -- wrong gene, or wrong product of the right gene
+    "corpus_ungrounded": "gene weakly grounded in its cited literature",
+    "alias_collision": "cited literature may belong to a different gene sharing an alias",
+    "cross_species_homonym": "narrative may describe a same-named gene from another species",
+    "paralog": "narrative may describe a different gene (paralog/alias)",
+    "alt_product": "narrative describes an alternative product of this locus",
+    # GROUNDING -- narrative under-extracts or misuses evidence
+    "recall_miss": "narrative missed evidence available in UniProt",
+    "fabrication": "cites a reference not found in the literature",
+    "truncated_citation": "carries a truncated or malformed citation",
+    "uncited_synthesis": "some claims lack citations",
+    # BEHAVIOR -- generation anomaly / failure
+    "memorization_empty_corpus": "asserts findings without supporting literature",
+    "memorization_wrong_corpus": "content not drawn from its cited literature",
+    "model_safety_refusal": "no usable narrative (model refusal)",
+    "parse_failure": "no usable narrative (output could not be parsed)",
+    "unexpected_refusal": "no usable narrative (model declined despite evidence)",
+}
+
+
 def _audit_note(audit_flag) -> str:
-    """One-line note from the API's audit_flag field; '' when unflagged."""
+    """Human-readable one-line note from the API's audit_flag; '' when unflagged.
+
+    Built from the API's own human-facing fields (verdict + subtype), not the
+    rule-coded `issue` string — e.g. "Evidence-grounding concern: some claims
+    lack citations" rather than "R6: ... overlap = 0.00% (n_cited=3, ...)".
+    """
     if not audit_flag:
         return ""
     if isinstance(audit_flag, dict):
-        return str(audit_flag.get("issue") or audit_flag.get("verdict") or "audit-flagged")
+        verdict = str(audit_flag.get("verdict") or "audit-flagged")
+        subtype = audit_flag.get("subtype")
+        if subtype:
+            detail = _AUDIT_SUBTYPES.get(str(subtype), str(subtype))
+            return f"{verdict}: {detail}"
+        return str(audit_flag.get("issue") or verdict)
     return "audit-flagged"
 
 
