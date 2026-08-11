@@ -132,13 +132,16 @@ are understudied.
 # =============================================================================
 
 OUTPUT_FORMAT_JSON = """
-Provide a concise analysis in this exact JSON format:
+Provide a concise analysis in this exact JSON format. Include every gene, and place each gene in exactly one category between
+ESTABLISHED, NOVEL_ROLE, and UNCHARACTERIZED — never list the same gene in two categories. Only fill the additional fields for
+genes that are in the NOVEL_ROLE or UNCHARACTERIZED categories.
+
 {
   "cluster_id": "[CLUSTER_ID]",  // IMPORTANT: Use the exact cluster_id provided in the prompt
-  "dominant_process": "pathway name (or comma-separated if multiple)",
+  "dominant_process": "pathway name (semicolon-separated if 2-3)",
   "pathway_confidence": "High/Medium/Low",
-  "established_genes": ["GeneA", "GeneB"],
-  "uncharacterized_genes": [
+  "established_genes": ["GeneA", "GeneB"],  // known role in this cluster's dominant process
+  "uncharacterized_genes": [  // little or no functional annotation
     {
       "gene": "GeneC",
       "class": "DARK_GENE | NASCENT | ANNOTATED_ONLY | NON_HUMAN_CHARACTERIZED",
@@ -146,7 +149,7 @@ Provide a concise analysis in this exact JSON format:
       "evidence": "quote(s) from annotations or citations, if available"
     }
   ],
-  "novel_role_genes": [
+  "novel_role_genes": [  // documented function elsewhere, no known role in this process
     {
       "gene": "GeneD",
       "class": "NO_EVIDENCE | INDIRECT_EVIDENCE | PARTIAL_EVIDENCE | CONTRADICTORY_EVIDENCE",
