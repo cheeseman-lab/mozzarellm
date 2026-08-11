@@ -734,6 +734,7 @@ def _run_benchmark_loop(
     # stores last_usage on self, so a shared instance would cross-contaminate
     # token/cost accounting across threads).
     api_key = None
+    probe = None
     if not config.run.dry_run:
         api_key = (
             os.getenv("ANTHROPIC_API_KEY")
@@ -844,6 +845,11 @@ def _run_benchmark_loop(
     }
     if manifest_extra:
         manifest.update(manifest_extra)
+    # Record the model params the client actually sent (resolution is
+    # deterministic per config+model, so the probe speaks for every run client).
+    if probe is not None and hasattr(probe, "_resolve_params"):
+        probe._resolve_params()
+        manifest["model_resolved_params"] = probe.resolved_params
     (output_dir / "run_manifest.json").write_text(
         json.dumps(manifest, indent=2, default=str), encoding="utf-8"
     )
