@@ -1,0 +1,116 @@
+{
+  "screen_name": "whitney",
+  "cluster_id": "49",
+  "cluster_genes": [
+    {
+      "gene_symbol": "nontargeting_intergenic_CTCGGTCAGACG",
+      "up_features": "",
+      "down_features": "",
+      "phenotypic_strength": "0.3360094064470065",
+      "accession": "NON_TARGETING_CONTROL"
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_CTCCAACTCGGG",
+      "up_features": "",
+      "down_features": "",
+      "phenotypic_strength": "0.4622165401932288",
+      "accession": "NON_TARGETING_CONTROL"
+    },
+    {
+      "gene_symbol": "NDUFAF4",
+      "up_features": "cell_Hoescht_median; cytoplasm_Hoescht_median",
+      "down_features": "",
+      "phenotypic_strength": "0.3332983451382968",
+      "UniProt_functional_annotation": "Involved in the assembly of mitochondrial NADH:ubiquinone oxidoreductase complex (complex I) (PubMed:18179882, PubMed:28853723). May be involved in cell proliferation and survival of hormone-dependent tumor cells. May be a regulator of breast tumor cell invasion",
+      "affinage_functional_annotation": "NDUFAF4 (C6ORF66/HRPAP20) is a mitochondrial assembly factor required for the biogenesis of respiratory complex I (NADH:ubiquinone oxidoreductase); loss-of-function mutations in patients reduce NDUFAF4 protein and abolish fully assembled complex I, a defect rescued by re-expression of wild-type cDNA [PMID:18179882]. It functions in tight cooperation with the assembly factor NDUFAF3, with which it physically interacts and acts during a shared step of complex I assembly [PMID:19463981]. NDUFAF4 drives the maturation of multiple complex I modules — the Q-, N- and PP-b-modules — by supporting integration of the subunits NDUFS3 (Q-module) and NDUFS5 (PP-b-module) and stabilizing the assembly factor TIMMDC1 in intermediates, and its forced expression can rescue Q-module defects caused by NDUFAF3 disruption [PMID:34386730]. Consequently, NDUFAF4 loss eliminates fully assembled complex I and complex I-containing supercomplexes, causes abnormal accumulation of SCIII2IV1 supercomplexes, alters mitochondrial morphology, and severely reduces respiratory capacity [PMID:32949790]; restoring NDUFAF4 directly to patient mitochondria recovers complex I activity, ATP production, and lowers ROS [PMID:23670274]. Beyond its mitochondrial role, NDUFAF4 binds calmodulin through a conserved motif (residue K73) to promote breast cancer cell invasion and MMP-9 secretion [PMID:17001319], and it interacts with the vesicular stomatitis virus matrix protein to restrict viral replication independently of type I interferon signaling [PMID:33635491].",
+      "accession": "Q9P032"
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GCAATTCTGTCG",
+      "up_features": "",
+      "down_features": "",
+      "phenotypic_strength": "0.5589734028029609",
+      "accession": "NON_TARGETING_CONTROL"
+    },
+    {
+      "gene_symbol": "ETV4",
+      "up_features": "cytoplasm_ConA_int",
+      "down_features": "",
+      "phenotypic_strength": "0.3635953102131035",
+      "UniProt_functional_annotation": "Transcriptional activator (PubMed:19307308, PubMed:31552090). Regulates the positioning of motor neurons within the lateral medial column of the spinal cord and controls the terminal arborization of specific motor neuron axons within their target muscles (By similarity). Required for the expression of CDH8 and SEMA3E in ETV4-expressing motor neurons and for the exclusion of CDH7 expression from these neurons (By similarity). May play a role in keratinocyte differentiation (PubMed:31552090)\n(Microbial infection) Binds to the enhancer of the adenovirus E1A gene and acts as a transcriptional activator; the core-binding sequence is 5'-[AC]GGA[AT]GT-3'",
+      "affinage_functional_annotation": "ETV4 (PEA3/E1AF) is an ETS-family transcription factor that integrates receptor tyrosine kinase signaling into a transcriptional program driving tumor cell invasion, metastasis, proliferation, and immune modulation across diverse tissues [PMID:1923525, PMID:8570199, PMID:23918374]. Its DNA-binding activity is intrinsically autoinhibited by two independent elements flanking the ETS domain: a C-terminal α-helix that perturbs the DNA-recognition helix and an intrinsically disordered N-terminal inhibitory domain whose lysine acetylation relieves repression; an additional redox switch, in which disulfide-linked dimerization lowers DNA-binding affinity 40–200-fold, further tunes activity [PMID:25866208, PMID:28161714]. ETV4 is activated downstream of HER2/Neu, HGF/c-Met, FGFR, and Ret through Ras-dependent ERK and JNK/SAPK MAPK pathways [PMID:9467955, PMID:10836994, PMID:19898483, PMID:33983905], and ERK phosphorylation at Ser73 stabilizes the protein by blocking COP1-mediated ubiquitination [PMID:28373072]. Activated ETV4 recruits the Mediator subunit MED25 through multivalent contacts that relieve its own autoinhibition, co-occupying enhancers and jointly driving target-gene transcription [PMID:28728983]. Its target program prominently includes matrix metalloproteinases (MMP-1, -3, -9, -13, MT1-MMP) and the uPA/uPAR and Rho/ROCK invasion machinery [PMID:7731700, PMID:10208438, PMID:16322223, PMID:29996935, PMID:30914208], cell-cycle regulators (Cyclin D1, Cyclin D3, and repression of CDKN1A/p21 with reduced p53) [PMID:17467662, PMID:29117940, PMID:32791988], and immune/chemokine effectors (PD-L1, CCL2, CXCL1/8, TNF-α) that reshape the tumor microenvironment [PMID:35296440, PMID:36907560, PMID:37670477]. ETV4 also acts as a transcriptional cofactor: it forms complexes with HIF-1/2α to co-activate hypoxia-inducible genes, with the estrogen receptor to license its genomic binding and chromatin accessibility, and with YAP to potentiate Hippo-pathway transcription [PMID:22075993, PMID:32046982, PMID:35296440]. Beyond oncogenesis, ETV4 functions redundantly with ETV5 in GDNF/Ret-driven ureteric bud branching and renal development, in motor and sensory neuron targeting, and in embryonic stem cell self-renewal [PMID:12372283, PMID:19898483, PMID:24089499, PMID:26224636, PMID:26894589].",
+      "accession": "P43268"
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GAGGGTCGCTTC",
+      "up_features": "",
+      "down_features": "",
+      "phenotypic_strength": "0.3547696557858421",
+      "accession": "NON_TARGETING_CONTROL"
+    },
+    {
+      "gene_symbol": "NEFM",
+      "up_features": "",
+      "down_features": "nucleus_Hoescht_mean; cell_Hoescht_int",
+      "phenotypic_strength": "0.403890977355431",
+      "UniProt_functional_annotation": "Neurofilaments usually contain three intermediate filament proteins: NEFL, NEFM, and NEFH which are involved in the maintenance of neuronal caliber. May additionally cooperate with the neuronal intermediate filament proteins PRPH and INA to form neuronal filamentous networks (By similarity)",
+      "affinage_functional_annotation": "NEFM (NF-M) is a type IV neuronal intermediate filament subunit that obligatorily co-assembles with NF-L to build the axonal neurofilament network and to regulate its architecture and caliber [PMID:2516804, PMID:7721944]. Its modular architecture comprises a non-α-helical arginine-rich head, a coiled-coil rod, and an extended, glutamic-acid- and lysine-rich C-terminal tail [PMID:6439558]; the rod domain is essential and sufficient for filament co-assembly, since rod deletions act as dominant-negative disruptors of filament arrays while head and tail deletions still permit incorporation [PMID:2121743]. The acidic tail domain performs two distinct architectural functions: it forms the inter-filament cross-bridges that set inter-filament spacing and it promotes longitudinal elongation and straightening of core filaments, as shown by reconstitution of cross-bridged 10-nm filament bundles from NF-L plus NF-M in cells lacking endogenous intermediate filaments [PMID:7721944]. NF-M abundance governs neurofilament stoichiometry in vivo, competing with NF-H for a limiting NF-L pool and regulating NF-L levels and NF-H phosphorylation state [PMID:7559762, PMID:7790359]. The tail KSP repeat motifs are the substrate of a topographically organized phosphorylation program: ERK1/2 phosphorylates the KSPXXXK-type repeats while CDK5 acts on KSPXK motifs [PMID:9592082], with ERK activation driven by MEK signaling downstream of integrin-matrix engagement, membrane depolarization/L-type calcium influx, and growth-factor stimulation [PMID:10231383, PMID:10381546, PMID:11158240]. Transient PKA phosphorylation of the head domain inhibits premature tail KSP phosphorylation in the cell body [PMID:12695506], whereas tail KSP phosphorylation in myelinated internodes is the essential effector of the myelination-dependent outside-in cascade that drives radial axonal growth and sets axonal caliber and conduction velocity [PMID:14662745]. Beyond neurons, NF-M co-immunoprecipitates with the dopamine D1 receptor in adrenocortical cells and negatively regulates aldosterone secretion by facilitating D1R internalization [PMID:28584012], and ALS-associated miRNA dysregulation elevates NEFM protein and perturbs neurofilament subunit stoichiometry [PMID:30029677].",
+      "accession": "P07197"
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GACACTCTCCTT",
+      "up_features": "",
+      "down_features": "",
+      "phenotypic_strength": "0.3916985051009795",
+      "accession": "NON_TARGETING_CONTROL"
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GATGAATCTAAC",
+      "up_features": "",
+      "down_features": "",
+      "phenotypic_strength": "0.4016636575621788",
+      "accession": "NON_TARGETING_CONTROL"
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_CGTTAGGAGATA",
+      "up_features": "",
+      "down_features": "",
+      "phenotypic_strength": "0.3458427512188097",
+      "accession": "NON_TARGETING_CONTROL"
+    },
+    {
+      "gene_symbol": "nontargeting_intergenic_GCACAAGGTCAT",
+      "up_features": "",
+      "down_features": "",
+      "phenotypic_strength": "1.382159386356472",
+      "accession": "NON_TARGETING_CONTROL"
+    },
+    {
+      "gene_symbol": "BTG1",
+      "up_features": "nucleus_ConA_median; nucleus_ConA_mean; nucleus_AGP_mean",
+      "down_features": "",
+      "phenotypic_strength": "0.370112187596009",
+      "UniProt_functional_annotation": "Anti-proliferative protein",
+      "affinage_functional_annotation": "BTG1 is an antiproliferative transcriptional cofactor and post-transcriptional regulator that enforces cellular quiescence and terminal differentiation across hematopoietic, neural, muscle, and cardiac lineages [PMID:1373383, PMID:32165587]. It operates through two convergent biochemical activities. First, BTG1 binds the arginine methyltransferase PRMT1 and modulates its enzymatic activity [PMID:8663146], a partnership required for BTG1's growth-arrest function in B lymphoma cells [PMID:17466295] and for arginine methylation of substrates including ATF4 at R239, which tunes the ATF4-dependent stress response [PMID:26657730]; through this PRMT1 axis BTG1 also acts as a coactivator, recruiting PRMT1 to the glucocorticoid receptor promoter to support GR autoinduction [PMID:20354172]. Second, BTG1 stimulates mRNA deadenylation and decay by recruiting the CCR4-NOT deadenylase via its CAF1 subunits (CNOT7/CNOT8) and engaging PABPC1, interactions mapped to its conserved boxB and boxC motifs; this deadenylation activity maintains lymphocyte quiescence by limiting global mRNA abundance and poly(A) tail length [PMID:9712883, PMID:32165587, PMID:34060423]. The CAF1 interaction is gated by CDK2/cyclin E- or A-dependent phosphorylation of BTG1 at Ser-159 [PMID:9820826]. BTG1 additionally functions as a transcriptional coregulator of nuclear receptors (T3R, RARs), MyoD, and the homeodomain protein Hoxb9 through its A box, C-terminal region, and LXXLL motifs [PMID:10617598, PMID:11136725, PMID:15674337], and it suppresses β-catenin/TCF4 complex formation to restrain c-Myc and Cyclin D1 [PMID:41950351]. BTG1 expression is itself controlled transcriptionally by FoxO3a and AP-1 and post-transcriptionally by PUM2 binding its 3'UTR [PMID:14734530, PMID:10366433, PMID:30787206]. Loss-of-function BTG1 variants in non-Hodgkin lymphoma impair CNOT7/CNOT8 binding and abolish antiproliferative activity, and BTG1 mutations drive a B-cell supercompetitor phenotype during affinity maturation by altering MYC induction kinetics, establishing BTG1 as a tumor suppressor in germinal-center lymphomagenesis [PMID:33021411, PMID:36656933].",
+      "accession": "P62324"
+    },
+    {
+      "gene_symbol": "MYO9B",
+      "up_features": "cytoplasm_area",
+      "down_features": "cell_Hoescht_mean",
+      "phenotypic_strength": "0.5930255278495083",
+      "UniProt_functional_annotation": "Myosins are actin-based motor molecules with ATPase activity. Unconventional myosins serve in intracellular movements. Binds actin with high affinity both in the absence and presence of ATP and its mechanochemical activity is inhibited by calcium ions (PubMed:9490638). Also acts as a GTPase activator for RHOA (PubMed:26529257, PubMed:9490638). Plays a role in the regulation of cell migration via its role as RHOA GTPase activator. This is regulated by its interaction with the SLIT2 receptor ROBO1; interaction with ROBO1 impairs interaction with RHOA and subsequent activation of RHOA GTPase activity, and thereby leads to increased levels of active, GTP-bound RHOA (PubMed:26529257)",
+      "affinage_functional_annotation": "MYO9B is an unconventional myosin that couples actin-based motor function to RhoA-specific GTPase-activating (RhoGAP) activity, allowing it to spatially restrict RhoA signaling and thereby control cell spreading, polarity, and directional migration [PMID:20566876, PMID:33268376]. Its catalytic core accelerates RhoA GTP hydrolysis through a non-canonical dual-arginine-finger mechanism, in which a second arginine finger anchors the RhoA Switch I loop to stabilize the transition state in place of the auxiliary asparagine used by conventional RhoGAPs, while a unique surface patch confers RhoA specificity [PMID:26529257, PMID:27363609]. Motor activity targets MYO9B to lamellipodial extensions downstream of Rac-driven actin polymerization, where it delivers local rather than global RhoA suppression to organize the leading edge [PMID:33268376]. This RhoA-restricting activity is gated by multiple inputs: the SLIT-receptor ROBO directly binds the RhoGAP domain and inhibits its catalysis [PMID:26529257]; PKA/PKG phosphorylation at S1354 and CDK4 phosphorylation at S1935 enhance GAP activity [PMID:32692911]; the transcription factor KLF5 drives MYO9B expression [PMID:28115390]; and the GTPase MIRO2 partners with MYO9B to lower active RhoA during invasion [PMID:39723893]. Through this RhoA-centered control of the cytoskeleton, MYO9B governs macrophage podosome formation and migration [PMID:28115390], neutrophil β2-integrin/talin-1 activation and recruitment [PMID:40504998], dendritic cell maturation and T-cell priming [PMID:37749140], cortical neuron dendrite growth [PMID:22250289], osteoblast spreading and bone growth [PMID:28585695], lens vesicle morphogenesis [PMID:36008362], and tumor cell invasion [PMID:39723893]. Recessive MYO9B motor-domain variants that impair motor activity cause Charcot-Marie-Tooth disease type 2 and isolated optic atrophy, consistent with degenerating peripheral and optic axons in Myo9b-null mice [PMID:36260368].",
+      "accession": "Q13459"
+    },
+    {
+      "gene_symbol": "RELT",
+      "up_features": "cytoplasm_AGP_int; cell_AGP_int; cell_area; cytoplasm_area",
+      "down_features": "",
+      "phenotypic_strength": "0.3813995615809074",
+      "UniProt_functional_annotation": "May play a role in apoptosis (PubMed:19969290, PubMed:28688764). Induces activation of MAPK14/p38 and MAPK8/JNK MAPK cascades, when overexpressed (PubMed:16530727). Involved in dental enamel formation (PubMed:30506946)",
+      "affinage_functional_annotation": "RELT is a type I transmembrane TNF receptor superfamily member with a cysteine-rich extracellular domain that couples to the Ste20-related kinases SPAK and OSR1 to drive stress-MAPK signaling and apoptosis [PMID:11313261, PMID:16530727, PMID:16389068]. RELT binds SPAK through a 349RFRV motif in its intracellular domain to activate p38 and JNK, and disrupting this motif or using kinase-dead SPAK abolishes the response [PMID:16530727]; OSR1 binds and phosphorylates RELT and its homologues RELL1/RELL2, and assembles with RELT and the substrate PLSCR1 into a membrane-associated multiprotein complex [PMID:16389068, PMID:22052202]. RELT overexpression induces apoptosis in a cell-type-dependent manner through a FADD/Caspase-8-independent route that requires the full intracellular domain and does not depend on OXSR1-mediated phosphorylation [PMID:19969290, PMID:28688764, PMID:39767574]. The receptor is regulated by ADAM10-mediated ectodomain shedding [PMID:31575895] and additionally interacts with TRAF1 and MDFIC [PMID:11313261, PMID:33367115]. Physiologically, RELT negatively regulates the early phase of T-cell activation in vivo, restraining CD4+ homeostatic proliferation and CD8+ anti-tumor responses [PMID:30138536]. Loss-of-function mutations in RELT cause autosomal recessive amelogenesis imperfecta, and RELT is expressed by secretory-stage ameloblasts and odontoblasts where it is required for normal enamel formation [PMID:30506946].",
+      "accession": "Q969Z4"
+    }
+  ]
+}

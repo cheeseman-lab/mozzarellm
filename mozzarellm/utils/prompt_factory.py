@@ -247,8 +247,36 @@ def strip_feature_fields(bundle_obj: dict) -> None:
                 gene.pop(field, None)
 
 
+# Per-source annotation fields; a master bundle carries the superset of both.
+SOURCE_FIELDS = {
+    "uniprot": ("UniProt_functional_annotation",),
+    "affinage": ("affinage_functional_annotation", "affinage_audit_note"),
+}
+
+
+def strip_source_fields(bundle_obj: dict, source: str) -> None:
+    """Reduce a master (superset) evidence bundle to one source's view, in place.
+
+    source="both" is a no-op (the master is the both-sources view). Otherwise
+    the other source's annotation fields are removed, and the kept source's
+    empty annotations (None/"") are dropped rather than serialized as empty.
+    """
+    if source == "both":
+        return
+    if source not in SOURCE_FIELDS:
+        raise ValueError(f"source must be one of 'uniprot', 'affinage', 'both'; got {source!r}")
+    other = "affinage" if source == "uniprot" else "uniprot"
+    for gene in bundle_obj.get("cluster_genes", []):
+        if isinstance(gene, dict):
+            for field in SOURCE_FIELDS[other]:
+                gene.pop(field, None)
+            for field in SOURCE_FIELDS[source]:
+                if not gene.get(field):
+                    gene.pop(field, None)
+
+
 def make_single_cluster_analysis_user_prompt(
-    cluster_id, screen_name, cluster_to_bundle_path_map, include_features=False
+    cluster_id, screen_name, cluster_to_bundle_path_map, include_features=False, source="both"
 ):
     BUNDLE_PATH = cluster_to_bundle_path_map[str(cluster_id)]
 
@@ -256,6 +284,7 @@ def make_single_cluster_analysis_user_prompt(
     bundle_obj = json.loads(Path(BUNDLE_PATH).read_text(encoding="utf-8"))
     if not include_features:
         strip_feature_fields(bundle_obj)  # no feature-interp component => no feature leak
+    strip_source_fields(bundle_obj, source)  # master bundle -> the run's evidence source
     bundle_text = json.dumps(bundle_obj, ensure_ascii=False)
 
     output_dir = Path(f"output/{screen_name}_analysis/prompts_used/")
