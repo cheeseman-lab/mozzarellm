@@ -22,6 +22,126 @@ from anthropic.types.messages.batch_create_params import Request
 logger = logging.getLogger(__name__)
 
 
+# Models that reject non-default temperature/top_p/top_k with a 400, per the
+# Anthropic model migration guide:
+# https://platform.claude.com/docs/en/about-claude/models/migration-guide
+# These same models also removed budget_tokens-style extended thinking, so the
+# tuple doubles as the offline fallback for the thinking capability lookup.
+_SAMPLING_LOCKED_MODELS = (
+    "claude-sonnet-5",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-fable-5",
+    "claude-mythos-5",
+)
+
+# Model -> whether type=enabled extended thinking is supported, resolved once per
+# process from the Models API capability tree (offline fallback: the tuple above).
+_THINKING_SUPPORT_CACHE: dict[str, bool] = {}
+
+
+def _model_accepts_sampling_params(model: str) -> bool:
+    """Whether the model accepts non-default temperature/top_p/top_k.
+
+    The models in ``_SAMPLING_LOCKED_MODELS`` reject them with a 400 per the
+    migration guide cited above; every other model accepts them.
+    """
+    return not model.startswith(_SAMPLING_LOCKED_MODELS)
+
+
+def _model_supports_enabled_thinking(model: str, api_key: str | None) -> bool:
+    """Whether the model supports type=enabled extended thinking.
+
+    Looks the model up once per process via the Models API capability tree
+    (``.capabilities["thinking"]["types"]["enabled"]["supported"]``). If the
+    lookup fails (offline, no key), falls back to the documented static tuple:
+    the sampling-locked models also removed budget_tokens-style thinking.
+    """
+    if model in _THINKING_SUPPORT_CACHE:
+        return _THINKING_SUPPORT_CACHE[model]
+    try:
+        info = anthropic.Anthropic(api_key=api_key).models.retrieve(model)
+        supported = bool(info.capabilities["thinking"]["types"]["enabled"]["supported"])
+    except Exception as e:
+        supported = not model.startswith(_SAMPLING_LOCKED_MODELS)
+        logger.warning(
+            "Models API thinking-capability lookup failed for %s (%s); "
+            "using the documented static fallback (supported=%s).",
+            model,
+            e,
+            supported,
+        )
+    _THINKING_SUPPORT_CACHE[model] = supported
+    return supported
+
+
+class AnthropicNoTextError(RuntimeError):
+    """Anthropic returned no usable text block.
+
+    Carries the API's stop_reason plus refusal diagnostics (stop_details
+    category and explanation, request id — the fields Anthropic asks for when
+    reporting a misfired refusal). A safety-classifier refusal is deterministic
+    for a given prompt and therefore not retryable; other empty responses
+    (e.g. the whole max_tokens budget spent on thinking) are stochastic and
+    may succeed on retry.
+    """
+
+    def __init__(
+        self,
+        stop_reason: str | None,
+        input_tokens: int | None,
+        output_tokens: int | None,
+        category: str | None = None,
+        explanation: str | None = None,
+        request_id: str | None = None,
+    ):
+        self.stop_reason = stop_reason
+        self.retryable = stop_reason != "refusal"
+        self.category = category
+        self.explanation = explanation
+        self.request_id = request_id
+        hint = " (safety-classifier refusal)" if stop_reason == "refusal" else ""
+        detail = "".join(
+            f", {name}={value!r}"
+            for name, value in (
+                ("category", category),
+                ("explanation", explanation),
+                ("request_id", request_id),
+            )
+            if value
+        )
+        super().__init__(
+            f"Anthropic returned no text{hint}: stop_reason={stop_reason!r}, "
+            f"input_tokens={input_tokens}, output_tokens={output_tokens}{detail}"
+        )
+
+
+def _extract_anthropic_text(response) -> str:
+    """Join all text blocks from a messages response, tolerating thinking blocks.
+
+    Raises AnthropicNoTextError on a refusal or any response with no text block,
+    rather than blindly indexing content[0].
+    """
+    usage = getattr(response, "usage", None)
+    in_tok = getattr(usage, "input_tokens", None)
+    out_tok = getattr(usage, "output_tokens", None)
+    request_id = getattr(response, "_request_id", None)
+    if response.stop_reason == "refusal":
+        details = getattr(response, "stop_details", None)
+        raise AnthropicNoTextError(
+            response.stop_reason,
+            in_tok,
+            out_tok,
+            category=getattr(details, "category", None),
+            explanation=getattr(details, "explanation", None),
+            request_id=request_id,
+        )
+    texts = [b.text for b in response.content if getattr(b, "type", None) == "text"]
+    if not texts:
+        raise AnthropicNoTextError(response.stop_reason, in_tok, out_tok, request_id=request_id)
+    return "".join(texts)
+
+
 class LLMClientBase(ABC):
     """Abstract base class for LLM providers."""
 
@@ -34,6 +154,7 @@ class LLMClientBase(ABC):
         top_k: int | None = None,
         stop_sequences: list[str] | None = None,
         api_key: str | None = None,
+        thinking: bool | None = None,
     ):
         """
         Initialize LLM provider.
@@ -46,6 +167,8 @@ class LLMClientBase(ABC):
             top_k: Top-K sampling parameter (optional, Claude/Gemini only)
             stop_sequences: List of stop sequences (optional)
             api_key: API key (if None, reads from environment)
+            thinking: Extended-thinking control (Claude only). None = model default,
+                False = disabled, True = enabled with a budget under max_tokens.
         """
         self.model = model
         self.temperature = temperature
@@ -53,6 +176,7 @@ class LLMClientBase(ABC):
         self.top_p = top_p
         self.top_k = top_k
         self.stop_sequences = stop_sequences
+        self.thinking = thinking
         self.api_key = api_key or self._get_api_key_from_env()
         self._validate_api_key()
 
@@ -127,6 +251,9 @@ class LLMClientBase(ABC):
                     f"Attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}: {error_str}"
                 )
                 logger.warning(f"{self.__class__.__name__}: {error_msg}")
+
+                if not getattr(e, "retryable", True):
+                    return None, f"{type(e).__name__}: {e}"
 
                 if attempt < max_retries - 1:
                     wait_time = 2**attempt  # Exponential backoff
@@ -214,7 +341,6 @@ class AnthropicClient(LLMClientBase):
         kwargs = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
             "system": [
                 {
                     "type": "text",
@@ -243,13 +369,9 @@ class AnthropicClient(LLMClientBase):
             ],
         }
 
-        # Add optional sampling parameters
-        if self.top_p is not None:
-            kwargs["top_p"] = self.top_p
-        if self.top_k is not None:
-            kwargs["top_k"] = self.top_k
-        if self.stop_sequences:
-            kwargs["stop_sequences"] = self.stop_sequences
+        # Add optional sampling + thinking params (omitted for models that reject them)
+        kwargs.update(self._sampling_kwargs())
+        kwargs.update(self._thinking_kwarg())
 
         cluster_request = Request(
             custom_id=f"{cluster_id}_analysis_request",
@@ -273,33 +395,92 @@ class AnthropicClient(LLMClientBase):
         return requests
 
     ### Endpoint access functions ###
+    def _resolve_params(self) -> None:
+        """Decide once which sampling and thinking params are actually sent.
+
+        Lazy (first request, never in __init__, so tests and dry-runs stay
+        offline) and cached. Records the outcome in ``self.resolved_params``
+        ({"sent": {...}, "dropped": [...], "thinking": "enabled"|"disabled"|
+        "omitted"}) so a run manifest can log what was actually sent rather
+        than what was configured.
+        """
+        if getattr(self, "_params_resolved", False):
+            return
+        configured: dict = {"temperature": self.temperature}
+        if self.top_p is not None:
+            configured["top_p"] = self.top_p
+        if self.top_k is not None:
+            configured["top_k"] = self.top_k
+        if _model_accepts_sampling_params(self.model):
+            sampling, dropped = configured, []
+        else:
+            sampling, dropped = {}, list(configured)
+            logger.warning(
+                "Model %s rejects non-default sampling params (per the migration "
+                "guide); dropping %s.",
+                self.model,
+                ", ".join(dropped),
+            )
+        if self.stop_sequences:  # accepted by every model
+            sampling["stop_sequences"] = self.stop_sequences
+
+        thinking_kwarg: dict = {}
+        thinking_state = "omitted"
+        if self.thinking is False:
+            thinking_kwarg = {"thinking": {"type": "disabled"}}
+            thinking_state = "disabled"
+        elif self.thinking and _model_supports_enabled_thinking(self.model, self.api_key):
+            budget = min(max(1024, min(self.max_tokens // 2, 8000)), self.max_tokens - 1)
+            thinking_kwarg = {"thinking": {"type": "enabled", "budget_tokens": budget}}
+            thinking_state = "enabled"
+        elif self.thinking:
+            logger.warning(
+                "Model %s does not support type=enabled extended thinking; dropping it.",
+                self.model,
+            )
+
+        self._resolved_sampling_kwargs = sampling
+        self._resolved_thinking_kwarg = thinking_kwarg
+        self.resolved_params = {
+            "sent": dict(sampling),
+            "dropped": dropped,
+            "thinking": thinking_state,
+        }
+        self._params_resolved = True
+
+    def _sampling_kwargs(self) -> dict:
+        """Resolved sampling params for the request (resolves on first use)."""
+        self._resolve_params()
+        return dict(self._resolved_sampling_kwargs)
+
+    def _thinking_kwarg(self) -> dict:
+        """Resolved extended-thinking param for the request (resolves on first use)."""
+        self._resolve_params()
+        return dict(self._resolved_thinking_kwarg)
+
+    def _create_message(self, client, base: dict):
+        """messages.create with the resolved sampling and thinking params."""
+        return client.messages.create(**base, **self._sampling_kwargs(), **self._thinking_kwarg())
+
     def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
         """
         Makes a single request to the Anthropic messages API.
         https://platform.claude.com/docs/en/api/python/messages/create
+
+        Tolerates thinking blocks in the response and raises AnthropicNoTextError
+        on a refusal or any response with no text block.
         """
 
         client = anthropic.Anthropic(api_key=self.api_key)
 
-        # Build kwargs with optional parameters
-        kwargs = {
+        base = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
             "system": system_prompt,
-            # "thinking": {"type": "enabled"},  # can eventually set a token budget here
             "messages": [{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
         }
 
-        # Add optional sampling parameters
-        if self.top_p is not None:
-            kwargs["top_p"] = self.top_p
-        if self.top_k is not None:
-            kwargs["top_k"] = self.top_k
-        if self.stop_sequences:
-            kwargs["stop_sequences"] = self.stop_sequences
-
-        response = client.messages.create(**kwargs)
+        response = self._create_message(client, base)
 
         # Store usage for cost tracking by callers
         if hasattr(response, "usage"):
@@ -313,7 +494,7 @@ class AnthropicClient(LLMClientBase):
         else:
             self.last_usage = {}
 
-        return response.content[0].text
+        return _extract_anthropic_text(response)
 
     def _make_batch_api_call(
         self,
@@ -897,6 +1078,7 @@ def create_client(
     top_k: int | None = None,
     stop_sequences: list[str] | None = None,
     api_key: str | None = None,
+    thinking: bool | None = None,
 ):
     """
     Factory function to create the appropriate client based on model name.
@@ -909,6 +1091,7 @@ def create_client(
         top_k: Top-K sampling parameter (optional, Claude/Gemini only)
         stop_sequences: List of stop sequences (optional)
         api_key: Optional API key (reads from env if None)
+        thinking: Extended-thinking control (Claude only; None/False/True)
 
     Returns:
         Appropriate LLMProvider instance
@@ -925,7 +1108,7 @@ def create_client(
     # Anthropic models
     elif model_lower.startswith("claude"):
         return AnthropicClient(
-            model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key
+            model, temperature, max_tokens, top_p, top_k, stop_sequences, api_key, thinking
         )
 
     # Google models
