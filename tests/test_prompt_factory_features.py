@@ -74,6 +74,53 @@ def test_user_prompt_gate(tmp_path):
     assert "up_features" not in default
 
 
+def test_source_gate_reduces_master_bundle(tmp_path):
+    # One master bundle carries both sources' annotations; each run's source
+    # view is derived at assembly time. "both" is a passthrough; empty
+    # annotations are dropped rather than serialized as empty fields.
+    from mozzarellm.utils.prompt_factory import strip_source_fields
+
+    def master():
+        return {
+            "cluster_genes": [
+                {
+                    "gene_symbol": "G1",
+                    "UniProt_functional_annotation": "uni text",
+                    "affinage_functional_annotation": "aff text",
+                    "affinage_audit_note": "flagged",
+                },
+                {
+                    "gene_symbol": "G2",
+                    "UniProt_functional_annotation": None,
+                    "affinage_functional_annotation": "aff only",
+                },
+            ]
+        }
+
+    uni = master()
+    strip_source_fields(uni, "uniprot")
+    g1, g2 = uni["cluster_genes"]
+    assert g1["UniProt_functional_annotation"] == "uni text"
+    assert "affinage_functional_annotation" not in g1 and "affinage_audit_note" not in g1
+    assert "UniProt_functional_annotation" not in g2  # empty annotation dropped
+
+    aff = master()
+    strip_source_fields(aff, "affinage")
+    assert "UniProt_functional_annotation" not in aff["cluster_genes"][0]
+    assert aff["cluster_genes"][0]["affinage_audit_note"] == "flagged"
+
+    both = master()
+    strip_source_fields(both, "both")
+    assert both == master()  # byte-stable passthrough
+
+    bundle = master()
+    bundle.update({"screen_name": "s1", "cluster_id": "1"})
+    bp = tmp_path / "b.json"
+    bp.write_text(json.dumps(bundle))
+    prompt = make_single_cluster_analysis_user_prompt("1", "s1", {"1": bp}, source="uniprot")
+    assert "uni text" in prompt and "aff text" not in prompt
+
+
 def test_batch_request_gate(tmp_path):
     # The gate must also hold on the client's batch-request path, where it is a
     # per-request parameter (default: strip) rather than client state.
@@ -104,3 +151,38 @@ def test_batch_request_gate(tmp_path):
         assert field not in _bundle_text(off), field
         assert field in _bundle_text(on), field
     assert "does a thing" in _bundle_text(off)
+
+
+def test_batch_request_source_gate(tmp_path):
+    # The source gate must also hold on the client's batch-request path, where
+    # it is a per-request parameter (default: "both" passthrough), mirroring
+    # the include_features contract.
+    from mozzarellm.clients.llm_api_clients import AnthropicClient
+
+    bundle = {
+        "screen_name": "s1",
+        "cluster_id": "1",
+        "cluster_genes": [
+            {
+                "gene_symbol": "G1",
+                "UniProt_functional_annotation": "uni text",
+                "affinage_functional_annotation": "aff text",
+                "affinage_audit_note": "flagged",
+            }
+        ],
+    }
+    bp = tmp_path / "bundle.json"
+    bp.write_text(json.dumps(bundle))
+    client = AnthropicClient(model="claude-sonnet-5", api_key="test-key")
+
+    def _bundle_text(request) -> str:
+        return request["params"]["messages"][0]["content"][0]["text"]
+
+    both = client._make_single_cluster_message_request("1", str(bp), "sys")
+    uni = client._make_single_cluster_message_request("1", str(bp), "sys", source="uniprot")
+    aff = client._make_single_cluster_message_request("1", str(bp), "sys", source="affinage")
+    assert "uni text" in _bundle_text(both) and "aff text" in _bundle_text(both)
+    assert "uni text" in _bundle_text(uni) and "aff text" not in _bundle_text(uni)
+    assert "aff text" in _bundle_text(aff) and "uni text" not in _bundle_text(aff)
+    assert "flagged" in _bundle_text(aff) and "flagged" not in _bundle_text(uni)
+

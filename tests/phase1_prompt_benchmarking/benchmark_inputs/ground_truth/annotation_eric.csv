@@ -1,0 +1,134 @@
+annotator,screen,cluster,pathway,coherence,cluster_notes,gene,classification,subclass,preferred_source,used_web
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",CHP2,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",CSNK2B,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",CYB5B,ESTABLISHED,,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",DNAJC11,ESTABLISHED,,A,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",DNM1L,ESTABLISHED,,both,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",EEF2,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",GPAT4,ESTABLISHED,,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",LSM2,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",MARCHF6,ESTABLISHED,,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",MFN2,ESTABLISHED,,A,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",PCYT1A,NOVEL_ROLE,PARTIAL_EVIDENCE,B,yes
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",RHOT2,ESTABLISHED,,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",SCD,ESTABLISHED,,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",SLC25A1,ESTABLISHED,,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",SMIM12,UNCHARACTERIZED,ANNOTATED_ONLY,neither,yes
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",SREBF2,ESTABLISHED,,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",TMEM11,ESTABLISHED,,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",TMPO,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",VHL,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",VKORC1L1,NOVEL_ROLE,PARTIAL_EVIDENCE,B,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",VPS13D,ESTABLISHED,,A,no
+eric,whitney,9,mitochondrial regulators of ferroptosis,Single pathway — high coherence,"I may be wrong, but for the CHP2 description there is some confusion with the yeast Chp2 protein. yeast chp2 is a hp1 protein while this doesn't share any of the same domains as the HP1 family of proteins.",ZMYM4,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,AHCTF1,ESTABLISHED,,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,ATL2,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,CDCA3,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,CHP1,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,CKAP2L,NOVEL_ROLE,NO_EVIDENCE,B,yes
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,CSDE1,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,DPH7,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,KDM4A,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,KPNA6,ESTABLISHED,,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,LMNB1,NOVEL_ROLE,INDIRECT_EVIDENCE,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,LMNB2,NOVEL_ROLE,INDIRECT_EVIDENCE,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,NUP107,ESTABLISHED,,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,NUP133,ESTABLISHED,,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,NUP153,ESTABLISHED,,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,NUP160,ESTABLISHED,,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,NUP37,ESTABLISHED,,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,NUP43,ESTABLISHED,,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,NUP85,ESTABLISHED,,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,NUP98,ESTABLISHED,,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,OSTC,NOVEL_ROLE,NO_EVIDENCE,both,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,PCYT1A,NOVEL_ROLE,INDIRECT_EVIDENCE,A,yes
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,RAMAC,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,RANBP1,ESTABLISHED,,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,SCAF8,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,SCAP,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,SEC13,ESTABLISHED,,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,STRAP,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,TCEAL4,NOVEL_ROLE,NO_EVIDENCE,B,yes
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,THAP11,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,TIAL1,NOVEL_ROLE,INDIRECT_EVIDENCE,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,UFL1,NOVEL_ROLE,NO_EVIDENCE,both,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,VKORC1L1,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,XPO5,ESTABLISHED,,both,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,YEATS4,NOVEL_ROLE,NO_EVIDENCE,both,no
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,ZNF367,NOVEL_ROLE,NO_EVIDENCE,A,yes
+eric,aconcagua_interphase,41,Nuclear Pore Complex,Single pathway — high coherence,,ZWINT,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,ARMC7,ESTABLISHED,,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,COMT,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,DDX6,NOVEL_ROLE,INDIRECT_EVIDENCE,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,DOT1L,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,GOLGA2,NOVEL_ROLE,NO_EVIDENCE,both,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,HNRNPH1,ESTABLISHED,,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,PDCD7,ESTABLISHED,,B,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,PPP4R2,NOVEL_ROLE,NO_EVIDENCE,both,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,RBM48,ESTABLISHED,,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,RNPC3,ESTABLISHED,,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,SNAPC4,ESTABLISHED,,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,SNRNP25,ESTABLISHED,,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,SNRNP48,ESTABLISHED,,B,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,SRSF2,ESTABLISHED,,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,TSPYL1,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,WDR25,NOVEL_ROLE,PARTIAL_EVIDENCE,B,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,WDR61,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,ZC3H18,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,ZMAT5,ESTABLISHED,,B,no
+eric,denali,43,mRNA splicing,Single pathway — high coherence,,ZRSR2,ESTABLISHED,,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,AMY1A,ESTABLISHED,,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,AMY1B,ESTABLISHED,,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,BEND3,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,CD101,ESTABLISHED,,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,CLCC1,ESTABLISHED,,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,DDX20,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,DENND2C,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,EPS8L3,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,FCGR1B,UNCHARACTERIZED,ANNOTATED_ONLY,neither,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,GPR61,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,HAO2,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,HSD3B1,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,IGSF3,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,KCNA10,ESTABLISHED,,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,KCND3,ESTABLISHED,,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,MYBPHL,ESTABLISHED,,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,NBPF6,UNCHARACTERIZED,ANNOTATED_ONLY,neither,yes
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,OLFML3,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,OVGP1,ESTABLISHED,,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,PDE4DIP,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,PHGDH,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,PPM1J,ESTABLISHED,,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,PSME2,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,PSRC1,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,SLC16A1,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,STRIP1,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,STXBP3,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,SYPL2,ESTABLISHED,,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,TRIM33,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,denali,24,metal sensing/metabolism,Single pathway — low coherence,,WARS2,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,AKIRIN2,ESTABLISHED,,A,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,ENSG00000256206,UNCHARACTERIZED,DARK_GENE,neither,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,ENSG00000256646,UNCHARACTERIZED,DARK_GENE,neither,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,FNBP4,NOVEL_ROLE,NO_EVIDENCE,A,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,FOXN3,NOVEL_ROLE,NO_EVIDENCE,B,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,NAE1,ESTABLISHED,,both,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,NEDD8,ESTABLISHED,,both,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,NEDD8-MDP1,UNCHARACTERIZED,ANNOTATED_ONLY,neither,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMA1,ESTABLISHED,,both,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMA4,ESTABLISHED,,both,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMA7,ESTABLISHED,,both,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMB1,ESTABLISHED,,A,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMB3,ESTABLISHED,,B,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMB4,ESTABLISHED,,B,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMB7,ESTABLISHED,,B,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMC1,ESTABLISHED,,B,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMC2,ESTABLISHED,,A,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMC3,ESTABLISHED,,A,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMC4,ESTABLISHED,,A,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMC5,ESTABLISHED,,A,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMC6,ESTABLISHED,,B,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMD2,ESTABLISHED,,B,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,PSMD7,ESTABLISHED,,A,no
+eric,whitney,6,Proteasome,Single pathway — high coherence,,SNRNP27,UNCHARACTERIZED,ANNOTATED_ONLY,B,yes
+eric,whitney,6,Proteasome,Single pathway — high coherence,,SNRPE,NOVEL_ROLE,NO_EVIDENCE,B,no

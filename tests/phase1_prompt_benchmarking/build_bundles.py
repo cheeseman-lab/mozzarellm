@@ -2,15 +2,18 @@
 """
 Batch data preprocessing for phase-1 prompt benchmarking.
 
-Reads inputs/benchmark_clusters.csv (screen_name, cluster_id, gene_symbol),
-matches each screen to its <screen_name>_screen_context.json in inputs/,
-resolves stable accessions via UniProt, and builds evidence bundles.
+Reads inputs/benchmark_input.csv (screen_name, cluster_id, role, gene_symbol,
+up_features, down_features, phenotypic_strength), matches each screen to its
+<screen_name>_screen_context.json in inputs/, resolves stable accessions via
+UniProt, and builds one master evidence bundle per cluster: the superset of
+evidence (UniProt + Affinage annotations + feature columns). Per-source /
+per-feature views are derived at prompt-assembly time (strip_source_fields /
+strip_feature_fields in mozzarellm.utils.prompt_factory).
 
 Usage:
-    python data_preprocess.py
+    python build_bundles.py
 """
 
-import argparse
 from pathlib import Path
 
 import pandas as pd
@@ -30,28 +33,22 @@ load_dotenv()  # walks upward to find .env automatically
 ############### configuration ###############
 SCRIPT_DIR = Path(__file__).resolve().parent
 INPUTS_DIR = SCRIPT_DIR / "benchmark_inputs"
-OUTPUT_DIRS = {
-    "uniprot": SCRIPT_DIR / "benchmark_evidence_bundles_uniprot",
-    "affinage": SCRIPT_DIR / "benchmark_evidence_bundles_affinage",
-    "both": SCRIPT_DIR / "benchmark_evidence_bundles_both",
-}
-BENCHMARK_CSV = INPUTS_DIR / "benchmark_clusters.csv"
+OUTPUT_DIR = SCRIPT_DIR / "benchmark_bundles"
+BENCHMARK_CSV = INPUTS_DIR / "benchmark_input.csv"
 SCREEN_COL = "screen_name"
 CLUSTER_COL = "cluster_id"
 GENE_COL = "gene_symbol"
 ORGANISM_ID = 9606  # human
 
-# feature columns if present (for later run maybe)
-FEATURE_COLUMNS: list[str] = []
+# non-bundle columns dropped before bundling; per-gene features pass through
+NON_BUNDLE_COLS = [SCREEN_COL, "role"]
 
 
 # per-screen processing
 def process_screen(
-    screen_name: str, screen_df: pd.DataFrame, source: str = "uniprot", output_dir: Path = None
+    screen_name: str, screen_df: pd.DataFrame, output_dir: Path = OUTPUT_DIR
 ) -> dict:
     """Assert that screen context is present and well-formed, run accession lookup, and build evidence bundles."""
-    if output_dir is None:
-        output_dir = OUTPUT_DIRS["uniprot"]
     # locate screen context JSON
     ctx_path = INPUTS_DIR / f"{screen_name}_screen_context.json"
     if not ctx_path.exists():
@@ -59,10 +56,12 @@ def process_screen(
     screen_ctx = load_screen_context_json(ctx_path)
     print(f"  screen_context: {ctx_path.name}  ({len(screen_ctx)} keys)")
 
-    # drop the screen_name column - downstream needs only cluster_id + gene_symbol
-    cluster_df = screen_df.drop(columns=[SCREEN_COL])
+    # drop the non-bundle columns - downstream needs cluster_id + gene_symbol + features
+    cluster_df = screen_df.drop(columns=[c for c in NON_BUNDLE_COLS if c in screen_df.columns])
+    if "phenotypic_strength" in cluster_df.columns:
+        cluster_df["phenotypic_strength"] = cluster_df["phenotypic_strength"].astype("string")
 
-    # accession lookup (UniProt: primary for uniprot/both, backup for affinage)
+    # accession lookup (UniProt: primary annotation source + accession authority)
     acc_df = get_or_append_stable_accession(
         screen_name=screen_name,
         cluster_df=cluster_df,
@@ -73,15 +72,15 @@ def process_screen(
     )
     print(f"  accessions resolved: {acc_df.shape}")
 
-    # build evidence bundles (flat: directly into output_dir)
+    # build master evidence bundles (flat: directly into output_dir)
     build_evidence_bundles(
         screen_name=screen_name,
         acc_cluster_df=acc_df,
         gene_column=GENE_COL,
         cluster_id_column=CLUSTER_COL,
         stable_accession_col="accession",
-        feature_columns=FEATURE_COLUMNS,
-        source=source,
+        feature_columns=[],  # per-gene features pass through as columns; no numeric coherence
+        source="both",
         output_dir=output_dir,
         flat_output=True,
     )
@@ -101,14 +100,8 @@ def process_screen(
 
 #    main
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=["uniprot", "affinage", "both"], default="uniprot")
-    args = parser.parse_args()
-    output_dir = OUTPUT_DIRS[args.source]
-
     print(f"Inputs:    {INPUTS_DIR}")
-    print(f"Source:    {args.source}")
-    print(f"Output:    {output_dir}")
+    print(f"Output:    {OUTPUT_DIR}")
     print()
 
     # load master benchmark table
@@ -124,9 +117,7 @@ def main():
         n_genes = len(screen_df)
         print(f"[{screen_name}] {n_genes} genes across {n_clusters} clusters")
 
-        results[screen_name] = process_screen(
-            screen_name, screen_df, source=args.source, output_dir=output_dir
-        )
+        results[screen_name] = process_screen(screen_name, screen_df)
         print()
 
     # summary

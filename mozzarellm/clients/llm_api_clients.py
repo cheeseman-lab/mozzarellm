@@ -336,12 +336,14 @@ class AnthropicClient(LLMClientBase):
         path_to_evidence_bundle: str,
         system_prompt: str,
         include_features: bool = False,
+        source: str = "both",
     ) -> Request:
-        from mozzarellm.utils.prompt_factory import strip_feature_fields
+        from mozzarellm.utils.prompt_factory import strip_feature_fields, strip_source_fields
 
         bundle_obj = json.loads(Path(path_to_evidence_bundle).read_text(encoding="utf-8"))
         if not include_features:
             strip_feature_fields(bundle_obj)  # no feature-interp component => no feature leak
+        strip_source_fields(bundle_obj, source)  # master bundle -> the run's evidence source
         bundle_text = json.dumps(
             bundle_obj, ensure_ascii=False
         )  # minify JSON; has no effect on readability for LLMs + saves tokens
@@ -392,6 +394,7 @@ class AnthropicClient(LLMClientBase):
         cluster_to_prompt_map: dict[str, str],
         system_prompt: str,
         include_features: bool = False,
+        source: str = "both",
     ) -> list[str]:
         """
         Returns a list of Request objects for the Anthropic batch messages API.
@@ -399,7 +402,7 @@ class AnthropicClient(LLMClientBase):
         requests = [
             # NOTE: user_prompt is unique to the cluster
             self._make_single_cluster_message_request(
-                cluster_id, path_to_evidence_bundle, system_prompt, include_features
+                cluster_id, path_to_evidence_bundle, system_prompt, include_features, source
             )
             for cluster_id, path_to_evidence_bundle in cluster_to_prompt_map.items()
         ]
@@ -580,6 +583,7 @@ class AnthropicClient(LLMClientBase):
         screen_name: str | None = None,
         max_retries: int = 3,
         include_features: bool = False,
+        source: str = "both",
     ) -> tuple[dict | None, dict]:
         """Single entry point for cluster analysis.
 
@@ -587,7 +591,10 @@ class AnthropicClient(LLMClientBase):
         phenotypic strength) in batch evidence bundles; by default they are
         stripped so runs without a feature-interpretation prompt component
         never leak features into the prompt. Per-request, not client state,
-        so one client can serve both kinds of requests.
+        so one client can serve both kinds of requests. source reduces each
+        batch bundle to one evidence source's view at request build
+        (strip_source_fields; "both" is the master passthrough) -- same
+        per-request contract as include_features.
 
         Routes on (mode, mcp, batch) — always returns (parsed, raw_outputs):
 
@@ -617,6 +624,7 @@ class AnthropicClient(LLMClientBase):
                 cluster_to_prompt_map=cluster_to_prompt_map,
                 screen_name=screen_name,
                 include_features=include_features,
+                source=source,
             )
 
         if user_prompt is None:
@@ -986,13 +994,14 @@ class AnthropicClient(LLMClientBase):
         cluster_to_prompt_map: dict[str, str],
         screen_name: str,
         include_features: bool = False,
+        source: str = "both",
     ) -> tuple[None, dict]:
         """Submit + poll + retrieve a message batch. Per-cluster results write
         to disk; returns (None, raw_outputs) where raw_outputs carries batch_id
         and any errored custom_ids."""
         client = anthropic.Anthropic(api_key=self.api_key)
         request_list = self._make_list_of_cluster_request_objs(
-            cluster_to_prompt_map, system_prompt, include_features
+            cluster_to_prompt_map, system_prompt, include_features, source
         )
         message_batch = client.messages.batches.create(requests=request_list)
         batch_id = message_batch.id
