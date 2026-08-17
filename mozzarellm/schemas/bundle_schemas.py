@@ -101,6 +101,7 @@ class BundleGene(SemiFlexModel):
     # canonical, per-gene annotations (e.g. Uniprot functional annotations)
     UniProt_functional_annotation: str | None = None
     affinage_functional_annotation: str | None = None
+    affinage_audit_note: str | None = None
 
 
 # Main schema model
