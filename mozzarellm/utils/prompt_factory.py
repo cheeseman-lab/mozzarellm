@@ -238,12 +238,18 @@ def make_cluster_analysis_system_prompt(
 FEATURE_FIELDS = ("up_features", "down_features", "phenotypic_strength")
 
 
-def strip_feature_fields(bundle_obj: dict) -> None:
-    """Remove screen-derived feature data from an evidence bundle in place."""
+def strip_feature_fields(bundle_obj: dict, fields: tuple[str, ...] = FEATURE_FIELDS) -> None:
+    """Remove screen-derived feature data from an evidence bundle in place.
+
+    fields names the per-gene feature columns to remove; the default matches
+    the standard builder output. Bundles built with custom feature_columns
+    (build_evidence_bundles) must pass their own names or those columns
+    survive the strip.
+    """
     bundle_obj.pop("feature_coherence", None)
     for gene in bundle_obj.get("cluster_genes", []):
         if isinstance(gene, dict):
-            for field in FEATURE_FIELDS:
+            for field in fields:
                 gene.pop(field, None)
 
 
