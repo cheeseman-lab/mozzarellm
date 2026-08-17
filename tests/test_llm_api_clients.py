@@ -79,3 +79,50 @@ def test_capability_lookup_falls_back_offline():
         assert llm._model_supports_enabled_thinking("claude-sonnet-5", None) is False
         assert llm._model_supports_enabled_thinking("claude-sonnet-4-5", None) is True
     llm._THINKING_SUPPORT_CACHE.clear()
+
+def test_resolved_params_records_the_full_outcome():
+    c = _client(
+        "claude-sonnet-5", temperature=0.2, top_p=0.9, top_k=40,
+        stop_sequences=["END"], thinking=False,
+    )
+    c._resolve_params()
+    assert c.resolved_params == {
+        "sent": {"stop_sequences": ["END"]},
+        "dropped": ["temperature", "top_p", "top_k"],
+        "thinking": "disabled",
+    }
+
+
+def test_resolution_happens_once_and_is_stable():
+    c = _client("claude-sonnet-4-5", temperature=0.2)
+    assert c._sampling_kwargs()["temperature"] == 0.2
+    c.temperature = 0.9  # post-resolution mutation must not change what is sent
+    assert c._sampling_kwargs()["temperature"] == 0.2
+    assert c.resolved_params["sent"]["temperature"] == 0.2
+
+
+def test_thinking_capability_lookup_is_cached_per_model():
+    llm._THINKING_SUPPORT_CACHE.clear()
+    calls = []
+
+    class _Models:
+        def retrieve(self, model):
+            calls.append(model)
+            return SimpleNamespace(
+                capabilities={"thinking": {"types": {"enabled": {"supported": True}}}}
+            )
+
+    with patch.object(llm.anthropic, "Anthropic", return_value=SimpleNamespace(models=_Models())):
+        assert llm._model_supports_enabled_thinking("claude-sonnet-4-5", "k") is True
+        assert llm._model_supports_enabled_thinking("claude-sonnet-4-5", "k") is True
+    assert calls == ["claude-sonnet-4-5"]
+    llm._THINKING_SUPPORT_CACHE.clear()
+
+
+def test_enabled_thinking_budget_stays_within_max_tokens():
+    with patch.object(llm, "_model_supports_enabled_thinking", return_value=True):
+        c = _client("claude-sonnet-4-5", thinking=True, max_tokens=1500)
+        budget = c._thinking_kwarg()["thinking"]["budget_tokens"]
+    assert 1024 <= budget < 1500
+    assert c.resolved_params["thinking"] == "enabled"
+
