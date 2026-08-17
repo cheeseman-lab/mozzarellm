@@ -151,3 +151,38 @@ def test_batch_request_gate(tmp_path):
         assert field not in _bundle_text(off), field
         assert field in _bundle_text(on), field
     assert "does a thing" in _bundle_text(off)
+
+
+def test_batch_request_source_gate(tmp_path):
+    # The source gate must also hold on the client's batch-request path, where
+    # it is a per-request parameter (default: "both" passthrough), mirroring
+    # the include_features contract.
+    from mozzarellm.clients.llm_api_clients import AnthropicClient
+
+    bundle = {
+        "screen_name": "s1",
+        "cluster_id": "1",
+        "cluster_genes": [
+            {
+                "gene_symbol": "G1",
+                "UniProt_functional_annotation": "uni text",
+                "affinage_functional_annotation": "aff text",
+                "affinage_audit_note": "flagged",
+            }
+        ],
+    }
+    bp = tmp_path / "bundle.json"
+    bp.write_text(json.dumps(bundle))
+    client = AnthropicClient(model="claude-sonnet-5", api_key="test-key")
+
+    def _bundle_text(request) -> str:
+        return request["params"]["messages"][0]["content"][0]["text"]
+
+    both = client._make_single_cluster_message_request("1", str(bp), "sys")
+    uni = client._make_single_cluster_message_request("1", str(bp), "sys", source="uniprot")
+    aff = client._make_single_cluster_message_request("1", str(bp), "sys", source="affinage")
+    assert "uni text" in _bundle_text(both) and "aff text" in _bundle_text(both)
+    assert "uni text" in _bundle_text(uni) and "aff text" not in _bundle_text(uni)
+    assert "aff text" in _bundle_text(aff) and "uni text" not in _bundle_text(aff)
+    assert "flagged" in _bundle_text(aff) and "flagged" not in _bundle_text(uni)
+
