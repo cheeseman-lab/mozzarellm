@@ -186,3 +186,19 @@ def test_batch_request_source_gate(tmp_path):
     assert "aff text" in _bundle_text(aff) and "uni text" not in _bundle_text(aff)
     assert "flagged" in _bundle_text(aff) and "flagged" not in _bundle_text(uni)
 
+def test_strip_feature_fields_accepts_custom_field_names():
+    # Bundles built with custom feature_columns carry those names per gene;
+    # the strip must take the field set as a parameter or they would leak.
+    bundle = {
+        "cluster_genes": [
+            {"gene_symbol": "G1", "my_morphology_score": "1.2", "up_features": "cell_x"}
+        ]
+    }
+    strip_feature_fields(bundle)  # default set: custom column survives (the documented boundary)
+    assert bundle["cluster_genes"][0]["my_morphology_score"] == "1.2"
+    assert "up_features" not in bundle["cluster_genes"][0]
+
+    bundle2 = {"cluster_genes": [{"gene_symbol": "G1", "my_morphology_score": "1.2"}]}
+    strip_feature_fields(bundle2, fields=("my_morphology_score",))
+    assert "my_morphology_score" not in bundle2["cluster_genes"][0]
+
