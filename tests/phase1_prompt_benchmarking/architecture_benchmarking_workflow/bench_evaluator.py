@@ -32,17 +32,6 @@ from typing import Any
 
 import pandas as pd
 
-# Optional semantic pathway scoring via sentence-transformers.
-# Degrades gracefully: if not installed, semantic columns are omitted and
-# a single informational message is printed.
-try:
-    import numpy as _np
-    from sentence_transformers import SentenceTransformer
-
-    _SEMANTIC_AVAILABLE = True
-except ImportError:
-    _SEMANTIC_AVAILABLE = False
-
 _SEMANTIC_MODEL_NAME = "all-MiniLM-L6-v2"
 _semantic_model: Any = None  # lazy-loaded on first use
 
@@ -84,6 +73,16 @@ _RUN_ID_RE = re.compile(r"^(?P<screen>.+)__cluster_(?P<cluster>[^_]+)__rep_(?P<r
 # category -- if the model won't commit, don't reward the more-established call.
 # (The output floor enforces single-labeling; this is the fallback for residuals.)
 _HEDGE_PRIORITY = {"UNCHARACTERIZED": 0, "NOVEL_ROLE": 1, "ESTABLISHED": 2}
+
+# Generic words stripped before testing whether reviewers' free-text pathway
+# labels share a content keyword (approximate cluster-level concordance).
+_PATHWAY_STOPWORDS = frozenset(
+    (
+        "and", "the", "through", "function", "related", "cell", "cellular",
+        "process", "complex", "pathway", "regulation", "activity", "protein",
+        "genes", "gene", "role", "roles", "involved",
+    )
+)
 
 
 def _norm_str(x: Any) -> str:
@@ -205,107 +204,130 @@ def pathway_loose_match(predicted: str, experts: list[str]) -> bool:
     return False
 
 
+def _semantic_available() -> bool:
+    """Whether sentence-transformers is importable (checked without importing torch)."""
+    import importlib.util
+
+    return importlib.util.find_spec("sentence_transformers") is not None
+
+
 def _get_semantic_model() -> Any:
     """Lazy-load the sentence-transformer model (~80 MB download on first use)."""
     global _semantic_model
     if _semantic_model is None:
-        print(f"  [semantic] Loading {_SEMANTIC_MODEL_NAME} (downloads ~80 MB on first use)...")
+        from sentence_transformers import SentenceTransformer
+
         _semantic_model = SentenceTransformer(_SEMANTIC_MODEL_NAME)
     return _semantic_model
 
 
-def compute_semantic_scores(
-    joined: pd.DataFrame,
-    reviewers: tuple[str, ...],
-    threshold: float = 0.70,
-) -> pd.DataFrame:
-    """Batch-encode all pathway strings and annotate with per-gene semantic similarity.
+def _max_cosine(predicted: str, experts: list[str], model) -> float | None:
+    """Max cosine similarity of the prediction to any expert pathway, or None."""
+    import numpy as np
 
-    Adds two columns to the returned DataFrame:
-    - pathway_semantic_score: max cosine similarity to any active reviewer's
-      nominated_pathway (float, NaN when either side is empty)
-    - pathway_semantic_match: score >= threshold (bool)
+    exp = [e.strip() for e in experts if e and e.strip()]
+    pred = (predicted or "").strip()
+    if not pred or not exp:
+        return None
+    emb = model.encode([pred, *exp], convert_to_tensor=False, show_progress_bar=False)
+    emb = np.asarray(emb)
+    emb = emb / np.maximum(np.linalg.norm(emb, axis=1, keepdims=True), 1e-9)
+    sims = emb[1:] @ emb[0]
+    return round(float(sims.max()), 3)
 
-    All unique non-empty pathway strings (predicted + all reviewer nominations)
-    are encoded in a single batch call — one model forward pass regardless of
-    the number of routes or rows.
 
-    Returns joined unchanged (NaN/False semantic columns) when sentence-transformers
-    is not installed.
+def _pathway_keywords(text: str) -> set[str]:
+    """5-char stems of content words (minus generic terms) from a free-text pathway.
+
+    Stemming to a 5-char prefix lets morphological variants match (mitochondria /
+    mitochondrial, splice / splicing) so cluster-level pathway concordance isn't
+    lost to wording differences.
     """
-    out = joined.copy()
-    nan_fill = [float("nan")] * len(out)
-    false_fill = [False] * len(out)
+    toks = set(re.findall(r"[a-z]{4,}", text.lower())) - _PATHWAY_STOPWORDS
+    return {t[:5] for t in toks}
 
-    if not _SEMANTIC_AVAILABLE:
-        out["pathway_semantic_score"] = nan_fill
-        out["pathway_semantic_match"] = false_fill
-        return out
 
-    model = _get_semantic_model()
-    expert_cols = [f"nominated_pathway_{r}" for r in reviewers]
+def cluster_dominant_process(
+    run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> dict[tuple, str]:
+    """Modal `dominant_process` per (screen, cluster) across replicates for one condition.
 
-    # Collect all unique non-empty strings across predictions + all expert columns.
-    all_strings: set[str] = set()
-    for s in out["pathway"].dropna():
-        s = str(s).strip()
-        if s:
-            all_strings.add(s)
-    for col in expert_cols:
-        if col in out.columns:
-            for s in out[col].dropna():
-                s = str(s).strip()
-                if s:
-                    all_strings.add(s)
+    Route filtering mirrors score_run.
+    """
+    votes: dict[tuple, Counter] = defaultdict(Counter)
+    with open(Path(run_dir) / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
+            parsed = cell.get("parsed_output")
+            if parsed is None:
+                continue
+            process = parsed.get("dominant_process")
+            if not process:
+                continue
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            votes[(screen, cluster)][process] += 1
+    return {k: v.most_common(1)[0][0] for k, v in votes.items()}
 
-    if not all_strings:
-        out["pathway_semantic_score"] = nan_fill
-        out["pathway_semantic_match"] = false_fill
-        return out
 
-    str_list = sorted(all_strings)
-    str_to_idx = {s: i for i, s in enumerate(str_list)}
+def pathway_diagnostics(
+    run_dir: Path,
+    gt: dict,
+    reviewer_csvs: dict[str, Path],
+    condition: str,
+    threshold: float = 0.70,
+    use_semantic: bool | None = None,
+) -> dict:
+    """Per-cluster pathway agreement for one condition: substring / loose / semantic.
 
-    print(
-        f"  [semantic] Encoding {len(str_list)} unique pathway strings "
-        f"with {_SEMANTIC_MODEL_NAME}..."
-    )
-    # numpy arrays (n_strings, d) — avoids torch tensor handling entirely.
-    embeddings = model.encode(str_list, convert_to_tensor=False, show_progress_bar=False)
-    # Pre-normalise all rows once so similarity = dot product.
-    norms = _np.linalg.norm(embeddings, axis=1, keepdims=True)
-    embeddings = embeddings / _np.maximum(norms, 1e-9)
+    The model's modal dominant_process for each real cluster is compared to the
+    reviewers' nominated pathways. `use_semantic` defaults to whether
+    sentence-transformers is installed; pass False to skip the model load (tests).
+    """
+    if use_semantic is None:
+        use_semantic = _semantic_available()
+    model = _get_semantic_model() if use_semantic else None
 
-    scores: list[float] = []
-    for _, row in out.iterrows():
-        pred = str(row.get("pathway") or "").strip()
-        if not pred or pred not in str_to_idx:
-            scores.append(float("nan"))
-            continue
+    model_pw = cluster_dominant_process(run_dir, route_equals=condition)
+    _, _, reviewer_pw, _ = _read_annotations(reviewer_csvs, gt)  # {(screen, cluster): {rev: text}}
 
-        expert_indices = [
-            str_to_idx[str(row.get(col) or "").strip()]
-            for col in expert_cols
-            if str(row.get(col) or "").strip() in str_to_idx
-        ]
-        if not expert_indices:
-            scores.append(float("nan"))
-            continue
+    per_cluster: dict[str, dict] = {}
+    for key, experts_map in reviewer_pw.items():
+        pred = model_pw.get(key, "")
+        experts = [v for v in experts_map.values() if v]
+        score = _max_cosine(pred, experts, model) if model else None
+        per_cluster[f"{key[0]}/{key[1]}"] = {
+            "predicted": pred,
+            "substring": pathway_substring_match(pred, experts),
+            "loose": pathway_loose_match(pred, experts),
+            "semantic_score": score,
+            "semantic_match": score is not None and score >= threshold,
+        }
 
-        pred_vec = embeddings[str_to_idx[pred]]  # (d,) normalised
-        exp_vecs = embeddings[expert_indices]  # (n, d) normalised
-        sims = exp_vecs @ pred_vec  # (n,) dot products = cosine sims
-        scores.append(round(float(_np.max(sims)), 3))
+    n = len(per_cluster)
+    scores = [c["semantic_score"] for c in per_cluster.values() if c["semantic_score"] is not None]
 
-    out["pathway_semantic_score"] = scores
-    out["pathway_semantic_match"] = [
-        bool(s >= threshold) if s == s else False  # NaN check via self-equality
-        for s in out["pathway_semantic_score"]
-    ]
-    out["pathway_semantic_match_loose"] = [
-        bool(s >= 0.60) if s == s else False for s in out["pathway_semantic_score"]
-    ]
-    return out
+    def _rate(field: str) -> float:
+        return sum(1 for c in per_cluster.values() if c[field]) / n if n else 0.0
+
+    return {
+        "condition": condition,
+        "n_clusters": n,
+        "substring_rate": round(_rate("substring"), 3),
+        "loose_rate": round(_rate("loose"), 3),
+        "semantic_mean": round(sum(scores) / len(scores), 3) if scores else None,
+        "semantic_match_rate": round(_rate("semantic_match"), 3),
+        "semantic_available": bool(model),
+        "per_cluster": per_cluster,
+    }
 
 
 def _gene_symbol(item) -> str:
@@ -591,6 +613,29 @@ def score_run(
         n=category_n,
         failures=failures,
     )
+
+
+def _read_annotations(reviewer_csvs, gt):
+    """Per real (gene / cluster) reviewer classification, subclass, pathway, web use."""
+    cat: dict[tuple, dict] = defaultdict(dict)
+    sub: dict[tuple, dict] = defaultdict(dict)
+    pathway: dict[tuple, dict] = defaultdict(dict)
+    web_rows: list[tuple[str, bool]] = []  # (consensus_class, used_web) per annotation
+    for name, path in reviewer_csvs.items():
+        with open(path) as fh:
+            for x in csv.DictReader(fh):
+                gk = (x["screen"].strip(), str(x["cluster"]).strip(), x["gene"].strip())
+                if gt.get(gk, {}).get("cluster_role") != "real":
+                    continue
+                if x.get("classification", "").strip():
+                    cat[gk][name] = x["classification"].strip()
+                if x.get("subclass", "").strip():
+                    sub[gk][name] = x["subclass"].strip()
+                pathway[(gk[0], gk[1])][name] = x.get("pathway", "").strip()
+                web_rows.append(
+                    (gt[gk].get("consensus_class", ""), x.get("used_web", "").strip().lower() == "yes")
+                )
+    return cat, sub, pathway, web_rows
 
 
 def inter_reviewer_concordance(
