@@ -20,6 +20,7 @@ from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_e
     pathway_substring_match,
     reviewer_label_sets,
     score_decoys,
+    score_run,
     source_diagnostics,
     source_preference_tally,
 )
@@ -425,3 +426,33 @@ def test_score_decoys_reports_completion(tmp_path):
     assert res.median_genes == 10.0
     assert res.expected_genes == 10 and res.completion == 1.0
     assert res.passed is True
+
+def test_duplicate_parsed_lines_cannot_inflate_counts(tmp_path):
+    # The 2026-07-16 audit's dedup guard: re-parsed/duplicated output rows must
+    # not inflate N. Votes key on (screen, cluster, gene), so a duplicated cell
+    # doubles votes but changes neither the gene count nor any modal call.
+    rec = {
+        "run_id": "e__affinage__single_call__s1__cluster_1__rep_1",
+        "route": "affinage__single_call",
+        "parsed_output": {
+            "dominant_process": "x",
+            "established_genes": ["A", "B"],
+            "novel_role_genes": [],
+            "uncharacterized_genes": [],
+            "pathway_confidence": "High",
+        },
+    }
+    gt = {
+        ("s1", "1", "A"): {"cluster_role": "real", "consensus_class": "ESTABLISHED"},
+        ("s1", "1", "B"): {"cluster_role": "real", "consensus_class": "ESTABLISHED"},
+    }
+    once = tmp_path / "once"
+    twice = tmp_path / "twice"
+    for d, n in ((once, 1), (twice, 3)):
+        d.mkdir()
+        (d / "parsed_outputs.jsonl").write_text((json.dumps(rec) + "\n") * n)
+    p1 = score_run(once, gt, route_equals="affinage__single_call")
+    p3 = score_run(twice, gt, route_equals="affinage__single_call")
+    assert p1.n == p3.n == 2
+    assert p1.category == p3.category == 1.0
+
