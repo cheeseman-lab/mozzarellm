@@ -1,49 +1,27 @@
-"""Cross-field evaluator: join prediction CSVs against the ground-truth CSV
-and compute per-route / per-case-type match rates.
+"""Benchmark evaluator: consensus ground truth + per-run metric generation.
 
-Consumes the gene-level prediction CSVs produced by `bench_trace_parser.py`
-(one CSV per route in an experiment directory) and joins them against
-`benchmark_inputs/benchmark_combined_expert_annotations.csv` on (screen_name,
-cluster_id, gene_symbol).
+Builds consensus ground truth from the raw per-reviewer annotations
+(>=2-of-3 majority classification, ordinal-median subclass, majority coherence)
+and scores a run's parsed_outputs.jsonl against it:
 
-Match flags are computed against human reviewers; operon is excluded by default
-because it is an LLM annotator. Consensus is recomputed from the active reviewers
-so the scored reviewer set can be changed if needed via --reviewers.
+- per-run scoring: gene-category recall by modal vote across replicates (a
+  hedged gene resolves to the less-high call), novel/uncharacterized subclass,
+  and cluster coherence -> MetricPanel;
+- decoy validation: abstain/functional expectations on the negative-control
+  clusters, with output-completeness reporting;
+- diagnostics: per-consensus-class recall, lenient any-reviewer recall,
+  inter-reviewer concordance (pairwise / Fleiss / by level), the reviewers'
+  de-blinded source-preference tally, and audit-flag engagement;
+- pathway agreement: the model's modal dominant process vs reviewers' nominated
+  pathways (substring / bidirectional substring / optional semantic cosine via
+  a sentence-transformer).
 
-With three reviewers, classification is scored three ways so concordance is
-visible:
-- classification_match_{r}: vs each reviewer individually
-- classification_match_either: matches at least one reviewer (ceiling 100%)
-- classification_match_consensus: matches the agreed label, scored only on genes
-  where all active reviewers agree (None elsewhere; ceiling 100% on that subset)
-- experts_agree: do the active reviewers unanimously agree (the per-gene ceiling)
-
-Aggregates per route and per (route x case_type), emits (the prefix auto-derives
-from the experiment-dir phase folder: arch/ord/word/comp -> '<phase>_eval', e.g.
-arch_eval_*; falls back to 'eval' if no phase is detected, or override with
---output-prefix):
-- <prefix>_per_gene.csv
-- <prefix>_per_route.csv
-- <prefix>_per_route_per_case_type.csv
-- <prefix>_report.md
-
-Ground-truth CSV column conventions (benchmark_combined_expert_annotations.csv):
-- Reviewer classification:  expert_classification_{r}
-- Reviewer pathway:         nominated_pathway_{r}
-- Reviewer confidence:      pathway_confidence_{r}
-- Case type column:         benchmark_case_type
-- Screen name column:       sheet  (renamed to screen_name on load)
-
-Usage:
-    python -m architecture_benchmarking_workflow.bench_evaluator \\
-        --experiment-dir benchmarking_outputs/1.arch/<experiment_id> \\
-        --ground-truth benchmark_inputs/benchmark_combined_expert_annotations.csv \\
-        --reviewers eric,iain,liz
+Library consumed by the pipeline runners -- no CLI. State files written by the
+runners are the record; nothing is re-derived downstream.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 from collections import Counter
 from pathlib import Path
@@ -72,31 +50,6 @@ DEFAULT_GROUND_TRUTH = PHASE_DIR / "benchmark_inputs" / "benchmark_combined_expe
 # LLM annotator, so including it makes the benchmark LLM-evaluating-LLM.
 DEFAULT_REVIEWERS = ("eric", "iain", "liz")
 JOIN_KEYS = ("screen_name", "cluster_id", "gene_symbol")
-
-# Phase prefixes derived from the experiment-dir path so eval outputs from each
-# benchmark phase (architecture / order / wording) are distinguishable. Keyed by
-# a substring matched against the path components of --experiment-dir.
-_PHASE_PREFIX_MARKERS = (
-    ("arch", "arch"),
-    ("order", "ord"),
-    ("word", "word"),
-    ("comp", "comp"),
-)
-
-
-def _detect_phase_prefix(experiment_dir: Path) -> str:
-    """Infer a phase prefix (arch/ord/word/comp) from the experiment-dir path.
-
-    Scans the parent path components (excluding the experiment-id leaf, which may
-    itself contain phase-like tokens). Returns "" if no phase folder is matched.
-    """
-    parts = [p.lower() for p in experiment_dir.resolve().parts[:-1]]
-    for part in parts:
-        for marker, prefix in _PHASE_PREFIX_MARKERS:
-            if marker in part:
-                return prefix
-    return ""
-
 
 # Stable suffixes of evaluator output CSVs (independent of the phase prefix), used
 # to exclude them when globbing prediction CSVs so re-runs don't re-ingest them.
@@ -558,141 +511,6 @@ def inter_reviewer_concordance(
     return stats
 
 
-def _df_to_markdown(df: pd.DataFrame) -> str:
-    """Render a DataFrame as a Markdown table without requiring `tabulate`."""
-    if df.empty:
-        return "_(empty)_"
-
-    def _fmt(v: Any) -> str:
-        if isinstance(v, float):
-            return f"{v:.3f}" if not pd.isna(v) else "—"
-        if pd.isna(v):
-            return "—"
-        return str(v)
-
-    cols = list(df.columns)
-    rows = [[_fmt(v) for v in row] for row in df.itertuples(index=False)]
-    header = "| " + " | ".join(cols) + " |"
-    sep = "| " + " | ".join(["---"] * len(cols)) + " |"
-    body = ["| " + " | ".join(row) + " |" for row in rows]
-    return "\n".join([header, sep, *body])
-
-
-def write_report(
-    out_path: Path,
-    experiment_dir: Path,
-    ground_truth_path: Path,
-    reviewers: tuple[str, ...],
-    joined: pd.DataFrame,
-    per_route: pd.DataFrame,
-    per_route_case_type: pd.DataFrame,
-    concordance: dict[str, float],
-    negative_abstention: pd.DataFrame | None = None,
-    coverage: pd.DataFrame | None = None,
-    output_fragility: pd.DataFrame | None = None,
-) -> None:
-    n_genes = len(joined)
-    n_routes = joined["route"].nunique()
-    n_clusters = joined[["screen_name", "cluster_id"]].drop_duplicates().shape[0]
-    rev_str = " + ".join(reviewers)
-    sections = []
-    sections.append(f"# Evaluation report — `{experiment_dir.name}`\n")
-    sections.append(f"- Experiment dir: `{experiment_dir}`")
-    sections.append(f"- Ground truth: `{ground_truth_path}`")
-    sections.append(f"- Reviewers scored: **{rev_str}** (operon excluded — LLM annotator)")
-    sections.append(f"- Joined rows: {n_genes}  ({n_routes} routes × {n_clusters} clusters)\n")
-
-    sections.append("## Inter-reviewer concordance (scoring ceiling)")
-    sections.append(
-        "Classification agreement among reviewers — a model cannot exceed this when "
-        "scored against a consensus that requires agreement."
-    )
-    sections.append(_df_to_markdown(pd.DataFrame([concordance])))
-    sections.append("")
-
-    sections.append("## How classification is scored")
-    for r in reviewers:
-        sections.append(f"- `classification_match_{r}`: vs reviewer {r} individually.")
-    sections.append(
-        "- `classification_match_either`: prediction matches at least one reviewer (ceiling 100%)."
-    )
-    sections.append(
-        "- `classification_match_consensus`: matches the agreed label, scored ONLY on genes "
-        "where all active reviewers agree (`_n` column gives the applicable count; ceiling 100% "
-        "on that subset)."
-    )
-    sections.append("")
-
-    sections.append("## Heuristics (caveats)")
-    sections.append(
-        "- `pathway_match_substring`: any active expert's `nominated_pathway` is a "
-        "case-insensitive substring of the predicted `pathway`. Model names are typically "
-        "verbose; expert names short. Imperfect."
-    )
-    sections.append("- `pathway_match_loose`: bidirectional substring (catches inverse cases).")
-    sections.append(
-        f"- `confidence_consensus_match`: mode of `pathway_confidence_*` over {rev_str}; "
-        "ties broken toward higher confidence."
-    )
-    sections.append(
-        "- `subclass_match`: counted only for genes whose recomputed consensus is "
-        "NOVEL_ROLE or UNCHARACTERIZED."
-    )
-    if "pathway_semantic_match_rate" in per_route.columns:
-        sections.append(
-            f"- `pathway_semantic_score` / `pathway_semantic_match`: cosine similarity "
-            f"between predicted pathway and each active reviewer's `nominated_pathway`, "
-            f"encoded with `{_SEMANTIC_MODEL_NAME}`. `pathway_semantic_match` = score ≥ "
-            f"threshold (see CLI `--semantic-threshold`). NaN when either side is empty."
-        )
-    else:
-        sections.append(
-            "- Semantic pathway scoring skipped (install `sentence-transformers` and "
-            "omit `--no-semantic` to enable)."
-        )
-    sections.append("")
-
-    sections.append("## Per-route match rates")
-    sections.append(_df_to_markdown(per_route))
-    sections.append("")
-
-    sections.append("## Per-route × per-case-type match rates")
-    sections.append(_df_to_markdown(per_route_case_type))
-    sections.append("")
-
-    if coverage is not None and not coverage.empty:
-        sections.append("## Coverage (unique gene symbols)")
-        sections.append(
-            "`coverage_rate_all` across every cluster; `_real` excludes shuffled "
-            "negative controls; `_categorized` also excludes clusters where "
-            "`benchmark_case_type` is NaN (PI consensus failed)."
-        )
-        sections.append(_df_to_markdown(coverage))
-        sections.append("")
-
-    if negative_abstention is not None and not negative_abstention.empty:
-        sections.append("## Negative-control abstention")
-        sections.append(
-            "Per-route abstention on the shuffled negative-control clusters. "
-            "`abstain` = dominant_process contains 'no coherent' AND confidence is "
-            "Low AND all three gene-classification arrays are empty."
-        )
-        sections.append(_df_to_markdown(negative_abstention))
-        sections.append("")
-
-    if output_fragility is not None and not output_fragility.empty:
-        sections.append("## Output-fragility diagnostic (jebel/0)")
-        sections.append(
-            "147-gene ribosome cluster with no expert annotations. Reports per-route "
-            "coverage and pathway-consistency (model output mentions ribosome or "
-            "translation) to surface output-structure failures on a large input."
-        )
-        sections.append(_df_to_markdown(output_fragility))
-        sections.append("")
-
-    out_path.write_text("\n".join(sections), encoding="utf-8")
-
-
 def compute_negative_abstention(experiment_dir: Path) -> pd.DataFrame:
     """Per-route abstention rate on the shuffled negative-control clusters.
 
@@ -897,161 +715,3 @@ def compute_output_fragility(preds: pd.DataFrame, clusters_csv_path: Path) -> pd
             }
         )
     return pd.DataFrame(rows)
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate prediction CSVs against ground truth.")
-    parser.add_argument(
-        "--experiment-dir",
-        type=Path,
-        required=True,
-        help="Directory containing per-route prediction CSVs (e.g. benchmarking_outputs/1.arch/<id>)",
-    )
-    parser.add_argument(
-        "--ground-truth",
-        type=Path,
-        default=DEFAULT_GROUND_TRUTH,
-        help=f"Path to ground-truth CSV (default: {DEFAULT_GROUND_TRUTH.name})",
-    )
-    parser.add_argument(
-        "--reviewers",
-        default=",".join(DEFAULT_REVIEWERS),
-        help=(
-            f"Comma-separated reviewers to score against "
-            f"(default '{','.join(DEFAULT_REVIEWERS)}'; operon excluded — LLM annotator)."
-        ),
-    )
-    parser.add_argument(
-        "--output-prefix",
-        default=None,
-        help=(
-            "Prefix for output files. Default auto-derives from the experiment-dir "
-            "phase folder → '<phase>_eval' (arch/ord/word/comp), e.g. "
-            "arch_eval_per_gene.csv; falls back to 'eval' if no phase is detected."
-        ),
-    )
-    parser.add_argument(
-        "--semantic-threshold",
-        type=float,
-        default=0.70,
-        help=(
-            "Cosine similarity threshold for pathway_semantic_match (default 0.70). "
-            "Requires sentence-transformers."
-        ),
-    )
-    parser.add_argument(
-        "--no-semantic",
-        action="store_true",
-        default=False,
-        help="Disable semantic pathway scoring even if sentence-transformers is installed.",
-    )
-    args = parser.parse_args()
-
-    reviewers = tuple(r.strip() for r in args.reviewers.split(",") if r.strip())
-    if not reviewers:
-        print("  [ERROR] No reviewers specified.")
-        return 1
-
-    preds = load_predictions(args.experiment_dir)
-    gt = load_ground_truth(args.ground_truth)
-
-    missing_gt = [
-        f"expert_classification_{r}"
-        for r in reviewers
-        if f"expert_classification_{r}" not in gt.columns
-    ]
-    if missing_gt:
-        print(f"  [ERROR] Ground truth missing reviewer columns: {missing_gt}")
-        return 1
-
-    joined = preds.merge(gt, on=list(JOIN_KEYS), how="inner", suffixes=("", "_gt"))
-    if len(joined) == 0:
-        print(
-            f"  [WARN] No rows joined. predictions={len(preds)} ground_truth={len(gt)}\n"
-            f"  Check that (screen_name, cluster_id, gene_symbol) match between sources."
-        )
-        return 1
-
-    print(
-        f"Joined {len(joined)} rows ({preds['route'].nunique()} routes × "
-        f"{joined[['screen_name', 'cluster_id']].drop_duplicates().shape[0]} clusters). "
-        f"Reviewers: {', '.join(reviewers)}."
-    )
-
-    joined = annotate_matches(joined, reviewers)
-
-    use_semantic = _SEMANTIC_AVAILABLE and not args.no_semantic
-    if use_semantic:
-        joined = compute_semantic_scores(joined, reviewers, threshold=args.semantic_threshold)
-    elif not _SEMANTIC_AVAILABLE and not args.no_semantic:
-        print(
-            "  [semantic] sentence-transformers not installed; "
-            "semantic scoring skipped. Install with: pip install sentence-transformers"
-        )
-
-    concordance = inter_reviewer_concordance(joined, reviewers)
-    per_route = aggregate_per_route(joined, reviewers)
-    per_route_case_type = aggregate_per_route_per_case_type(joined, reviewers)
-
-    clusters_csv_path = PHASE_DIR / "benchmark_inputs" / "benchmark_clusters.csv"
-    negative_abstention = compute_negative_abstention(args.experiment_dir)
-    coverage = compute_coverage(preds, clusters_csv_path, ground_truth=gt)
-    output_fragility = compute_output_fragility(preds, clusters_csv_path)
-
-    # Resolve output prefix: explicit --output-prefix wins; otherwise auto-derive
-    # '<phase>_eval' from the experiment-dir phase folder, falling back to 'eval'.
-    if args.output_prefix is not None:
-        output_prefix = args.output_prefix
-    else:
-        phase_prefix = _detect_phase_prefix(args.experiment_dir)
-        output_prefix = f"{phase_prefix}_eval" if phase_prefix else "eval"
-
-    per_gene_path = args.experiment_dir / f"{output_prefix}_per_gene.csv"
-    per_route_path = args.experiment_dir / f"{output_prefix}_per_route.csv"
-    per_case_type_path = args.experiment_dir / f"{output_prefix}_per_route_per_case_type.csv"
-    negative_path = args.experiment_dir / f"{output_prefix}_negative_abstention.csv"
-    coverage_path = args.experiment_dir / f"{output_prefix}_coverage.csv"
-    fragility_path = args.experiment_dir / f"{output_prefix}_output_fragility.csv"
-    report_path = args.experiment_dir / f"{output_prefix}_report.md"
-
-    joined.to_csv(per_gene_path, index=False)
-    per_route.to_csv(per_route_path, index=False)
-    per_route_case_type.to_csv(per_case_type_path, index=False)
-    if not negative_abstention.empty:
-        negative_abstention.to_csv(negative_path, index=False)
-    if not coverage.empty:
-        coverage.to_csv(coverage_path, index=False)
-    if not output_fragility.empty:
-        output_fragility.to_csv(fragility_path, index=False)
-    write_report(
-        report_path,
-        args.experiment_dir,
-        args.ground_truth,
-        reviewers,
-        joined,
-        per_route,
-        per_route_case_type,
-        concordance,
-        negative_abstention=negative_abstention if not negative_abstention.empty else None,
-        coverage=coverage if not coverage.empty else None,
-        output_fragility=output_fragility if not output_fragility.empty else None,
-    )
-
-    print(f"  per-gene:      {per_gene_path}")
-    print(f"  per-route:     {per_route_path}")
-    print(f"  per-case-type: {per_case_type_path}")
-    if not negative_abstention.empty:
-        print(f"  abstention:    {negative_path}")
-    if not coverage.empty:
-        print(f"  coverage:      {coverage_path}")
-    if not output_fragility.empty:
-        print(f"  fragility:     {fragility_path}")
-    print(f"  report:        {report_path}")
-    print(f"\n=== Inter-reviewer concordance (ceiling) ===\n  {concordance}")
-    print("\n=== Per-route match rates ===")
-    print(per_route.to_string(index=False))
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

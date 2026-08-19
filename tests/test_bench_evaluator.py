@@ -15,7 +15,6 @@ from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_e
     majority_confidence,
     pathway_substring_match,
     pathway_loose_match,
-    _detect_phase_prefix,
     annotate_matches,
     _agg_rate,
     aggregate_per_route,
@@ -148,13 +147,6 @@ class TestUtilityFunctions:
 
     def test_pathway_loose_empty_experts(self):
         assert pathway_loose_match("something", ["", ""]) is False
-
-    def test_detect_phase_prefix(self):
-        assert _detect_phase_prefix(Path("/project/1.arch/experiment_id")) == "arch"
-        assert _detect_phase_prefix(Path("/project/2.order/experiment_id")) == "ord"
-        assert _detect_phase_prefix(Path("/project/3.wording/experiment_id")) == "word"
-        assert _detect_phase_prefix(Path("/project/4.comp/experiment_id")) == "comp"
-        assert _detect_phase_prefix(Path("/project/other/experiment_id")) == ""
 
 
 # ===========================================================================
