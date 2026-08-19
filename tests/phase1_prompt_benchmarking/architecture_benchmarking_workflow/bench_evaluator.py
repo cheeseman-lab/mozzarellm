@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +45,10 @@ except ImportError:
 
 _SEMANTIC_MODEL_NAME = "all-MiniLM-L6-v2"
 _semantic_model: Any = None  # lazy-loaded on first use
+
+# Coherent-cluster gene total: the 4 coherent real clusters. The Low-coherence
+# denali/24 is demoted to abstain-only, so it and its genes are excluded here.
+N_REAL_GENES = 103
 
 # Ordinal evidence ladders per category (rank ascending = more support for the
 # call). CONTRADICTORY_EVIDENCE sits at the bottom of the NOVEL_ROLE ladder --
@@ -72,18 +78,12 @@ REAL_COLUMNS = [
     "pref_neither",
 ]
 
-JOIN_KEYS = ("screen_name", "cluster_id", "gene_symbol")
+_RUN_ID_RE = re.compile(r"^(?P<screen>.+)__cluster_(?P<cluster>[^_]+)__rep_(?P<rep>.+)$")
 
-# Stable suffixes of evaluator output CSVs (independent of the phase prefix), used
-# to exclude them when globbing prediction CSVs so re-runs don't re-ingest them.
-_EVAL_OUTPUT_SUFFIXES = (
-    "_per_gene.csv",
-    "_per_route.csv",
-    "_per_route_per_case_type.csv",
-    "_negative_abstention.csv",
-    "_coverage.csv",
-    "_output_fragility.csv",
-)
+# A gene hedged across category lists resolves to the LESS-HIGH (more conservative)
+# category -- if the model won't commit, don't reward the more-established call.
+# (The output floor enforces single-labeling; this is the fallback for residuals.)
+_HEDGE_PRIORITY = {"UNCHARACTERIZED": 0, "NOVEL_ROLE": 1, "ESTABLISHED": 2}
 
 # Shuffled clusters carry no expert pathway annotation by construction; scored
 # on whether the model correctly emits "no coherent pathway" + empty arrays.
@@ -96,20 +96,6 @@ NEGATIVE_CLUSTERS = (
 # Output-fragility diagnostic: a large coherent cluster (jebel/0, 147 genes)
 # with no expert annotations. Reported separately from accuracy / abstention.
 OUTPUT_FRAGILITY_CLUSTER = ("jebel", "0")
-
-# Columns in the prediction CSVs we always expect (from bench_trace_parser.py)
-PRED_COLS_REQUIRED = (
-    "screen_name",
-    "cluster_id",
-    "gene_symbol",
-    "route",
-    "replicate",
-    "run_id",
-    "predicted_class",
-    "predicted_subclass",
-    "pathway",
-    "pathway_confidence",
-)
 
 
 def _norm_str(x: Any) -> str:
@@ -334,37 +320,101 @@ def compute_semantic_scores(
     return out
 
 
-def load_predictions(experiment_dir: Path) -> pd.DataFrame:
-    """Stack every prediction CSV in the experiment dir into one frame.
+def _gene_symbol(item) -> str:
+    """Normalize an established_genes entry to a bare gene symbol."""
+    if isinstance(item, dict):
+        return next(iter(item))
+    return item
 
-    Excludes eval_*.csv (evaluator outputs) and aggregate_summary.csv.
+
+def _parse_run_id(run_id: str, route: str) -> tuple[str, str]:
+    """Extract (screen, cluster) from a run_id, anchored on the cell's own route."""
+    marker = f"__{route}__"
+    idx = run_id.find(marker)
+    if idx == -1:
+        raise ValueError(f"route {route!r} not found in run_id {run_id!r}")
+    remainder = run_id[idx + len(marker) :]
+    match = _RUN_ID_RE.match(remainder)
+    if not match:
+        raise ValueError(f"could not parse screen/cluster from run_id {run_id!r}")
+    return match.group("screen"), match.group("cluster")
+
+
+def _accumulate_votes(
+    run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> tuple[dict, dict, dict, int]:
+    """Fold parsed_outputs.jsonl into per-gene / per-cluster vote tallies.
+
+    Shared by score_run and gene_modal_categories so both apply the identical
+    route filter and self-contradiction drop rule. Returns
+    (gene_votes, subclass_votes, cluster_confidence_votes, failures).
     """
-    csvs = sorted(experiment_dir.glob("*.csv"))
-    # Exclude evaluator outputs (any prefix, e.g. eval_*, arch_eval_*) by their
-    # stable suffixes, plus the aggregate summary, so re-runs never re-ingest them.
-    csvs = [
-        c
-        for c in csvs
-        if not c.name.startswith("eval_")
-        and not c.name.endswith(_EVAL_OUTPUT_SUFFIXES)
-        and c.name != "aggregate_summary.csv"
-    ]
-    if not csvs:
-        raise FileNotFoundError(
-            f"No per-route prediction CSVs in {experiment_dir}. "
-            f"Run bench_trace_parser.py first to generate them."
-        )
-    frames = []
-    for c in csvs:
-        df = pd.read_csv(c, dtype={"cluster_id": str, "gene_symbol": str})
-        missing = [col for col in PRED_COLS_REQUIRED if col not in df.columns]
-        if missing:
-            raise ValueError(f"{c.name} missing required columns: {missing}")
-        frames.append(df)
-    out = pd.concat(frames, ignore_index=True)
-    for k in JOIN_KEYS:
-        out[k] = out[k].astype(str).str.strip()
-    return out
+    gene_votes: dict[tuple, Counter] = defaultdict(Counter)
+    subclass_votes: dict[tuple, dict] = defaultdict(lambda: defaultdict(Counter))
+    cluster_confidence_votes: dict[tuple, Counter] = defaultdict(Counter)
+    failures = 0
+
+    with open(Path(run_dir) / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
+
+            parsed = cell.get("parsed_output")
+            if parsed is None or parsed.get("dominant_process") is None:
+                failures += 1
+                continue
+
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            cluster_key = (screen, cluster)
+
+            # A gene in more than one category list within a reply is a hedge; it
+            # resolves to the less-high category (see _HEDGE_PRIORITY). Collect this
+            # cell's per-gene category->subclass mapping first.
+            cell_categories: dict[str, dict[str, str]] = defaultdict(dict)
+
+            for item in parsed.get("established_genes") or []:
+                gene = _gene_symbol(item)
+                cell_categories[gene]["ESTABLISHED"] = ""
+
+            for item in parsed.get("novel_role_genes") or []:
+                cell_categories[item["gene"]]["NOVEL_ROLE"] = item.get("class", "")
+
+            for item in parsed.get("uncharacterized_genes") or []:
+                cell_categories[item["gene"]]["UNCHARACTERIZED"] = item.get("class", "")
+
+            for gene, categories in cell_categories.items():
+                # hedged genes resolve to the less-high category (UNCHAR > NOVEL > EST)
+                category = min(categories, key=lambda c: _HEDGE_PRIORITY.get(c, 99))
+                subclass = categories[category]
+                gene_votes[(screen, cluster, gene)][category] += 1
+                if subclass:
+                    subclass_votes[(screen, cluster, gene)][category][subclass] += 1
+
+            confidence = parsed.get("pathway_confidence")
+            if confidence:
+                cluster_confidence_votes[cluster_key][confidence] += 1
+
+    return gene_votes, subclass_votes, cluster_confidence_votes, failures
+
+
+def gene_modal_categories(
+    run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> dict[tuple, str]:
+    """Return {(screen, cluster, gene): modal category} for one condition.
+
+    The modal (most-voted) category per gene across replicates -- the same
+    per-gene call score_run scores, exposed for source-diagnostic metrics.
+    """
+    gene_votes, _, _, _ = _accumulate_votes(run_dir, route_equals, route_excludes)
+    return {k: v.most_common(1)[0][0] for k, v in gene_votes.items()}
 
 
 def build_consensus_gt(
@@ -461,90 +511,98 @@ def load_consensus_gt(csv_path: Path) -> dict[tuple, dict]:
     return result
 
 
-# Metric columns whose values may be None (scored only on applicable rows).
-NULLABLE_METRICS = ("classification_match_consensus", "subclass_match")
+@dataclass
+class MetricPanel:
+    category: float
+    novel_subclass: tuple
+    unchar_subclass: tuple
+    coherence: tuple
+    n: int
+    failures: int
 
 
-def _route_metric_cols(reviewers: tuple[str, ...]) -> list[str]:
-    cols = [
-        "classification_match_consensus",
-        "classification_match_either",
-    ]
-    cols += [f"classification_match_{r}" for r in reviewers]
-    cols += [
-        "pathway_match_substring",
-        "pathway_match_loose",
-        "confidence_consensus_match",
-        "subclass_match",
-    ]
-    return cols
+def score_run(
+    run_dir: Path,
+    gt: dict,
+    cluster_coherence: dict | None = None,
+    route_excludes: str = "mcp",
+    route_equals: str | None = None,
+) -> MetricPanel:
+    """Score one run directory's parsed_outputs.jsonl against consensus ground truth.
 
+    Route filtering: route_equals (if set) keeps only rows whose route matches
+    exactly -- isolates one cell when several share a prefix (e.g. single_call vs
+    single_call_mcp, or W5 vs W51); otherwise skip rows matching the
+    route_excludes substring.
+    """
+    run_dir = Path(run_dir)
+    gene_votes, subclass_votes, cluster_confidence_votes, failures = _accumulate_votes(
+        run_dir, route_equals, route_excludes
+    )
 
-def _agg_rate(grp: pd.DataFrame, metric: str) -> tuple[float | None, int]:
-    """Mean of a boolean/None metric column over applicable rows; returns (rate, n)."""
-    if metric in NULLABLE_METRICS:
-        applicable = grp[grp[metric].notna()]
-        n = len(applicable)
-        return (round(applicable[metric].mean(), 3) if n else None), n
-    return round(grp[metric].mean(), 3), len(grp)
+    category_correct = 0
+    category_n = 0
+    novel_correct = 0
+    novel_n = 0
+    unchar_correct = 0
+    unchar_n = 0
 
+    for (screen, cluster, gene), votes in gene_votes.items():
+        row = gt.get((screen, cluster, gene))
+        if row is None or row.get("cluster_role") != "real":
+            continue
 
-def aggregate_per_route(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.DataFrame:
-    """Per-route match rates across all genes."""
-    metric_cols = _route_metric_cols(reviewers)
-    has_semantic = "pathway_semantic_score" in joined.columns
-    rows = []
-    for route, grp in joined.groupby("route", sort=True):
-        rec: dict[str, Any] = {"route": route, "n_genes": len(grp)}
-        for m in metric_cols:
-            rate, n = _agg_rate(grp, m)
-            rec[f"{m}_rate"] = rate
-            if m in NULLABLE_METRICS:
-                rec[f"{m}_n"] = n
-        if has_semantic:
-            valid = grp["pathway_semantic_score"].dropna()
-            rec["pathway_semantic_score_mean"] = (
-                round(float(valid.mean()), 3) if len(valid) else float("nan")
-            )
-            rec["pathway_semantic_match_rate"] = round(
-                float(grp["pathway_semantic_match"].mean()), 3
-            )
-            if "pathway_semantic_match_loose" in grp.columns:
-                rec["pathway_semantic_match_loose_rate"] = round(
-                    float(grp["pathway_semantic_match_loose"].mean()), 3
-                )
-        rows.append(rec)
-    return pd.DataFrame(rows)
+        modal_category = votes.most_common(1)[0][0]
+        category_n += 1
+        consensus_class = row.get("consensus_class", "")
+        if modal_category == consensus_class:
+            category_correct += 1
 
+        consensus_subclass = row.get("consensus_subclass", "")
 
-def aggregate_per_route_per_case_type(
-    joined: pd.DataFrame, reviewers: tuple[str, ...]
-) -> pd.DataFrame:
-    """Per-route per-case-type match rates."""
-    metric_cols = [
-        "classification_match_consensus",
-        "classification_match_either",
-        "pathway_match_substring",
-        "pathway_match_loose",
-        "confidence_consensus_match",
-    ]
-    has_semantic = "pathway_semantic_score" in joined.columns
-    rows = []
-    for (route, case_type), grp in joined.groupby(["route", "benchmark_case_type"], sort=True):
-        rec = {"route": route, "case_type": case_type, "n_genes": len(grp)}
-        for m in metric_cols:
-            rate, _ = _agg_rate(grp, m)
-            rec[f"{m}_rate"] = rate
-        if has_semantic:
-            valid = grp["pathway_semantic_score"].dropna()
-            rec["pathway_semantic_score_mean"] = (
-                round(float(valid.mean()), 3) if len(valid) else float("nan")
-            )
-            rec["pathway_semantic_match_rate"] = round(
-                float(grp["pathway_semantic_match"].mean()), 3
-            )
-        rows.append(rec)
-    return pd.DataFrame(rows)
+        if (
+            consensus_class == "NOVEL_ROLE"
+            and consensus_subclass
+            and modal_category == "NOVEL_ROLE"
+        ):
+            sub_counter = subclass_votes[(screen, cluster, gene)]["NOVEL_ROLE"]
+            modal_subclass = sub_counter.most_common(1)[0][0] if sub_counter else None
+            novel_n += 1
+            if modal_subclass == consensus_subclass:
+                novel_correct += 1
+
+        if (
+            consensus_class == "UNCHARACTERIZED"
+            and consensus_subclass
+            and modal_category == "UNCHARACTERIZED"
+        ):
+            sub_counter = subclass_votes[(screen, cluster, gene)]["UNCHARACTERIZED"]
+            modal_subclass = sub_counter.most_common(1)[0][0] if sub_counter else None
+            unchar_n += 1
+            if modal_subclass == consensus_subclass:
+                unchar_correct += 1
+
+    category_score = category_correct / category_n if category_n else 0.0
+
+    coherence_correct = 0
+    coherence_n = 0
+    if cluster_coherence:
+        for cluster_key, confidence_votes in cluster_confidence_votes.items():
+            if cluster_key not in cluster_coherence:
+                continue
+            modal_confidence = confidence_votes.most_common(1)[0][0]
+            coherence_n += 1
+            if modal_confidence == cluster_coherence[cluster_key]:
+                coherence_correct += 1
+
+    return MetricPanel(
+        category=category_score,
+        novel_subclass=(novel_correct, novel_n),
+        unchar_subclass=(unchar_correct, unchar_n),
+        coherence=(coherence_correct, coherence_n),
+        n=category_n,
+        failures=failures,
+    )
 
 
 def inter_reviewer_concordance(
@@ -625,96 +683,6 @@ def compute_negative_abstention(experiment_dir: Path) -> pd.DataFrame:
                 "n_cells": len(grp),
                 "abstain_rate": round(rate, 3),
                 "fabrication_rate": round(1 - rate, 3),
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-def compute_coverage(
-    preds: pd.DataFrame,
-    clusters_csv_path: Path,
-    ground_truth: pd.DataFrame | None = None,
-) -> pd.DataFrame:
-    """Per-route coverage on unique gene symbols.
-
-    Reports three rates so the "coverage drop" signal isn't confounded by the
-    shuffled-controls case where lower coverage is correct:
-    - coverage_rate_all: across every cluster in the benchmark
-    - coverage_rate_real: excludes the shuffled negative-control clusters
-    - coverage_rate_categorized: also excludes clusters with benchmark_case_type=NaN
-      (PI consensus failed; abstaining there is a defensible call)
-    """
-    if not clusters_csv_path.exists():
-        return pd.DataFrame()
-    clusters = pd.read_csv(clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str})
-    if "sheet" in clusters.columns and "screen_name" not in clusters.columns:
-        clusters = clusters.rename(columns={"sheet": "screen_name"})
-    if not {"screen_name", "cluster_id", "gene_symbol"}.issubset(clusters.columns):
-        return pd.DataFrame()
-    expected_per_cluster = (
-        clusters.drop_duplicates(["screen_name", "cluster_id", "gene_symbol"])
-        .groupby(["screen_name", "cluster_id"])
-        .size()
-    )
-    shuffled_keys = {(s, str(c).strip()) for s, c, _ in NEGATIVE_CLUSTERS}
-    uncategorized_keys: set[tuple[str, str]] = set()
-    if ground_truth is not None and "benchmark_case_type" in ground_truth.columns:
-        defined = {
-            (s, str(c).strip())
-            for s, c in ground_truth.dropna(subset=["benchmark_case_type"])
-            .drop_duplicates(["screen_name", "cluster_id"])[["screen_name", "cluster_id"]]
-            .itertuples(index=False)
-        }
-        all_clusters = {(s, str(c).strip()) for (s, c) in expected_per_cluster.index}
-        uncategorized_keys = all_clusters - defined - shuffled_keys
-    full_expected = {(s, str(c).strip()): n for (s, c), n in expected_per_cluster.items()}
-    rows = []
-    for route, grp in preds.groupby("route", sort=True):
-        # defense/future-proofing: use actual IDs rather than range(1, N+1)
-        replicate_ids = sorted(grp["replicate"].unique())
-        per_cell = (
-            grp.groupby(["screen_name", "cluster_id", "replicate"])["gene_symbol"]
-            .nunique()
-            .reset_index(name="n_unique_pred")
-        )
-        all_pairs = [
-            (s, str(c).strip(), rep)
-            for (s, c) in expected_per_cluster.index
-            for rep in replicate_ids
-        ]
-        all_df = pd.DataFrame(all_pairs, columns=["screen_name", "cluster_id", "replicate"])
-        merged = all_df.merge(per_cell, on=["screen_name", "cluster_id", "replicate"], how="left")
-        merged["n_unique_pred"] = merged["n_unique_pred"].fillna(0)
-        merged["expected"] = merged.apply(
-            lambda r: full_expected.get((r["screen_name"], r["cluster_id"]), 0), axis=1
-        )
-        merged["is_shuffled"] = merged.apply(
-            lambda r: (r["screen_name"], r["cluster_id"]) in shuffled_keys, axis=1
-        )
-        merged["is_uncategorized"] = merged.apply(
-            lambda r: (r["screen_name"], r["cluster_id"]) in uncategorized_keys, axis=1
-        )
-        total_pred_all = int(merged["n_unique_pred"].sum())
-        total_exp_all = int(merged["expected"].sum())
-        real = merged[~merged["is_shuffled"]]
-        cat = merged[~merged["is_shuffled"] & ~merged["is_uncategorized"]]
-        rows.append(
-            {
-                "route": route,
-                "n_replicates": len(replicate_ids),
-                "coverage_rate_all": round(total_pred_all / total_exp_all, 3)
-                if total_exp_all
-                else 0.0,
-                "coverage_rate_real": round(
-                    int(real["n_unique_pred"].sum()) / int(real["expected"].sum()), 3
-                )
-                if int(real["expected"].sum())
-                else 0.0,
-                "coverage_rate_categorized": round(
-                    int(cat["n_unique_pred"].sum()) / int(cat["expected"].sum()), 3
-                )
-                if int(cat["expected"].sum())
-                else 0.0,
             }
         )
     return pd.DataFrame(rows)
