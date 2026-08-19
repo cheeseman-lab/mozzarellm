@@ -22,8 +22,9 @@ runners are the record; nothing is re-derived downstream.
 
 from __future__ import annotations
 
+import csv
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -43,12 +44,34 @@ except ImportError:
 _SEMANTIC_MODEL_NAME = "all-MiniLM-L6-v2"
 _semantic_model: Any = None  # lazy-loaded on first use
 
-PHASE_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_GROUND_TRUTH = PHASE_DIR / "benchmark_inputs" / "benchmark_combined_expert_annotations.csv"
+# Ordinal evidence ladders per category (rank ascending = more support for the
+# call). CONTRADICTORY_EVIDENCE sits at the bottom of the NOVEL_ROLE ladder --
+# most skeptical -- so a CONTRADICTORY majority is respected by the median while
+# scattered votes resolve to the conservative middle. DARK_GENE < ANNOTATED_ONLY.
+NOVEL_LADDER = {
+    "CONTRADICTORY_EVIDENCE": 0,
+    "NO_EVIDENCE": 1,
+    "INDIRECT_EVIDENCE": 2,
+    "PARTIAL_EVIDENCE": 3,
+}
+UNCHAR_LADDER = {"DARK_GENE": 0, "ANNOTATED_ONLY": 1}
+_SUBCLASS_LADDERS = {"NOVEL_ROLE": NOVEL_LADDER, "UNCHARACTERIZED": UNCHAR_LADDER}
 
-# Human reviewers used for scoring. operon is intentionally excluded — it is an
-# LLM annotator, so including it makes the benchmark LLM-evaluating-LLM.
-DEFAULT_REVIEWERS = ("eric", "iain", "liz")
+REAL_COLUMNS = [
+    "screen",
+    "cluster",
+    "cluster_role",
+    "gene",
+    "consensus_class",
+    "unanimous",
+    "n_agree",
+    "consensus_subclass",
+    "pref_affinage",
+    "pref_uniprot",
+    "pref_both",
+    "pref_neither",
+]
+
 JOIN_KEYS = ("screen_name", "cluster_id", "gene_symbol")
 
 # Stable suffixes of evaluator output CSVs (independent of the phase prefix), used
@@ -73,9 +96,6 @@ NEGATIVE_CLUSTERS = (
 # Output-fragility diagnostic: a large coherent cluster (jebel/0, 147 genes)
 # with no expert annotations. Reported separately from accuracy / abstention.
 OUTPUT_FRAGILITY_CLUSTER = ("jebel", "0")
-
-# Confidence ordering for tie-breaks (mode ties resolve toward higher confidence).
-_CONF_ORDER = {"high": 3, "medium": 2, "low": 1}
 
 # Columns in the prediction CSVs we always expect (from bench_trace_parser.py)
 PRED_COLS_REQUIRED = (
@@ -102,33 +122,87 @@ def _norm_lower(x: Any) -> str:
     return _norm_str(x).lower()
 
 
-def _norm_class(x: Any) -> str:
-    """Classification labels: trim + uppercase. Empty stays empty."""
-    return _norm_str(x).upper()
+def consensus_of(classifications: list[str]) -> tuple[str, bool, int]:
+    """Strict >=2-of-3 majority over classification labels: (winner, unanimous, n_agree).
 
-
-def consensus_of(values: list[str]) -> str:
-    """Consensus over present (non-empty) values: the agreed value if all present
-    values are equal, else "" (no consensus). Requires at least one present value."""
-    present = [v for v in values if v]
+    Returns ("", False, top_count) when no label reaches a >=2 majority (a 1-1-1
+    three-way split) -- the gene is then unresolved and excluded from consensus
+    scoring. On the 133-gene benchmark there are no such splits.
+    """
+    present = [c for c in classifications if c]
     if not present:
-        return ""
-    return present[0] if len(set(present)) == 1 else ""
+        return "", False, 0
+    counts = Counter(present)
+    winner, n_agree = counts.most_common(1)[0]
+    if n_agree < 2:
+        return "", False, n_agree
+    return winner, len(counts) == 1, n_agree
 
 
-def majority_confidence(row: pd.Series, reviewers: tuple[str, ...]) -> str:
-    """Most-frequent pathway_confidence_{r} across active reviewers. Ties resolve
-    toward higher confidence. Empty if no votes."""
-    votes = [_norm_str(row.get(f"pathway_confidence_{r}")) for r in reviewers]
-    votes = [v for v in votes if v]
-    if not votes:
+def _consensus_subclass(subclasses: list[str], consensus_class: str) -> str:
+    """Ordinal-median subclass over votes on the consensus category's ladder.
+
+    Only NOVEL_ROLE / UNCHARACTERIZED carry a subclass. Votes off the relevant
+    ladder (e.g. a NOVEL_ROLE subclass on an UNCHARACTERIZED-consensus gene) are
+    dropped; the median of the remaining ranks is taken with the lower median on
+    even counts (the more conservative call). Empty if no on-ladder vote exists.
+    """
+    ladder = _SUBCLASS_LADDERS.get(consensus_class)
+    if ladder is None:
         return ""
-    counter = Counter(votes)
-    top_count = max(counter.values())
-    top = [v for v, c in counter.items() if c == top_count]
-    if len(top) == 1:
-        return top[0]
-    return max(top, key=lambda v: _CONF_ORDER.get(v.lower(), 0))
+    ranks = sorted(ladder[s] for s in subclasses if s in ladder)
+    if not ranks:
+        return ""
+    median_rank = ranks[(len(ranks) - 1) // 2]
+    return {v: k for k, v in ladder.items()}[median_rank]
+
+
+def _coherence_label(coherence_text: str) -> str | None:
+    """Map a reviewer's free-text coherence to High/Medium/Low, or None."""
+    text = coherence_text.lower()
+    for level in ("high", "medium", "low"):
+        if level in text:
+            return level.capitalize()
+    return None
+
+
+def consensus_coherence(reviewer_csvs: dict[str, Path]) -> dict[tuple, str]:
+    """Majority-vote per-cluster coherence (High/Medium/Low) across reviewers.
+
+    Reads the cluster-level `coherence` free text from each reviewer's rows,
+    maps it to a level, and returns {(screen, cluster): level} for clusters with
+    a strict majority. Ties (e.g. one High, one Medium, one Low) are excluded.
+    """
+    per_cluster: dict[tuple, list[str]] = defaultdict(list)
+    for path in reviewer_csvs.values():
+        with open(path, newline="") as fh:
+            seen: set[tuple] = set()
+            for row in csv.DictReader(fh):
+                cluster_key = (row["screen"].strip(), row["cluster"].strip())
+                if cluster_key in seen:
+                    continue  # one coherence vote per reviewer per cluster
+                seen.add(cluster_key)
+                label = _coherence_label(row["coherence"])
+                if label:
+                    per_cluster[cluster_key].append(label)
+
+    result: dict[tuple, str] = {}
+    for cluster_key, labels in per_cluster.items():
+        counts = Counter(labels)
+        winner, top = counts.most_common(1)[0]
+        if sum(1 for c in counts.values() if c == top) == 1:
+            result[cluster_key] = winner
+    return result
+
+
+def _deblind(preferred_source: str, key_row: dict) -> str:
+    """Map a reviewer's blinded 'a'/'b' pick to its real source via the key row."""
+    choice = preferred_source.strip().lower()
+    if choice == "a":
+        return key_row["srcA_src"].strip().lower()
+    if choice == "b":
+        return key_row["srcB_src"].strip().lower()
+    return choice
 
 
 def pathway_substring_match(predicted: str, experts: list[str]) -> bool:
@@ -293,116 +367,98 @@ def load_predictions(experiment_dir: Path) -> pd.DataFrame:
     return out
 
 
-def load_ground_truth(path: Path) -> pd.DataFrame:
-    """Load the ground-truth CSV.
+def build_consensus_gt(
+    reviewer_csvs: dict[str, Path],
+    key_csv: Path,
+    decoy_specs: list[dict],
+    out_csv: Path,
+) -> None:
+    """Build the consensus ground-truth CSV from reviewer annotations + blinding key.
 
-    Renames `sheet` → `screen_name` to match the prediction CSV join key.
+    Args:
+        reviewer_csvs: mapping of reviewer name -> path to their annotation CSV.
+        key_csv: path to the blinding key (screen, cluster, gene, srcA_src,
+            srcB_src).
+        decoy_specs: list of {"screen", "cluster", "decoy_type", "genes"} dicts;
+            each gene becomes a blank negative-control row.
+        out_csv: destination path for the consensus ground-truth CSV.
     """
-    gt = pd.read_csv(path, dtype={"cluster_id": str, "gene_symbol": str})
-    if "sheet" in gt.columns and "screen_name" not in gt.columns:
-        gt = gt.rename(columns={"sheet": "screen_name"})
-    for k in JOIN_KEYS:
-        gt[k] = gt[k].astype(str).str.strip()
-    return gt
+    key: dict[tuple, dict] = {}
+    with open(key_csv, newline="") as fh:
+        for row in csv.DictReader(fh):
+            key[(row["screen"].strip(), row["cluster"].strip(), row["gene"].strip())] = row
 
+    per_gene: dict[tuple, list[dict]] = defaultdict(list)
+    for path in reviewer_csvs.values():
+        with open(path, newline="") as fh:
+            for row in csv.DictReader(fh):
+                gene_key = (row["screen"].strip(), row["cluster"].strip(), row["gene"].strip())
+                per_gene[gene_key].append(row)
 
-def annotate_matches(joined: pd.DataFrame, reviewers: tuple[str, ...]) -> pd.DataFrame:
-    """Add per-row match flag columns scored against the active reviewers."""
-    out = joined.copy()
-    out["predicted_class_norm"] = out["predicted_class"].apply(_norm_class)
+    rows = []
+    for (screen, cluster, gene), revs in per_gene.items():
+        key_row = key[(screen, cluster, gene)]
 
-    # --- Classification: per-reviewer, either, recomputed consensus ----------
-    for r in reviewers:
-        out[f"expert_class_{r}"] = out[f"expert_classification_{r}"].apply(_norm_class)
-        out[f"classification_match_{r}"] = (out[f"expert_class_{r}"] != "") & (
-            out["predicted_class_norm"] == out[f"expert_class_{r}"]
+        consensus_class, unanimous, n_agree = consensus_of(
+            [r["classification"].strip() for r in revs]
+        )
+        consensus_subclass = _consensus_subclass(
+            [r["subclass"].strip() for r in revs], consensus_class
         )
 
-    def _expert_classes(row: pd.Series) -> list[str]:
-        return [row[f"expert_class_{r}"] for r in reviewers if row[f"expert_class_{r}"]]
+        pref_counts = Counter(_deblind(r["preferred_source"], key_row) for r in revs)
 
-    out["classification_match_either"] = out.apply(
-        lambda r: r["predicted_class_norm"] != ""
-        and r["predicted_class_norm"] in _expert_classes(r),
-        axis=1,
-    )
-    out["experts_agree"] = out.apply(
-        lambda r: len(_expert_classes(r)) >= 1
-        and len(set(_expert_classes(r))) == 1
-        and len(_expert_classes(r)) == len([rv for rv in reviewers if r[f"expert_class_{rv}"]]),
-        axis=1,
-    )
-    out["consensus_class"] = out.apply(
-        lambda r: consensus_of([r[f"expert_class_{rv}"] for rv in reviewers]), axis=1
-    )
-
-    def _class_consensus(row: pd.Series) -> bool | None:
-        if not row["consensus_class"]:
-            return None  # reviewers disagree → not scored under consensus rule
-        return row["predicted_class_norm"] == row["consensus_class"]
-
-    out["classification_match_consensus"] = out.apply(_class_consensus, axis=1)
-
-    # --- Confidence: per-reviewer + majority (ties → higher) ----------------
-    # NOTE: ground truth uses pathway_confidence_{r}; predictions use pathway_confidence.
-    # After the merge, pathway_confidence = model output; pathway_confidence_{r} = expert.
-    out["majority_expert_confidence"] = out.apply(
-        lambda r: majority_confidence(r, reviewers), axis=1
-    )
-    for r in reviewers:
-        out[f"confidence_match_{r}"] = (out[f"pathway_confidence_{r}"].apply(_norm_lower) != "") & (
-            out["pathway_confidence"].apply(_norm_lower)
-            == out[f"pathway_confidence_{r}"].apply(_norm_lower)
+        rows.append(
+            {
+                "screen": screen,
+                "cluster": cluster,
+                "cluster_role": "real",
+                "gene": gene,
+                "consensus_class": consensus_class,
+                "unanimous": unanimous,
+                "n_agree": n_agree,
+                "consensus_subclass": consensus_subclass,
+                "pref_affinage": pref_counts.get("affinage", 0),
+                "pref_uniprot": pref_counts.get("uniprot", 0),
+                "pref_both": pref_counts.get("both", 0),
+                "pref_neither": pref_counts.get("neither", 0),
+            }
         )
-    out["confidence_consensus_match"] = (
-        out["majority_expert_confidence"].apply(_norm_lower) != ""
-    ) & (
-        out["pathway_confidence"].apply(_norm_lower)
-        == out["majority_expert_confidence"].apply(_norm_lower)
-    )
 
-    # --- Pathway: per-reviewer + any-reviewer --------------------------------
-    # Ground truth uses nominated_pathway_{r} for expert pathway nominations.
-    def _expert_pathways(row: pd.Series) -> list[str]:
-        vals = [row.get(f"nominated_pathway_{r}") for r in reviewers]
-        return [v for v in vals if isinstance(v, str) and v.strip()]
+    for spec in decoy_specs:
+        for gene in spec["genes"]:
+            rows.append(
+                {
+                    "screen": spec["screen"],
+                    "cluster": spec["cluster"],
+                    "cluster_role": "decoy",
+                    "gene": gene,
+                    "consensus_class": "",
+                    "unanimous": "",
+                    "n_agree": "",
+                    "consensus_subclass": "",
+                    "pref_affinage": "",
+                    "pref_uniprot": "",
+                    "pref_both": "",
+                    "pref_neither": "",
+                }
+            )
 
-    for r in reviewers:
-        out[f"pathway_match_substring_{r}"] = out.apply(
-            lambda x, rv=r: pathway_substring_match(
-                x.get("pathway"), [x.get(f"nominated_pathway_{rv}")]
-            ),
-            axis=1,
-        )
-        out[f"pathway_match_loose_{r}"] = out.apply(
-            lambda x, rv=r: pathway_loose_match(
-                x.get("pathway"), [x.get(f"nominated_pathway_{rv}")]
-            ),
-            axis=1,
-        )
-    out["pathway_match_substring"] = out.apply(
-        lambda r: pathway_substring_match(r.get("pathway"), _expert_pathways(r)), axis=1
-    )
-    out["pathway_match_loose"] = out.apply(
-        lambda r: pathway_loose_match(r.get("pathway"), _expert_pathways(r)), axis=1
-    )
+    out_csv = Path(out_csv)
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_csv, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=REAL_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
 
-    # --- Subclass: gated on recomputed consensus for NOVEL_ROLE / UNCHARACTERIZED ---
-    def _subclass_match(row: pd.Series) -> bool | None:
-        if row["consensus_class"] not in {"NOVEL_ROLE", "UNCHARACTERIZED"}:
-            return None  # not applicable
-        pred_sc = _norm_class(row.get("predicted_subclass"))
-        if not pred_sc:
-            return False
-        experts = [_norm_class(row.get(f"expert_subclass_{r}")) for r in reviewers]
-        experts = [e for e in experts if e]
-        if not experts:
-            return None
-        return pred_sc in experts
 
-    out["subclass_match"] = out.apply(_subclass_match, axis=1)
-
-    return out
+def load_consensus_gt(csv_path: Path) -> dict[tuple, dict]:
+    """Load a consensus ground-truth CSV into {(screen, cluster, gene): row_dict}."""
+    result = {}
+    with open(csv_path, newline="") as fh:
+        for row in csv.DictReader(fh):
+            result[(row["screen"], row["cluster"], row["gene"])] = row
+    return result
 
 
 # Metric columns whose values may be None (scored only on applicable rows).
