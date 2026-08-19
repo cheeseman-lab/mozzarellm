@@ -8,20 +8,15 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-import pytest
-import pandas as pd
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_evaluator import (  # noqa: E402
     _consensus_subclass,
     build_consensus_gt,
-    compute_negative_abstention,
-    compute_output_fragility,
     consensus_coherence,
     consensus_of,
     load_consensus_gt,
-    NEGATIVE_CLUSTERS,
-    OUTPUT_FRAGILITY_CLUSTER,
     pathway_loose_match,
     pathway_substring_match,
+    score_decoys,
 )
 
 # ---------------------------------------------------------------------------
@@ -79,356 +74,6 @@ class TestUtilityFunctions:
 
     def test_pathway_loose_empty_experts(self):
         assert pathway_loose_match("something", ["", ""]) is False
-
-
-# ===========================================================================
-# Helpers for new-addition tests
-# ===========================================================================
-
-
-def _write_jsonl(path: Path, records: list[dict]) -> None:
-    path.write_text(
-        "\n".join(json.dumps(r) for r in records),
-        encoding="utf-8",
-    )
-
-
-def _clusters_csv(tmp_path: Path, rows: list[dict]) -> Path:
-    p = tmp_path / "benchmark_clusters.csv"
-    pd.DataFrame(rows).to_csv(p, index=False)
-    return p
-
-
-# ===========================================================================
-# 3.6 compute_negative_abstention
-# ===========================================================================
-
-
-class TestComputeNegativeAbstention:
-    """Tests derived from docstring:
-
-    Per-route abstention rate on the shuffled negative-control clusters.
-    Reads parsed_outputs.jsonl directly so cells with empty gene arrays (correct
-    abstention) are counted. Abstain iff `dominant_process` contains "no coherent"
-    AND `pathway_confidence` is Low AND all three gene-classification arrays are
-    empty.
-    """
-
-    def test_returns_empty_when_no_file(self, tmp_path):
-        result = compute_negative_abstention(tmp_path)
-        assert result.empty
-
-    def test_correct_abstention_detected(self, tmp_path):
-        """A cell that meets all three abstention criteria should be scored as abstain=True."""
-        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
-        record = {
-            "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
-            "route": "route_A",
-            "parsed_output": {
-                "dominant_process": "no coherent pathway identified",
-                "pathway_confidence": "Low",
-                "established_genes": [],
-                "novel_role_genes": [],
-                "uncharacterized_genes": [],
-            },
-        }
-        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
-        result = compute_negative_abstention(tmp_path)
-        assert len(result) == 1
-        assert result.iloc[0]["abstain_rate"] == 1.0
-        assert result.iloc[0]["fabrication_rate"] == 0.0
-
-    def test_non_abstention_when_genes_present(self, tmp_path):
-        """If gene arrays are non-empty, abstention condition fails even with correct text."""
-        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
-        record = {
-            "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
-            "route": "route_A",
-            "parsed_output": {
-                "dominant_process": "no coherent pathway identified",
-                "pathway_confidence": "Low",
-                "established_genes": ["TP53"],
-                "novel_role_genes": [],
-                "uncharacterized_genes": [],
-            },
-        }
-        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
-        result = compute_negative_abstention(tmp_path)
-        assert result.iloc[0]["abstain_rate"] == 0.0
-        assert result.iloc[0]["fabrication_rate"] == 1.0
-
-    def test_non_abstention_when_confidence_not_low(self, tmp_path):
-        """If confidence is not Low, abstention condition fails."""
-        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
-        record = {
-            "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
-            "route": "route_A",
-            "parsed_output": {
-                "dominant_process": "no coherent pathway identified",
-                "pathway_confidence": "High",
-                "established_genes": [],
-                "novel_role_genes": [],
-                "uncharacterized_genes": [],
-            },
-        }
-        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
-        result = compute_negative_abstention(tmp_path)
-        assert result.iloc[0]["abstain_rate"] == 0.0
-
-    def test_non_abstention_when_dominant_process_missing_keyword(self, tmp_path):
-        """If dominant_process does not contain 'no coherent', it's not abstention."""
-        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
-        record = {
-            "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
-            "route": "route_A",
-            "parsed_output": {
-                "dominant_process": "cell cycle regulation",
-                "pathway_confidence": "Low",
-                "established_genes": [],
-                "novel_role_genes": [],
-                "uncharacterized_genes": [],
-            },
-        }
-        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
-        result = compute_negative_abstention(tmp_path)
-        assert result.iloc[0]["abstain_rate"] == 0.0
-
-    def test_ignores_non_negative_clusters(self, tmp_path):
-        """Records for clusters not in NEGATIVE_CLUSTERS should be ignored."""
-        record = {
-            "run_id": "exp__route_A__aconcagua_interphase__cluster_29__rep_1",
-            "route": "route_A",
-            "parsed_output": {
-                "dominant_process": "no coherent pathway",
-                "pathway_confidence": "Low",
-                "established_genes": [],
-                "novel_role_genes": [],
-                "uncharacterized_genes": [],
-            },
-        }
-        _write_jsonl(tmp_path / "parsed_outputs.jsonl", [record])
-        result = compute_negative_abstention(tmp_path)
-        assert result.empty
-
-    def test_multiple_routes_reported_separately(self, tmp_path):
-        """Each route should get its own row in the output."""
-        screen, cluster, case_type = NEGATIVE_CLUSTERS[0]
-        records = [
-            {
-                "run_id": f"exp__route_A__{screen}__cluster_{cluster}__rep_1",
-                "route": "route_A",
-                "parsed_output": {
-                    "dominant_process": "no coherent pathway",
-                    "pathway_confidence": "Low",
-                    "established_genes": [],
-                    "novel_role_genes": [],
-                    "uncharacterized_genes": [],
-                },
-            },
-            {
-                "run_id": f"exp__route_B__{screen}__cluster_{cluster}__rep_1",
-                "route": "route_B",
-                "parsed_output": {
-                    "dominant_process": "cell cycle",
-                    "pathway_confidence": "High",
-                    "established_genes": ["TP53"],
-                    "novel_role_genes": [],
-                    "uncharacterized_genes": [],
-                },
-            },
-        ]
-        _write_jsonl(tmp_path / "parsed_outputs.jsonl", records)
-        result = compute_negative_abstention(tmp_path)
-        assert len(result) == 2
-        route_a = result[result["route"] == "route_A"].iloc[0]
-        route_b = result[result["route"] == "route_B"].iloc[0]
-        assert route_a["abstain_rate"] == 1.0
-        assert route_b["abstain_rate"] == 0.0
-
-
-# ===========================================================================
-# 3.8 compute_output_fragility
-# ===========================================================================
-
-
-class TestComputeOutputFragility:
-    """Tests derived from docstring:
-
-    Per-route diagnostic on the output_fragility cluster (jebel/0, 147 genes).
-    No expert annotations exist for this cluster, so it is not scored on accuracy
-    or abstention. Reports per-route coverage and pathway-consistency to surface
-    output-structure failures on a large coherent input.
-    """
-
-    def _make_preds(self, rows: list[dict]) -> pd.DataFrame:
-        screen, cid = OUTPUT_FRAGILITY_CLUSTER
-        base = {
-            "screen_name": screen,
-            "cluster_id": cid,
-            "gene_symbol": "gene1",
-            "route": "route_A",
-            "replicate": 1,
-            "run_id": "run1",
-            "predicted_class": "ESTABLISHED",
-            "predicted_subclass": "",
-            "pathway": "ribosome biogenesis",
-            "pathway_confidence": "High",
-        }
-        records = [{**base, **r} for r in rows]
-        return pd.DataFrame(records)
-
-    def test_returns_empty_when_cluster_absent(self, tmp_path):
-        """If the fragility cluster isn't in predictions, return empty."""
-        preds = pd.DataFrame(
-            [
-                {
-                    "screen_name": "other_screen",
-                    "cluster_id": "99",
-                    "gene_symbol": "gA",
-                    "route": "route_A",
-                    "replicate": 1,
-                    "run_id": "r1",
-                    "predicted_class": "E",
-                    "predicted_subclass": "",
-                    "pathway": "p",
-                    "pathway_confidence": "H",
-                }
-            ]
-        )
-        result = compute_output_fragility(preds, tmp_path / "clusters.csv")
-        assert result.empty
-
-    def test_coverage_computed_against_clusters_file(self, tmp_path):
-        """Coverage should be predictions / expected genes from the clusters CSV."""
-        screen, cid = OUTPUT_FRAGILITY_CLUSTER
-        clusters_path = _clusters_csv(
-            tmp_path,
-            [{"screen_name": screen, "cluster_id": cid, "gene_symbol": f"g{i}"} for i in range(10)],
-        )
-        preds = self._make_preds([{"gene_symbol": f"g{i}", "replicate": 1} for i in range(5)])
-        result = compute_output_fragility(preds, clusters_path)
-        assert len(result) == 1
-        assert result.iloc[0]["coverage_rate"] == 0.5
-        assert result.iloc[0]["n_expected_per_cell"] == 10
-
-    def test_pathway_consistency_ribosome(self, tmp_path):
-        """Pathways mentioning 'ribosom' or 'translation' should count as consistent."""
-        screen, cid = OUTPUT_FRAGILITY_CLUSTER
-        clusters_path = _clusters_csv(
-            tmp_path,
-            [{"screen_name": screen, "cluster_id": cid, "gene_symbol": f"g{i}"} for i in range(4)],
-        )
-        preds = self._make_preds(
-            [
-                {"gene_symbol": "g0", "replicate": 1, "pathway": "Ribosome biogenesis"},
-                {"gene_symbol": "g1", "replicate": 2, "pathway": "mRNA translation"},
-                {"gene_symbol": "g2", "replicate": 3, "pathway": "cell cycle"},
-            ]
-        )
-        result = compute_output_fragility(preds, clusters_path)
-        assert result.iloc[0]["pathway_consistency_rate"] == pytest.approx(2 / 3, abs=0.01)
-
-    def test_pathway_consistency_all_unrelated(self, tmp_path):
-        """If no replicate mentions ribosome/translation, consistency should be 0."""
-        screen, cid = OUTPUT_FRAGILITY_CLUSTER
-        clusters_path = _clusters_csv(
-            tmp_path,
-            [
-                {"screen_name": screen, "cluster_id": cid, "gene_symbol": "g0"},
-            ],
-        )
-        preds = self._make_preds(
-            [
-                {"gene_symbol": "g0", "replicate": 1, "pathway": "cell cycle regulation"},
-                {"gene_symbol": "g0", "replicate": 2, "pathway": "DNA damage response"},
-            ]
-        )
-        result = compute_output_fragility(preds, clusters_path)
-        assert result.iloc[0]["pathway_consistency_rate"] == 0.0
-
-    def test_multiple_routes(self, tmp_path):
-        """Each route should get a separate diagnostic row."""
-        screen, cid = OUTPUT_FRAGILITY_CLUSTER
-        clusters_path = _clusters_csv(
-            tmp_path,
-            [
-                {"screen_name": screen, "cluster_id": cid, "gene_symbol": "g0"},
-            ],
-        )
-        preds = self._make_preds(
-            [
-                {"gene_symbol": "g0", "replicate": 1, "route": "route_A", "pathway": "ribosome"},
-                {"gene_symbol": "g0", "replicate": 1, "route": "route_B", "pathway": "cell cycle"},
-            ]
-        )
-        result = compute_output_fragility(preds, clusters_path)
-        assert len(result) == 2
-        route_a = result[result["route"] == "route_A"].iloc[0]
-        route_b = result[result["route"] == "route_B"].iloc[0]
-        assert route_a["pathway_consistency_rate"] == 1.0
-        assert route_b["pathway_consistency_rate"] == 0.0
-
-
-class TestOutputFragilityMultiGenePerReplicate:
-    """Stress test: multiple genes per replicate and pathway consistency."""
-
-    def test_consistency_uses_first_row_per_replicate(self, tmp_path):
-        """With multiple genes in one replicate, drop_duplicates('replicate') keeps
-        only the first row's pathway. This test documents that behavior."""
-        screen, cid = OUTPUT_FRAGILITY_CLUSTER
-        clusters_path = _clusters_csv(
-            tmp_path,
-            [{"screen_name": screen, "cluster_id": cid, "gene_symbol": f"g{i}"} for i in range(10)],
-        )
-        preds = pd.DataFrame(
-            [
-                {
-                    "screen_name": screen,
-                    "cluster_id": cid,
-                    "gene_symbol": "g0",
-                    "route": "route_A",
-                    "replicate": 1,
-                    "run_id": "r1",
-                    "predicted_class": "E",
-                    "predicted_subclass": "",
-                    "pathway": "ribosome biogenesis",
-                    "pathway_confidence": "H",
-                },
-                {
-                    "screen_name": screen,
-                    "cluster_id": cid,
-                    "gene_symbol": "g1",
-                    "route": "route_A",
-                    "replicate": 1,
-                    "run_id": "r1",
-                    "predicted_class": "E",
-                    "predicted_subclass": "",
-                    "pathway": "cell cycle",
-                    "pathway_confidence": "H",
-                },
-                {
-                    "screen_name": screen,
-                    "cluster_id": cid,
-                    "gene_symbol": "g2",
-                    "route": "route_A",
-                    "replicate": 2,
-                    "run_id": "r2",
-                    "predicted_class": "E",
-                    "predicted_subclass": "",
-                    "pathway": "DNA damage",
-                    "pathway_confidence": "H",
-                },
-            ]
-        )
-        result = compute_output_fragility(preds, clusters_path)
-        # Rep 1 has "ribosome biogenesis" as first row -> consistent
-        # Rep 2 has "DNA damage" -> not consistent
-        # Consistency = 1/2 = 0.5
-        # NOTE: rep 1 also has "cell cycle" for g1, but that's ignored because
-        # drop_duplicates keeps only the first row. This is questionable behavior
-        # (the cluster-level pathway should be the same for all genes in a
-        # replicate, but if it isn't, only the first is checked).
-        assert result.iloc[0]["pathway_consistency_rate"] == 0.5
 
 
 # ===========================================================================
@@ -518,3 +163,105 @@ def test_decoy_rows(tmp_path):
     gt = load_consensus_gt(out)
     decoys = {k: v for k, v in gt.items() if v["cluster_role"] == "decoy"}
     assert len(decoys) == 2
+
+
+# ===========================================================================
+# Per-run decoy validation (score_decoys)
+# ===========================================================================
+
+
+def _decoy_cell(route, screen, cluster, rep, confidence, valid=True):
+    parsed = None if not valid else {"dominant_process": "x", "pathway_confidence": confidence}
+    return {
+        "run_id": f"exp__{route}__{screen}__cluster_{cluster}__rep_{rep}",
+        "route": route,
+        "parsed_output": parsed,
+    }
+
+
+def test_score_decoys_abstain_and_functional(tmp_path):
+    rows = []
+    # nonsense cluster -> correctly abstains (Low) across reps -> abstain PASS
+    for r in (1, 2, 3):
+        rows.append(_decoy_cell("single_call", "aconcagua_interphase_shuffled", "17", r, "Low"))
+    # control-heavy cluster -> confidently annotates (High) -> abstain FAIL
+    for r in (1, 2, 3):
+        rows.append(_decoy_cell("single_call", "whitney", "49", r, "High"))
+    # large coherent cluster -> valid High output every rep -> functional PASS
+    for r in (1, 2, 3):
+        rows.append(_decoy_cell("single_call", "jebel", "0", r, "High"))
+
+    d = tmp_path / "run"
+    d.mkdir()
+    (d / "parsed_outputs.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+
+    specs = {
+        ("aconcagua_interphase_shuffled", "17"): "abstain",
+        ("whitney", "49"): "abstain",
+        ("jebel", "0"): "functional",
+    }
+    results = {(r.screen, r.cluster): r for r in score_decoys(d, specs)}
+    assert results[("aconcagua_interphase_shuffled", "17")].passed is True
+    assert results[("whitney", "49")].passed is False  # did not abstain
+    assert results[("jebel", "0")].passed is True
+
+
+def test_score_decoys_functional_fails_on_error(tmp_path):
+    # jebel/0 errors out on one rep (truncation) -> functional FAIL
+    rows = [
+        _decoy_cell("single_call", "jebel", "0", 1, "High"),
+        _decoy_cell("single_call", "jebel", "0", 2, None, valid=False),
+        _decoy_cell("single_call", "jebel", "0", 3, "High"),
+    ]
+    d = tmp_path / "run"
+    d.mkdir()
+    (d / "parsed_outputs.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    (res,) = score_decoys(d, {("jebel", "0"): "functional"})
+    assert res.failures == 1
+    assert res.passed is False
+
+
+def test_score_decoys_abstain_fails_on_crash(tmp_path):
+    # A crash is not abstention: 2 valid "Low" + 1 crash must NOT pass.
+    rows = [
+        _decoy_cell("single_call", "whitney", "49", 1, "Low"),
+        _decoy_cell("single_call", "whitney", "49", 2, None, valid=False),
+        _decoy_cell("single_call", "whitney", "49", 3, "Low"),
+    ]
+    d = tmp_path / "run"
+    d.mkdir()
+    (d / "parsed_outputs.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    (res,) = score_decoys(d, {("whitney", "49"): "abstain"})
+    assert res.modal_confidence == "Low"
+    assert res.failures == 1
+    assert res.passed is False  # crash masks abstention
+
+
+def test_score_decoys_reports_completion(tmp_path):
+    # jebel/0 (functional): the model classifies 8, 10, 10 genes across reps for a
+    # 10-gene cluster -> median 10, completion 1.0 (over/under would show as != 1.0).
+    rows = []
+    for rep, k in ((1, 8), (2, 10), (3, 10)):
+        rows.append(
+            {
+                "run_id": f"exp__single_call__jebel__cluster_0__rep_{rep}",
+                "route": "single_call",
+                "parsed_output": {
+                    "dominant_process": "translation",
+                    "pathway_confidence": "High",
+                    "established_genes": [f"G{i}" for i in range(k)],
+                    "novel_role_genes": [],
+                    "uncharacterized_genes": [],
+                },
+            }
+        )
+    d = tmp_path / "run"
+    d.mkdir()
+    (d / "parsed_outputs.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    (res,) = score_decoys(
+        d, {("jebel", "0"): "functional"}, expected_counts={("jebel", "0"): 10}
+    )
+    assert res.genes_per_rep == [8, 10, 10]
+    assert res.median_genes == 10.0
+    assert res.expected_genes == 10 and res.completion == 1.0
+    assert res.passed is True

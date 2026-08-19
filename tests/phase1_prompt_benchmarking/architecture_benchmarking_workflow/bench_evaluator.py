@@ -85,18 +85,6 @@ _RUN_ID_RE = re.compile(r"^(?P<screen>.+)__cluster_(?P<cluster>[^_]+)__rep_(?P<r
 # (The output floor enforces single-labeling; this is the fallback for residuals.)
 _HEDGE_PRIORITY = {"UNCHARACTERIZED": 0, "NOVEL_ROLE": 1, "ESTABLISHED": 2}
 
-# Shuffled clusters carry no expert pathway annotation by construction; scored
-# on whether the model correctly emits "no coherent pathway" + empty arrays.
-NEGATIVE_CLUSTERS = (
-    ("aconcagua_interphase_shuffled", "244", "no_coherent_pathway"),
-    ("aconcagua_interphase_shuffled", "3", "no_coherent_pathway"),
-    ("aconcagua_interphase_shuffled", "17", "no_coherent_pathway"),
-)
-
-# Output-fragility diagnostic: a large coherent cluster (jebel/0, 147 genes)
-# with no expert annotations. Reported separately from accuracy / abstention.
-OUTPUT_FRAGILITY_CLUSTER = ("jebel", "0")
-
 
 def _norm_str(x: Any) -> str:
     if pd.isna(x):
@@ -625,117 +613,107 @@ def inter_reviewer_concordance(
     return stats
 
 
-def compute_negative_abstention(experiment_dir: Path) -> pd.DataFrame:
-    """Per-route abstention rate on the shuffled negative-control clusters.
+@dataclass
+class DecoyResult:
+    screen: str
+    cluster: str
+    expectation: str  # "abstain" | "functional"
+    reps: int
+    failures: int
+    modal_confidence: str | None
+    passed: bool
+    genes_per_rep: list[int]  # genes classified each rep (output completeness)
+    median_genes: float
+    expected_genes: int | None  # cluster's true gene count, when known
+    completion: float | None  # median_genes / expected_genes (1.0 = perfect; >1 = over-produced)
 
-    Reads parsed_outputs.jsonl directly so cells with empty gene arrays (correct
-    abstention) are counted. Abstain iff `dominant_process` contains "no coherent"
-    AND `pathway_confidence` is Low AND all three gene-classification arrays are
-    empty.
+
+def _median(xs: list[int]) -> float:
+    s = sorted(xs)
+    m = len(s)
+    if not m:
+        return 0.0
+    return float(s[m // 2] if m % 2 else (s[m // 2 - 1] + s[m // 2]) / 2)
+
+
+def score_decoys(
+    run_dir: Path,
+    decoy_specs: dict[tuple, str],
+    route_equals: str | None = None,
+    route_excludes: str = "mcp",
+    expected_counts: dict[tuple, int] | None = None,
+) -> list[DecoyResult]:
+    """Validate negative-control decoy clusters (not consensus-scored).
+
+    decoy_specs maps (screen, cluster) -> expectation. Both require valid replies
+    (no crash) across reps: "abstain" passes on modal confidence Low (recognized
+    no cluster); "functional" passes on modal High/Medium (handled the big
+    cluster without erroring out). Route filtering mirrors score_run. Also reports
+    output completeness (genes classified per rep vs the cluster's expected gene
+    count) so output fragility -- dropping or hallucinating genes on the large
+    functional decoy -- is visible even when confidence passes.
     """
-    parsed_path = experiment_dir / "parsed_outputs.jsonl"
-    if not parsed_path.exists():
-        return pd.DataFrame()
-    neg_lookup = {(s, str(c).strip()): ct for s, c, ct in NEGATIVE_CLUSTERS}
-    cell_rows: list[dict] = []
-    for line in parsed_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            d = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        run_id = d.get("run_id", "")
-        route = d.get("route", "")
-        parts = run_id.split("__")
-        if len(parts) < 5:
-            continue
-        screen = parts[-3]
-        cluster = parts[-2].replace("cluster_", "")
-        if (screen, cluster.strip()) not in neg_lookup:
-            continue
-        po = d.get("parsed_output") or {}
-        proc = _norm_lower(po.get("dominant_process") or "")
-        conf = _norm_lower(po.get("pathway_confidence") or "")
-        n_genes = (
-            len(po.get("established_genes") or [])
-            + len(po.get("novel_role_genes") or [])
-            + len(po.get("uncharacterized_genes") or [])
-        )
-        abstain = ("no coherent" in proc) and (conf == "low") and (n_genes == 0)
-        cell_rows.append(
-            {
-                "route": route,
-                "case_type": neg_lookup[(screen, cluster.strip())],
-                "abstain": abstain,
-            }
-        )
-    if not cell_rows:
-        return pd.DataFrame()
-    cells = pd.DataFrame(cell_rows)
-    rows = []
-    for (route, ct), grp in cells.groupby(["route", "case_type"]):
-        rate = float(grp["abstain"].mean())
-        rows.append(
-            {
-                "route": route,
-                "case_type": ct,
-                "n_cells": len(grp),
-                "abstain_rate": round(rate, 3),
-                "fabrication_rate": round(1 - rate, 3),
-            }
-        )
-    return pd.DataFrame(rows)
+    run_dir = Path(run_dir)
+    reps: dict[tuple, int] = defaultdict(int)
+    failures: dict[tuple, int] = defaultdict(int)
+    conf_votes: dict[tuple, Counter] = defaultdict(Counter)
+    gene_counts: dict[tuple, list[int]] = defaultdict(list)
 
+    with open(run_dir / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
 
-def compute_output_fragility(preds: pd.DataFrame, clusters_csv_path: Path) -> pd.DataFrame:
-    """Per-route diagnostic on the output_fragility cluster (jebel/0, 147 genes).
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            key = (screen, cluster)
+            if key not in decoy_specs:
+                continue
+            reps[key] += 1
+            parsed = cell.get("parsed_output")
+            if parsed is None or parsed.get("dominant_process") is None:
+                failures[key] += 1
+                continue
+            gene_counts[key].append(
+                len(parsed.get("established_genes") or [])
+                + len(parsed.get("novel_role_genes") or [])
+                + len(parsed.get("uncharacterized_genes") or [])
+            )
+            confidence = parsed.get("pathway_confidence")
+            if confidence:
+                conf_votes[key][confidence] += 1
 
-    No expert annotations exist for this cluster, so it is not scored on accuracy
-    or abstention. Reports per-route coverage and pathway-consistency to surface
-    output-structure failures on a large coherent input.
-    """
-    screen, cid = OUTPUT_FRAGILITY_CLUSTER
-    cell = preds[(preds["screen_name"] == screen) & (preds["cluster_id"].astype(str) == cid)].copy()
-    if cell.empty:
-        return pd.DataFrame()
-    expected = 0
-    if clusters_csv_path.exists():
-        clusters = pd.read_csv(clusters_csv_path, dtype={"cluster_id": str, "gene_symbol": str})
-        if "sheet" in clusters.columns and "screen_name" not in clusters.columns:
-            clusters = clusters.rename(columns={"sheet": "screen_name"})
-        expected = int(
-            clusters[
-                (clusters["screen_name"] == screen) & (clusters["cluster_id"].astype(str) == cid)
-            ]
-            .drop_duplicates("gene_symbol")
-            .shape[0]
+    results = []
+    for key, expectation in decoy_specs.items():
+        screen, cluster = key
+        votes = conf_votes[key]
+        modal = votes.most_common(1)[0][0] if votes else None
+        n_reps = reps[key]
+        n_fail = failures[key]
+        if expectation == "abstain":
+            # A crash is not abstention: require valid replies (no failures)
+            # whose modal confidence is Low.
+            passed = n_reps > 0 and n_fail == 0 and modal == "Low"
+        elif expectation == "functional":
+            passed = n_reps > 0 and n_fail == 0 and modal in ("High", "Medium")
+        else:
+            raise ValueError(f"unknown decoy expectation {expectation!r} for {key}")
+        counts = gene_counts[key]
+        median_g = _median(counts)
+        expected = (expected_counts or {}).get(key)
+        completion = round(median_g / expected, 3) if expected else None
+        results.append(
+            DecoyResult(
+                screen, cluster, expectation, n_reps, n_fail, modal, passed,
+                genes_per_rep=counts, median_genes=median_g,
+                expected_genes=expected, completion=completion,
+            )
         )
-    rows = []
-    for route, grp in cell.groupby("route", sort=True):
-        n_replicates = int(grp["replicate"].nunique())
-        per_rep_counts = grp.groupby("replicate")["gene_symbol"].nunique()
-        median_per_cell = float(per_rep_counts.median()) if not per_rep_counts.empty else 0.0
-        total_pred = int(per_rep_counts.sum())
-        expected_total = expected * max(n_replicates, 1)
-        coverage = total_pred / expected_total if expected_total else 0.0
-        per_rep_consistent = grp.drop_duplicates("replicate").assign(
-            _ok=lambda d: d["pathway"]
-            .astype(str)
-            .str.lower()
-            .apply(lambda s: "ribosom" in s or "translation" in s)
-        )
-        consistency_rate = (
-            float(per_rep_consistent["_ok"].mean()) if len(per_rep_consistent) else 0.0
-        )
-        rows.append(
-            {
-                "route": route,
-                "n_replicates": n_replicates,
-                "median_genes_per_cell": round(median_per_cell, 1),
-                "n_expected_per_cell": expected,
-                "coverage_rate": round(float(coverage), 3),
-                "pathway_consistency_rate": round(consistency_rate, 3),
-            }
-        )
-    return pd.DataFrame(rows)
+    return results
