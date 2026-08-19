@@ -10,13 +10,18 @@ if str(_REPO_ROOT) not in sys.path:
 
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_evaluator import (  # noqa: E402
     _consensus_subclass,
+    audit_flag_diagnostics,
     build_consensus_gt,
     consensus_coherence,
     consensus_of,
+    inter_reviewer_concordance,
     load_consensus_gt,
     pathway_loose_match,
     pathway_substring_match,
+    reviewer_label_sets,
     score_decoys,
+    source_diagnostics,
+    source_preference_tally,
 )
 
 # ---------------------------------------------------------------------------
@@ -74,6 +79,161 @@ class TestUtilityFunctions:
 
     def test_pathway_loose_empty_experts(self):
         assert pathway_loose_match("something", ["", ""]) is False
+
+
+# ===========================================================================
+# Reviewer + source diagnostics
+# ===========================================================================
+
+
+def _write_reviewer_csv(path, rows):
+    header = "annotator,screen,cluster,pathway,coherence,cluster_notes,gene,classification,subclass,preferred_source,used_web\n"
+    with open(path, "w") as fh:
+        fh.write(header)
+        for r in rows:
+            fh.write(f"{r['annotator']},s1,1,p,High,,{r['gene']},{r['classification']},,a,no\n")
+
+
+def test_reviewer_label_sets_unions_across_reviewers(tmp_path):
+    a = tmp_path / "annotation_a.csv"
+    b = tmp_path / "annotation_b.csv"
+    _write_reviewer_csv(a, [{"annotator": "a", "gene": "G1", "classification": "NOVEL_ROLE"},
+                            {"annotator": "a", "gene": "G2", "classification": "ESTABLISHED"}])
+    _write_reviewer_csv(b, [{"annotator": "b", "gene": "G1", "classification": "ESTABLISHED"},
+                            {"annotator": "b", "gene": "G2", "classification": "ESTABLISHED"}])
+    labels = reviewer_label_sets({"a": a, "b": b})
+    assert labels[("s1", "1", "G1")] == {"NOVEL_ROLE", "ESTABLISHED"}  # reviewers disagree
+    assert labels[("s1", "1", "G2")] == {"ESTABLISHED"}  # reviewers agree
+
+
+def test_source_preference_tally_overall_and_by_class():
+    gt = {
+        ("s1", "1", "G1"): {"cluster_role": "real", "consensus_class": "NOVEL_ROLE",
+                            "pref_affinage": "2", "pref_uniprot": "1", "pref_both": "0", "pref_neither": "0"},
+        ("s1", "1", "G2"): {"cluster_role": "real", "consensus_class": "ESTABLISHED",
+                            "pref_affinage": "1", "pref_uniprot": "0", "pref_both": "1", "pref_neither": "1"},
+        ("s1", "1", "D"): {"cluster_role": "decoy", "consensus_class": "", "pref_affinage": "9"},
+    }
+    tally = source_preference_tally(gt)
+    assert tally["overall"] == {"affinage": 3, "uniprot": 1, "both": 1, "neither": 1}  # decoy excluded
+    assert tally["by_class"]["NOVEL_ROLE"]["affinage"] == 2
+
+
+def test_reviewer_concordance_pairwise_and_unanimity(tmp_path):
+    a = tmp_path / "annotation_a.csv"
+    b = tmp_path / "annotation_b.csv"
+    c = tmp_path / "annotation_c.csv"
+    # G1: all agree (unanimous, ESTABLISHED). G2: a,b agree / c differs (split, NOVEL).
+    _write_reviewer_csv(a, [{"annotator": "a", "gene": "G1", "classification": "ESTABLISHED"},
+                            {"annotator": "a", "gene": "G2", "classification": "NOVEL_ROLE"}])
+    _write_reviewer_csv(b, [{"annotator": "b", "gene": "G1", "classification": "ESTABLISHED"},
+                            {"annotator": "b", "gene": "G2", "classification": "NOVEL_ROLE"}])
+    _write_reviewer_csv(c, [{"annotator": "c", "gene": "G1", "classification": "ESTABLISHED"},
+                            {"annotator": "c", "gene": "G2", "classification": "ESTABLISHED"}])
+    gt = {
+        ("s1", "1", "G1"): {"cluster_role": "real", "consensus_class": "ESTABLISHED"},
+        ("s1", "1", "G2"): {"cluster_role": "real", "consensus_class": "NOVEL_ROLE"},
+    }
+    conc = inter_reviewer_concordance({"a": a, "b": b, "c": c}, gt)
+    assert conc["n_genes"] == 2
+    assert conc["pairwise"]["a-b"] == 1.0  # a,b agree on both genes
+    assert conc["pairwise"]["a-c"] == 0.5  # agree on G1 only
+    assert conc["unanimous"] == 1 and conc["unanimous_frac"] == 0.5
+    assert conc["by_class"]["ESTABLISHED"]["frac"] == 1.0  # G1 unanimous
+    assert conc["by_class"]["NOVEL_ROLE"]["frac"] == 0.0  # G2 split
+
+
+def test_source_diagnostics_consensus_vs_lenient(tmp_path):
+    # One rep: model calls A=ESTABLISHED, B=ESTABLISHED, C=UNCHARACTERIZED.
+    rec = {
+        "run_id": "exp__affinage__single_call__s1__cluster_1__rep_1",
+        "route": "affinage__single_call",
+        "parsed_output": {
+            "dominant_process": "x",
+            "established_genes": ["A", "B"],
+            "novel_role_genes": [],
+            "uncharacterized_genes": [{"gene": "C", "class": "DARK_GENE"}],
+            "pathway_confidence": "Low",
+        },
+    }
+    (tmp_path / "parsed_outputs.jsonl").write_text(json.dumps(rec) + "\n")
+    gt = {
+        ("s1", "1", "A"): {"cluster_role": "real", "consensus_class": "ESTABLISHED"},
+        ("s1", "1", "B"): {"cluster_role": "real", "consensus_class": "NOVEL_ROLE"},
+        ("s1", "1", "C"): {"cluster_role": "real", "consensus_class": "NOVEL_ROLE"},
+    }
+    reviewer_labels = {
+        ("s1", "1", "A"): {"ESTABLISHED"},
+        ("s1", "1", "B"): {"NOVEL_ROLE", "ESTABLISHED"},  # a reviewer endorsed the ESTABLISHED call
+        ("s1", "1", "C"): {"NOVEL_ROLE"},
+    }
+    d = source_diagnostics(tmp_path, gt, reviewer_labels, "affinage__single_call", n_real=3)
+    assert d["n_scored"] == 3
+    assert d["consensus_recall"] == 1 / 3  # only A matches consensus
+    assert d["any_recall"] == 2 / 3  # A and B land within human envelope
+    assert d["forgiven"] == 1  # B: right for a reviewer, wrong for consensus
+    assert d["consensus_cw"] == 1 / 3 and d["any_cw"] == 2 / 3
+    nov = d["per_class"]["NOVEL_ROLE"]
+    assert nov["n"] == 2 and nov["recall_consensus"] == 0.0 and nov["recall_any"] == 0.5
+    assert nov["confusion"] == {"ESTABLISHED": 1, "UNCHARACTERIZED": 1}
+    # precision/recall/F1 emitted per class: no novel calls -> all zero
+    assert nov["tp"] == 0 and nov["fn"] == 2 and nov["precision"] == 0.0 and nov["f1"] == 0.0
+    # ESTABLISHED: A correct (TP) + B (novel) mislabeled established (FP) -> precision 0.5, recall 1.0
+    est = d["per_class"]["ESTABLISHED"]
+    assert est["tp"] == 1 and est["fp"] == 1 and est["precision"] == 0.5 and est["recall"] == 1.0
+    # per-cluster recall emitted: 1 of 3 genes matched consensus
+    assert d["per_cluster"]["s1/1"] == {"correct": 1, "n": 3, "recall": 0.333}
+
+
+def test_audit_flag_diagnostics_reports_flagged_gene_handling(tmp_path):
+    bundles = tmp_path / "bundles"
+    bundles.mkdir()
+    (bundles / "whitney__cluster_6__bundle.json").write_text(
+        json.dumps(
+            {
+                "screen_name": "whitney",
+                "cluster_id": 6,
+                "cluster_genes": [
+                    {"gene_symbol": "PSMA4", "affinage_audit_note": "Identity concern: x"},
+                    {"gene_symbol": "CLEAN1"},
+                ],
+            }
+        )
+    )
+    run = tmp_path / "run"
+    run.mkdir()
+    reps = [
+        {"novel_role_genes": [{"gene": "PSMA4", "class": "STRONG", "rationale": "proteasome role", "evidence": ""}]},
+        {
+            "uncharacterized_genes": [
+                {"gene": "PSMA4", "class": "DARK", "rationale": "annotation is audit-flagged", "evidence": ""}
+            ]
+        },
+        {"established_genes": ["PSMA4", "CLEAN1"]},
+    ]
+    with open(run / "parsed_outputs.jsonl", "w") as fh:
+        for i, extra in enumerate(reps):
+            parsed = {"cluster_id": "6", "dominant_process": "proteolysis", "pathway_confidence": "High"}
+            parsed.update(extra)
+            fh.write(
+                json.dumps(
+                    {"run_id": f"src__base__whitney__cluster_6__rep_{i}", "route": "base", "parsed_output": parsed}
+                )
+                + "\n"
+            )
+
+    diag = audit_flag_diagnostics(bundles, run)
+    assert set(diag) == {("whitney", "6", "PSMA4")}
+    entry = diag[("whitney", "6", "PSMA4")]
+    assert entry["audit_note"] == "Identity concern: x"
+    assert entry["votes"] == {"NOVEL_ROLE": 1, "UNCHARACTERIZED": 1, "ESTABLISHED": 1}
+    assert entry["reps_with_rationale"] == 2
+    assert entry["reps_engaging"] == 1  # only the audit-flagged-mentioning rationale
+
+    (bundles / "whitney__cluster_6__bundle.json").write_text(
+        json.dumps({"screen_name": "whitney", "cluster_id": 6, "cluster_genes": [{"gene_symbol": "CLEAN1"}]})
+    )
+    assert audit_flag_diagnostics(bundles, run) == {}
 
 
 # ===========================================================================
