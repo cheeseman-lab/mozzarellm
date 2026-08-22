@@ -23,7 +23,7 @@ phase1_prompt_benchmarking/
         (14 pre-built bundle JSONs + per-screen intermediates)
 
     architecture_benchmarking_workflow/
-        arch_bench_routes.py          -- Route dataclass + 6-route registry
+        bench_routes.py          -- Route dataclass + 6-route registry
         bench_orchestrator.py         -- Main loop, CLI, prompt construction, execution
         bench_configparse.py          -- YAML config loader + dataclass sections
         bench_metricfns.py            -- Structural, MCP, logical, efficiency metrics

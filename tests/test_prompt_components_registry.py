@@ -18,7 +18,7 @@ from mozzarellm.prompt_components import (  # noqa: E402
     COMPONENT_REGISTRY,
     GENE_CATEGORIZATION_RULES,
 )
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (  # noqa: E402
+from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (  # noqa: E402
     ROUTE_REGISTRY,
 )
 

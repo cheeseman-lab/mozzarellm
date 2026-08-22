@@ -30,7 +30,7 @@ try:
         RunConfig,
         TimingConfig,
     )
-    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
+    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
         ROUTE_REGISTRY,
         Route,
     )

@@ -44,7 +44,7 @@ from mozzarellm.utils.prompt_factory import (
     make_single_cluster_analysis_user_prompt,
 )
 
-from .arch_bench_routes import Route, build_routes_from_config
+from .bench_routes import Route, build_routes_from_config
 from .bench_configparse import BenchmarkConfig, TimingConfig, load_config
 from .bench_dry_run import (
     _load_bundle_genes,

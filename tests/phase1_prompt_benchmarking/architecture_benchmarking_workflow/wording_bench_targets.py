@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .arch_bench_routes import ROUTE_REGISTRY, Route
+from .bench_routes import ROUTE_REGISTRY, Route
 from .order_bench_orderings import resolve_variant_ids
 from .wording_bench_alternates import WORDING_ALTERNATE_SET_REGISTRY
 
