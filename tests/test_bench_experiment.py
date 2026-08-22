@@ -362,3 +362,31 @@ class TestStagedInvocation:
         state = run_experiment(path, stage="CAT", dry_run=True, source="uniprot")
         assert state["source"] == "uniprot"
         assert state["stages"][0]["resolved"]["source"] == "uniprot"
+
+
+WALKUP_YAML = SOURCE_YAML.parent / "walkup.yaml"
+
+
+def test_walkup_yaml_parses_with_the_full_candidate_bank():
+    exp = load_experiment(WALKUP_YAML)
+    assert exp["uses"] == "source.carry.source"
+    stages = {s["component"]: s for s in exp["stages"]}
+    assert list(stages) == ["CAT", "GCR", "NPR", "UPR", "PCC"]
+    goals = {c: s["goal"] for c, s in stages.items()}
+    assert goals == {
+        "CAT": "category",
+        "GCR": "category",
+        "NPR": "novel_subclass",
+        "UPR": "unchar_subclass",
+        "PCC": "coherence",
+    }
+    assert {c["id"] for c in stages["CAT"]["candidates"]} == {
+        "concise",
+        "discovery_first",
+        "pathway_anchored",
+        "process_relative",
+        "process_guarded",
+    }
+    for stage in stages.values():
+        for cand in stage["candidates"]:
+            assert cand["rationale"] and cand["text"]
