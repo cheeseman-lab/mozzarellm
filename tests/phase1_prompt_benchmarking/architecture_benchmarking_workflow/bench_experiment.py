@@ -13,12 +13,22 @@ and are never overwritten. ``score_only`` re-scores the newest archived run dir
 per condition without API calls; ``dry_run`` exercises the full plumbing on
 mock outputs.
 
-``stages:`` and ``uses:`` are reserved schema keys for staged experiments (the
-walkup); the loader rejects them until that PR lands.
+STAGED experiments (the walkup) replace the static ``conditions:`` with a
+``stages:`` block; each stage generates its conditions at runtime -- ``prior``
+(the carried build read from the experiment's own state) plus the stage's
+candidates. A stage is an INVOCATION, not an experiment: ``stage="CAT"`` runs
+exactly one stage, upserts its record into the experiment state, and STOPS --
+the human gate. ``select=("CAT", "process_guarded")`` records the choice and
+carries the winning text forward; recording the last stage's choice assembles
+the final build into ``carry``. ``uses: <experiment>.carry.<key>`` resolves a
+cross-experiment input (the walkup's evidence source) from that experiment's
+state file; every staged invocation logs and snapshots its resolved inputs.
 
 Usage:
     python -m tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_experiment \
         tests/phase1_prompt_benchmarking/experiments/source.yaml [--dry-run | --score-only]
+    ... bench_experiment experiments/walkup.yaml --stage CAT [--source affinage]
+    ... bench_experiment experiments/walkup.yaml --select CAT process_guarded
 """
 
 from __future__ import annotations
@@ -93,7 +103,9 @@ ABSTAIN_COHERENCE = "Low"
 # Keys a condition may set; anything a condition sets overrides the shared
 # ``run:`` block for that condition only.
 _CONDITION_KEYS = {"name", "bundle_source", "route", "component_overrides"}
-_RESERVED_KEYS = ("stages", "uses")
+# ``uses: <experiment>.carry.<key>`` -- a cross-experiment input, resolved from
+# that experiment's state file at invocation.
+_USES_RE = re.compile(r"^(?P<experiment>\w+)\.carry\.(?P<key>\w+)$")
 
 
 def load_experiment(yaml_path: Path) -> dict:
@@ -103,13 +115,20 @@ def load_experiment(yaml_path: Path) -> dict:
         raise FileNotFoundError(f"Experiment yaml not found: {yaml_path}")
     raw = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
 
-    for key in _RESERVED_KEYS:
-        if key in raw:
-            raise ValueError(
-                f"{yaml_path.name}: '{key}:' is reserved for staged experiments, "
-                "which arrive with the walkup PR"
-            )
-    for key in ("experiment", "model", "run", "conditions", "selection"):
+    staged = "stages" in raw
+    if staged and "conditions" in raw:
+        raise ValueError(
+            f"{yaml_path.name}: an experiment declares 'stages:' or 'conditions:', never both"
+        )
+    if not staged and "uses" in raw:
+        raise ValueError(
+            f"{yaml_path.name}: 'uses:' applies to staged experiments; stage-less "
+            "conditions declare their inputs (bundle_source) directly"
+        )
+    required = ("experiment", "model", "run") + (
+        ("stages",) if staged else ("conditions", "selection")
+    )
+    for key in required:
         if key not in raw:
             raise ValueError(f"{yaml_path.name}: missing required key '{key}:'")
 
@@ -119,6 +138,10 @@ def load_experiment(yaml_path: Path) -> dict:
             f"{yaml_path.name}: run.route {route!r} not in registry "
             f"{sorted(ROUTE_REGISTRY)}"
         )
+
+    if staged:
+        _validate_stages(yaml_path.name, raw, route)
+        return raw
 
     names = []
     for cond in raw["conditions"]:
@@ -146,6 +169,50 @@ def load_experiment(yaml_path: Path) -> dict:
                 f"allowed: {list(SELECTION_METRICS)}"
             )
     return raw
+
+
+def _validate_stages(yaml_name: str, raw: dict, route: str) -> None:
+    """Schema checks for a staged experiment's uses/stages blocks."""
+    uses = raw.get("uses")
+    if uses is not None and not _USES_RE.match(uses):
+        raise ValueError(
+            f"{yaml_name}: uses {uses!r} must be '<experiment>.carry.<key>'"
+        )
+    components = []
+    for stage in raw["stages"]:
+        for key in ("component", "goal", "candidates"):
+            if key not in stage:
+                raise ValueError(
+                    f"{yaml_name}: stage {stage.get('component')!r} missing '{key}'"
+                )
+        if stage["component"] not in ROUTE_REGISTRY[route].component_order:
+            raise ValueError(
+                f"{yaml_name}: stage component {stage['component']!r} is not a "
+                f"prompt slot of route {route!r}"
+            )
+        if stage["goal"] not in SELECTION_METRICS:
+            raise ValueError(
+                f"{yaml_name}: stage {stage['component']!r} goal {stage['goal']!r} "
+                f"not in {list(SELECTION_METRICS)}"
+            )
+        ids = []
+        for cand in stage["candidates"]:
+            for key in ("id", "rationale", "text"):
+                if not cand.get(key):
+                    raise ValueError(
+                        f"{yaml_name}: stage {stage['component']!r} candidate "
+                        f"{cand.get('id')!r} missing '{key}' (every candidate "
+                        "carries its rationale)"
+                    )
+            ids.append(cand["id"])
+        if "prior" in ids or len(ids) != len(set(ids)):
+            raise ValueError(
+                f"{yaml_name}: stage {stage['component']!r} candidate ids must be "
+                f"unique and not 'prior'; got {ids}"
+            )
+        components.append(stage["component"])
+    if len(components) != len(set(components)):
+        raise ValueError(f"{yaml_name}: duplicate stage components in {components}")
 
 
 # =============================================================================
@@ -317,16 +384,19 @@ def panel_json(p: MetricPanel) -> dict:
     }
 
 
-def _condition_config(exp: dict, cond: dict, stamp: str, dry_run: bool) -> BenchmarkConfig:
-    """BenchmarkConfig for one condition: shared blocks + the condition's overrides.
+def _condition_config(
+    exp: dict, label: str, bundle_source: str, stamp: str, dry_run: bool
+) -> BenchmarkConfig:
+    """BenchmarkConfig for one invocation: the yaml's shared blocks + its inputs.
 
+    label is the condition name (stage-less) or the stage component (staged).
     experiment_id carries the run stamp: with overwrite_outputs the resolved dir
-    (OUTPUTS/<experiment>/<condition>_<stamp>) is stable across accesses AND
-    unique per run, so previous runs archive in place and nothing is wiped.
+    (OUTPUTS/<experiment>/<label>_<stamp>) is stable across accesses AND unique
+    per run, so previous runs archive in place and nothing is wiped.
     """
     model, run = exp["model"], exp["run"]
     cfg = BenchmarkConfig()
-    cfg.experiment_id = f"{cond['name']}_{stamp}"
+    cfg.experiment_id = f"{label}_{stamp}"
     cfg.model = ModelConfig(
         provider=model.get("provider", cfg.model.provider),
         model_name=model["model_name"],
@@ -347,7 +417,7 @@ def _condition_config(exp: dict, cond: dict, stamp: str, dry_run: bool) -> Bench
         benchmark_clusters_csv=CLUSTERS_ALL,
         evidence_bundles_dir=BUNDLES_DIR,
         output_dir=OUTPUTS / exp["experiment"],
-        bundle_source=cond["bundle_source"],
+        bundle_source=bundle_source,
     )
     return cfg
 
@@ -364,19 +434,40 @@ def run_experiment(
     select: tuple[str, str] | None = None,
     dry_run: bool = False,
     score_only: bool = False,
+    source: str | None = None,
 ) -> dict:
     """Run every condition an experiment yaml declares, score, select, write state.
 
-    stage/select serve staged experiments (walkup PR); on a stage-less
-    experiment they raise cleanly. score_only re-scores the newest archived run
-    dir per condition without API calls and rewrites state.
+    Stage-less experiments run all conditions and apply the yaml's selection
+    rule. On a staged experiment, ``stage`` runs exactly one stage and stops at
+    the human gate; ``select`` records the human's choice for a stage (candidate
+    id or "prior"); ``source`` overrides the ``uses:``-resolved evidence source
+    (the stale-carry guard). Each of the three raises cleanly on the other kind
+    of experiment. score_only re-scores the newest archived run dir(s) without
+    API calls and rewrites state.
     """
     exp = load_experiment(yaml_path)
     name = exp["experiment"]
+    if "stages" in exp:
+        if select is not None:
+            if stage is not None:
+                raise ValueError("pass stage= or select=, not both")
+            return _record_selection(exp, tuple(select))
+        if stage is None:
+            raise ValueError(
+                f"experiment {name!r} is staged: pass stage=<component> to run "
+                "one stage, or select=(stage, choice) to record a gate decision"
+            )
+        return _run_stage(exp, stage, dry_run=dry_run, score_only=score_only, source=source)
     if stage is not None or select is not None:
         raise ValueError(
             f"experiment {name!r} declares no stages; stage/select apply to "
-            "staged experiments only (walkup PR)"
+            "staged experiments only"
+        )
+    if source is not None:
+        raise ValueError(
+            f"experiment {name!r} is stage-less; its conditions declare "
+            "bundle_source directly (source= overrides a staged 'uses:' input)"
         )
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -400,7 +491,7 @@ def run_experiment(
                     f"score_only: no archived run dir {OUTPUTS / name}/{cond_name}_<stamp>/"
                 )
         else:
-            cfg = _condition_config(exp, cond, stamp, dry_run)
+            cfg = _condition_config(exp, cond_name, cond["bundle_source"], stamp, dry_run)
             overrides = {**shared_overrides, **(cond.get("component_overrides") or {})}
             specs = [
                 RunSpec(
@@ -468,6 +559,204 @@ def run_experiment(
     return state
 
 
+# =============================================================================
+# STAGED EXPERIMENTS
+# =============================================================================
+
+
+def _resolve_uses(uses: str) -> str:
+    """Resolve '<experiment>.carry.<key>' from that experiment's state file."""
+    m = _USES_RE.match(uses)
+    src_name, key = m["experiment"], m["key"]
+    state_path = OUTPUTS / src_name / f"{src_name}_state.json"
+    if not state_path.exists():
+        raise FileNotFoundError(f"uses {uses!r}: no state file at {state_path}")
+    value = json.loads(state_path.read_text()).get("carry", {}).get(key)
+    if not value:
+        raise ValueError(f"uses {uses!r}: {state_path.name} carries no {key!r}")
+    return value
+
+
+def _staged_state(exp: dict) -> tuple[dict, Path]:
+    """Load (or initialise) a staged experiment's state; carried starts all-blank.
+
+    The all-blank carried dict IS the blank W0 floor: every stage component is
+    overridden to "" until a stage's selection fills it.
+    """
+    name = exp["experiment"]
+    order = [s["component"] for s in exp["stages"]]
+    path = OUTPUTS / name / f"{name}_state.json"
+    if path.exists():
+        return json.loads(path.read_text()), path
+    return {
+        "experiment": name,
+        "uses": exp.get("uses"),
+        "source": None,
+        "order": order,
+        "carried": dict.fromkeys(order, ""),
+        "stages": [],
+    }, path
+
+
+def _save_staged_state(state: dict, path: Path) -> None:
+    state["components_filled"] = [c for c in state["order"] if state["carried"].get(c)]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=2))
+    print(f"\nstate -> {path}")
+
+
+def _run_stage(
+    exp: dict, stage: str, *, dry_run: bool, score_only: bool, source: str | None
+) -> dict:
+    """Run one stage's conditions (prior + candidates), score, upsert, STOP.
+
+    Selection is deliberately absent: several goal metrics are too low-powered
+    on this benchmark to trust an automatic rule, so each stage ends at a human
+    gate -- the panels land in the state file and a person records the choice
+    via select=.
+    """
+    name = exp["experiment"]
+    spec = next((s for s in exp["stages"] if s["component"] == stage), None)
+    if spec is None:
+        raise ValueError(
+            f"unknown stage {stage!r}; stages: {[s['component'] for s in exp['stages']]}"
+        )
+    state, state_path = _staged_state(exp)
+
+    # Resolve the evidence source once per experiment: explicit override, else
+    # the source earlier stages ran on, else the uses: input. A mid-experiment
+    # switch would mix evidence regimes across stages, so it is refused.
+    resolved = source or state.get("source")
+    if resolved is None and exp.get("uses"):
+        resolved = _resolve_uses(exp["uses"])
+    if resolved is None:
+        raise ValueError(f"{name}: no evidence source (declare uses: or pass source=)")
+    if state["stages"] and state.get("source") and resolved != state["source"]:
+        raise ValueError(
+            f"{name}: stages already ran on source={state['source']!r}; refusing "
+            f"to run {stage} on {resolved!r}"
+        )
+    state["source"] = resolved
+
+    carried = state["carried"]
+    filled = [c for c in state["order"] if carried.get(c)]
+    print(
+        f"[{name}] stage {stage} on source={resolved}; "
+        f"carried build: {'+'.join(filled) if filled else 'blank W0'}"
+    )
+
+    gt, coh = load_gt_and_coherence()
+    controls = validation_specs(gt)
+    route_name = exp["run"]["route"]
+    conditions = {f"{stage}_prior": dict(carried)}
+    for cand in spec["candidates"]:
+        conditions[f"{stage}_{cand['id']}"] = {**carried, stage: cand["text"]}
+
+    if score_only:
+        out = latest_run_dir(name, stage)
+        if out is None:
+            raise FileNotFoundError(
+                f"score_only: no archived run dir {OUTPUTS / name}/{stage}_<stamp>/"
+            )
+        stamp = None
+    else:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        cfg = _condition_config(exp, stage, resolved, stamp, dry_run)
+        specs = [
+            RunSpec(
+                route=ROUTE_REGISTRY[route_name],
+                condition_name=label,
+                component_overrides=overrides,
+            )
+            for label, overrides in conditions.items()
+        ]
+        snapshot = _build_config_snapshot(
+            cfg,
+            experiment={
+                "experiment": name,
+                "stage": stage,
+                "goal": spec["goal"],
+                "source": resolved,
+                "carried_components": filled,
+            },
+        )
+        print(f"[{name}] {len(conditions)} conditions -> {cfg.experiment_output_dir}")
+        _run_benchmark_loop(cfg, specs, snapshot, phase_label=f"{name}:{stage}")
+        out = cfg.experiment_output_dir
+
+    def _abstain(label: str) -> str:
+        rows = decoy_results(out, label, controls)
+        return f"{sum(1 for d in rows if d['passed'])}/{len(rows)}"
+
+    panels = {
+        label: score_run(out, gt, cluster_coherence=coh, route_equals=label)
+        for label in conditions
+    }
+    record = {
+        "stage": stage,
+        "goal": spec["goal"],
+        "run_dir": out.name,
+        "resolved": {"source": resolved, "carried_components": filled},
+        "prior": panel_json(panels[f"{stage}_prior"]),
+        "prior_abstain": _abstain(f"{stage}_prior"),
+        "candidates": {
+            cand["id"]: panel_json(panels[f"{stage}_{cand['id']}"])
+            for cand in spec["candidates"]
+        },
+        "candidate_abstain": {
+            cand["id"]: _abstain(f"{stage}_{cand['id']}") for cand in spec["candidates"]
+        },
+        "selected": None,
+    }
+    state["stages"] = [s for s in state["stages"] if s["stage"] != stage]
+    state["stages"].append(record)
+    state["stages"].sort(key=lambda s: state["order"].index(s["stage"]))
+    _save_staged_state(state, state_path)
+    print(f"[{name}] gate: record the choice with select=({stage!r}, <candidate|'prior'>)")
+    return state
+
+
+def _record_selection(exp: dict, select: tuple[str, str]) -> dict:
+    """Record the human gate decision for a stage; finalize after the last one.
+
+    The chosen candidate's text (or "" for prior) becomes the carried build for
+    every later stage. When every stage has a recorded choice, the final build
+    is assembled into ``carry`` for the next step to consume.
+    """
+    stage, choice = select
+    name = exp["experiment"]
+    spec = next((s for s in exp["stages"] if s["component"] == stage), None)
+    if spec is None:
+        raise ValueError(
+            f"unknown stage {stage!r}; stages: {[s['component'] for s in exp['stages']]}"
+        )
+    state, state_path = _staged_state(exp)
+    record = next((s for s in state["stages"] if s["stage"] == stage), None)
+    if record is None:
+        raise ValueError(f"stage {stage!r} has not been run yet (pass stage={stage!r} first)")
+    texts = {cand["id"]: cand["text"] for cand in spec["candidates"]}
+    if choice != "prior" and choice not in texts:
+        raise ValueError(f"unknown candidate {choice!r}; options: {['prior', *texts]}")
+    record["selected"] = choice
+    state["carried"][stage] = "" if choice == "prior" else texts[choice]
+
+    chosen = {s["stage"] for s in state["stages"] if s["selected"]}
+    if chosen == set(state["order"]):
+        filled = [c for c in state["order"] if state["carried"].get(c)]
+        state["winner"] = "+".join(filled) if filled else "blank_W0"
+        state["carry"] = {
+            "source": state["source"],
+            "components_filled": filled,
+            "final_component_texts": {k: v for k, v in state["carried"].items() if v},
+        }
+        print(f"[{name}] all stages chosen; final build: {state['winner']}")
+    else:
+        pending = [c for c in state["order"] if c not in chosen]
+        print(f"[{name}] recorded {stage} <- {choice}; next stage: {pending[0]}")
+    _save_staged_state(state, state_path)
+    return state
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("yaml_path", type=Path, help="experiment yaml (e.g. experiments/source.yaml)")
@@ -475,8 +764,23 @@ def main() -> None:
     ap.add_argument(
         "--score-only", action="store_true", help="re-score newest archived run dirs, no API calls"
     )
+    ap.add_argument("--stage", help="staged experiments: run one stage's candidates and stop")
+    ap.add_argument(
+        "--select",
+        nargs=2,
+        metavar=("STAGE", "CHOICE"),
+        help="staged experiments: record the human gate decision (candidate id or 'prior')",
+    )
+    ap.add_argument("--source", help="staged experiments: override the uses:-resolved source")
     args = ap.parse_args()
-    run_experiment(args.yaml_path, dry_run=args.dry_run, score_only=args.score_only)
+    run_experiment(
+        args.yaml_path,
+        stage=args.stage,
+        select=tuple(args.select) if args.select else None,
+        dry_run=args.dry_run,
+        score_only=args.score_only,
+        source=args.source,
+    )
 
 
 if __name__ == "__main__":
