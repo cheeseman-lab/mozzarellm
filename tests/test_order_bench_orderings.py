@@ -220,37 +220,37 @@ class TestResolveOrderVariantIds:
 
 class TestApplyOrderVariant:
     def test_produces_new_route_with_correct_name(self):
-        base = ROUTE_REGISTRY["3b"]
+        base = ROUTE_REGISTRY["cot"]
         result = apply_order_variant(base, "O1")
-        assert result.name == "3b_O1_late_screen_context"
+        assert result.name == "cot_O1_late_screen_context"
 
     def test_preserves_base_fields(self):
-        base = ROUTE_REGISTRY["3a"]
+        base = ROUTE_REGISTRY["single_call"]
         result = apply_order_variant(base, "O")
         assert result.mode == base.mode
         assert result.mcp == base.mcp
         assert result.delivery == base.delivery
 
     def test_sets_order_metadata(self):
-        base = ROUTE_REGISTRY["3b"]
+        base = ROUTE_REGISTRY["cot"]
         result = apply_order_variant(base, "O3")
-        assert result.base_route == "3b"
+        assert result.base_route == "cot"
         assert result.order_variant == "early_output_format"
         assert result.order_hypothesis == "H4"
 
     def test_canonical_variant_has_empty_hypothesis(self):
-        base = ROUTE_REGISTRY["3a"]
+        base = ROUTE_REGISTRY["single_call"]
         result = apply_order_variant(base, "O")
         assert result.order_hypothesis == ""
 
     def test_component_order_is_tuple(self):
-        base = ROUTE_REGISTRY["3b"]
+        base = ROUTE_REGISTRY["cot"]
         result = apply_order_variant(base, "O4")
         assert isinstance(result.component_order, tuple)
         assert len(result.component_order) > 0
 
     def test_stepwise_route_has_user_turns(self):
-        base = ROUTE_REGISTRY["3c"]
+        base = ROUTE_REGISTRY["stepwise"]
         result = apply_order_variant(base, "O1")
         assert result.delivery == "multi_turn"
         assert len(result.system_components) > 0
@@ -258,33 +258,33 @@ class TestApplyOrderVariant:
         assert all(isinstance(t, StepwiseTurn) for t in result.user_turns)
 
     def test_stepwise_mcp_has_lit_turn(self):
-        base = ROUTE_REGISTRY["3c_mcp"]
+        base = ROUTE_REGISTRY["stepwise_mcp"]
         result = apply_order_variant(base, "O")
         lit_turns = [t for t in result.user_turns if t.mcp]
         assert len(lit_turns) == 1
         assert lit_turns[0].component == "LIT"
 
     def test_route_is_frozen(self):
-        base = ROUTE_REGISTRY["3a"]
+        base = ROUTE_REGISTRY["single_call"]
         result = apply_order_variant(base, "O")
         with pytest.raises(AttributeError):
             result.name = "modified"
 
     def test_unknown_variant_raises(self):
-        base = ROUTE_REGISTRY["3a"]
+        base = ROUTE_REGISTRY["single_call"]
         with pytest.raises(ValueError, match="Unknown order variant"):
             apply_order_variant(base, "nonexistent")
 
     def test_perturbation_changes_order(self):
         """Non-canonical variant should produce different order from canonical."""
-        base = ROUTE_REGISTRY["3b"]
+        base = ROUTE_REGISTRY["cot"]
         canonical = apply_order_variant(base, "O")
         perturbed = apply_order_variant(base, "O4")
         assert canonical.component_order != perturbed.component_order
 
     def test_same_components_different_order(self):
         """Perturbed variant should have same components, just reordered."""
-        base = ROUTE_REGISTRY["3a"]
+        base = ROUTE_REGISTRY["single_call"]
         canonical = apply_order_variant(base, "O")
         perturbed = apply_order_variant(base, "O1")
         assert set(canonical.component_order) == set(perturbed.component_order)
@@ -298,25 +298,25 @@ class TestApplyOrderVariant:
 
 class TestBuildOrderBenchmarkRoutes:
     def test_returns_correct_count(self):
-        base_routes = build_routes_from_config(["3a", "3b"])
+        base_routes = build_routes_from_config(["single_call", "cot"])
         result = build_order_benchmark_routes(base_routes, ["O", "O1"])
         assert len(result) == 4  # 2 routes × 2 variants
 
     def test_all_selector_string(self):
         """'all' selector produces routes for every variant."""
-        base_routes = build_routes_from_config(["3a"])
+        base_routes = build_routes_from_config(["single_call"])
         result = build_order_benchmark_routes(base_routes, "all")
         assert all(isinstance(r, Route) for r in result)
         assert len(result) == 5  # 1 route × 5 variants
 
     def test_range_selector_string(self):
         """Range selector like 'O1-O3' expands and includes canonical."""
-        base_routes = build_routes_from_config(["3a"])
+        base_routes = build_routes_from_config(["single_call"])
         result = build_order_benchmark_routes(base_routes, "O1-O3")
         assert len(result) == 4  # O + O1 + O2 + O3
 
     def test_invalid_variants_raise(self):
-        base_routes = build_routes_from_config(["3a"])
+        base_routes = build_routes_from_config(["single_call"])
         with pytest.raises(ValueError):
             build_order_benchmark_routes(base_routes, ["O", "invalid"])
 

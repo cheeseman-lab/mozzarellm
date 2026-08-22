@@ -4,8 +4,8 @@ Each Route is a frozen dataclass encoding a unique prompt-delivery configuration
 mode (standard / cot / stepwise), MCP toggle, delivery mechanism, and the ordered list of prompt components.
 More details on each component can be found in the README and prompt-assembly-routes-info.md.
 
-ROUTE_REGISTRY maps short names (3a, 3a_mcp, 3b, ...) to Route objects used by the orchestrator for prompt
-construction, model dispatch, and output tagging.
+ROUTE_REGISTRY maps route names (single_call, single_call_mcp, cot, ...) to Route objects used by
+the orchestrator for prompt construction, model dispatch, and output tagging.
 
 Phase 2 order-benchmarking extends Route with metadata fields (base_route,
 order_variant, order_hypothesis) so perturbed orderings can be traced back
@@ -54,40 +54,40 @@ class Route:
 # =============================================================================
 
 ROUTE_REGISTRY: dict[str, Route] = {
-    "3a": Route(
-        name="3a",
+    "single_call": Route(
+        name="single_call",
         mode="standard",
         mcp=False,
         delivery="single_call",
         component_order=("CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"),
         description="Standard flat prompt, no MCP.",
     ),
-    "3a_mcp": Route(
-        name="3a_mcp",
+    "single_call_mcp": Route(
+        name="single_call_mcp",
         mode="standard",
         mcp=True,
         delivery="single_call",
         component_order=("CAT", "SC", "GCR", "NPR", "UPR", "PCC", "LIT", "O"),
         description="Standard flat prompt with PubMed MCP literature validation.",
     ),
-    "3b": Route(
-        name="3b",
+    "cot": Route(
+        name="cot",
         mode="cot",
         mcp=False,
         delivery="single_call",
         component_order=("CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cO"),
         description="Chain-of-thought numbered steps, single call, no MCP.",
     ),
-    "3b_mcp": Route(
-        name="3b_mcp",
+    "cot_mcp": Route(
+        name="cot_mcp",
         mode="cot",
         mcp=True,
         delivery="single_call",
         component_order=("CAT", "SC", "cPH", "cGCR", "cPri", "LIT", "cPSC", "cVer", "cO"),
         description="Chain-of-thought numbered steps with PubMed MCP.",
     ),
-    "3c": Route(
-        name="3c",
+    "stepwise": Route(
+        name="stepwise",
         mode="stepwise",
         mcp=False,
         delivery="multi_turn",
@@ -103,8 +103,8 @@ ROUTE_REGISTRY: dict[str, Route] = {
         ),
         description="Stepwise multi-turn, no MCP.",
     ),
-    "3c_mcp": Route(
-        name="3c_mcp",
+    "stepwise_mcp": Route(
+        name="stepwise_mcp",
         mode="stepwise",
         mcp=True,
         delivery="multi_turn",

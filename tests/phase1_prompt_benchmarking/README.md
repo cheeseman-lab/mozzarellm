@@ -85,12 +85,12 @@ Each **experiment directory** contains:
 - **delivery** -- *single_call* or *multi_turn*. Stepwise routes use multi_turn; standard and cot use single_call.
 - **component_order** -- the ordered tuple of shorthand keys (CAT, SC, GCR, NPR, UPR, PCC, O, cPH, cGCR, cPri, cPSC, cVer, cO, LIT) that defines what goes into the prompt and in what sequence.
 - **variant** -- a named perturbation of component_order relative to the canonical baseline (Phase 2 only). Defined in `order_bench_orderings.py`.
-- **base route** -- the Phase 1 route (e.g. 3a, 3b) from which an order variant is derived. The canonical variant preserves the base route's original component_order.
+- **base route** -- the Phase 1 route (e.g. single_call, cot) from which an order variant is derived. The canonical variant preserves the base route's original component_order.
 - **replicate** -- repeated execution of the same prompt on the same input. Used to measure reasoning stability at a given temperature.
 
 ## Benchmark Phases
 
-Phase 1 -- Architecture: Compares zeroshot prompting, CoT prompting, and stepwise CoT prompting toggling mcp on and off. Mechanistically, this orchestrates 6 routes across 3 modes (standard, cot, stepwise) each with and without MCP. Routes 3a/3a_mcp use flat concatenation, 3b/3b_mcp use numbered CoT steps in a single call, and 3c/3c_mcp deliver steps as separate API turns. Run all 6 with `arch_bench_default.yaml` or pick a subset in a custom config.
+Phase 1 -- Architecture: Compares zeroshot prompting, CoT prompting, and stepwise CoT prompting toggling mcp on and off. Mechanistically, this orchestrates 6 routes across 3 modes (standard, cot, stepwise) each with and without MCP. Routes single_call/single_call_mcp use flat concatenation, cot/cot_mcp use numbered CoT steps in a single call, and stepwise/stepwise_mcp deliver steps as separate API turns. Run all 6 with `arch_bench_default.yaml` or pick a subset in a custom config.
 
 Phase 2 -- Order: Holds the mode and MCP constant while permuting component_order. Five variants (canonical + 4 perturbations) are crossed against one or more base routes. Each perturbation tests a specific hypothesis about positional sensitivity. Run with any `order_bench_*.yaml` config.
 
@@ -164,7 +164,7 @@ All parameters below are YAML keys. Defaults are shown in parentheses. Parsed by
 
 
 **routes:** <--Phase 1 Only
-- **include** (all 6) -- list of route names to run: 3a, 3a_mcp, 3b, 3b_mcp, 3c, 3c_mcp. 
+- **include** (all 6) -- list of route names to run: single_call, single_call_mcp, cot, cot_mcp, stepwise, stepwise_mcp. 
 
 **screens:** 
 - **include** ("all" or list) -- which screens to include. Use "all" or a list like `[denali, whitney]`.
@@ -193,7 +193,7 @@ All parameters below are YAML keys. Defaults are shown in parentheses. Parsed by
 
 **order_benchmark:** <--Phase 2 Only
 - **enabled** (false) -- when true, ignores `routes.include` and instead builds routes from base_routes x variants
-- **base_routes** -- list of Phase 1 route names to permute (e.g. [3a, 3b])
+- **base_routes** -- list of Phase 1 route names to permute (e.g. [single_call, cot])
 - **variants** -- list of variant names: canonical, late_screen_context, prioritization_before_classification, early_output_format, delayed_task_anchor
 
 ## Running the Trace Parser

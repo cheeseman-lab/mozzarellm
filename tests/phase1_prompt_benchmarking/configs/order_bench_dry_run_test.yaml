@@ -32,7 +32,7 @@ run:
 order_benchmark:
   enabled: true
   base_routes:
-    - 3b
+    - cot
   variants:
     - O
     - O1

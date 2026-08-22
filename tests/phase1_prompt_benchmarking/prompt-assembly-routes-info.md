@@ -11,12 +11,12 @@ Arbitrary ordering of shorthand keys via assemble_from_component_order(). Keys f
 Route 3 — Mode-Based Defaults (what the notebook currently uses)
 | Route   | MODE     | USE_MCP | Components Assembled                                                          | Request Type                   |
 |---------|----------|---------|-------------------------------------------------------------------------------|--------------------------------|
-| 3a      | standard | False   | CAT → SC → GCR → NPR → UPR → PCC → O (7)                                    | Flat, single call              |
-| 3a+mcp  | standard | True    | CAT → SC → GCR → NPR → UPR → PCC → LIT → O (8)                              | Flat, single call w/ PubMed    |
-| 3b      | cot      | False   | CAT → SC → cPH → cGCR → cPri → cPSC → cVer → cO (8 numbered)               | Single call                    |
-| 3b+mcp  | cot      | True    | CAT → SC → cPH → cGCR → cPri → LIT → cPSC → cVer → cO (9 numbered)         | Single call w/ PubMed          |
-| 3c      | stepwise | False   | System: CAT+SC; Turns: cPH → cGCR → cPri → cPSC → cVer → cO (6 turns)       | Multi-turn                     |
-| 3c+mcp  | stepwise | True    | System: CAT+SC; Turns: cPH → cGCR → cPri → LIT(mcp) → cPSC → cVer → cO (7) | Multi-turn, MCP on lit turn    |
+| single_call      | standard | False   | CAT → SC → GCR → NPR → UPR → PCC → O (7)                                    | Flat, single call              |
+| single_call+mcp  | standard | True    | CAT → SC → GCR → NPR → UPR → PCC → LIT → O (8)                              | Flat, single call w/ PubMed    |
+| cot      | cot      | False   | CAT → SC → cPH → cGCR → cPri → cPSC → cVer → cO (8 numbered)               | Single call                    |
+| cot+mcp  | cot      | True    | CAT → SC → cPH → cGCR → cPri → LIT → cPSC → cVer → cO (9 numbered)         | Single call w/ PubMed          |
+| stepwise      | stepwise | False   | System: CAT+SC; Turns: cPH → cGCR → cPri → cPSC → cVer → cO (6 turns)       | Multi-turn                     |
+| stepwise+mcp  | stepwise | True    | System: CAT+SC; Turns: cPH → cGCR → cPri → LIT(mcp) → cPSC → cVer → cO (7) | Multi-turn, MCP on lit turn    |
 
 Key difference between standard and CoT: standard uses baseline components directly
 (GCR, NPR, UPR, PCC, O as separate blocks), while CoT uses wrapped versions

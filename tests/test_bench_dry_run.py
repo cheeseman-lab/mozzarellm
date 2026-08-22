@@ -26,7 +26,7 @@ from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_r
 class TestMockOutputs:
     def test_mock_parsed_non_mcp(self):
         genes = ["A", "B", "C", "D", "E"]
-        parsed = generate_mock_parsed_output("21", genes, ROUTE_REGISTRY["3a"])
+        parsed = generate_mock_parsed_output("21", genes, ROUTE_REGISTRY["single_call"])
         assert parsed["cluster_id"] == "21"
         assert parsed["pathway_confidence"] == "Low"
         assert set(parsed["established_genes"]) == set(genes)
@@ -34,12 +34,12 @@ class TestMockOutputs:
 
     def test_mock_parsed_mcp(self):
         genes = ["X", "Y"]
-        parsed = generate_mock_parsed_output("5", genes, ROUTE_REGISTRY["3a_mcp"])
+        parsed = generate_mock_parsed_output("5", genes, ROUTE_REGISTRY["single_call_mcp"])
         assert "literature_informed_reclassifications" in parsed
         assert "literature_informed_pathway_revision" in parsed
 
     def test_mock_raw_outputs(self):
-        raw = generate_mock_raw_outputs(ROUTE_REGISTRY["3a"])
+        raw = generate_mock_raw_outputs(ROUTE_REGISTRY["single_call"])
         for key in ("response_text", "tool_calls", "input_tokens", "elapsed_s", "error", "steps"):
             assert key in raw
 

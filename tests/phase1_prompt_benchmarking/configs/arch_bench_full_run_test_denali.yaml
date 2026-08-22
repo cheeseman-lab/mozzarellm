@@ -27,8 +27,8 @@ run:
 architecture_benchmark:
   enabled: true
   base_routes:
-    - 3a
-    - 3c_mcp
+    - single_call
+    - stepwise_mcp
 
 screens:
   include:

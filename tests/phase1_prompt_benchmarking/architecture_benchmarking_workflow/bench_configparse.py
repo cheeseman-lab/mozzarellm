@@ -72,7 +72,7 @@ class TimingConfig:
 class ArchitectureBenchmarkConfig:
     enabled: bool = True
     base_routes: list[str] = field(
-        default_factory=lambda: ["3a", "3a_mcp", "3b", "3b_mcp", "3c", "3c_mcp"]
+        default_factory=lambda: ["single_call", "single_call_mcp", "cot", "cot_mcp", "stepwise", "stepwise_mcp"]
     )
 
 
@@ -94,7 +94,7 @@ class WordingBenchmarkConfig:
     """
 
     enabled: bool = False
-    base_routes: list[str] = field(default_factory=lambda: ["3a"])
+    base_routes: list[str] = field(default_factory=lambda: ["single_call"])
     # "all", a range string like "W1-W5", or an explicit list like ["W1", "W3"].
     targets: str | list[str] = "all"
     default_source: str | None = None
@@ -295,7 +295,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
         wb = raw["wording_benchmark"]
         cfg.wording_benchmark = WordingBenchmarkConfig(
             enabled=wb.get("enabled", False),
-            base_routes=wb.get("base_routes", ["3a"]),
+            base_routes=wb.get("base_routes", ["single_call"]),
             targets=wb.get("targets", "all"),
             default_source=wb.get("default_source"),
             force_source=wb.get("force_source"),

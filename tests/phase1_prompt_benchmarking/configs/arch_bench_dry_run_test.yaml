@@ -29,8 +29,8 @@ run:
 architecture_benchmark:
   enabled: true
   base_routes:
-    - 3a
-    - 3b
+    - single_call
+    - cot
 
 screens:
   include:

@@ -133,7 +133,7 @@ may still contain valuable discovery candidates.
 # =============================================================================
 # CoT components (cGCR, cPri, cPSC) embed their baseline counterparts at
 # import time, so overriding GCR/NPR/UPR/PCC has NO effect on them.  To run
-# wording experiments on CoT/stepwise routes (3b, 3c) the registry must also
+# wording experiments on CoT/stepwise routes (cot, stepwise) the registry must also
 # contain standalone CoT-framed replacements keyed by the CoT shorthand.
 
 # cGCR (W3 on CoT routes): imperative CoT gene-categorization step.
@@ -417,7 +417,7 @@ When uncertain between two adjacent levels, prefer the lower confidence. Flaggin
 # CoT-native ports of W23 decisions (Phase 4 mode anchor).
 # cGCR embeds GCR_FRAME_DECISION_TREE; cPri embeds NPR/UPR_FRAME_SIMPLE;
 # cPSC embeds PCC_FRAME_SIMPLE + VER_PRECONDITION. Same tuning as W23 zero-shot,
-# just placed in CoT/stepwise component slots so routes 3b/3c use W23's calls.
+# just placed in CoT/stepwise component slots so routes cot/stepwise use W23's calls.
 # =============================================================================
 
 cGCR_W23_DECISION_TREE = f"""GENE CATEGORIZATION (cite evidence):
@@ -458,7 +458,7 @@ WORDING_ALTERNATE_SET_REGISTRY: dict[str, dict[str, str]] = {
         "NPR": NPR_ALT_V1,
         "UPR": UPR_ALT_V1,
         "PCC": PCC_ALT_V1,
-        # CoT/stepwise equivalents — needed for overrides on 3b/3c routes
+        # CoT/stepwise equivalents — needed for overrides on cot/stepwise routes
         "cGCR": cGCR_ALT_V1,
         "cPri": cPri_ALT_V1,
         "cPSC": cPSC_ALT_V1,
@@ -613,7 +613,7 @@ WORDING_ALTERNATE_SET_REGISTRY: dict[str, dict[str, str]] = {
         "UPR": UPR_FRAME_SIMPLE,
         "PCC": PCC_FRAME_SIMPLE + VER_PRECONDITION,
         # CoT-native ports — carry W23 decisions into cGCR/cPri/cPSC so the
-        # same text applies when W23 is used on route 3b/3c (mode axis).
+        # same text applies when W23 is used on route cot/stepwise (mode axis).
         "cGCR": cGCR_W23_DECISION_TREE,
         "cPri": cPri_W23_SIMPLE,
         "cPSC": cPSC_W23_SIMPLE_PRECONDITION,

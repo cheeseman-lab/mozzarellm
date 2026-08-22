@@ -165,13 +165,13 @@ class TestConfigLoading:
                 "experiment_id": "ab_test",
                 "architecture_benchmark": {
                     "enabled": True,
-                    "base_routes": ["3a", "3b"],
+                    "base_routes": ["single_call", "cot"],
                 },
             },
         )
         cfg = load_config(cfg_file)
         assert cfg.architecture_benchmark.enabled is True
-        assert cfg.architecture_benchmark.base_routes == ["3a", "3b"]
+        assert cfg.architecture_benchmark.base_routes == ["single_call", "cot"]
 
     def test_architecture_benchmark_defaults(self, tmp_path):
         cfg_file = _write_yaml(tmp_path, {"experiment_id": "ab_def"})
@@ -184,12 +184,12 @@ class TestConfigLoading:
             tmp_path,
             {
                 "experiment_id": "legacy",
-                "routes": {"include": ["3a", "3c"]},
+                "routes": {"include": ["single_call", "stepwise"]},
             },
         )
         cfg = load_config(cfg_file)
         assert cfg.architecture_benchmark.enabled is True
-        assert cfg.architecture_benchmark.base_routes == ["3a", "3c"]
+        assert cfg.architecture_benchmark.base_routes == ["single_call", "stepwise"]
 
     def test_order_benchmark_section(self, tmp_path):
         cfg_file = _write_yaml(
@@ -198,14 +198,14 @@ class TestConfigLoading:
                 "experiment_id": "ob_test",
                 "order_benchmark": {
                     "enabled": True,
-                    "base_routes": ["3a", "3b"],
+                    "base_routes": ["single_call", "cot"],
                     "variants": ["reverse", "shuffle"],
                 },
             },
         )
         cfg = load_config(cfg_file)
         assert cfg.order_benchmark.enabled is True
-        assert cfg.order_benchmark.base_routes == ["3a", "3b"]
+        assert cfg.order_benchmark.base_routes == ["single_call", "cot"]
         assert cfg.order_benchmark.variants == ["reverse", "shuffle"]
 
     def test_wording_benchmark_section(self, tmp_path):
@@ -215,7 +215,7 @@ class TestConfigLoading:
                 "experiment_id": "wb_test",
                 "wording_benchmark": {
                     "enabled": True,
-                    "base_routes": ["3a"],
+                    "base_routes": ["single_call"],
                     "targets": ["W1", "W3"],
                     "default_source": "gpt4o",
                 },
@@ -223,7 +223,7 @@ class TestConfigLoading:
         )
         cfg = load_config(cfg_file)
         assert cfg.wording_benchmark.enabled is True
-        assert cfg.wording_benchmark.base_routes == ["3a"]
+        assert cfg.wording_benchmark.base_routes == ["single_call"]
         assert cfg.wording_benchmark.targets == ["W1", "W3"]
         assert cfg.wording_benchmark.default_source == "gpt4o"
 

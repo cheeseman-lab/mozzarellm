@@ -180,8 +180,8 @@ def construct_prompts(
     # Label used for the on-disk prompt filename; defaults to the route name.
     prompt_label = condition_name or route.name
 
-    # For 3a/3b routes: save system prompt once with stable filename, reuse on subsequent calls.
-    # For 3c (stepwise) routes: build system prompt in memory only
+    # For single_call/cot routes: save system prompt once with stable filename, reuse on subsequent calls.
+    # For stepwise (stepwise) routes: build system prompt in memory only
     # to save space, the multi-turn conversation is recorded in traces/prompts.jsonl only -- can extract later if needed.
     if route.delivery == "multi_turn":
         if is_order_variant:

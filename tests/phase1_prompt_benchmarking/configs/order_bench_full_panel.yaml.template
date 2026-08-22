@@ -30,22 +30,22 @@ run:
 architecture_benchmark:
   enabled: false
   base_routes:
-    - 3a
-    - 3a_mcp
-    - 3b
-    - 3b_mcp
-    - 3c
-    - 3c_mcp
+    - single_call
+    - single_call_mcp
+    - cot
+    - cot_mcp
+    - stepwise
+    - stepwise_mcp
 
 order_benchmark:
   enabled: false
   base_routes:
-    - 3a
-    - 3a_mcp
-    - 3b
-    - 3b_mcp
-    - 3c
-    - 3c_mcp
+    - single_call
+    - single_call_mcp
+    - cot
+    - cot_mcp
+    - stepwise
+    - stepwise_mcp
   variants:
     - O
     - O1
@@ -56,12 +56,12 @@ order_benchmark:
 wording_benchmark:
   enabled: false
   base_routes:
-    - 3a
-    - 3a_mcp
-    - 3b
-    - 3b_mcp
-    - 3c
-    - 3c_mcp
+    - single_call
+    - single_call_mcp
+    - cot
+    - cot_mcp
+    - stepwise
+    - stepwise_mcp
   targets:
     - W0
     - W1

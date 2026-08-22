@@ -31,12 +31,12 @@ run:
 architecture_benchmark:
   enabled: true
   base_routes:
-    - 3a
-    - 3a_mcp
-    - 3b
-    - 3b_mcp
-    - 3c
-    - 3c_mcp
+    - single_call
+    - single_call_mcp
+    - cot
+    - cot_mcp
+    - stepwise
+    - stepwise_mcp
 
 screens:
   include: all

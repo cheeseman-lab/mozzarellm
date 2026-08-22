@@ -83,7 +83,7 @@ class TestPhase1BackwardCompatibility:
         self, tmp_path, mock_bundle_path, mock_screen_context_path
     ):
         """Phase 1 route should use mode-based assembly (no component_order)."""
-        route = ROUTE_REGISTRY["3a"]
+        route = ROUTE_REGISTRY["single_call"]
         assert route.order_variant == ""  # Phase 1
 
         with patch(
@@ -117,7 +117,7 @@ class TestPhase2ComponentOrder:
     def test_single_call_route_passes_component_order(
         self, tmp_path, mock_bundle_path, mock_screen_context_path
     ):
-        base = ROUTE_REGISTRY["3a"]
+        base = ROUTE_REGISTRY["single_call"]
         order_route = apply_order_variant(base, "O1")
 
         with patch(
@@ -142,7 +142,7 @@ class TestPhase2ComponentOrder:
     def test_cot_route_passes_component_order(
         self, tmp_path, mock_bundle_path, mock_screen_context_path
     ):
-        base = ROUTE_REGISTRY["3b"]
+        base = ROUTE_REGISTRY["cot"]
         order_route = apply_order_variant(base, "O3")
 
         with patch(
@@ -167,7 +167,7 @@ class TestPhase2ComponentOrder:
         self, tmp_path, mock_bundle_path, mock_screen_context_path
     ):
         """Stepwise order-variant should pass system_components, not full order."""
-        base = ROUTE_REGISTRY["3c"]
+        base = ROUTE_REGISTRY["stepwise"]
         order_route = apply_order_variant(base, "O1")
 
         with (
@@ -206,7 +206,7 @@ class TestPhase2ComponentOrder:
         self, tmp_path, mock_bundle_path, mock_screen_context_path
     ):
         """Phase 1 stepwise route should use compose_stepwise_user_turns (not from_route)."""
-        route = ROUTE_REGISTRY["3c"]
+        route = ROUTE_REGISTRY["stepwise"]
 
         with (
             patch(
@@ -250,7 +250,7 @@ class TestOrderVariantPromptContent:
         self, tmp_path, mock_bundle_path, mock_screen_context_path
     ):
         """late_screen_context should place SC after rules, not right after CAT."""
-        base = ROUTE_REGISTRY["3a"]
+        base = ROUTE_REGISTRY["single_call"]
         canonical = apply_order_variant(base, "O")
         perturbed = apply_order_variant(base, "O1")
 
@@ -262,7 +262,7 @@ class TestOrderVariantPromptContent:
 
     def test_early_output_format_moves_o(self):
         """early_output_format should place O near the start."""
-        base = ROUTE_REGISTRY["3a"]
+        base = ROUTE_REGISTRY["single_call"]
         canonical = apply_order_variant(base, "O")
         perturbed = apply_order_variant(base, "O3")
 
@@ -272,7 +272,7 @@ class TestOrderVariantPromptContent:
 
     def test_delayed_task_anchor_moves_cat(self):
         """delayed_task_anchor should move CAT away from position 0."""
-        base = ROUTE_REGISTRY["3b"]
+        base = ROUTE_REGISTRY["cot"]
         canonical = apply_order_variant(base, "O")
         perturbed = apply_order_variant(base, "O4")
 
