@@ -172,6 +172,7 @@ def construct_prompts(
     overwrite_outputs: bool = False,
     component_overrides: dict[str, str] | None = None,
     condition_name: str | None = None,
+    source: str = "both",
 ) -> dict:
     """Construct system and user prompts for a given route+cluster.
 
@@ -183,6 +184,8 @@ def construct_prompts(
         condition_name: Stable label for cached prompt filenames. For wording runs
             this is the per-condition run-route name so different wording conditions
             on the same base route do not collide in the prompt cache.
+        source: Evidence source the run's prompts carry ("uniprot" / "affinage" /
+            "both"); the master bundle is reduced to that source's view at assembly.
     """
     # Build a pseudo cluster_to_bundle_path_map for the existing utility
     cluster_to_bundle_map = {str(cluster_id): bundle_path}
@@ -241,7 +244,7 @@ def construct_prompts(
                 )
 
     user_prompt = make_single_cluster_analysis_user_prompt(
-        cluster_id, screen_name, cluster_to_bundle_map
+        cluster_id, screen_name, cluster_to_bundle_map, source=source
     )
 
     stepwise_turns = None
@@ -370,6 +373,7 @@ def execute_single_run(
         overwrite_outputs=config.run.overwrite_outputs,
         component_overrides=component_overrides,
         condition_name=condition_name,
+        source=config.paths.bundle_source,
     )
     system_prompt = prompts["system_prompt"]
     user_prompt = prompts["user_prompt"]

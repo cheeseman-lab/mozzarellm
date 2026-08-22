@@ -565,3 +565,65 @@ class TestResolvedParams:
         _run_benchmark_loop(cfg, run_specs=[], config_snapshot={})
         manifest = json.loads((tmp_path / "manifest_dry" / "run_manifest.json").read_text())
         assert "model_resolved_params" not in manifest
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TestEvidenceSourceThreading
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class TestEvidenceSourceThreading:
+    """bundle_source reaches prompt assembly: each run's prompts carry only its source."""
+
+    def _run_with_source(self, tmp_path, source: str) -> str:
+        output_dir = tmp_path / f"output_{source}"
+        output_dir.mkdir()
+        bundle_path = tmp_path / f"{source}_denali__cluster_21__bundle.json"
+        bundle_path.write_text(
+            json.dumps(
+                {
+                    "cluster_genes": [
+                        {
+                            "gene_symbol": "GeneA",
+                            "UniProt_functional_annotation": "uniprot text",
+                            "affinage_functional_annotation": "affinage text",
+                            "affinage_audit_note": "flagged",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        _, ctx_path = _setup_bundle_and_context(tmp_path)
+        config = _make_dry_run_config(output_dir)
+        config.paths.bundle_source = source
+        execute_single_run(
+            route=ROUTE_REGISTRY["single_call"],
+            screen_name="denali",
+            cluster_id="21",
+            bundle_path=bundle_path,
+            screen_context_path=ctx_path,
+            replicate=1,
+            config=config,
+            client=None,
+            output_dir=output_dir,
+        )
+        prompt_record = json.loads((output_dir / "prompts.jsonl").read_text().splitlines()[0])
+        return prompt_record["user_prompt"]
+
+    def test_uniprot_prompt_carries_no_affinage_fields(self, tmp_path):
+        user_prompt = self._run_with_source(tmp_path, "uniprot")
+        assert "UniProt_functional_annotation" in user_prompt
+        assert "affinage_functional_annotation" not in user_prompt
+        assert "affinage_audit_note" not in user_prompt
+
+    def test_affinage_prompt_carries_no_uniprot_fields(self, tmp_path):
+        user_prompt = self._run_with_source(tmp_path, "affinage")
+        assert "affinage_functional_annotation" in user_prompt
+        assert "affinage_audit_note" in user_prompt
+        assert "UniProt_functional_annotation" not in user_prompt
+
+    def test_both_prompt_carries_both_sources(self, tmp_path):
+        user_prompt = self._run_with_source(tmp_path, "both")
+        assert "UniProt_functional_annotation" in user_prompt
+        assert "affinage_functional_annotation" in user_prompt
