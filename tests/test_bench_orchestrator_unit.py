@@ -18,14 +18,20 @@ try:
     from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_orchestrator import (
         _build_run_id,
         _build_timing_dict,
+        _client_from_config,
         _filter_clusters,
         _resolve_bundle_path,
         _resolve_screen_context_path,
+        _run_benchmark_loop,
         execute_single_run,
+    )
+    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow import (
+        bench_orchestrator,
     )
     from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_configparse import (
         BenchmarkConfig,
         ClusterFilter,
+        ModelConfig,
         PathsConfig,
         RunConfig,
         TimingConfig,
@@ -482,3 +488,80 @@ class TestDryRunExecution:
         pairs = _filter_clusters(df, cfg)
         assert len(pairs) == 2
         assert set(pairs) == {("denali", "21"), ("aconcagua", "5")}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TestResolvedParams
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class TestResolvedParams:
+    def test_client_built_from_full_model_config(self):
+        """_client_from_config passes every model param through, not just the name."""
+        cfg = BenchmarkConfig()
+        cfg.model = ModelConfig(
+            model_name="claude-sonnet-5",
+            temperature=0.7,
+            max_tokens=16000,
+            top_p=0.9,
+            top_k=40,
+            thinking=False,
+        )
+        client = _client_from_config(cfg, api_key="test-key")
+        assert client.temperature == 0.7
+        assert client.max_tokens == 16000
+        assert client.top_p == 0.9
+        assert client.top_k == 40
+        assert client.thinking is False
+
+    def test_manifest_records_resolved_params(self, tmp_path, monkeypatch):
+        """run_manifest.json carries what the client resolved, not just what was configured."""
+
+        class _StubClient:
+            def _resolve_params(self):
+                self.resolved_params = {
+                    "sent": {},
+                    "dropped": ["temperature"],
+                    "thinking": "disabled",
+                }
+
+        monkeypatch.setattr(bench_orchestrator, "create_client", lambda **kw: _StubClient())
+        clusters_csv = tmp_path / "clusters.csv"
+        clusters_csv.write_text("screen_name,cluster_id,gene_symbol\n")
+
+        cfg = BenchmarkConfig()
+        cfg.experiment_id = "manifest_test"
+        cfg.paths = PathsConfig(
+            benchmark_inputs_dir=tmp_path,
+            benchmark_clusters_csv=clusters_csv,
+            evidence_bundles_dir=tmp_path,
+            output_dir=tmp_path,
+        )
+        cfg.run = RunConfig(dry_run=False, overwrite_outputs=True)
+
+        _run_benchmark_loop(cfg, run_specs=[], config_snapshot={})
+        manifest = json.loads((tmp_path / "manifest_test" / "run_manifest.json").read_text())
+        assert manifest["model_resolved_params"] == {
+            "sent": {},
+            "dropped": ["temperature"],
+            "thinking": "disabled",
+        }
+
+    def test_dry_run_manifest_omits_resolved_params(self, tmp_path):
+        """Dry runs build no client, so the manifest makes no resolved-params claim."""
+        clusters_csv = tmp_path / "clusters.csv"
+        clusters_csv.write_text("screen_name,cluster_id,gene_symbol\n")
+
+        cfg = BenchmarkConfig()
+        cfg.experiment_id = "manifest_dry"
+        cfg.paths = PathsConfig(
+            benchmark_inputs_dir=tmp_path,
+            benchmark_clusters_csv=clusters_csv,
+            evidence_bundles_dir=tmp_path,
+            output_dir=tmp_path,
+        )
+        cfg.run = RunConfig(dry_run=True, overwrite_outputs=True)
+
+        _run_benchmark_loop(cfg, run_specs=[], config_snapshot={})
+        manifest = json.loads((tmp_path / "manifest_dry" / "run_manifest.json").read_text())
+        assert "model_resolved_params" not in manifest

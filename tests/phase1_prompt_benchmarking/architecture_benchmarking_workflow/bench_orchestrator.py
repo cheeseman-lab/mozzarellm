@@ -65,6 +65,20 @@ from .wording_bench_targets import build_wording_override_runs
 _IO_LOCK = threading.Lock()
 
 
+def _client_from_config(config: BenchmarkConfig, api_key: str | None):
+    """Build an LLM client from the full model config (temperature, thinking, etc.)."""
+    m = config.model
+    return create_client(
+        model=m.model_name,
+        temperature=m.temperature,
+        max_tokens=m.max_tokens,
+        top_p=m.top_p,
+        top_k=m.top_k,
+        api_key=api_key,
+        thinking=m.thinking,
+    )
+
+
 @dataclass(frozen=True)
 class RunSpec:
     """Phase-agnostic work item for the unified benchmark loop.
@@ -711,13 +725,14 @@ def _run_benchmark_loop(
     # stores last_usage on self, so a shared instance would cross-contaminate
     # token/cost accounting across threads).
     api_key = None
+    probe = None
     if not config.run.dry_run:
         api_key = (
             os.getenv("ANTHROPIC_API_KEY")
             or os.getenv("OPENAI_API_KEY")
             or os.getenv("GOOGLE_API_KEY")
         )
-        probe = create_client(model=config.model.model_name, api_key=api_key)
+        probe = _client_from_config(config, api_key)
         print(f"  Client: {type(probe).__name__} ({config.model.model_name})")
 
     # Build the flat work list, resolving paths and applying skips up front.
@@ -759,11 +774,7 @@ def _run_benchmark_loop(
         item: tuple[RunSpec, str, str, Path, Path, int],
     ) -> dict:
         spec, screen_name, cluster_id, bundle_path, screen_context_path, rep = item
-        run_client = (
-            None
-            if config.run.dry_run
-            else create_client(model=config.model.model_name, api_key=api_key)
-        )
+        run_client = None if config.run.dry_run else _client_from_config(config, api_key)
         return execute_single_run(
             route=spec.route,
             screen_name=screen_name,
@@ -825,6 +836,11 @@ def _run_benchmark_loop(
     }
     if manifest_extra:
         manifest.update(manifest_extra)
+    # Record the model params the client actually sent (resolution is
+    # deterministic per config+model, so the probe speaks for every run client).
+    if probe is not None and hasattr(probe, "_resolve_params"):
+        probe._resolve_params()
+        manifest["model_resolved_params"] = probe.resolved_params
     (output_dir / "run_manifest.json").write_text(
         json.dumps(manifest, indent=2, default=str), encoding="utf-8"
     )

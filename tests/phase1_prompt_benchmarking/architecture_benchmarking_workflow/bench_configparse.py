@@ -18,6 +18,7 @@ class ModelConfig:
     max_tokens: int = 4000
     top_p: float | None = None
     top_k: int | None = None
+    thinking: bool | None = None  # None = model default, False = off, True = on
 
 
 @dataclass
@@ -199,6 +200,7 @@ def load_config(config_path: Path) -> BenchmarkConfig:
             max_tokens=m.get("max_tokens", cfg.model.max_tokens),
             top_p=m.get("top_p"),
             top_k=m.get("top_k"),
+            thinking=m.get("thinking"),
         )
 
     # Run
