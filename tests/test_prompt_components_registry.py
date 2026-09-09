@@ -11,7 +11,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (  # noqa: E402
+from benchmarks.architecture_benchmarking_workflow.bench_routes import (  # noqa: E402
     ROUTE_REGISTRY,
 )
 from mozzarellm.prompt_components import (  # noqa: E402

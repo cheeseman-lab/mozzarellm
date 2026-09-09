@@ -10,14 +10,14 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow import (  # noqa: E402
+from benchmarks.architecture_benchmarking_workflow import (  # noqa: E402
     bench_experiment,
 )
-from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_evaluator import (  # noqa: E402
+from benchmarks.architecture_benchmarking_workflow.bench_evaluator import (  # noqa: E402
     N_REAL_GENES,
     MetricPanel,
 )
-from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_experiment import (  # noqa: E402
+from benchmarks.architecture_benchmarking_workflow.bench_experiment import (  # noqa: E402
     latest_run_dir,
     load_experiment,
     metric_value,
@@ -26,7 +26,7 @@ from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.be
 )
 
 SOURCE_YAML = (
-    Path(__file__).resolve().parents[1] / "benchmarks" / "phase1_prompt_benchmarking" / "experiments" / "source.yaml"
+    Path(__file__).resolve().parents[1] / "benchmarks" / "experiments" / "source.yaml"
 )
 
 # ---------------------------------------------------------------------------
@@ -517,10 +517,10 @@ def test_mode_yaml_parses_as_the_full_delivery_x_mcp_matrix():
 
 
 def test_order_variant_condition_reorders_the_route():
-    from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
+    from benchmarks.architecture_benchmarking_workflow.bench_routes import (
         ROUTE_REGISTRY,
     )
-    from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (  # noqa: E501
+    from benchmarks.architecture_benchmarking_workflow.order_bench_orderings import (  # noqa: E501
         apply_order_variant,
     )
 
