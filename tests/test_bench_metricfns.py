@@ -25,9 +25,6 @@ for _name, _subdir in [
         sys.modules[_name] = _m
 
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_metricfns import (
-    VALID_CONFIDENCE_VALUES,
-    VALID_NOVEL_SUBCLASSES,
-    VALID_UNCHARACTERIZED_SUBCLASSES,
     compute_all_metrics,
     compute_efficiency_metrics,
     compute_logical_metrics,

@@ -8,21 +8,17 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
-
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_trace_parser import (
     CSV_COLUMNS,
-    TRACE_FILENAME_RE,
     _extract_gene_rows,
     extract_predictions_from_traces,
     parse_trace_filename,
     write_prediction_csvs,
 )
-
 
 # ---- helpers ---------------------------------------------------------------
 

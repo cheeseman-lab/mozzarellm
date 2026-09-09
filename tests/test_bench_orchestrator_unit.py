@@ -15,16 +15,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 try:
     import pandas as pd
-    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_orchestrator import (
-        _build_run_id,
-        _build_timing_dict,
-        _client_from_config,
-        _filter_clusters,
-        _resolve_bundle_path,
-        _resolve_screen_context_path,
-        _run_benchmark_loop,
-        execute_single_run,
-    )
+
     from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow import (
         bench_orchestrator,
     )
@@ -36,9 +27,18 @@ try:
         RunConfig,
         TimingConfig,
     )
+    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_orchestrator import (
+        _build_run_id,
+        _build_timing_dict,
+        _client_from_config,
+        _filter_clusters,
+        _resolve_bundle_path,
+        _resolve_screen_context_path,
+        _run_benchmark_loop,
+        execute_single_run,
+    )
     from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
         ROUTE_REGISTRY,
-        Route,
     )
 
     _IMPORTS_OK = True
