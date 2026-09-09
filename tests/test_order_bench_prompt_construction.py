@@ -230,7 +230,8 @@ class TestPhase2ComponentOrder:
                 output_dir=tmp_path,
             )
 
-            mock_canonical_turns.assert_called_once_with(route.mcp)
+            # Canonical turns, with the caller's component overrides forwarded.
+            mock_canonical_turns.assert_called_once_with(route.mcp, None)
             mock_order_turns.assert_not_called()
 
 

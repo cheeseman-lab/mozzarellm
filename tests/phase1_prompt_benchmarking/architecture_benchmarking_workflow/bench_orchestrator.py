@@ -252,7 +252,7 @@ def construct_prompts(
         if is_order_variant and route.user_turns:
             stepwise_turns = compose_stepwise_turns_from_route(route, screen_context_path)
         else:
-            stepwise_turns = compose_stepwise_user_turns(route.mcp)
+            stepwise_turns = compose_stepwise_user_turns(route.mcp, component_overrides)
 
     return {
         "system_prompt": system_prompt,

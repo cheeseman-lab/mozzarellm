@@ -627,3 +627,30 @@ class TestEvidenceSourceThreading:
         user_prompt = self._run_with_source(tmp_path, "both")
         assert "UniProt_functional_annotation" in user_prompt
         assert "affinage_functional_annotation" in user_prompt
+
+
+class TestStepwiseTurnOverrides:
+    def test_component_override_reaches_the_stepwise_turn(self, tmp_path):
+        """A LIT-slot override lands in the stepwise MCP turn, not just the system prompt."""
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+        bundle_path, ctx_path = _setup_bundle_and_context(tmp_path)
+        config = _make_dry_run_config(output_dir)
+        record = execute_single_run(
+            route=ROUTE_REGISTRY["stepwise_mcp"],
+            screen_name="denali",
+            cluster_id="21",
+            bundle_path=bundle_path,
+            screen_context_path=ctx_path,
+            replicate=1,
+            config=config,
+            client=None,
+            output_dir=output_dir,
+            component_overrides={"LIT": "LITB OVERRIDE TEXT"},
+        )
+        prompts = json.loads((output_dir / "prompts.jsonl").read_text().splitlines()[0])
+        turns = prompts["stepwise_turns"]
+        lit_turns = [t for t in turns if t["mcp"]]
+        assert len(lit_turns) == 1
+        assert "LITB OVERRIDE TEXT" in lit_turns[0]["content"]
+        assert record["error"] is None
