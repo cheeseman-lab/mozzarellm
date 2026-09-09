@@ -65,7 +65,8 @@ from .bench_evaluator import (
 )
 from .bench_evaluator import audit_flag_diagnostics as _audit_flag_diagnostics
 from .bench_orchestrator import RunSpec, _build_config_snapshot, _run_benchmark_loop
-from .bench_routes import ROUTE_REGISTRY
+from .bench_routes import ROUTE_REGISTRY, Route
+from .order_bench_orderings import ORDER_VARIANTS, apply_order_variant
 
 PHASE1_DIR = Path(__file__).resolve().parents[1]
 INPUTS_DIR = PHASE1_DIR / "benchmark_inputs"
@@ -108,7 +109,7 @@ ABSTAIN_COHERENCE = "Low"
 
 # Keys a condition may set; anything a condition sets overrides the shared
 # ``run:`` block for that condition only.
-_CONDITION_KEYS = {"name", "bundle_source", "route", "component_overrides"}
+_CONDITION_KEYS = {"name", "bundle_source", "route", "component_overrides", "order_variant"}
 # ``uses: <experiment>.carry.<key>`` -- a cross-experiment input, resolved from
 # that experiment's state file at invocation.
 _USES_RE = re.compile(r"^(?P<experiment>\w+)\.carry\.(?P<key>\w+)$")
@@ -160,6 +161,12 @@ def load_experiment(yaml_path: Path) -> dict:
             raise ValueError(
                 f"{yaml_path.name}: condition {cond.get('name')!r} route "
                 f"{cond_route!r} not in registry"
+            )
+        variant = cond.get("order_variant")
+        if variant is not None and variant not in ORDER_VARIANTS:
+            raise ValueError(
+                f"{yaml_path.name}: condition {cond.get('name')!r} order_variant "
+                f"{variant!r} not in {sorted(ORDER_VARIANTS)}"
             )
         if uses_source == ("bundle_source" in cond):
             raise ValueError(
@@ -417,6 +424,14 @@ def panel_json(p: MetricPanel) -> dict:
     }
 
 
+def _condition_route(cond: dict, route_name: str) -> Route:
+    """The condition's Route: the registry route, reordered when it asks for it."""
+    route = ROUTE_REGISTRY[route_name]
+    if cond.get("order_variant"):
+        route = apply_order_variant(route, cond["order_variant"])
+    return route
+
+
 def _condition_config(
     exp: dict, label: str, bundle_source: str, stamp: str, dry_run: bool
 ) -> BenchmarkConfig:
@@ -549,7 +564,7 @@ def run_experiment(
             overrides = {**shared_overrides, **(cond.get("component_overrides") or {})}
             specs = [
                 RunSpec(
-                    route=ROUTE_REGISTRY[route_name],
+                    route=_condition_route(cond, route_name),
                     condition_name=condition,
                     component_overrides=overrides,
                 )
@@ -561,6 +576,7 @@ def run_experiment(
                     "condition": cond_name,
                     "bundle_source": bundle_source,
                     "route": route_name,
+                    "order_variant": cond.get("order_variant"),
                     "component_overrides": overrides,
                 },
             )

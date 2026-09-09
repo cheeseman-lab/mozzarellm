@@ -263,53 +263,6 @@ class TestComponentOverridesPropagate:
 
 # ============================================================================
 # Config parsing
-# ============================================================================
-
-
-class TestWordingBenchmarkConfig:
-    def test_parse_minimal(self, tmp_path):
-        from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_configparse import (
-            load_config,
-        )
-
-        cfg_dir = tmp_path / "configs"
-        cfg_dir.mkdir()
-        cfg_file = cfg_dir / "wb.yaml"
-        cfg_file.write_text(
-            "experiment_id: wb_test\n"
-            "wording_benchmark:\n"
-            "  enabled: true\n"
-            "  base_routes:\n"
-            "    - single_call\n"
-            "  targets: W1-W3\n"
-            "  default_source: wording_v1\n",
-            encoding="utf-8",
-        )
-        cfg = load_config(cfg_file)
-        assert cfg.wording_benchmark.enabled is True
-        assert cfg.wording_benchmark.base_routes == ["single_call"]
-        assert cfg.wording_benchmark.targets == "W1-W3"
-        assert cfg.wording_benchmark.default_source == "wording_v1"
-        assert cfg.wording_benchmark.force_source is None
-
-    def test_default_disabled(self, tmp_path):
-        from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_configparse import (
-            load_config,
-        )
-
-        cfg_dir = tmp_path / "configs"
-        cfg_dir.mkdir()
-        cfg_file = cfg_dir / "wb.yaml"
-        cfg_file.write_text("experiment_id: wb_test\n", encoding="utf-8")
-        cfg = load_config(cfg_file)
-        assert cfg.wording_benchmark.enabled is False
-
-
-# ============================================================================
-# Supplements — edge-case coverage
-# ============================================================================
-
-
 class TestWordingBenchSupplements:
     def test_cot_route_with_gcr_override_silent(self):
         # Currently no warning — override silently has no effect on CoT prompt

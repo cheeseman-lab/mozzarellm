@@ -122,22 +122,3 @@ ROUTE_REGISTRY: dict[str, Route] = {
         description="Stepwise multi-turn with MCP on literature turn only.",
     ),
 }
-
-
-def validate_route_names(names: list[str]) -> list[str]:
-    """Validate that all requested route names exist in the registry.
-
-    Returns the validated list unchanged if all are valid; raises ValueError otherwise.
-    """
-    invalid = [n for n in names if n not in ROUTE_REGISTRY]
-    if invalid:
-        raise ValueError(
-            f"Unknown route(s): {invalid}. Valid routes: {sorted(ROUTE_REGISTRY.keys())}"
-        )
-    return names
-
-
-def build_routes_from_config(route_names: list[str]) -> list[Route]:
-    """Build an ordered list of Route objects from a list of route names."""
-    validate_route_names(route_names)
-    return [ROUTE_REGISTRY[name] for name in route_names]

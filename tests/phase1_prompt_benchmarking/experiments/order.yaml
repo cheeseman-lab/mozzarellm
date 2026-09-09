@@ -1,0 +1,38 @@
+# The order experiment: positional sensitivity of the tuned prompt. Holds the
+# source and component *content* fixed (carried from mode/walkup) and permutes
+# the component order -- the O-variant catalog in order_bench_orderings, each
+# with its hypothesis. Order is applied to the single_call route: the walkup
+# tunes the single_call slots, so a verbatim order transplant onto cot/stepwise
+# (different slots) is out of scope; the mode winner is context, not the base.
+
+experiment: order
+description: component-order sensitivity of the tuned single_call prompt
+
+uses:
+  source: mode.carry.source
+  component_overrides: walkup.carry.final_component_texts
+
+model:
+  provider: anthropic
+  model_name: claude-sonnet-5
+  # temperature omitted: claude-sonnet-5 rejects non-default sampling params
+  max_tokens: 16000
+  thinking: false
+
+run:
+  replicates: 3
+  max_workers: 12
+  route: single_call
+
+conditions:  # what varies is component order; source + build are carried
+  - {name: O,  order_variant: O}   # canonical, dependency-respecting baseline
+  - {name: O1, order_variant: O1}  # late screen context (H3)
+  - {name: O2, order_variant: O2}  # prioritization before classification (H2)
+  - {name: O3, order_variant: O3}  # early output format (H4)
+  - {name: O4, order_variant: O4}  # delayed task anchor (H1)
+
+selection:
+  primary: coverage_weighted_category
+  metrics: [category, novel_subclass, unchar_subclass, coherence, coverage]
+
+carry: [source, order]  # carry.source = the resolved source; carry.order = winner

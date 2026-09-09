@@ -509,3 +509,46 @@ def test_mode_yaml_parses_as_the_full_delivery_x_mcp_matrix():
     }
     assert len(texts) == 1
     assert exp["carry"] == ["source", "mode"]
+
+
+# ---------------------------------------------------------------------------
+# Order-variant conditions
+# ---------------------------------------------------------------------------
+
+
+def test_order_variant_condition_reorders_the_route():
+    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
+        ROUTE_REGISTRY,
+    )
+    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (  # noqa: E501
+        apply_order_variant,
+    )
+
+    plain = bench_experiment._condition_route({"name": "O"}, "single_call")
+    assert plain is ROUTE_REGISTRY["single_call"]
+    reordered = bench_experiment._condition_route(
+        {"name": "O1", "order_variant": "O1"}, "single_call"
+    )
+    expected = apply_order_variant(ROUTE_REGISTRY["single_call"], "O1")
+    assert reordered.component_order == expected.component_order
+    assert reordered.component_order != plain.component_order
+
+
+def test_unknown_order_variant_rejected(tmp_path):
+    text = _MINIMAL_YAML.replace(
+        "{name: a, bundle_source: uniprot}",
+        "{name: a, bundle_source: uniprot, order_variant: O9}",
+    )
+    with pytest.raises(ValueError, match="order_variant 'O9'"):
+        load_experiment(_write_yaml(tmp_path, text))
+
+
+ORDER_YAML = SOURCE_YAML.parent / "order.yaml"
+
+
+def test_order_yaml_parses_with_the_variant_catalog():
+    exp = load_experiment(ORDER_YAML)
+    assert exp["uses"]["source"] == "mode.carry.source"
+    assert [c["name"] for c in exp["conditions"]] == ["O", "O1", "O2", "O3", "O4"]
+    assert all(c["order_variant"] == c["name"] for c in exp["conditions"])
+    assert exp["carry"] == ["source", "order"]
