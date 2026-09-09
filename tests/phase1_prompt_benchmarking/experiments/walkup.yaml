@@ -1,0 +1,341 @@
+# The walkup experiment: build the prompt up from the blank W0 floor, one
+# component per stage (CAT -> GCR -> NPR -> UPR -> PCC), on the evidence source
+# the source experiment carried. Each stage runs 'prior' (the carried build)
+# plus the candidates below and stops at the human gate; a person records the
+# choice (candidate id or 'prior') under the walkup contract -- the stage's goal
+# metric must improve beyond noise with the other panel metrics held.
+#
+# Candidate texts are the experiment's material and live here, with their
+# rationales; engineered candidates (from miss censuses) are yaml edits with
+# their rationale, committed and visible in history. Directions informed by the
+# first flat run: GCR/NPR/PCC test validated ladders (simple -> +procedure ->
+# +guard); CAT tests distinct task lenses plus the two engineered process-frame
+# candidates; UPR candidates are all corrections (the v6 rules over-demoted
+# named/annotated genes toward DARK_GENE).
+
+experiment: walkup
+description: build-up prompt walkup on the carried evidence source, human-gated per stage
+
+uses: source.carry.source
+
+model:
+  provider: anthropic
+  model_name: claude-sonnet-5
+  # temperature omitted: claude-sonnet-5 rejects non-default sampling params
+  max_tokens: 16000
+  thinking: false
+
+run:
+  replicates: 3
+  max_workers: 12
+  route: single_call
+
+stages:
+  - component: CAT
+    goal: category
+    candidates:
+      - id: concise
+        rationale: >-
+          lean task statement (multi-pathway-aware) -- tests whether the elaboration
+          grounds the model or just spends tokens
+        text: |
+          MISSION: Analyze this gene cluster and:
+          1. Identify the biological pathway(s) — a single dominant process, or 2-3 if the cluster genuinely
+             spans several — that explain why these genes cluster together.
+          2. Categorize ALL genes as ESTABLISHED (known role in the pathway), NOVEL_ROLE (characterized
+             elsewhere), or UNCHARACTERIZED (no focused study).
+          3. Prioritize NOVEL_ROLE and UNCHARACTERIZED genes for follow-up.
+
+      - id: discovery_first
+        rationale: >-
+          lead with the recall-first mission + honest 'no coherent pathway' from the very
+          first component (multi-pathway-aware)
+        text: |
+          MISSION: Functional genomics experiments cluster genes by phenotypic similarity. The deliverable is
+          to surface UNDERSTUDIED genes (UNCHARACTERIZED and NOVEL_ROLE) that merit experimental follow-up.
+          To do that:
+          1. Identify the pathway(s) that best explain why these genes cluster — a single dominant process, or
+             2-3 if the cluster genuinely spans several. This is the lens for discovery, not the end goal.
+          2. Categorize ALL genes relative to that pathway (ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED).
+          3. Prioritize the understudied genes for follow-up.
+
+          If the genes do not share a coherent pathway, say so honestly rather than forcing a label — a clear
+          "no coherent pathway" call is a valid and useful outcome.
+
+      - id: pathway_anchored
+        rationale: >-
+          anchor on rigorously fixing the pathway(s) first, since every downstream call
+          depends on it (multi-pathway-aware)
+        text: |
+          MISSION: Every downstream call depends on correctly identifying what unites this cluster, so anchor
+          there first.
+          1. Determine the biological pathway(s) that explain the cluster — commit to a single dominant
+             process where one clearly fits, or 2-3 distinct processes if the cluster genuinely spans them. If
+             no process explains a substantial share of the genes, declare no coherent pathway.
+          2. Categorize ALL genes against that pathway (ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED).
+          3. Prioritize UNCHARACTERIZED and NOVEL_ROLE genes for follow-up.
+
+      - id: process_relative
+        rationale: >-
+          engineered from the W0 miss census (all 6 misses are NOVEL leaks): pin the
+          categorization reference frame to the cluster's pathway -- a documented gene with
+          no documented link to THIS pathway is NOVEL_ROLE not ESTABLISHED, a sparse gene
+          whose evidence threads to the pathway is NOVEL_ROLE not UNCHARACTERIZED
+        text: |
+          MISSION: Functional genomics experiments cluster genes by phenotypic similarity. Your goal is to:
+          1. Identify the dominant biological pathway(s) that explain why these genes cluster together — or
+             declare no coherent pathway if none explains a substantial share of the genes.
+          2. Categorize EVERY gene by its relationship to THAT pathway, never by how well the gene is
+             characterized overall:
+             - ESTABLISHED: the gene has a documented role in this cluster's pathway
+             - NOVEL_ROLE: the gene is documented, but a role in this cluster's pathway is not — its
+               membership here is the new evidence
+             - UNCHARACTERIZED: annotation is too sparse to judge any relationship
+             A well-studied gene with no documented link to this pathway is NOVEL_ROLE, not ESTABLISHED. A
+             sparsely annotated gene whose evidence still threads to this pathway is NOVEL_ROLE, not
+             UNCHARACTERIZED.
+          3. Prioritize understudied genes (UNCHARACTERIZED and NOVEL_ROLE) for follow-up experiments.
+
+          The pathway is not the end goal - it's the reference frame for deciding which genes merit
+          investigation.
+
+      - id: process_guarded
+        rationale: >-
+          round-2 engineering: process_relative fixed the fame leak (novel recall
+          .857->.929) but over-rotated 5 in-pathway genes to NOVEL (SCD/SREBF2/GPAT4 in the
+          lipid cluster); adds the symmetric guard -- check the annotation for the pathway
+          itself before NOVEL_ROLE, and reserve UNCHARACTERIZED for annotation that offers
+          nothing to relate
+        text: |
+          MISSION: Functional genomics experiments cluster genes by phenotypic similarity. Your goal is to:
+          1. Identify the dominant biological pathway(s) that explain why these genes cluster together — or
+             declare no coherent pathway if none explains a substantial share of the genes.
+          2. Categorize EVERY gene by its relationship to THAT pathway, using this two-way test:
+             - First check the gene's annotation FOR THE PATHWAY ITSELF: if its documented function is part
+               of this cluster's pathway, it is ESTABLISHED — however famous or obscure the gene.
+             - Only if its documented function is genuinely distinct from this pathway is it NOVEL_ROLE —
+               membership here is the new evidence. General fame never makes a gene ESTABLISHED.
+             - UNCHARACTERIZED is reserved for genes whose annotation offers nothing to relate; if any
+               functional annotation exists, decide between ESTABLISHED and NOVEL_ROLE relative to the
+               pathway.
+          3. Prioritize understudied genes (UNCHARACTERIZED and NOVEL_ROLE) for follow-up experiments.
+
+          The pathway is not the end goal - it's the reference frame for deciding which genes merit
+          investigation.
+
+  - component: GCR
+    goal: category
+    candidates:
+      - id: simple
+        rationale: definitions only -- baseline categorization rules
+        text: |
+          PRECONDITION: This step applies ONLY when a coherent biological pathway has been identified for the cluster. If no coherent pathway exists, leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty and skip this step — per-gene classification relative to a nonexistent pathway is undefined.
+
+          TASK: For each gene in the cluster, categorize as ESTABLISHED, NOVEL_ROLE, or UNCHARACTERIZED based on the evidence provided in the gene's bundle annotation.
+          - ESTABLISHED: the annotation directly demonstrates the gene's role in the identified pathway.
+          - NOVEL_ROLE: the annotation describes a documented function in a different pathway.
+          - UNCHARACTERIZED: the annotation is empty, generic, or limited to homology/domain information.
+
+      - id: decision_tree
+        rationale: ordered gating procedure cuts category ambiguity -- the first-run winner
+        text: |
+          PRECONDITION: This step applies ONLY when a coherent biological pathway has been identified for the cluster. If no coherent pathway exists, leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty and skip this step — per-gene classification relative to a nonexistent pathway is undefined.
+
+          TASK: For each gene in the cluster, categorize as ESTABLISHED, NOVEL_ROLE, or UNCHARACTERIZED based on the evidence provided in the gene's bundle annotation.
+          - ESTABLISHED: the annotation directly demonstrates the gene's role in the identified pathway.
+          - NOVEL_ROLE: the annotation describes a documented function in a different pathway.
+          - UNCHARACTERIZED: the annotation is empty, generic, or limited to homology/domain information.
+
+          Gating procedure (apply in order):
+          1. Does the bundle's annotation describe the gene's molecular function? → No → UNCHARACTERIZED.
+          2. Does that annotation describe a role in THIS pathway? → Yes → ESTABLISHED.
+          3. Otherwise → NOVEL_ROLE.
+
+      - id: guarded
+        rationale: >-
+          decision-tree + default-to-NOVEL-when-uncertain -- anti-overcrediting,
+          recall-first
+        text: |
+          PRECONDITION: This step applies ONLY when a coherent biological pathway has been identified for the cluster. If no coherent pathway exists, leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty and skip this step — per-gene classification relative to a nonexistent pathway is undefined.
+
+          TASK: For each gene in the cluster, categorize as ESTABLISHED, NOVEL_ROLE, or UNCHARACTERIZED based on the evidence provided in the gene's bundle annotation.
+          - ESTABLISHED: the annotation directly demonstrates the gene's role in the identified pathway.
+          - NOVEL_ROLE: the annotation describes a documented function in a different pathway.
+          - UNCHARACTERIZED: the annotation is empty, generic, or limited to homology/domain information.
+
+          Gating procedure (apply in order):
+          1. Does the bundle's annotation describe the gene's molecular function? → No → UNCHARACTERIZED.
+          2. Does that annotation describe a role in THIS pathway? → Yes → ESTABLISHED.
+          3. Otherwise → NOVEL_ROLE.
+
+          When uncertain whether the bundle's evidence rises to the ESTABLISHED standard, default to NOVEL_ROLE — promoting on weak or indirect evidence misleads downstream follow-up.
+
+  - component: NPR
+    goal: novel_subclass
+    candidates:
+      - id: simple
+        rationale: flat NO/INDIRECT/PARTIAL/CONTRADICTORY definitions -- baseline
+        text: |
+          PRECONDITION: This step applies ONLY to genes already categorized as NOVEL_ROLE per the gene classification rules. If no genes were categorized as NOVEL_ROLE (because no coherent pathway exists, or no genes fit the criteria), do nothing — no sub-classification is needed.
+
+          SUB-CLASSIFICATION (NOVEL_ROLE genes only): assign exactly one sub-class based on how the bundle's annotation relates to the identified pathway.
+          - NO_EVIDENCE: nothing in the annotation links the gene to this pathway.
+          - INDIRECT_EVIDENCE: the annotation shows a logical connection (shared organelle, upstream regulator) but no direct experimental link.
+          - PARTIAL_EVIDENCE: the annotation hints at a link (proteomics hit, co-expression) without focused mechanistic study.
+          - CONTRADICTORY_EVIDENCE: the annotation describes a function incompatible with this pathway.
+
+      - id: decision_tree
+        rationale: ordered procedure over the four evidence levels -- first-run winner
+        text: |
+          PRECONDITION: This step applies ONLY to genes already categorized as NOVEL_ROLE per the gene classification rules. If no genes were categorized as NOVEL_ROLE (because no coherent pathway exists, or no genes fit the criteria), do nothing — no sub-classification is needed.
+
+          SUB-CLASSIFICATION (NOVEL_ROLE genes only): assign exactly one sub-class based on how the bundle's annotation relates to the identified pathway.
+          - NO_EVIDENCE: nothing in the annotation links the gene to this pathway.
+          - INDIRECT_EVIDENCE: the annotation shows a logical connection (shared organelle, upstream regulator) but no direct experimental link.
+          - PARTIAL_EVIDENCE: the annotation hints at a link (proteomics hit, co-expression) without focused mechanistic study.
+          - CONTRADICTORY_EVIDENCE: the annotation describes a function incompatible with this pathway.
+
+          Procedure (apply in order):
+          1. Does the annotation describe a function incompatible with this pathway? → CONTRADICTORY_EVIDENCE.
+          2. Does the annotation hint at a preliminary link (proteomics/co-expression/correlative data)? → PARTIAL_EVIDENCE.
+          3. Does the annotation suggest a logical connection without direct experimental link? → INDIRECT_EVIDENCE.
+          4. Otherwise → NO_EVIDENCE.
+
+      - id: process_scoped
+        rationale: >-
+          two-sided, diagnostic-driven: the model's dominant error is INDIRECT
+          under-credited to NO (chromatin/RNA genes in chromatin/RNA clusters), but a
+          blanket 'shared context = INDIRECT' overshot -- collapsed correct PARTIAL genes
+          and over-promoted unrelated NO genes. Reframes NO/INDIRECT as
+          unrelated-vs-same-process AND guards PARTIAL (data touching the pathway stays
+          PARTIAL) and NO (a shared generic compartment is not same-process)
+        text: |
+          PRECONDITION: This step applies ONLY to genes already categorized as NOVEL_ROLE per the gene classification rules. If no genes were categorized as NOVEL_ROLE (because no coherent pathway exists, or no genes fit the criteria), do nothing — no sub-classification is needed.
+
+          SUB-CLASSIFICATION (NOVEL_ROLE genes only): assign exactly one sub-class based on how the bundle's annotation relates to the identified pathway.
+          - NO_EVIDENCE: the gene's characterized function is in a process UNRELATED to this pathway.
+          - INDIRECT_EVIDENCE: the gene acts in the SAME broad process or machinery as the pathway (e.g. a chromatin factor in a chromatin/centromere cluster; an RNA-processing factor in an RNA cluster) but the annotation reports no experimental link to the specific pathway.
+          - PARTIAL_EVIDENCE: the annotation reports actual data touching this pathway — a physical interaction, proteomics/co-IP hit, co-expression, or a functional assay — but no focused mechanistic study.
+          - CONTRADICTORY_EVIDENCE: the annotation describes a function incompatible with this pathway.
+
+          Procedure (apply in order):
+          1. Does the annotation describe a function incompatible with this pathway? → CONTRADICTORY_EVIDENCE.
+          2. Does the annotation report experimental data touching this pathway (interaction, proteomics/co-IP, co-expression, functional assay)? → PARTIAL_EVIDENCE. Do NOT down-rank a gene that has such data to INDIRECT.
+          3. Does the gene operate in the same broad process or machinery as the pathway, with no such data? → INDIRECT_EVIDENCE.
+          4. Otherwise (function is in an unrelated process) → NO_EVIDENCE. Sharing only a generic compartment (e.g. "nuclear", "cytoplasmic") is NOT the same process — keep NO_EVIDENCE.
+
+  - component: UPR
+    goal: unchar_subclass
+    candidates:
+      - id: name_respecting
+        rationale: >-
+          CORRECTED: a name+domain gene is ANNOTATED_ONLY, not DARK -- undoes the v6
+          over-demotion that broke unchar-subclass
+        text: |
+          PRECONDITION: This step applies ONLY to genes already categorized as UNCHARACTERIZED per the gene
+          classification rules. If no genes were categorized as UNCHARACTERIZED, do nothing.
+
+          SUB-CLASSIFICATION (UNCHARACTERIZED genes only): assign exactly one sub-class from the gene's bundle
+          annotation. A standard gene name plus domain/motif annotation IS meaningful signal — do NOT demote a
+          named, domain-annotated gene to DARK_GENE merely because no mechanistic study exists.
+          - DARK_GENE: no standard name AND no domain/functional annotation whatsoever.
+          - NASCENT: no standard name, but the annotation contains preliminary functional data.
+          - ANNOTATED_ONLY: has a standard name and/or domain/motif annotation but no mechanistic study — this
+            is the default for named genes that lack a focused functional study.
+          - NON_HUMAN_CHARACTERIZED: the annotation describes functional studies only in non-human organisms.
+
+      - id: evidence_ladder
+        rationale: >-
+          CORRECTED: rank by the HIGHEST level of evidence actually present with no
+          downward tiebreak (the v6 'prefer lower' guard was the likely source of the
+          unchar-subclass loss)
+        text: |
+          PRECONDITION: This step applies ONLY to genes already categorized as UNCHARACTERIZED per the gene
+          classification rules. If no genes were categorized as UNCHARACTERIZED, do nothing.
+
+          SUB-CLASSIFICATION (UNCHARACTERIZED genes only): assign the sub-class matching the HIGHEST level of
+          evidence present in the annotation. Evaluate in order and assign the first that matches; do not bias
+          toward lower-information classes.
+          - NON_HUMAN_CHARACTERIZED: functional studies described only in a non-human organism.
+          - ANNOTATED_ONLY: a standard name with domain/motif annotation, no mechanistic study.
+          - NASCENT: no standard name, but some preliminary functional data present.
+          - DARK_GENE: none of the above — no name, no domain annotation, no functional data.
+
+      - id: canonical_grounded
+        rationale: >-
+          CORRECTED: revert to the canonical 4-subclass rules (scored 0.714),
+          bundle-grounded, no aggressive guard
+        text: |
+          PRECONDITION: This step applies ONLY to genes already categorized as UNCHARACTERIZED per the gene
+          classification rules. If no genes were categorized as UNCHARACTERIZED, do nothing.
+
+          SUB-CLASSIFICATION (UNCHARACTERIZED genes only): assign exactly one sub-class based on the gene's
+          bundle annotation.
+          - DARK_GENE: no name, no functional characterization whatsoever.
+          - NASCENT: no standard name, but some preliminary functional data exists.
+          - ANNOTATED_ONLY: has a gene name and domain/motif annotations, but no mechanistic study.
+          - NON_HUMAN_CHARACTERIZED: functionally studied in a non-human organism only.
+          Assign exactly one sub-class per gene.
+
+  - component: PCC
+    goal: coherence
+    candidates:
+      - id: simple
+        rationale: qualitative high/medium/low by fraction consistent -- lean
+        text: |
+          PATHWAY CONFIDENCE: assess how well the identified pathway explains the cluster, based on the fraction of genes whose bundle annotations are consistent with the pathway.
+          - High: most genes have annotations consistent with the pathway.
+          - Medium: a majority are consistent; some genes are unclear or unrelated.
+          - Low: few genes are clearly consistent — or, if too few, the cluster lacks a coherent pathway entirely (use "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty since per-gene classification relative to a nonexistent pathway is undefined).
+
+      - id: detailed
+        rationale: explicit >70/50-70/30-50 percent thresholds per level
+        text: |
+          PATHWAY CONFIDENCE: assess how well the identified pathway explains the cluster, based on the bundle's gene annotations.
+
+          High confidence:
+          - >70% of cluster genes have annotations consistent with the pathway
+          - Multiple well-established members with direct functional evidence
+          - Clear functional relationships explain the phenotypic clustering
+
+          Medium confidence:
+          - 50-70% of cluster genes are consistent with the pathway
+          - Some established members alongside plausible additional candidates
+          - Functional relationship is plausible but has gaps
+
+          Low confidence:
+          - 30-50% of cluster genes are clearly consistent
+          - Few established members; themes may be broad or general
+          - Significant heterogeneity in gene functions
+
+          No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined):
+          - <30% of cluster genes fit any proposed pathway
+          - Cluster contains many unrelated functions or nontargeting controls
+
+      - id: guarded
+        rationale: >-
+          thresholds + prefer-lower-confidence + honest no-pathway framing -- corrects the
+          model running 'hot' on coherence
+        text: |
+          PATHWAY CONFIDENCE: assess how well the identified pathway explains the cluster, based on the bundle's gene annotations.
+
+          High confidence:
+          - >70% of cluster genes have annotations consistent with the pathway
+          - Multiple well-established members with direct functional evidence
+          - Clear functional relationships explain the phenotypic clustering
+
+          Medium confidence:
+          - 50-70% of cluster genes are consistent with the pathway
+          - Some established members alongside plausible additional candidates
+          - Functional relationship is plausible but has gaps
+
+          Low confidence:
+          - 30-50% of cluster genes are clearly consistent
+          - Few established members; themes may be broad or general
+          - Significant heterogeneity in gene functions
+
+          No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined):
+          - <30% of cluster genes fit any proposed pathway
+          - Cluster contains many unrelated functions or nontargeting controls
+
+          When uncertain between two adjacent levels, prefer the lower confidence. Flagging that a cluster lacks a coherent pathway is a valuable finding — clusters can be heterogeneous, noisy, or artifactual, and an honest "no coherent pathway" call is more useful than a forced label.

@@ -64,10 +64,9 @@ class TestLoadExperiment:
         assert exp["run"]["route"] == "single_call"
         assert exp["carry"] == ["source"]
 
-    @pytest.mark.parametrize("reserved", ["stages", "uses"])
-    def test_reserved_keys_rejected_until_walkup_pr(self, tmp_path, reserved):
-        with pytest.raises(ValueError, match="reserved for staged experiments"):
-            load_experiment(_write_yaml(tmp_path, _MINIMAL_YAML + f"{reserved}: []\n"))
+    def test_uses_rejected_on_stageless_experiment(self, tmp_path):
+        with pytest.raises(ValueError, match="'uses:' applies to staged experiments"):
+            load_experiment(_write_yaml(tmp_path, _MINIMAL_YAML + "uses: source.carry.source\n"))
 
     def test_missing_required_key_rejected(self, tmp_path):
         text = _MINIMAL_YAML.replace(
@@ -230,3 +229,164 @@ def test_dry_run_of_source_experiment_writes_state(tmp_path, monkeypatch):
         assert cond in state["pathway"]
     assert "reviewer_concordance" in state
     assert "source_preference" in state
+
+
+# ---------------------------------------------------------------------------
+# Staged experiments
+# ---------------------------------------------------------------------------
+
+_STAGED_YAML = """\
+experiment: w
+model: {model_name: claude-sonnet-5}
+run: {replicates: 1, route: single_call}
+uses: source.carry.source
+stages:
+  - component: CAT
+    goal: category
+    candidates:
+      - {id: c1, rationale: test framing, text: CAT TEXT ONE}
+  - component: GCR
+    goal: category
+    candidates:
+      - {id: g1, rationale: test framing, text: GCR TEXT ONE}
+"""
+
+
+class TestStagedSchema:
+    def test_staged_yaml_parses(self, tmp_path):
+        exp = load_experiment(_write_yaml(tmp_path, _STAGED_YAML))
+        assert [s["component"] for s in exp["stages"]] == ["CAT", "GCR"]
+        assert exp["uses"] == "source.carry.source"
+
+    def test_stages_and_conditions_are_exclusive(self, tmp_path):
+        text = _STAGED_YAML + "conditions:\n  - {name: a, bundle_source: uniprot}\n"
+        with pytest.raises(ValueError, match="never both"):
+            load_experiment(_write_yaml(tmp_path, text))
+
+    def test_malformed_uses_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="must be '<experiment>.carry.<key>'"):
+            load_experiment(
+                _write_yaml(tmp_path, _STAGED_YAML.replace("source.carry.source", "source"))
+            )
+
+    def test_stage_component_must_be_a_prompt_slot(self, tmp_path):
+        with pytest.raises(ValueError, match="not a prompt slot"):
+            load_experiment(_write_yaml(tmp_path, _STAGED_YAML.replace("component: GCR", "component: XXX")))
+
+    def test_stage_goal_must_be_a_selection_metric(self, tmp_path):
+        text = _STAGED_YAML.replace("goal: category", "goal: accuracy", 1)
+        with pytest.raises(ValueError, match="goal 'accuracy'"):
+            load_experiment(_write_yaml(tmp_path, text))
+
+    def test_candidate_id_prior_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="not 'prior'"):
+            load_experiment(_write_yaml(tmp_path, _STAGED_YAML.replace("id: c1", "id: prior")))
+
+    def test_candidate_requires_rationale(self, tmp_path):
+        text = _STAGED_YAML.replace("rationale: test framing, ", "", 1)
+        with pytest.raises(ValueError, match="missing 'rationale'"):
+            load_experiment(_write_yaml(tmp_path, text))
+
+    def test_staged_invocation_requires_stage_or_select(self, tmp_path):
+        with pytest.raises(ValueError, match="is staged"):
+            run_experiment(_write_yaml(tmp_path, _STAGED_YAML))
+
+    def test_source_override_rejected_on_stageless(self, tmp_path):
+        with pytest.raises(ValueError, match="is stage-less"):
+            run_experiment(_write_yaml(tmp_path, _MINIMAL_YAML), source="affinage")
+
+
+class TestStagedInvocation:
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(bench_experiment, "OUTPUTS", tmp_path)
+        monkeypatch.setattr(bench_experiment, "GT_PATH", tmp_path / "consensus_gt.csv")
+        (tmp_path / "source").mkdir()
+        (tmp_path / "source" / "source_state.json").write_text(
+            json.dumps({"carry": {"source": "affinage"}})
+        )
+        return _write_yaml(tmp_path, _STAGED_YAML)
+
+    def test_stage_runs_scores_and_stops_at_the_gate(self, tmp_path, monkeypatch):
+        path = self._setup(tmp_path, monkeypatch)
+        state = run_experiment(path, stage="CAT", dry_run=True)
+
+        assert state["source"] == "affinage"  # resolved through uses:
+        assert [s["stage"] for s in state["stages"]] == ["CAT"]  # GCR did NOT run
+        rec = state["stages"][0]
+        assert rec["resolved"] == {"source": "affinage", "carried_components": []}
+        assert rec["selected"] is None
+        assert rec["prior"]["n"] > 0 and rec["candidates"]["c1"]["n"] > 0
+        run_dir = tmp_path / "w" / rec["run_dir"]
+        assert run_dir.is_dir() and rec["run_dir"].startswith("CAT_")
+        on_disk = json.loads((tmp_path / "w" / "w_state.json").read_text())
+        assert on_disk == json.loads(json.dumps(state))
+
+    def test_select_carries_text_and_finalizes_after_last_stage(self, tmp_path, monkeypatch):
+        path = self._setup(tmp_path, monkeypatch)
+        run_experiment(path, stage="CAT", dry_run=True)
+
+        with pytest.raises(ValueError, match="has not been run yet"):
+            run_experiment(path, select=("GCR", "g1"))
+        with pytest.raises(ValueError, match="unknown candidate"):
+            run_experiment(path, select=("CAT", "nope"))
+
+        state = run_experiment(path, select=("CAT", "c1"))
+        assert state["carried"]["CAT"] == "CAT TEXT ONE"
+        assert state["components_filled"] == ["CAT"]
+        assert "carry" not in state  # GCR still pending
+
+        state = run_experiment(path, stage="GCR", dry_run=True)
+        rec = next(s for s in state["stages"] if s["stage"] == "GCR")
+        assert rec["resolved"]["carried_components"] == ["CAT"]
+        # The carried CAT text reaches the next stage's prompts.
+        prompts = (tmp_path / "w" / rec["run_dir"] / "prompts.jsonl").read_text()
+        assert "CAT TEXT ONE" in prompts
+
+        state = run_experiment(path, select=("GCR", "prior"))
+        assert state["carried"]["GCR"] == ""
+        assert state["winner"] == "CAT"
+        assert state["carry"] == {
+            "source": "affinage",
+            "components_filled": ["CAT"],
+            "final_component_texts": {"CAT": "CAT TEXT ONE"},
+        }
+
+    def test_mid_experiment_source_switch_refused(self, tmp_path, monkeypatch):
+        path = self._setup(tmp_path, monkeypatch)
+        run_experiment(path, stage="CAT", dry_run=True)
+        with pytest.raises(ValueError, match="refusing"):
+            run_experiment(path, stage="GCR", dry_run=True, source="uniprot")
+
+    def test_source_override_beats_uses(self, tmp_path, monkeypatch):
+        path = self._setup(tmp_path, monkeypatch)
+        state = run_experiment(path, stage="CAT", dry_run=True, source="uniprot")
+        assert state["source"] == "uniprot"
+        assert state["stages"][0]["resolved"]["source"] == "uniprot"
+
+
+WALKUP_YAML = SOURCE_YAML.parent / "walkup.yaml"
+
+
+def test_walkup_yaml_parses_with_the_full_candidate_bank():
+    exp = load_experiment(WALKUP_YAML)
+    assert exp["uses"] == "source.carry.source"
+    stages = {s["component"]: s for s in exp["stages"]}
+    assert list(stages) == ["CAT", "GCR", "NPR", "UPR", "PCC"]
+    goals = {c: s["goal"] for c, s in stages.items()}
+    assert goals == {
+        "CAT": "category",
+        "GCR": "category",
+        "NPR": "novel_subclass",
+        "UPR": "unchar_subclass",
+        "PCC": "coherence",
+    }
+    assert {c["id"] for c in stages["CAT"]["candidates"]} == {
+        "concise",
+        "discovery_first",
+        "pathway_anchored",
+        "process_relative",
+        "process_guarded",
+    }
+    for stage in stages.values():
+        for cand in stage["candidates"]:
+            assert cand["rationale"] and cand["text"]
