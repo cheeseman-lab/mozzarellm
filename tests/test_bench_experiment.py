@@ -64,10 +64,6 @@ class TestLoadExperiment:
         assert exp["run"]["route"] == "single_call"
         assert exp["carry"] == ["source"]
 
-    def test_uses_rejected_on_stageless_experiment(self, tmp_path):
-        with pytest.raises(ValueError, match="'uses:' applies to staged experiments"):
-            load_experiment(_write_yaml(tmp_path, _MINIMAL_YAML + "uses: source.carry.source\n"))
-
     def test_missing_required_key_rejected(self, tmp_path):
         text = _MINIMAL_YAML.replace(
             "selection: {primary: coverage_weighted_category, metrics: [category, coverage]}\n", ""
@@ -291,8 +287,8 @@ class TestStagedSchema:
         with pytest.raises(ValueError, match="is staged"):
             run_experiment(_write_yaml(tmp_path, _STAGED_YAML))
 
-    def test_source_override_rejected_on_stageless(self, tmp_path):
-        with pytest.raises(ValueError, match="is stage-less"):
+    def test_source_override_needs_a_uses_source(self, tmp_path):
+        with pytest.raises(ValueError, match="declares no uses.source"):
             run_experiment(_write_yaml(tmp_path, _MINIMAL_YAML), source="affinage")
 
 
@@ -390,3 +386,96 @@ def test_walkup_yaml_parses_with_the_full_candidate_bank():
     for stage in stages.values():
         for cand in stage["candidates"]:
             assert cand["rationale"] and cand["text"]
+
+
+# ---------------------------------------------------------------------------
+# Cross-experiment inputs on stage-less experiments (uses: mapping)
+# ---------------------------------------------------------------------------
+
+_DOWNSTREAM_YAML = """\
+experiment: m
+model: {model_name: claude-sonnet-5}
+run: {replicates: 1, route: single_call}
+uses:
+  source: walkup.carry.source
+  component_overrides: walkup.carry.final_component_texts
+conditions:
+  - {name: single_call, route: single_call}
+  - {name: cot, route: cot}
+selection: {primary: coverage_weighted_category, metrics: [category, coverage]}
+carry: [source, mode]
+"""
+
+
+class TestStagelessUses:
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(bench_experiment, "OUTPUTS", tmp_path)
+        monkeypatch.setattr(bench_experiment, "GT_PATH", tmp_path / "consensus_gt.csv")
+        (tmp_path / "walkup").mkdir()
+        (tmp_path / "walkup" / "walkup_state.json").write_text(
+            json.dumps(
+                {
+                    "carry": {
+                        "source": "affinage",
+                        "final_component_texts": {"CAT": "TUNED CAT TEXT"},
+                    }
+                }
+            )
+        )
+        return _write_yaml(tmp_path, _DOWNSTREAM_YAML)
+
+    def test_uses_mapping_parses(self, tmp_path):
+        exp = load_experiment(_write_yaml(tmp_path, _DOWNSTREAM_YAML))
+        assert exp["uses"]["source"] == "walkup.carry.source"
+
+    def test_string_uses_rejected_on_stageless(self, tmp_path):
+        text = _DOWNSTREAM_YAML.replace(
+            "uses:\n  source: walkup.carry.source\n"
+            "  component_overrides: walkup.carry.final_component_texts\n",
+            "uses: walkup.carry.source\n",
+        )
+        with pytest.raises(ValueError, match="is a mapping"):
+            load_experiment(_write_yaml(tmp_path, text))
+
+    def test_unknown_uses_slot_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="unknown uses slot"):
+            load_experiment(
+                _write_yaml(tmp_path, _DOWNSTREAM_YAML.replace("source:", "src:", 1))
+            )
+
+    def test_bundle_source_conflicts_with_uses_source(self, tmp_path):
+        text = _DOWNSTREAM_YAML.replace(
+            "{name: cot, route: cot}", "{name: cot, route: cot, bundle_source: uniprot}"
+        )
+        with pytest.raises(ValueError, match="exactly one place"):
+            load_experiment(_write_yaml(tmp_path, text))
+
+    def test_condition_without_any_source_rejected(self, tmp_path):
+        text = _MINIMAL_YAML.replace("{name: b, bundle_source: affinage}", "{name: b}")
+        with pytest.raises(ValueError, match="exactly one place"):
+            load_experiment(_write_yaml(tmp_path, text))
+
+    def test_resolved_inputs_reach_every_condition(self, tmp_path, monkeypatch):
+        path = self._setup(tmp_path, monkeypatch)
+        state = run_experiment(path, dry_run=True)
+
+        assert state["resolved"]["source"] == "affinage"
+        assert state["resolved"]["component_overrides"] == {"CAT": "TUNED CAT TEXT"}
+        # carry.source is the resolved input, not the winning condition.
+        assert state["carry"]["source"] == "affinage"
+        assert state["carry"]["mode"] == state["winner_condition"]
+        # The carried CAT text reaches both routes' prompts (CAT is a shared slot).
+        for d in state["runs"].values():
+            prompts = (tmp_path / "m" / d / "prompts.jsonl").read_text()
+            assert "TUNED CAT TEXT" in prompts
+        # Both arms ran on the resolved source's evidence view.
+        snap = json.loads(
+            (tmp_path / "m" / state["runs"]["cot"] / "config_snapshot.yaml").read_text()
+        )
+        assert snap["experiment"]["bundle_source"] == "affinage"
+
+    def test_source_kwarg_overrides_uses_resolution(self, tmp_path, monkeypatch):
+        path = self._setup(tmp_path, monkeypatch)
+        state = run_experiment(path, dry_run=True, source="uniprot")
+        assert state["resolved"]["source"] == "uniprot"
+        assert state["carry"]["source"] == "uniprot"

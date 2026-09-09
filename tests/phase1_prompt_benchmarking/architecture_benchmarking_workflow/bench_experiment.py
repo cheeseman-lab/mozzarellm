@@ -13,6 +13,12 @@ and are never overwritten. ``score_only`` re-scores the newest archived run dir
 per condition without API calls; ``dry_run`` exercises the full plumbing on
 mock outputs.
 
+A stage-less experiment may declare ``uses:`` as a mapping of input slots to
+carry paths (``source: walkup.carry.source``, ``component_overrides:
+walkup.carry.final_component_texts``) -- resolved from the named experiment's
+state at invocation, logged, and recorded in the state file, so a downstream
+experiment (mode, order) runs on exactly what the upstream one carried.
+
 STAGED experiments (the walkup) replace the static ``conditions:`` with a
 ``stages:`` block; each stage generates its conditions at runtime -- ``prior``
 (the carried build read from the experiment's own state) plus the stage's
@@ -121,10 +127,7 @@ def load_experiment(yaml_path: Path) -> dict:
             f"{yaml_path.name}: an experiment declares 'stages:' or 'conditions:', never both"
         )
     if not staged and "uses" in raw:
-        raise ValueError(
-            f"{yaml_path.name}: 'uses:' applies to staged experiments; stage-less "
-            "conditions declare their inputs (bundle_source) directly"
-        )
+        _validate_uses_mapping(yaml_path.name, raw["uses"])
     required = ("experiment", "model", "run") + (
         ("stages",) if staged else ("conditions", "selection")
     )
@@ -143,6 +146,7 @@ def load_experiment(yaml_path: Path) -> dict:
         _validate_stages(yaml_path.name, raw, route)
         return raw
 
+    uses_source = "source" in (raw.get("uses") or {})
     names = []
     for cond in raw["conditions"]:
         unknown = set(cond) - _CONDITION_KEYS
@@ -156,6 +160,12 @@ def load_experiment(yaml_path: Path) -> dict:
             raise ValueError(
                 f"{yaml_path.name}: condition {cond.get('name')!r} route "
                 f"{cond_route!r} not in registry"
+            )
+        if uses_source == ("bundle_source" in cond):
+            raise ValueError(
+                f"{yaml_path.name}: condition {cond.get('name')!r} needs its evidence "
+                "source from exactly one place -- its own bundle_source, or the "
+                "experiment's uses.source"
             )
         names.append(cond["name"])
     if len(names) != len(set(names)):
@@ -171,12 +181,35 @@ def load_experiment(yaml_path: Path) -> dict:
     return raw
 
 
+_USES_SLOTS = ("source", "component_overrides")
+
+
+def _validate_uses_mapping(yaml_name: str, uses) -> None:
+    """A stage-less experiment's uses: maps input slots to carry paths."""
+    if not isinstance(uses, dict) or not uses:
+        raise ValueError(
+            f"{yaml_name}: a stage-less experiment's 'uses:' is a mapping of input "
+            f"slot ({'/'.join(_USES_SLOTS)}) -> '<experiment>.carry.<key>'"
+        )
+    unknown = set(uses) - set(_USES_SLOTS)
+    if unknown:
+        raise ValueError(
+            f"{yaml_name}: unknown uses slot(s) {sorted(unknown)}; allowed: {list(_USES_SLOTS)}"
+        )
+    for slot, path in uses.items():
+        if not isinstance(path, str) or not _USES_RE.match(path):
+            raise ValueError(
+                f"{yaml_name}: uses.{slot} {path!r} must be '<experiment>.carry.<key>'"
+            )
+
+
 def _validate_stages(yaml_name: str, raw: dict, route: str) -> None:
     """Schema checks for a staged experiment's uses/stages blocks."""
     uses = raw.get("uses")
-    if uses is not None and not _USES_RE.match(uses):
+    if uses is not None and (not isinstance(uses, str) or not _USES_RE.match(uses)):
         raise ValueError(
-            f"{yaml_name}: uses {uses!r} must be '<experiment>.carry.<key>'"
+            f"{yaml_name}: a staged experiment's uses {uses!r} must be "
+            "'<experiment>.carry.<key>' (the evidence source)"
         )
     components = []
     for stage in raw["stages"]:
@@ -441,10 +474,11 @@ def run_experiment(
     Stage-less experiments run all conditions and apply the yaml's selection
     rule. On a staged experiment, ``stage`` runs exactly one stage and stops at
     the human gate; ``select`` records the human's choice for a stage (candidate
-    id or "prior"); ``source`` overrides the ``uses:``-resolved evidence source
-    (the stale-carry guard). Each of the three raises cleanly on the other kind
-    of experiment. score_only re-scores the newest archived run dir(s) without
-    API calls and rewrites state.
+    id or "prior"). ``source`` overrides a ``uses:``-resolved evidence source
+    (the stale-carry guard) on any experiment that declares one; stage/select
+    raise cleanly on a stage-less experiment and vice versa. score_only
+    re-scores the newest archived run dir(s) without API calls and rewrites
+    state.
     """
     exp = load_experiment(yaml_path)
     name = exp["experiment"]
@@ -464,10 +498,29 @@ def run_experiment(
             f"experiment {name!r} declares no stages; stage/select apply to "
             "staged experiments only"
         )
-    if source is not None:
+    uses = exp.get("uses") or {}
+    if source is not None and "source" not in uses:
         raise ValueError(
-            f"experiment {name!r} is stage-less; its conditions declare "
-            "bundle_source directly (source= overrides a staged 'uses:' input)"
+            f"experiment {name!r} declares no uses.source to override; its "
+            "conditions declare bundle_source directly"
+        )
+    resolved_source: str | None = None
+    resolved_overrides: dict = {}
+    if "source" in uses:
+        resolved_source = source or _resolve_uses(uses["source"])
+        if not isinstance(resolved_source, str):
+            raise ValueError(f"uses.source {uses['source']!r} resolved to a non-string")
+    if "component_overrides" in uses:
+        resolved_overrides = _resolve_uses(uses["component_overrides"])
+        if not isinstance(resolved_overrides, dict):
+            raise ValueError(
+                f"uses.component_overrides {uses['component_overrides']!r} resolved "
+                "to a non-mapping"
+            )
+    if uses:
+        print(
+            f"[{name}] resolved inputs: source={resolved_source!r}, "
+            f"carried components: {sorted(resolved_overrides) or 'none'}"
         )
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -475,7 +528,7 @@ def run_experiment(
     reviewer_labels = reviewer_label_sets(reviewer_csvs())
     controls = validation_specs(gt)
     run_block = exp["run"]
-    shared_overrides = run_block.get("component_overrides") or {}
+    shared_overrides = {**resolved_overrides, **(run_block.get("component_overrides") or {})}
 
     cells: dict[str, MetricPanel] = {}
     decoys, diagnostics, pathway, audit_flags, run_dirs = {}, {}, {}, {}, {}
@@ -491,7 +544,8 @@ def run_experiment(
                     f"score_only: no archived run dir {OUTPUTS / name}/{cond_name}_<stamp>/"
                 )
         else:
-            cfg = _condition_config(exp, cond_name, cond["bundle_source"], stamp, dry_run)
+            bundle_source = cond.get("bundle_source", resolved_source)
+            cfg = _condition_config(exp, cond_name, bundle_source, stamp, dry_run)
             overrides = {**shared_overrides, **(cond.get("component_overrides") or {})}
             specs = [
                 RunSpec(
@@ -505,7 +559,7 @@ def run_experiment(
                 experiment={
                     "experiment": name,
                     "condition": cond_name,
-                    "bundle_source": cond["bundle_source"],
+                    "bundle_source": bundle_source,
                     "route": route_name,
                     "component_overrides": overrides,
                 },
@@ -535,15 +589,28 @@ def run_experiment(
     )
     winner = winner_cell.split("__")[0]
 
+    # carry.source names the experiment's evidence source: the uses:-resolved
+    # input when there is one (the winner is then a condition like a mode, not
+    # a source), else the winning condition (the source experiment itself).
+    carry = {
+        key: (resolved_source if key == "source" and resolved_source else winner)
+        for key in exp.get("carry", [])
+    }
     state = {
         "experiment": name,
         "stamp": stamp if not score_only else None,
+        "uses": uses or None,
+        "resolved": (
+            {"source": resolved_source, "component_overrides": resolved_overrides}
+            if uses
+            else None
+        ),
         "runs": run_dirs,
         "winner": winner_cell,
         "winner_condition": winner,
         "dominated": dominated,
         "selection": selection,
-        "carry": dict.fromkeys(exp.get("carry", []), winner),
+        "carry": carry,
         "cells": {k: panel_json(v) for k, v in cells.items()},
         "decoys": decoys,
         "diagnostics": diagnostics,
