@@ -24,15 +24,6 @@ MISSION: Functional genomics experiments cluster genes by phenotypic similarity.
 The pathway is not the end goal - it's the lens for discovering which genes merit investigation.
 """
 
-CLUSTER_ANALYSIS_TASK_MULTI = """
-MISSION: Functional genomics experiments cluster genes by phenotypic similarity. Your goal is to:
-1. Identify 1-3 biological pathways that together explain why these genes cluster together
-2. Categorize ALL genes relative to their best-fit pathway (ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE)
-3. Prioritize understudied genes (UNCHARACTERIZED and NOVEL_ROLE) for follow-up experiments
-
-A pathway requires at least 3 genes to be reported. The pathways are not the end goal — they are the lens for discovering which genes merit investigation.
-"""
-
 # =============================================================================
 # GENE CATEGORIZATION & CLASSIFICATION RULES
 # =============================================================================
@@ -326,7 +317,6 @@ In the final output, include:
 # CHAIN-OF-THOUGHT STEPS
 # =============================================================================
 
-COT_SCREEN_CONTEXT = "Review the provided screen context:"
 
 COT_STEP_PATHWAY_HYPOTHESIS = """PATHWAY HYPOTHESIS (2-3 candidates):
 - Review gene annotations

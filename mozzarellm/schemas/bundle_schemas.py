@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, model_validator
@@ -84,13 +83,6 @@ class ScreenContext(SemiFlexModel):
     clustering: Clustering
     controls: Controls
     provenance: Provenance
-
-
-# TO-DO: improve this class; currently a placeholder for future goal: better LLM readability
-class BundleGeneAnnotations(BaseModel):
-    functional_text: str | None = None
-    source: str | None = None
-    retrieved_at: datetime | None = None
 
 
 class BundleGene(SemiFlexModel):
