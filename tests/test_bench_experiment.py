@@ -484,12 +484,28 @@ class TestStagelessUses:
 MODE_YAML = SOURCE_YAML.parent / "mode.yaml"
 
 
-def test_mode_yaml_parses_and_carries_the_walkup_build():
+def test_mode_yaml_parses_as_the_full_delivery_x_mcp_matrix():
     exp = load_experiment(MODE_YAML)
     assert exp["uses"] == {
         "source": "walkup.carry.source",
         "component_overrides": "walkup.carry.final_component_texts",
     }
-    assert [c["name"] for c in exp["conditions"]] == ["single_call", "cot", "stepwise"]
-    assert [c["route"] for c in exp["conditions"]] == ["single_call", "cot", "stepwise"]
+    conds = {c["name"]: c for c in exp["conditions"]}
+    assert list(conds) == [
+        "single_call", "cot", "stepwise",
+        "single_call_lit", "cot_lit", "stepwise_lit",
+        "single_call_litb", "cot_litb", "stepwise_litb",
+    ]
+    for delivery in ("single_call", "cot", "stepwise"):
+        assert conds[delivery]["route"] == delivery
+        assert conds[f"{delivery}_lit"]["route"] == f"{delivery}_mcp"
+        litb = conds[f"{delivery}_litb"]
+        assert litb["route"] == f"{delivery}_mcp"
+        assert litb["component_overrides"]["LIT"].startswith("LITERATURE GAP-FILL")
+    # One LITB text, anchored -- identical across the three deliveries.
+    texts = {
+        conds[f"{d}_litb"]["component_overrides"]["LIT"]
+        for d in ("single_call", "cot", "stepwise")
+    }
+    assert len(texts) == 1
     assert exp["carry"] == ["source", "mode"]
