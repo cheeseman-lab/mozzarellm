@@ -19,8 +19,8 @@ builds the prompt on it one component at a time (human-gated per stage), mode co
 delivery formats on the final build, order permutes its component order.
 
 ```bash
-python -m benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_experiment \
-    benchmarks/phase1_prompt_benchmarking/experiments/source.yaml [--dry-run | --score-only]
+python -m benchmarks.architecture_benchmarking_workflow.bench_experiment \
+    benchmarks/experiments/source.yaml [--dry-run | --score-only]
 
 # staged experiments (the walkup): one stage per invocation, human-gated selection
 ... bench_experiment experiments/walkup.yaml --stage CAT [--source affinage]
