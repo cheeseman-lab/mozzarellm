@@ -1,7 +1,7 @@
 """Benchmark engine -- the shared execution loop.
 
 Runs a list of RunSpecs (route + condition + overrides) across clusters and
-replicates, producing JSONL outputs, traces, and a Markdown report. Driven by
+replicates, producing JSONL outputs and traces. Driven by
 bench_experiment.run_experiment; not invoked directly.
 """
 
@@ -48,7 +48,6 @@ from .bench_dry_run import (
     generate_mock_raw_outputs,
 )
 from .bench_metricfns import compute_all_metrics
-from .bench_reportgen import generate_report
 from .bench_routes import Route
 from .order_bench_orderings import compose_stepwise_turns_from_route
 
@@ -845,10 +844,6 @@ def _run_benchmark_loop(
         json.dumps(manifest, indent=2, default=str), encoding="utf-8"
     )
 
-    # Generate report
-    print("\nGenerating report...")
-    report_path = generate_report(all_records, config_snapshot, output_dir)
-    print(f"  Report: {report_path}")
     print(f"  Done. {len(all_records)} analysis runs completed, {manifest['errors']} errors.")
 
     return all_records

@@ -28,7 +28,6 @@ phase1_prompt_benchmarking/
         bench_experiment.py           -- Experiment layer: yaml -> runs -> scoring -> state
         bench_configparse.py          -- Benchmark config dataclasses
         bench_metricfns.py            -- Structural, MCP, logical, efficiency metrics
-        bench_reportgen.py            -- Markdown report + CSV/JSON aggregates
         bench_trace_parser.py         -- Trace JSON -> gene-level prediction CSVs
         bench_dry_run.py              -- Deterministic mock outputs for dry-run
         order_bench_orderings.py      -- Order variant definitions + route builder
@@ -70,8 +69,6 @@ Each **experiment directory** contains:
 - **raw_outputs.jsonl** -- raw LLM response text, tool calls, steps
 - **parsed_outputs.jsonl** -- parsed JSON from model responses
 - **metrics.jsonl** -- per-run metric records
-- **report.md** -- human-readable aggregate report
-- **aggregate_summary.json / .csv** -- per-route summary stats
 - **prompts_used/** -- deduplicated system prompt .txt files (one per route)
 - **traces/** -- per-run trace JSONs (full audit trail, step-level for stepwise)
 - **{experiment_id}_{route}_{date}.csv** -- gene-level analysis output CSVs (from trace parser)
