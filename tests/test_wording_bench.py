@@ -21,23 +21,18 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
-    ROUTE_REGISTRY,
-)
+from mozzarellm.prompt_components import COMPONENT_REGISTRY
+from mozzarellm.utils.prompt_factory import make_cluster_analysis_system_prompt
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.wording_bench_alternates import (
     WORDING_ALTERNATE_SET_REGISTRY,
 )
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.wording_bench_targets import (
     WORDING_OVERRIDE_TARGET_REGISTRY,
-    WordingOverrideRun,
     WordingOverrideTarget,
     build_wording_override_runs,
     resolve_source,
     resolve_target_ids,
 )
-from mozzarellm.prompt_components import COMPONENT_REGISTRY
-from mozzarellm.utils.prompt_factory import make_cluster_analysis_system_prompt
-
 
 # ============================================================================
 # Alternate source registry

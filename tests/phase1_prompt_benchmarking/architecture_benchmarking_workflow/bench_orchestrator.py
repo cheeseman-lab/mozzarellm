@@ -19,8 +19,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 # Ensure repo root is on sys.path for imports
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -44,7 +44,6 @@ from mozzarellm.utils.prompt_factory import (
     make_single_cluster_analysis_user_prompt,
 )
 
-from .bench_routes import Route, build_routes_from_config
 from .bench_configparse import BenchmarkConfig, TimingConfig, load_config
 from .bench_dry_run import (
     _load_bundle_genes,
@@ -53,6 +52,7 @@ from .bench_dry_run import (
 )
 from .bench_metricfns import compute_all_metrics
 from .bench_reportgen import generate_report
+from .bench_routes import Route, build_routes_from_config
 from .order_bench_orderings import build_order_benchmark_routes, compose_stepwise_turns_from_route
 from .wording_bench_targets import build_wording_override_runs
 
@@ -252,7 +252,7 @@ def construct_prompts(
         if is_order_variant and route.user_turns:
             stepwise_turns = compose_stepwise_turns_from_route(route, screen_context_path)
         else:
-            stepwise_turns = compose_stepwise_user_turns(route.mcp)
+            stepwise_turns = compose_stepwise_user_turns(route.mcp, component_overrides)
 
     return {
         "system_prompt": system_prompt,

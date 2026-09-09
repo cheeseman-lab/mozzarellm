@@ -7,7 +7,7 @@ build user turns from the route's user_turns field.
 
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -15,19 +15,15 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_orchestrator import (
+    construct_prompts,
+)
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
-    Route,
-    StepwiseTurn,
     ROUTE_REGISTRY,
 )
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (
     apply_order_variant,
 )
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_orchestrator import (
-    construct_prompts,
-)
-from mozzarellm.prompt_components import COMPONENT_REGISTRY
-
 
 # ============================================================================
 # Fixtures
@@ -234,7 +230,8 @@ class TestPhase2ComponentOrder:
                 output_dir=tmp_path,
             )
 
-            mock_canonical_turns.assert_called_once_with(route.mcp)
+            # Canonical turns, with the caller's component overrides forwarded.
+            mock_canonical_turns.assert_called_once_with(route.mcp, None)
             mock_order_turns.assert_not_called()
 
 

@@ -4,7 +4,6 @@ No API calls; uses tmp_path and synthetic data only.
 """
 
 import csv
-import json
 import sys
 from pathlib import Path
 
@@ -15,12 +14,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_reportgen import (
-    _build_report_markdown,
     _summarize_route,
-    _write_aggregate_csv,
     generate_report,
 )
-
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 

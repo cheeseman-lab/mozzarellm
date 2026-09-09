@@ -10,23 +10,22 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from mozzarellm.prompt_components import COMPONENT_REGISTRY
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
+    ROUTE_REGISTRY,
     Route,
     StepwiseTurn,
     build_routes_from_config,
-    ROUTE_REGISTRY,
 )
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (
-    ORDER_VARIANTS,
     _ORDER_SPECS,
+    ORDER_VARIANTS,
     OrderVariant,
     apply_order_variant,
     build_order_benchmark_routes,
     resolve_order_variant_ids,
     validate_order_variant_names,
 )
-from mozzarellm.prompt_components import COMPONENT_REGISTRY
-
 
 # ============================================================================
 # Variant registry tests
@@ -39,7 +38,7 @@ class TestOrderVariantsRegistry:
         assert set(ORDER_VARIANTS.keys()) == expected
 
     def test_all_variants_have_required_fields(self):
-        for key, variant in ORDER_VARIANTS.items():
+        for variant in ORDER_VARIANTS.values():
             assert isinstance(variant, OrderVariant)
             assert isinstance(variant.name, str) and len(variant.name) > 0
             assert isinstance(variant.description, str) and len(variant.description) > 0

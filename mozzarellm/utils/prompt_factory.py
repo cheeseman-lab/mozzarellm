@@ -42,21 +42,29 @@ def _resolve_screen_context(screen_context_path: Path | None, override: bool) ->
     return json.dumps(ctx_obj, ensure_ascii=False)
 
 
-def compose_stepwise_user_turns(mcp: bool) -> list[dict]:
+def compose_stepwise_user_turns(
+    mcp: bool, component_overrides: dict[str, str] | None = None
+) -> list[dict]:
     """Per-turn user content for stepwise mode.
 
     The first two canonical components (TASK + screen context) live in the system
     prompt; this returns the remaining reasoning steps formatted as `STEP N - ...`,
     plus a flag for which turns should attach MCP tools.
 
+    Args:
+        component_overrides: Optional dict mapping component keys to replacement
+            text, applied to turn components the same way system-prompt assembly
+            applies them (e.g. a LITB variant in the LIT slot).
+
     Returns a list of `{"content": str, "mcp": bool}`. The client walks these
     sequentially, prepending the cluster bundle to turn 0's content.
     """
     canonical = CANONICAL_COT_MCP_ORDER if mcp else CANONICAL_COT_ORDER
     runner_keys = canonical[2:]  # skip CAT + SC (system-prompt content)
+    overrides = component_overrides or {}
     return [
         {
-            "content": f"STEP {i + 1} - {COMPONENT_REGISTRY[key]}",
+            "content": f"STEP {i + 1} - {overrides.get(key, COMPONENT_REGISTRY[key])}",
             "mcp": (mcp and key == "LIT"),
         }
         for i, key in enumerate(runner_keys)

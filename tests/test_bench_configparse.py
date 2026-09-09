@@ -13,15 +13,10 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_configparse import (
-    ArchitectureBenchmarkConfig,
-    BenchmarkConfig,
     ClusterFilter,
     ModelConfig,
-    OrderBenchmarkConfig,
-    PathsConfig,
     RunConfig,
     TimingConfig,
-    WordingBenchmarkConfig,
     load_config,
 )
 
