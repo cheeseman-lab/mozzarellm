@@ -44,7 +44,7 @@ from mozzarellm.utils.prompt_factory import (
     make_single_cluster_analysis_user_prompt,
 )
 
-from .arch_bench_routes import Route, build_routes_from_config
+from .bench_routes import Route, build_routes_from_config
 from .bench_configparse import BenchmarkConfig, TimingConfig, load_config
 from .bench_dry_run import (
     _load_bundle_genes,
@@ -63,6 +63,20 @@ from .wording_bench_targets import build_wording_override_runs
 # Serializes shared-file writes (JSONL appends, cached system-prompt .txt) when
 # runs execute concurrently in the thread pool.
 _IO_LOCK = threading.Lock()
+
+
+def _client_from_config(config: BenchmarkConfig, api_key: str | None):
+    """Build an LLM client from the full model config (temperature, thinking, etc.)."""
+    m = config.model
+    return create_client(
+        model=m.model_name,
+        temperature=m.temperature,
+        max_tokens=m.max_tokens,
+        top_p=m.top_p,
+        top_k=m.top_k,
+        api_key=api_key,
+        thinking=m.thinking,
+    )
 
 
 @dataclass(frozen=True)
@@ -158,6 +172,7 @@ def construct_prompts(
     overwrite_outputs: bool = False,
     component_overrides: dict[str, str] | None = None,
     condition_name: str | None = None,
+    source: str = "both",
 ) -> dict:
     """Construct system and user prompts for a given route+cluster.
 
@@ -169,6 +184,8 @@ def construct_prompts(
         condition_name: Stable label for cached prompt filenames. For wording runs
             this is the per-condition run-route name so different wording conditions
             on the same base route do not collide in the prompt cache.
+        source: Evidence source the run's prompts carry ("uniprot" / "affinage" /
+            "both"); the master bundle is reduced to that source's view at assembly.
     """
     # Build a pseudo cluster_to_bundle_path_map for the existing utility
     cluster_to_bundle_map = {str(cluster_id): bundle_path}
@@ -180,8 +197,8 @@ def construct_prompts(
     # Label used for the on-disk prompt filename; defaults to the route name.
     prompt_label = condition_name or route.name
 
-    # For 3a/3b routes: save system prompt once with stable filename, reuse on subsequent calls.
-    # For 3c (stepwise) routes: build system prompt in memory only
+    # For single_call/cot routes: save system prompt once with stable filename, reuse on subsequent calls.
+    # For stepwise (stepwise) routes: build system prompt in memory only
     # to save space, the multi-turn conversation is recorded in traces/prompts.jsonl only -- can extract later if needed.
     if route.delivery == "multi_turn":
         if is_order_variant:
@@ -227,7 +244,7 @@ def construct_prompts(
                 )
 
     user_prompt = make_single_cluster_analysis_user_prompt(
-        cluster_id, screen_name, cluster_to_bundle_map
+        cluster_id, screen_name, cluster_to_bundle_map, source=source
     )
 
     stepwise_turns = None
@@ -356,6 +373,7 @@ def execute_single_run(
         overwrite_outputs=config.run.overwrite_outputs,
         component_overrides=component_overrides,
         condition_name=condition_name,
+        source=config.paths.bundle_source,
     )
     system_prompt = prompts["system_prompt"]
     user_prompt = prompts["user_prompt"]
@@ -711,13 +729,14 @@ def _run_benchmark_loop(
     # stores last_usage on self, so a shared instance would cross-contaminate
     # token/cost accounting across threads).
     api_key = None
+    probe = None
     if not config.run.dry_run:
         api_key = (
             os.getenv("ANTHROPIC_API_KEY")
             or os.getenv("OPENAI_API_KEY")
             or os.getenv("GOOGLE_API_KEY")
         )
-        probe = create_client(model=config.model.model_name, api_key=api_key)
+        probe = _client_from_config(config, api_key)
         print(f"  Client: {type(probe).__name__} ({config.model.model_name})")
 
     # Build the flat work list, resolving paths and applying skips up front.
@@ -759,11 +778,7 @@ def _run_benchmark_loop(
         item: tuple[RunSpec, str, str, Path, Path, int],
     ) -> dict:
         spec, screen_name, cluster_id, bundle_path, screen_context_path, rep = item
-        run_client = (
-            None
-            if config.run.dry_run
-            else create_client(model=config.model.model_name, api_key=api_key)
-        )
+        run_client = None if config.run.dry_run else _client_from_config(config, api_key)
         return execute_single_run(
             route=spec.route,
             screen_name=screen_name,
@@ -825,6 +840,11 @@ def _run_benchmark_loop(
     }
     if manifest_extra:
         manifest.update(manifest_extra)
+    # Record the model params the client actually sent (resolution is
+    # deterministic per config+model, so the probe speaks for every run client).
+    if probe is not None and hasattr(probe, "_resolve_params"):
+        probe._resolve_params()
+        manifest["model_resolved_params"] = probe.resolved_params
     (output_dir / "run_manifest.json").write_text(
         json.dumps(manifest, indent=2, default=str), encoding="utf-8"
     )

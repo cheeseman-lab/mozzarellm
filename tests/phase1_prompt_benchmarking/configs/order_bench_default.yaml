@@ -35,7 +35,7 @@ run:
 order_benchmark:
   enabled: true
   base_routes:
-    - 3b #adjust as needed
+    - cot #adjust as needed
   # Selector options:
   #   variants: all
   #   variants: O1-O4

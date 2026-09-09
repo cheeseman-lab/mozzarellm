@@ -243,9 +243,9 @@ def _build_report_markdown(
 
     # Overhead comparison
     _route_full = {rn: s.get("mean_full_run_time_seconds") for rn, s in route_summaries.items()}
-    baseline_full = _route_full.get("3a")
+    baseline_full = _route_full.get("single_call")
     if baseline_full is not None:
-        lines.append("### Overhead vs Baseline (3a)")
+        lines.append("### Overhead vs Baseline (single_call)")
         lines.append("")
         lines.append("| Route | Mean Full Run (s) | Overhead (s) | Overhead (%) |")
         lines.append("|-------|-------------------|-------------|-------------|")

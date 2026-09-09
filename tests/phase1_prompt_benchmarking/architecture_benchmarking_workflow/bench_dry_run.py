@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .arch_bench_routes import Route
+from .bench_routes import Route
 
 
 def _load_bundle_genes(bundle_path: Path) -> list[str]:

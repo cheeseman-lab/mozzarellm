@@ -19,7 +19,7 @@ from typing import Literal
 from mozzarellm.prompt_components import COMPONENT_REGISTRY, STEP_LITERATURE_VALIDATION
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
-from .arch_bench_routes import Route, StepwiseTurn
+from .bench_routes import Route, StepwiseTurn
 
 # ============================================================================
 # Order variant descriptor

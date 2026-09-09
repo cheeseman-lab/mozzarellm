@@ -18,19 +18,25 @@ try:
     from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_orchestrator import (
         _build_run_id,
         _build_timing_dict,
+        _client_from_config,
         _filter_clusters,
         _resolve_bundle_path,
         _resolve_screen_context_path,
+        _run_benchmark_loop,
         execute_single_run,
+    )
+    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow import (
+        bench_orchestrator,
     )
     from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_configparse import (
         BenchmarkConfig,
         ClusterFilter,
+        ModelConfig,
         PathsConfig,
         RunConfig,
         TimingConfig,
     )
-    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.arch_bench_routes import (
+    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
         ROUTE_REGISTRY,
         Route,
     )
@@ -67,8 +73,8 @@ def _config_with_filters(
 
 class TestHelpers:
     def test_build_run_id(self):
-        result = _build_run_id("exp", "3a", "denali", "21", 1)
-        assert result == "exp__3a__denali__cluster_21__rep_1"
+        result = _build_run_id("exp", "single_call", "denali", "21", 1)
+        assert result == "exp__single_call__denali__cluster_21__rep_1"
 
     def test_resolve_bundle_path_exact_match(self, tmp_path):
         bundle = tmp_path / "denali__cluster_21__bundle.json"
@@ -116,7 +122,7 @@ class TestHelpers:
 
 class TestTimingDict:
     def test_all_flags_true(self):
-        route = ROUTE_REGISTRY["3a"]
+        route = ROUTE_REGISTRY["single_call"]
         timing_cfg = TimingConfig(
             track_full_run=True,
             track_prompt_construction=True,
@@ -144,7 +150,7 @@ class TestTimingDict:
         assert result["n_api_calls"] == 1
 
     def test_all_flags_false(self):
-        route = ROUTE_REGISTRY["3a"]
+        route = ROUTE_REGISTRY["single_call"]
         timing_cfg = TimingConfig(
             track_full_run=False,
             track_prompt_construction=False,
@@ -172,7 +178,7 @@ class TestTimingDict:
         assert result["n_api_calls"] == 1
 
     def test_multi_turn_with_steps(self):
-        route = ROUTE_REGISTRY["3c"]
+        route = ROUTE_REGISTRY["stepwise"]
         raw_outputs = {
             "steps": [
                 {"elapsed_s": 0.5, "component": "cPH"},
@@ -196,7 +202,7 @@ class TestTimingDict:
         assert result["slowest_step_component"] == "cGCR"
 
     def test_single_call_route(self):
-        route = ROUTE_REGISTRY["3a"]
+        route = ROUTE_REGISTRY["single_call"]
         result = _build_timing_dict(
             route=route,
             t_prompt=0.0,
@@ -210,7 +216,7 @@ class TestTimingDict:
         assert result["step_latencies_seconds"] is None
 
     def test_mcp_tool_latency(self):
-        route = ROUTE_REGISTRY["3a_mcp"]
+        route = ROUTE_REGISTRY["single_call_mcp"]
         raw_outputs = {
             "steps": [],
             "tool_calls": [
@@ -315,7 +321,7 @@ class TestDryRunExecution:
         bundle_path, ctx_path = _setup_bundle_and_context(tmp_path)
 
         record = execute_single_run(
-            route=ROUTE_REGISTRY["3a"],
+            route=ROUTE_REGISTRY["single_call"],
             screen_name="denali",
             cluster_id="21",
             bundle_path=bundle_path,
@@ -335,7 +341,7 @@ class TestDryRunExecution:
         bundle_path, ctx_path = _setup_bundle_and_context(tmp_path)
 
         record = execute_single_run(
-            route=ROUTE_REGISTRY["3a"],
+            route=ROUTE_REGISTRY["single_call"],
             screen_name="denali",
             cluster_id="21",
             bundle_path=bundle_path,
@@ -367,7 +373,7 @@ class TestDryRunExecution:
         bundle_path, ctx_path = _setup_bundle_and_context(tmp_path)
 
         record = execute_single_run(
-            route=ROUTE_REGISTRY["3a"],
+            route=ROUTE_REGISTRY["single_call"],
             screen_name="denali",
             cluster_id="21",
             bundle_path=bundle_path,
@@ -389,7 +395,7 @@ class TestDryRunExecution:
         bundle_path, ctx_path = _setup_bundle_and_context(tmp_path)
 
         record = execute_single_run(
-            route=ROUTE_REGISTRY["3a"],
+            route=ROUTE_REGISTRY["single_call"],
             screen_name="denali",
             cluster_id="21",
             bundle_path=bundle_path,
@@ -402,7 +408,7 @@ class TestDryRunExecution:
         trace_path = Path(record["trace_path"])
         assert trace_path.exists()
         trace_data = json.loads(trace_path.read_text(encoding="utf-8"))
-        assert trace_data["route"] == "3a"
+        assert trace_data["route"] == "single_call"
         assert trace_data["parsed_output"] is not None
 
     def test_dry_run_with_wording_overrides(self, tmp_path):
@@ -418,7 +424,7 @@ class TestDryRunExecution:
             "wording_hypothesis": "test hypothesis",
         }
         record = execute_single_run(
-            route=ROUTE_REGISTRY["3a"],
+            route=ROUTE_REGISTRY["single_call"],
             screen_name="denali",
             cluster_id="21",
             bundle_path=bundle_path,
@@ -428,13 +434,13 @@ class TestDryRunExecution:
             client=None,
             output_dir=output_dir,
             component_overrides={"GCR": "Override text for GCR."},
-            condition_name="3a_w_wording_v1.W3",
+            condition_name="single_call_w_wording_v1.W3",
             extra_record_fields=extra_fields,
         )
-        assert record["route"] == "3a_w_wording_v1.W3"
+        assert record["route"] == "single_call_w_wording_v1.W3"
         assert record["wording_target_id"] == "W3"
         assert record["wording_source"] == "wording_v1"
-        assert "3a_w_wording_v1.W3" in record["run_id"]
+        assert "single_call_w_wording_v1.W3" in record["run_id"]
 
     def test_dry_run_order_variant_metadata(self, tmp_path):
         """Phase 2: order variant metadata appears in the record."""
@@ -447,7 +453,7 @@ class TestDryRunExecution:
         config = _make_dry_run_config(output_dir)
         bundle_path, ctx_path = _setup_bundle_and_context(tmp_path)
 
-        order_route = apply_order_variant(ROUTE_REGISTRY["3a"], "O1")
+        order_route = apply_order_variant(ROUTE_REGISTRY["single_call"], "O1")
         record = execute_single_run(
             route=order_route,
             screen_name="denali",
@@ -459,10 +465,10 @@ class TestDryRunExecution:
             client=None,
             output_dir=output_dir,
         )
-        assert record["base_route"] == "3a"
+        assert record["base_route"] == "single_call"
         assert record["order_variant"] == "late_screen_context"
         assert record["order_hypothesis"] is not None
-        assert record["component_order"] != list(ROUTE_REGISTRY["3a"].component_order)
+        assert record["component_order"] != list(ROUTE_REGISTRY["single_call"].component_order)
 
     def test_filter_clusters_empty_df(self):
         df = _make_clusters_df([])
@@ -482,3 +488,142 @@ class TestDryRunExecution:
         pairs = _filter_clusters(df, cfg)
         assert len(pairs) == 2
         assert set(pairs) == {("denali", "21"), ("aconcagua", "5")}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TestResolvedParams
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class TestResolvedParams:
+    def test_client_built_from_full_model_config(self):
+        """_client_from_config passes every model param through, not just the name."""
+        cfg = BenchmarkConfig()
+        cfg.model = ModelConfig(
+            model_name="claude-sonnet-5",
+            temperature=0.7,
+            max_tokens=16000,
+            top_p=0.9,
+            top_k=40,
+            thinking=False,
+        )
+        client = _client_from_config(cfg, api_key="test-key")
+        assert client.temperature == 0.7
+        assert client.max_tokens == 16000
+        assert client.top_p == 0.9
+        assert client.top_k == 40
+        assert client.thinking is False
+
+    def test_manifest_records_resolved_params(self, tmp_path, monkeypatch):
+        """run_manifest.json carries what the client resolved, not just what was configured."""
+
+        class _StubClient:
+            def _resolve_params(self):
+                self.resolved_params = {
+                    "sent": {},
+                    "dropped": ["temperature"],
+                    "thinking": "disabled",
+                }
+
+        monkeypatch.setattr(bench_orchestrator, "create_client", lambda **kw: _StubClient())
+        clusters_csv = tmp_path / "clusters.csv"
+        clusters_csv.write_text("screen_name,cluster_id,gene_symbol\n")
+
+        cfg = BenchmarkConfig()
+        cfg.experiment_id = "manifest_test"
+        cfg.paths = PathsConfig(
+            benchmark_inputs_dir=tmp_path,
+            benchmark_clusters_csv=clusters_csv,
+            evidence_bundles_dir=tmp_path,
+            output_dir=tmp_path,
+        )
+        cfg.run = RunConfig(dry_run=False, overwrite_outputs=True)
+
+        _run_benchmark_loop(cfg, run_specs=[], config_snapshot={})
+        manifest = json.loads((tmp_path / "manifest_test" / "run_manifest.json").read_text())
+        assert manifest["model_resolved_params"] == {
+            "sent": {},
+            "dropped": ["temperature"],
+            "thinking": "disabled",
+        }
+
+    def test_dry_run_manifest_omits_resolved_params(self, tmp_path):
+        """Dry runs build no client, so the manifest makes no resolved-params claim."""
+        clusters_csv = tmp_path / "clusters.csv"
+        clusters_csv.write_text("screen_name,cluster_id,gene_symbol\n")
+
+        cfg = BenchmarkConfig()
+        cfg.experiment_id = "manifest_dry"
+        cfg.paths = PathsConfig(
+            benchmark_inputs_dir=tmp_path,
+            benchmark_clusters_csv=clusters_csv,
+            evidence_bundles_dir=tmp_path,
+            output_dir=tmp_path,
+        )
+        cfg.run = RunConfig(dry_run=True, overwrite_outputs=True)
+
+        _run_benchmark_loop(cfg, run_specs=[], config_snapshot={})
+        manifest = json.loads((tmp_path / "manifest_dry" / "run_manifest.json").read_text())
+        assert "model_resolved_params" not in manifest
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TestEvidenceSourceThreading
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class TestEvidenceSourceThreading:
+    """bundle_source reaches prompt assembly: each run's prompts carry only its source."""
+
+    def _run_with_source(self, tmp_path, source: str) -> str:
+        output_dir = tmp_path / f"output_{source}"
+        output_dir.mkdir()
+        bundle_path = tmp_path / f"{source}_denali__cluster_21__bundle.json"
+        bundle_path.write_text(
+            json.dumps(
+                {
+                    "cluster_genes": [
+                        {
+                            "gene_symbol": "GeneA",
+                            "UniProt_functional_annotation": "uniprot text",
+                            "affinage_functional_annotation": "affinage text",
+                            "affinage_audit_note": "flagged",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        _, ctx_path = _setup_bundle_and_context(tmp_path)
+        config = _make_dry_run_config(output_dir)
+        config.paths.bundle_source = source
+        execute_single_run(
+            route=ROUTE_REGISTRY["single_call"],
+            screen_name="denali",
+            cluster_id="21",
+            bundle_path=bundle_path,
+            screen_context_path=ctx_path,
+            replicate=1,
+            config=config,
+            client=None,
+            output_dir=output_dir,
+        )
+        prompt_record = json.loads((output_dir / "prompts.jsonl").read_text().splitlines()[0])
+        return prompt_record["user_prompt"]
+
+    def test_uniprot_prompt_carries_no_affinage_fields(self, tmp_path):
+        user_prompt = self._run_with_source(tmp_path, "uniprot")
+        assert "UniProt_functional_annotation" in user_prompt
+        assert "affinage_functional_annotation" not in user_prompt
+        assert "affinage_audit_note" not in user_prompt
+
+    def test_affinage_prompt_carries_no_uniprot_fields(self, tmp_path):
+        user_prompt = self._run_with_source(tmp_path, "affinage")
+        assert "affinage_functional_annotation" in user_prompt
+        assert "affinage_audit_note" in user_prompt
+        assert "UniProt_functional_annotation" not in user_prompt
+
+    def test_both_prompt_carries_both_sources(self, tmp_path):
+        user_prompt = self._run_with_source(tmp_path, "both")
+        assert "UniProt_functional_annotation" in user_prompt
+        assert "affinage_functional_annotation" in user_prompt

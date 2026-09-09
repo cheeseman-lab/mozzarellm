@@ -32,11 +32,11 @@ from typing import Any
 
 # Trace filenames use double-underscore separators:
 #   {experiment_id}__{route}__{screen_name}__cluster_{cluster_id}__rep_{replicate}.json
-# Route names with underscores (e.g. 3a_mcp) must be matched greedily before
+# Route names with underscores (e.g. single_call_mcp) must be matched greedily before
 # shorter variants to avoid ambiguity.
 TRACE_FILENAME_RE = re.compile(
     r"^(?P<experiment_id>.+?)__"
-    r"(?P<route>3[abc](?:(?!__).)*)"
+    r"(?P<route>(?:single_call|cot|stepwise)(?:(?!__).)*)"
     r"__(?P<screen_name>.+?)__"
     r"cluster_(?P<cluster_id>.+?)__"
     r"rep_(?P<replicate>\d+)\.json$"
