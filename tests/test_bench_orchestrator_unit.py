@@ -444,7 +444,7 @@ class TestDryRunExecution:
 
     def test_dry_run_order_variant_metadata(self, tmp_path):
         """Phase 2: order variant metadata appears in the record."""
-        from benchmarks.architecture_benchmarking_workflow.order_bench_orderings import (
+        from benchmarks.architecture_benchmarking_workflow.bench_orderings import (
             apply_order_variant,
         )
 

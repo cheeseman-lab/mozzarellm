@@ -65,8 +65,8 @@ from .bench_evaluator import (
 )
 from .bench_evaluator import audit_flag_diagnostics as _audit_flag_diagnostics
 from .bench_orchestrator import RunSpec, _build_config_snapshot, _run_benchmark_loop
+from .bench_orderings import ORDER_VARIANTS, apply_order_variant
 from .bench_routes import ROUTE_REGISTRY, Route
-from .order_bench_orderings import ORDER_VARIANTS, apply_order_variant
 
 PHASE1_DIR = Path(__file__).resolve().parents[1]
 INPUTS_DIR = PHASE1_DIR / "benchmark_inputs"

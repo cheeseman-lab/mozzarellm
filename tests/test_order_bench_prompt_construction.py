@@ -18,11 +18,11 @@ if str(_REPO_ROOT) not in sys.path:
 from benchmarks.architecture_benchmarking_workflow.bench_orchestrator import (
     construct_prompts,
 )
+from benchmarks.architecture_benchmarking_workflow.bench_orderings import (
+    apply_order_variant,
+)
 from benchmarks.architecture_benchmarking_workflow.bench_routes import (
     ROUTE_REGISTRY,
-)
-from benchmarks.architecture_benchmarking_workflow.order_bench_orderings import (
-    apply_order_variant,
 )
 
 # ============================================================================

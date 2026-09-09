@@ -517,11 +517,11 @@ def test_mode_yaml_parses_as_the_full_delivery_x_mcp_matrix():
 
 
 def test_order_variant_condition_reorders_the_route():
+    from benchmarks.architecture_benchmarking_workflow.bench_orderings import (  # noqa: E501
+        apply_order_variant,
+    )
     from benchmarks.architecture_benchmarking_workflow.bench_routes import (
         ROUTE_REGISTRY,
-    )
-    from benchmarks.architecture_benchmarking_workflow.order_bench_orderings import (  # noqa: E501
-        apply_order_variant,
     )
 
     plain = bench_experiment._condition_route({"name": "O"}, "single_call")

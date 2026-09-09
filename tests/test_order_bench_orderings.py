@@ -1,4 +1,4 @@
-"""Tests for order_bench_orderings — Phase 2 order variant generation and validation."""
+"""Tests for bench_orderings — Phase 2 order variant generation and validation."""
 
 import sys
 from pathlib import Path
@@ -10,17 +10,17 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from benchmarks.architecture_benchmarking_workflow.bench_routes import (
-    ROUTE_REGISTRY,
-    StepwiseTurn,
-)
-from benchmarks.architecture_benchmarking_workflow.order_bench_orderings import (
+from benchmarks.architecture_benchmarking_workflow.bench_orderings import (
     _ORDER_SPECS,
     ORDER_VARIANTS,
     OrderVariant,
     apply_order_variant,
     resolve_order_variant_ids,
     validate_order_variant_names,
+)
+from benchmarks.architecture_benchmarking_workflow.bench_routes import (
+    ROUTE_REGISTRY,
+    StepwiseTurn,
 )
 from mozzarellm.prompt_components import COMPONENT_REGISTRY
 

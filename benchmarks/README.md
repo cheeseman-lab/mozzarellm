@@ -39,7 +39,7 @@ re-scores the newest archived run dirs without API calls.
   yaml → runs → scoring → state), `bench_orchestrator` (engine: shared execution loop),
   `bench_evaluator` (the single metric generator: consensus GT, panels, decoys,
   diagnostics), `bench_routes` (route registry), `bench_configparse` (config dataclasses),
-  `order_bench_orderings` (O-variant catalog), `bench_dry_run`, `bench_metricfns`.
+  `bench_orderings` (O-variant catalog), `bench_dry_run`, `bench_metricfns`.
 - `benchmark_inputs/` — `benchmark_input.csv` (one row per screen/cluster/gene, with roles
   and phenotypic features), `ground_truth/annotation_{eric,liz,iain}.csv` (raw reviewer
   sheets) + `survey_key.csv` (source-blinding key), per-screen context JSONs.
