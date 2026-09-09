@@ -10,14 +10,14 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from benchmarks.architecture_benchmarking_workflow import (  # noqa: E402
+from benchmarks.workflow import (  # noqa: E402
     bench_experiment,
 )
-from benchmarks.architecture_benchmarking_workflow.bench_evaluator import (  # noqa: E402
+from benchmarks.workflow.bench_evaluator import (  # noqa: E402
     N_REAL_GENES,
     MetricPanel,
 )
-from benchmarks.architecture_benchmarking_workflow.bench_experiment import (  # noqa: E402
+from benchmarks.workflow.bench_experiment import (  # noqa: E402
     latest_run_dir,
     load_experiment,
     metric_value,
@@ -517,10 +517,10 @@ def test_mode_yaml_parses_as_the_full_delivery_x_mcp_matrix():
 
 
 def test_order_variant_condition_reorders_the_route():
-    from benchmarks.architecture_benchmarking_workflow.bench_orderings import (  # noqa: E501
+    from benchmarks.workflow.bench_orderings import (  # noqa: E501
         apply_order_variant,
     )
-    from benchmarks.architecture_benchmarking_workflow.bench_routes import (
+    from benchmarks.workflow.bench_routes import (
         ROUTE_REGISTRY,
     )
 

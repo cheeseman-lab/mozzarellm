@@ -32,8 +32,8 @@ load_dotenv()  # walks upward to find .env automatically
 
 ############### configuration ###############
 SCRIPT_DIR = Path(__file__).resolve().parent
-INPUTS_DIR = SCRIPT_DIR / "benchmark_inputs"
-OUTPUT_DIR = SCRIPT_DIR / "benchmark_bundles"
+INPUTS_DIR = SCRIPT_DIR / "inputs"
+OUTPUT_DIR = SCRIPT_DIR / "bundles"
 BENCHMARK_CSV = INPUTS_DIR / "benchmark_input.csv"
 SCREEN_COL = "screen_name"
 CLUSTER_COL = "cluster_id"

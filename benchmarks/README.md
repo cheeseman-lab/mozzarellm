@@ -19,7 +19,7 @@ builds the prompt on it one component at a time (human-gated per stage), mode co
 delivery formats on the final build, order permutes its component order.
 
 ```bash
-python -m benchmarks.architecture_benchmarking_workflow.bench_experiment \
+python -m benchmarks.workflow.bench_experiment \
     benchmarks/experiments/source.yaml [--dry-run | --score-only]
 
 # staged experiments (the walkup): one stage per invocation, human-gated selection
@@ -35,17 +35,17 @@ re-scores the newest archived run dirs without API calls.
 - `experiments/` — the experiment yamls: `source` (uniprot vs affinage on the blank W0
   floor), `walkup` (staged build-up CAT→GCR→NPR→UPR→PCC; candidates + rationales live in
   the yaml), `mode` (single_call vs cot vs stepwise), `order` (O–O4 permutations).
-- `architecture_benchmarking_workflow/` — the code: `bench_experiment` (experiment layer:
+- `workflow/` — the code: `bench_experiment` (experiment layer:
   yaml → runs → scoring → state), `bench_orchestrator` (engine: shared execution loop),
   `bench_evaluator` (the single metric generator: consensus GT, panels, decoys,
   diagnostics), `bench_routes` (route registry), `bench_configparse` (config dataclasses),
   `bench_orderings` (O-variant catalog), `bench_dry_run`, `bench_metricfns`.
-- `benchmark_inputs/` — `benchmark_input.csv` (one row per screen/cluster/gene, with roles
+- `inputs/` — `benchmark_input.csv` (one row per screen/cluster/gene, with roles
   and phenotypic features), `ground_truth/annotation_{eric,liz,iain}.csv` (raw reviewer
   sheets) + `survey_key.csv` (source-blinding key), per-screen context JSONs.
-- `benchmark_bundles/` — master evidence bundles (both sources' annotations; reduced to
+- `bundles/` — master evidence bundles (both sources' annotations; reduced to
   one source's view at prompt assembly). Rebuilt by `build_bundles.py`;
   `merge_reviewers.py` merges the reviewer sheets.
-- `benchmarking_outputs/` — submodule. Runs archive under
+- `outputs/` — submodule. Runs archive under
   `<experiment>/<condition-or-stage>_<stamp>/` (never overwritten); state at
   `<experiment>/<experiment>_state.json`.

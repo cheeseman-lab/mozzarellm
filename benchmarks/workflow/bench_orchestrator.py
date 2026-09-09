@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 # Ensure repo root is on sys.path for imports
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
@@ -751,7 +751,7 @@ def _run_benchmark_loop(
                 )
                 continue
             screen_context_path = _resolve_screen_context_path(
-                config.paths.benchmark_inputs_dir, screen_name
+                config.paths.inputs_dir, screen_name
             )
             if screen_context_path is None:
                 print(

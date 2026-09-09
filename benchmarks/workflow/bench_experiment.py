@@ -5,10 +5,10 @@ conditions that vary), drives every condition through the engine's RunSpec +
 ``_run_benchmark_loop`` machinery, scores real clusters against the
 reviewer-consensus ground truth, validates the control clusters, applies the
 yaml's selection rule, and writes the experiment's state file --
-``benchmarking_outputs/<experiment>/<experiment>_state.json``. State files are
+``outputs/<experiment>/<experiment>_state.json``. State files are
 the only metric output; downstream steps read state, never re-derive.
 
-Runs archive under ``benchmarking_outputs/<experiment>/<condition>_<stamp>/``
+Runs archive under ``outputs/<experiment>/<condition>_<stamp>/``
 and are never overwritten. ``score_only`` re-scores the newest archived run dir
 per condition without API calls; ``dry_run`` exercises the full plumbing on
 mock outputs.
@@ -31,7 +31,7 @@ cross-experiment input (the walkup's evidence source) from that experiment's
 state file; every staged invocation logs and snapshots its resolved inputs.
 
 Usage:
-    python -m benchmarks.architecture_benchmarking_workflow.bench_experiment \
+    python -m benchmarks.workflow.bench_experiment \
         benchmarks/experiments/source.yaml [--dry-run | --score-only]
     ... bench_experiment experiments/walkup.yaml --stage CAT [--source affinage]
     ... bench_experiment experiments/walkup.yaml --select CAT process_guarded
@@ -68,11 +68,11 @@ from .bench_orchestrator import RunSpec, _build_config_snapshot, _run_benchmark_
 from .bench_orderings import ORDER_VARIANTS, apply_order_variant
 from .bench_routes import ROUTE_REGISTRY, Route
 
-PHASE1_DIR = Path(__file__).resolve().parents[1]
-INPUTS_DIR = PHASE1_DIR / "benchmark_inputs"
+BENCH_DIR = Path(__file__).resolve().parents[1]
+INPUTS_DIR = BENCH_DIR / "inputs"
 GT_DIR = INPUTS_DIR / "ground_truth"
-BUNDLES_DIR = PHASE1_DIR / "benchmark_bundles"
-OUTPUTS = PHASE1_DIR / "benchmarking_outputs"
+BUNDLES_DIR = BENCH_DIR / "bundles"
+OUTPUTS = BENCH_DIR / "outputs"
 CLUSTERS_ALL = INPUTS_DIR / "benchmark_input.csv"
 SURVEY_KEY = GT_DIR / "survey_key.csv"
 GT_PATH = OUTPUTS / "consensus_gt.csv"
@@ -461,7 +461,7 @@ def _condition_config(
         overwrite_outputs=True,
     )
     cfg.paths = PathsConfig(
-        benchmark_inputs_dir=INPUTS_DIR,
+        inputs_dir=INPUTS_DIR,
         benchmark_clusters_csv=CLUSTERS_ALL,
         evidence_bundles_dir=BUNDLES_DIR,
         output_dir=OUTPUTS / exp["experiment"],

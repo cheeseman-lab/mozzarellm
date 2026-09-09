@@ -2,8 +2,8 @@
 """Merge the three per-reviewer annotation tables into one consensus-agnostic
 ground-truth table.
 
-Reads benchmark_inputs/ground_truth/annotation_{eric,liz,iain}.csv and writes
-benchmark_inputs/benchmark_ground_truth.csv, keyed on (screen, cluster, gene)
+Reads inputs/ground_truth/annotation_{eric,liz,iain}.csv and writes
+inputs/benchmark_ground_truth.csv, keyed on (screen, cluster, gene)
 with per-reviewer columns (classification_eric, subclass_liz, ...). No consensus
 is baked in — the raw reviewer labels are the ground truth; consensus is a
 downstream reduction computed by the evaluator.
@@ -14,8 +14,8 @@ from pathlib import Path
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-GT_DIR = HERE / "benchmark_inputs" / "ground_truth"
-OUT = HERE / "benchmark_inputs" / "benchmark_ground_truth.csv"
+GT_DIR = HERE / "inputs" / "ground_truth"
+OUT = HERE / "inputs" / "benchmark_ground_truth.csv"
 
 REVIEWERS = ("eric", "liz", "iain")
 KEY = ["screen", "cluster", "gene"]

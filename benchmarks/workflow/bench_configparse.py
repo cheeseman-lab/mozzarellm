@@ -20,8 +20,8 @@ class ModelConfig:
 
 @dataclass
 class PathsConfig:
-    benchmark_inputs_dir: Path = Path("benchmark_inputs")
-    benchmark_clusters_csv: Path = Path("benchmark_inputs/benchmark_clusters.csv")
+    inputs_dir: Path = Path("inputs")
+    benchmark_clusters_csv: Path = Path("inputs/benchmark_clusters.csv")
     evidence_bundles_dir: Path = Path("benchmark_evidence_bundles_uniprot")
     output_dir: Path = Path("1.architecture_testing_outputs")
     bundle_source: str = "uniprot"  # "uniprot" or "affinage"

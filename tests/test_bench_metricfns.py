@@ -24,7 +24,7 @@ for _name, _subdir in [
         _m.__package__ = _name
         sys.modules[_name] = _m
 
-from benchmarks.architecture_benchmarking_workflow.bench_metricfns import (
+from benchmarks.workflow.bench_metricfns import (
     compute_all_metrics,
     compute_efficiency_metrics,
     compute_logical_metrics,
