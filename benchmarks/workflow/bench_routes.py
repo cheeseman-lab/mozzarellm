@@ -2,7 +2,7 @@
 
 Each Route is a frozen dataclass encoding a unique prompt-delivery configuration:
 mode (standard / cot / stepwise), MCP toggle, delivery mechanism, and the ordered list of prompt components.
-More details on each component can be found in the README and prompt-assembly-routes-info.md.
+More details on each component can be found in the README.
 
 ROUTE_REGISTRY maps route names (single_call, single_call_mcp, cot, ...) to Route objects used by
 the orchestrator for prompt construction, model dispatch, and output tagging.
