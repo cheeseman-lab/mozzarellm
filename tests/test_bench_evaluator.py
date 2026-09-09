@@ -8,7 +8,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_evaluator import (  # noqa: E402
+from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_evaluator import (  # noqa: E402
     _consensus_subclass,
     audit_flag_diagnostics,
     build_consensus_gt,
@@ -29,7 +29,7 @@ from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_e
 # Fixtures
 # ---------------------------------------------------------------------------
 
-P = Path(__file__).resolve().parent / "phase1_prompt_benchmarking"
+P = Path(__file__).resolve().parents[1] / "benchmarks" / "phase1_prompt_benchmarking"
 GT = P / "benchmark_inputs" / "ground_truth"
 
 

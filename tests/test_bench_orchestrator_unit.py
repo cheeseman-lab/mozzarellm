@@ -16,10 +16,10 @@ if str(_REPO_ROOT) not in sys.path:
 try:
     import pandas as pd
 
-    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow import (
+    from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow import (
         bench_orchestrator,
     )
-    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_configparse import (
+    from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_configparse import (
         BenchmarkConfig,
         ClusterFilter,
         ModelConfig,
@@ -27,7 +27,7 @@ try:
         RunConfig,
         TimingConfig,
     )
-    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_orchestrator import (
+    from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_orchestrator import (
         _build_run_id,
         _build_timing_dict,
         _client_from_config,
@@ -37,7 +37,7 @@ try:
         _run_benchmark_loop,
         execute_single_run,
     )
-    from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
+    from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
         ROUTE_REGISTRY,
     )
 
@@ -444,7 +444,7 @@ class TestDryRunExecution:
 
     def test_dry_run_order_variant_metadata(self, tmp_path):
         """Phase 2: order variant metadata appears in the record."""
-        from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (
+        from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (
             apply_order_variant,
         )
 

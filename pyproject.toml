@@ -83,13 +83,12 @@ exclude = [
 # Intentional per-file exceptions
 [tool.ruff.lint.per-file-ignores]
 # Orchestrator puts the repo root on sys.path before importing mozzarellm.*
-"tests/phase1_prompt_benchmarking/architecture_benchmarking_workflow/bench_orchestrator.py" = ["E402"]
+"benchmarks/phase1_prompt_benchmarking/architecture_benchmarking_workflow/bench_orchestrator.py" = ["E402"]
 # Tests put the repo root on sys.path before importing the packages under test
 "tests/test_*.py" = ["E402"]
 # Constant-style locals / Chain-of-Thought argument naming, kept by intent
 "mozzarellm/pipeline/bundle_builder.py" = ["N806"]
 "mozzarellm/utils/prompt_factory.py" = ["N806", "N803"]
-"tests/phase1_prompt_benchmarking/architecture_benchmarking_workflow/wording_bench_alternates.py" = ["N816"]
 
 [tool.ruff.format]
 # Use double quotes for strings
