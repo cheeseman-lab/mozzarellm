@@ -68,3 +68,11 @@ Thumbs.db
 # Development artifacts
 dev/
 screen_context.json
+# Local run artifacts (analysis outputs, debug dumps, scratch)
+debug/
+output/
+tmp/
+examples/benchmark_results/
+interface/output/*
+!interface/output/.gitkeep
+benchmarks/bundle_regen.log
