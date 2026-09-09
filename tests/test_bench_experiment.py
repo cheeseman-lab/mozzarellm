@@ -541,3 +541,14 @@ def test_unknown_order_variant_rejected(tmp_path):
     )
     with pytest.raises(ValueError, match="order_variant 'O9'"):
         load_experiment(_write_yaml(tmp_path, text))
+
+
+ORDER_YAML = SOURCE_YAML.parent / "order.yaml"
+
+
+def test_order_yaml_parses_with_the_variant_catalog():
+    exp = load_experiment(ORDER_YAML)
+    assert exp["uses"]["source"] == "mode.carry.source"
+    assert [c["name"] for c in exp["conditions"]] == ["O", "O1", "O2", "O3", "O4"]
+    assert all(c["order_variant"] == c["name"] for c in exp["conditions"])
+    assert exp["carry"] == ["source", "order"]
