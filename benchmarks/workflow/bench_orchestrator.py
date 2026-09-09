@@ -667,7 +667,6 @@ def _build_config_snapshot(config: BenchmarkConfig, **phase_fields: Any) -> dict
             else [asdict(c) for c in config.clusters_include]
         ),
         "mcp": asdict(config.mcp),
-        "evaluation": asdict(config.evaluation),
         "timing": asdict(config.timing),
         "paths": {k: str(v) for k, v in asdict(config.paths).items()},
     }

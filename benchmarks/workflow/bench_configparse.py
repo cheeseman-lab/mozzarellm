@@ -48,14 +48,6 @@ class McpConfig:
 
 
 @dataclass
-class EvaluationConfig:
-    structural: bool = True
-    logical_consistency: bool = True
-    efficiency: bool = True
-    robustness: bool = True
-
-
-@dataclass
 class TimingConfig:
     track_full_run: bool = True
     track_prompt_construction: bool = True
@@ -83,7 +75,6 @@ class BenchmarkConfig:
     screens_include: list[str] | str = "all"
     clusters_include: list[ClusterFilter] | str = "all"
     mcp: McpConfig = field(default_factory=McpConfig)
-    evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     timing: TimingConfig = field(default_factory=TimingConfig)
 
     @property
