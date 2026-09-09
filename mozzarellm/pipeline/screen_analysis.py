@@ -88,6 +88,7 @@ def analyze_screen(
     mode: str = "cot",
     mcp: bool = False,
     include_features: bool = False,
+    component_overrides: dict[str, str] | None = None,
     original_df=None,
 ) -> dict:
     """Analyze every cluster in a screen and write the run's outputs.
@@ -105,6 +106,10 @@ def analyze_screen(
         include_features: Feed each gene's phenotypic feature columns to the
             model and add the feature-interpretation reasoning steps.
             Currently supported for mode="cot" without MCP.
+        component_overrides: {component_key: text} replacements for individual
+            prompt components (see mozzarellm.prompt_components
+            COMPONENT_REGISTRY) -- run your own wording for any reasoning step
+            without editing the package.
         original_df: Optional per-cluster metadata table (must carry
             ``cluster_id``); its columns merge into the output tables.
 
@@ -131,6 +136,7 @@ def analyze_screen(
         mode=mode,
         mcp=mcp,
         component_order=(list(CANONICAL_FEATURE_INTERP_COT_ORDER) if include_features else None),
+        component_overrides=component_overrides,
     )
 
     results: dict = {}

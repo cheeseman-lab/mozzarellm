@@ -153,3 +153,17 @@ def test_prepare_screen_bundles_reuses_cache(tmp_path):
         screen_name="s1", cluster_table=table, output_dir=tmp_path
     )  # cache hit: no network
     assert "21" in bundles
+
+
+def test_component_overrides_reach_the_system_prompt(tmp_path):
+    client = _StubClient()
+    analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=client,
+        run_dir=tmp_path / "run",
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+        component_overrides={"cGCR": "MY CUSTOM CATEGORIZATION RULES"},
+    )
+    assert "MY CUSTOM CATEGORIZATION RULES" in client.calls[0]["system"]
