@@ -28,7 +28,6 @@ phase1_prompt_benchmarking/
         bench_experiment.py           -- Experiment layer: yaml -> runs -> scoring -> state
         bench_configparse.py          -- Benchmark config dataclasses
         bench_metricfns.py            -- Structural, MCP, logical, efficiency metrics
-        bench_trace_parser.py         -- Trace JSON -> gene-level prediction CSVs
         bench_dry_run.py              -- Deterministic mock outputs for dry-run
         order_bench_orderings.py      -- Order variant definitions + route builder
 
@@ -120,32 +119,6 @@ python -m tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.be
 
 Runs archive under `benchmarking_outputs/<experiment>/<condition-or-stage>_<stamp>/`
 (never overwritten); state lives at `benchmarking_outputs/<experiment>/<experiment>_state.json`.
-
-## Running the Trace Parser
-
-After a benchmark run, use the trace parser to extract gene-level predictions from the trace JSONs into aligned CSVs for downstream analysis.
-
-**Usage:**
-```bash
-python -m tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_trace_parser \
-    --traces-dir <path_to_traces_dir> \
-    --output-dir <path_to_output_dir> \
-    [--experiment-id <experiment_id>] \
-    [--overwrite]
-```
-
-**Parameters:**
-- **--traces-dir** -- path to the `traces/` directory from a benchmark run (e.g. `benchmarking_outputs/2.order/order_bench_full_v1/traces/`)
-- **--output-dir** -- where to write the gene-level CSVs (usually the same directory as the traces)
-- **--experiment-id** -- optional; auto-detected from trace filenames if not provided
-- **--overwrite** -- overwrite existing CSVs; otherwise appends date to filename
-
-**Output:**
-Creates one CSV per route per experiment:
-- `{experiment_id}_{route}.csv` (if --overwrite)
-- `{experiment_id}_{route}_{YYYYMMDD}.csv` (otherwise)
-
-Each CSV contains columns: screen_name, cluster_id, gene_symbol, route, replicate, run_id, predicted_class, predicted_subclass, rationale, evidence, pathway, pathway_confidence, source_trace_path
 
 ## Screens
 
