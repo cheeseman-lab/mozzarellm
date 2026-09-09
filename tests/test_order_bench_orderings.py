@@ -15,8 +15,6 @@ from benchmarks.architecture_benchmarking_workflow.bench_orderings import (
     ORDER_VARIANTS,
     OrderVariant,
     apply_order_variant,
-    resolve_order_variant_ids,
-    validate_order_variant_names,
 )
 from benchmarks.architecture_benchmarking_workflow.bench_routes import (
     ROUTE_REGISTRY,
@@ -154,59 +152,6 @@ class TestOrderSpecs:
                     f"perturbed={sorted(spec['component_order'])} vs "
                     f"canonical={sorted(canonical_order)}"
                 )
-
-
-# ============================================================================
-# Validation
-# ============================================================================
-
-
-class TestValidation:
-    def test_valid_names_pass(self):
-        names = ["O", "O1"]
-        assert validate_order_variant_names(names) == names
-
-    def test_invalid_names_raise(self):
-        with pytest.raises(ValueError, match="Unknown order variant"):
-            validate_order_variant_names(["O", "nonexistent"])
-
-    def test_empty_list_is_valid(self):
-        assert validate_order_variant_names([]) == []
-
-
-# ============================================================================
-# Selector (resolve_order_variant_ids)
-# ============================================================================
-
-
-class TestResolveOrderVariantIds:
-    def test_all(self):
-        ids = resolve_order_variant_ids("all")
-        assert ids[0] == "O"
-        assert set(ids) == set(ORDER_VARIANTS)
-
-    def test_range(self):
-        ids = resolve_order_variant_ids("O1-O3")
-        assert ids == ["O", "O1", "O2", "O3"]
-
-    def test_explicit_list_always_includes_canonical(self):
-        ids = resolve_order_variant_ids(["O1", "O3"])
-        assert ids == ["O", "O1", "O3"]
-
-    def test_single_string(self):
-        assert resolve_order_variant_ids("O2") == ["O", "O2"]
-
-    def test_unknown_raises(self):
-        with pytest.raises(ValueError, match="Unknown order variant"):
-            resolve_order_variant_ids(["O99"])
-
-    def test_no_duplicate_canonical(self):
-        ids = resolve_order_variant_ids(["O", "O1"])
-        assert ids.count("O") == 1
-
-    def test_all_returns_full_registry(self):
-        ids = resolve_order_variant_ids("all")
-        assert len(ids) == len(ORDER_VARIANTS)
 
 
 # ============================================================================

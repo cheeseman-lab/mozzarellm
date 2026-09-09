@@ -11,7 +11,6 @@ Hypotheses this tests (more detail in MLLM Benchmarking Plan_2_10_26.docx --- se
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -222,92 +221,6 @@ _ORDER_SPECS: dict[str, dict[tuple[str, bool], dict]] = {
     },
 }
 # fmt: on
-
-
-# ============================================================================
-# Validation
-# ============================================================================
-
-
-def validate_order_variant_names(names: list[str]) -> list[str]:
-    """Validate that all requested variant names exist.
-
-    Returns the list unchanged if valid; raises ValueError otherwise.
-    """
-    invalid = [n for n in names if n not in ORDER_VARIANTS]
-    if invalid:
-        raise ValueError(
-            f"Unknown order variant(s): {invalid}. Valid variants: {sorted(ORDER_VARIANTS.keys())}"
-        )
-    return names
-
-
-# ============================================================================
-# Generic variant selector
-# ============================================================================
-
-
-def resolve_variant_ids(
-    selector: str | list[str],
-    *,
-    prefix: str,
-    registry: dict[str, object],
-    canonical_key: str,
-    label: str = "variant",
-) -> list[str]:
-    """Expand a variant selector into an ordered, de-duplicated list of ids.
-
-    Supports:
-        - ``"all"``             -> every key in *registry* (insertion order)
-        - ``"{prefix}1-{prefix}4"`` -> inclusive numeric range
-        - ``["{prefix}1", "{prefix}3"]`` -> explicit list
-        - ``"{prefix}2"``       -> single id
-
-    *canonical_key* is always included first.
-    """
-    range_re = re.compile(rf"^{re.escape(prefix)}(\d+)-{re.escape(prefix)}(\d+)$")
-
-    if selector == "all":
-        ids = list(registry.keys())
-    elif isinstance(selector, str):
-        m = range_re.match(selector.strip())
-        if m:
-            lo, hi = int(m.group(1)), int(m.group(2))
-            if hi < lo:
-                raise ValueError(f"Invalid {label} range (hi < lo): {selector!r}")
-            ids = [f"{prefix}{i}" for i in range(lo, hi + 1)]
-        else:
-            ids = [selector.strip()]
-    else:
-        ids = [str(t).strip() for t in selector]
-
-    unknown = [t for t in ids if t not in registry]
-    if unknown:
-        raise ValueError(f"Unknown {label} id(s): {unknown}. Known: {sorted(registry)}")
-
-    ordered = [canonical_key] + [t for t in ids if t != canonical_key]
-    seen: set[str] = set()
-    result: list[str] = []
-    for t in ordered:
-        if t not in seen:
-            seen.add(t)
-            result.append(t)
-    return result
-
-
-def resolve_order_variant_ids(selector: str | list[str]) -> list[str]:
-    """Expand an order-variant selector into a de-duplicated list of O-keys.
-
-    Always includes ``"O"`` (canonical) first.  See :func:`resolve_variant_ids`
-    for supported selector formats.
-    """
-    return resolve_variant_ids(
-        selector,
-        prefix="O",
-        registry=ORDER_VARIANTS,
-        canonical_key="O",
-        label="order variant",
-    )
 
 
 # ============================================================================
