@@ -31,8 +31,8 @@ cross-experiment input (the walkup's evidence source) from that experiment's
 state file; every staged invocation logs and snapshots its resolved inputs.
 
 Usage:
-    python -m tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_experiment \
-        tests/phase1_prompt_benchmarking/experiments/source.yaml [--dry-run | --score-only]
+    python -m benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_experiment \
+        benchmarks/phase1_prompt_benchmarking/experiments/source.yaml [--dry-run | --score-only]
     ... bench_experiment experiments/walkup.yaml --stage CAT [--source affinage]
     ... bench_experiment experiments/walkup.yaml --select CAT process_guarded
 """

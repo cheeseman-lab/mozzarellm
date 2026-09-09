@@ -98,8 +98,8 @@ through the engine, scored against reviewer-consensus GT, controls validated, th
 rule applied, and the experiment's state file written (the only metric output).
 
 ```bash
-python -m tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_experiment \
-    tests/phase1_prompt_benchmarking/experiments/source.yaml [--dry-run | --score-only]
+python -m benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_experiment \
+    benchmarks/phase1_prompt_benchmarking/experiments/source.yaml [--dry-run | --score-only]
 
 # staged experiments (the walkup): one stage per invocation, human-gated selection
 ... bench_experiment experiments/walkup.yaml --stage CAT [--source affinage]

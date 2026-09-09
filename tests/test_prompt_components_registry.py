@@ -11,15 +11,15 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from benchmarks.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (  # noqa: E402
+    ROUTE_REGISTRY,
+)
 from mozzarellm.prompt_components import (  # noqa: E402
     CANONICAL_COT_MCP_ORDER,
     CANONICAL_COT_ORDER,
     CANONICAL_ZERO_SHOT_ORDER,
     COMPONENT_REGISTRY,
     GENE_CATEGORIZATION_RULES,
-)
-from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (  # noqa: E402
-    ROUTE_REGISTRY,
 )
 
 
