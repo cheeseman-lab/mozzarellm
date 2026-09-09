@@ -479,3 +479,17 @@ class TestStagelessUses:
         state = run_experiment(path, dry_run=True, source="uniprot")
         assert state["resolved"]["source"] == "uniprot"
         assert state["carry"]["source"] == "uniprot"
+
+
+MODE_YAML = SOURCE_YAML.parent / "mode.yaml"
+
+
+def test_mode_yaml_parses_and_carries_the_walkup_build():
+    exp = load_experiment(MODE_YAML)
+    assert exp["uses"] == {
+        "source": "walkup.carry.source",
+        "component_overrides": "walkup.carry.final_component_texts",
+    }
+    assert [c["name"] for c in exp["conditions"]] == ["single_call", "cot", "stepwise"]
+    assert [c["route"] for c in exp["conditions"]] == ["single_call", "cot", "stepwise"]
+    assert exp["carry"] == ["source", "mode"]

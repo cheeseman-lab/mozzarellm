@@ -1,0 +1,45 @@
+# The mode experiment: delivery-mode comparison on the walkup's final build.
+# Runs single_call vs cot vs stepwise on the source and component texts the
+# walkup carried; selection is holistic (delivery format legitimately trades
+# metrics off), with the same coverage-honest primary as the source step.
+#
+# Component-mapping caveat: the walkup tunes the single_call slots
+# (CAT/GCR/NPR/UPR/PCC); cot and stepwise assemble from their own slots
+# (cPH/cGCR/cPri/cPSC/cVer/cO), sharing only CAT and SC. Carried overrides for
+# slots a route doesn't have are inert at assembly, so single_call runs the
+# full tuned prompt while cot/stepwise carry only the tuned CAT lens and keep
+# canonical text for their own components -- a fair mode comparison, not a
+# verbatim prompt transplant.
+
+experiment: mode
+description: delivery-mode comparison on the walkup's final assembled build
+
+uses:
+  source: walkup.carry.source
+  component_overrides: walkup.carry.final_component_texts
+
+model:
+  provider: anthropic
+  model_name: claude-sonnet-5
+  # temperature omitted: claude-sonnet-5 rejects non-default sampling params
+  max_tokens: 16000
+  thinking: false
+
+run:
+  replicates: 3
+  max_workers: 12
+  route: single_call
+
+conditions:  # what varies is the delivery route; source + build are carried
+  - name: single_call
+    route: single_call
+  - name: cot
+    route: cot
+  - name: stepwise
+    route: stepwise
+
+selection:
+  primary: coverage_weighted_category
+  metrics: [category, novel_subclass, unchar_subclass, coherence, coverage]
+
+carry: [source, mode]  # carry.source = the resolved source; carry.mode = winner
