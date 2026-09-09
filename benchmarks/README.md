@@ -44,8 +44,7 @@ re-scores the newest archived run dirs without API calls.
   and phenotypic features), `ground_truth/annotation_{eric,liz,iain}.csv` (raw reviewer
   sheets) + `survey_key.csv` (source-blinding key), per-screen context JSONs.
 - `bundles/` — master evidence bundles (both sources' annotations; reduced to
-  one source's view at prompt assembly). Rebuilt by `build_bundles.py`;
-  `merge_reviewers.py` merges the reviewer sheets.
+  one source's view at prompt assembly). Rebuilt by `build_bundles.py`.
 - `outputs/` — submodule. Runs archive under
   `<experiment>/<condition-or-stage>_<stamp>/` (never overwritten); state at
   `<experiment>/<experiment>_state.json`.
