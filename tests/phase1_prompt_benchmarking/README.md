@@ -24,22 +24,20 @@ phase1_prompt_benchmarking/
 
     architecture_benchmarking_workflow/
         bench_routes.py          -- Route dataclass + 6-route registry
-        bench_orchestrator.py         -- Main loop, CLI, prompt construction, execution
-        bench_configparse.py          -- YAML config loader + dataclass sections
+        bench_orchestrator.py         -- Engine: shared loop, prompt construction, execution
+        bench_experiment.py           -- Experiment layer: yaml -> runs -> scoring -> state
+        bench_configparse.py          -- Benchmark config dataclasses
         bench_metricfns.py            -- Structural, MCP, logical, efficiency metrics
         bench_reportgen.py            -- Markdown report + CSV/JSON aggregates
         bench_trace_parser.py         -- Trace JSON -> gene-level prediction CSVs
         bench_dry_run.py              -- Deterministic mock outputs for dry-run
         order_bench_orderings.py      -- Order variant definitions + route builder
 
-    configs/
-        arch_bench_default.yaml
-        arch_bench_dry_run_test.yaml
-        arch_bench_full_run_test_denali.yaml
-        order_bench_default.yaml
-        order_bench_dry_run_test.yaml
-        order_bench_full_run_test_denali.yaml
-        your-custom-config.yaml
+    experiments/
+        source.yaml                   -- evidence-source comparison (whole experiment)
+        walkup.yaml                   -- staged prompt build-up (whole experiment)
+        mode.yaml                     -- delivery-mode comparison on the final build
+        order.yaml                    -- component-order sensitivity
 
     benchmarking_outputs/
         0.comp/                       -- (reserved) component "unit" testing**
@@ -98,103 +96,33 @@ More detail on the philosophy behind running these phases is written up in MLLM 
 
 ## Running Benchmarks
 
-All benchmarks are run via the orchestrator CLI:
+Experiments are yaml-driven: one yaml describes one whole experiment (shared model/run
+regime + the conditions that vary), and one function runs it end to end -- every condition
+through the engine, scored against reviewer-consensus GT, controls validated, the selection
+rule applied, and the experiment's state file written (the only metric output).
 
-**Usage:**
 ```bash
-python architecture_benchmarking_workflow/bench_orchestrator.py --config configs/<config_file>.yaml [--dry-run]
+python -m tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_experiment \
+    tests/phase1_prompt_benchmarking/experiments/source.yaml [--dry-run | --score-only]
+
+# staged experiments (the walkup): one stage per invocation, human-gated selection
+... bench_experiment experiments/walkup.yaml --stage CAT [--source affinage]
+... bench_experiment experiments/walkup.yaml --select CAT process_guarded
 ```
 
-**Parameters:**
-- **--config** (required) -- path to YAML config file
-- **--dry-run** (optional) -- override config to enable dry-run mode; uses mock outputs instead of API calls
+- **--dry-run** -- exercise the full plumbing on mock outputs (zero API cost)
+- **--score-only** -- re-score the newest archived run dirs, no API calls
+- **--stage / --select / --source** -- staged experiments only (see `experiments/walkup.yaml`)
 
-**Example:**
-```bash
-# Live run with full architecture benchmark
-python architecture_benchmarking_workflow/bench_orchestrator.py --config configs/arch_bench_default.yaml
+## Experiments
 
-# Dry-run validation of order benchmark
-python architecture_benchmarking_workflow/bench_orchestrator.py --config configs/order_bench_dry_run_test.yaml --dry-run
-```
+- **experiments/source.yaml** -- uniprot vs affinage evidence on the blank W0 floor; winner carried as `carry.source`
+- **experiments/walkup.yaml** -- staged build-up (CAT -> GCR -> NPR -> UPR -> PCC) on the carried source; candidates + rationales live in the yaml
+- **experiments/mode.yaml** -- single_call vs cot vs stepwise on the walkup's final build
+- **experiments/order.yaml** -- component-order permutations (O-O4) of the tuned single_call prompt
 
-## Existing Config Files
-
-- **arch_bench_default.yaml** -- All 6 routes, all screens, 3 replicates
-- **arch_bench_dry_run_test.yaml** -- Dry-run validation (2 routes, denali, 1 rep)
-- **arch_bench_full_run_test_denali.yaml** -- Live test on denali only - routes to _workflow_output
-- **order_bench_default.yaml** -- Order benchmark, single base route, all variants
-- **order_bench_dry_run_test.yaml** -- Order dry-run validation
-- **order_bench_full_run_test_denali.yaml** -- Order full run on denali
-
-## Config Parameters
-
-All parameters below are YAML keys. Defaults are shown in parentheses. Parsed by `bench_configparse.py`.
-
-**experiment_id** (arch_bench_v1) -- unique name for this run. Determines the output subdirectory name. Please include either `arch_bench_` or `order_bench_` in the name to keep things organized.
-
-**paths:**
-
----likely constant in most cases---
-- **benchmark_inputs_dir** (benchmark_inputs) -- directory containing screen context JSONs
-- **benchmark_clusters_csv** (benchmark_inputs/benchmark_clusters.csv) -- CSV with columns: screen_name, cluster_id, gene_symbol
-- **evidence_bundles_dir** (benchmark_evidence_bundles) -- directory of pre-built evidence bundle JSONs
-
-----important to adjust as needed----
-- **output_dir** (benchmarking_outputs/1.arch) -- root output directory. 
-
-**model:**
-- **provider** (anthropic) -- LLM provider
-- **model_name** (claude-sonnet-4-5) -- model identifier
-- **temperature** (0.2) -- sampling temperature
-- **max_tokens** (4000) -- max output tokens
-- **top_p** (null) -- nucleus sampling. Leave null to use provider default.
-- **top_k** (null) -- top-k sampling. Leave null to use provider default.
-
-**run:**
-- **num_replicates** (1) -- how many times to run each route x cluster pair
-- **dry_run** (false) -- if true, uses mock outputs instead of calling the API
-- **workflow_testing** (false) -- if true, outputs go under `_workflow_testing/` subdirectory
-- **overwrite_outputs** (false) -- if true, truncates existing JSONL files on start
-- **continue_on_error** (true) -- if true, logs errors and continues to next run rather than aborting
-- **save_prompts** (true) -- write prompts.jsonl
-- **save_raw_outputs** (true) -- write raw_outputs.jsonl
-- **save_parsed_outputs** (true) -- write parsed_outputs.jsonl
-- **save_traces** (true) -- write per-run trace JSONs
-
-
-**routes:** <--Phase 1 Only
-- **include** (all 6) -- list of route names to run: single_call, single_call_mcp, cot, cot_mcp, stepwise, stepwise_mcp. 
-
-**screens:** 
-- **include** ("all" or list) -- which screens to include. Use "all" or a list like `[denali, whitney]`.
-
-**clusters:**
-- **include** ("all" or list) -- use "all" for every cluster in the CSV, or a list of `{screen_name, cluster_id}` objects for selective inclusion.
-
-**mcp:**
-- **preflight** (true) -- run MCP server availability check before starting
-- **fail_if_unavailable** (false) -- if true, abort when MCP is unreachable. If false, skip MCP routes gracefully.
-
-**evaluation:**
-- **structural** (true) -- compute structural metrics (schema compliance, gene completeness, etc.)
-- **logical_consistency** (true) -- compute logical metrics (duplicates, mutual exclusivity)
-- **efficiency** (true) -- compute token/cost/latency metrics
-- **robustness** (true) -- reserved for future robustness metrics
-
-**timing:**
-- **track_full_run** (true) -- total wall time per run
-- **track_prompt_construction** (true) -- time spent building prompts
-- **track_model_latency** (true) -- time waiting on the LLM
-- **track_metrics** (true) -- time computing metrics
-- **track_io** (true) -- time writing artifacts
-- **track_step_latencies** (true) -- per-step timing for stepwise routes
-- **track_mcp_tool_latency** (true) -- MCP tool call timing
-
-**order_benchmark:** <--Phase 2 Only
-- **enabled** (false) -- when true, ignores `routes.include` and instead builds routes from base_routes x variants
-- **base_routes** -- list of Phase 1 route names to permute (e.g. [single_call, cot])
-- **variants** -- list of variant names: canonical, late_screen_context, prioritization_before_classification, early_output_format, delayed_task_anchor
+Runs archive under `benchmarking_outputs/<experiment>/<condition-or-stage>_<stamp>/`
+(never overwritten); state lives at `benchmarking_outputs/<experiment>/<experiment>_state.json`.
 
 ## Running the Trace Parser
 

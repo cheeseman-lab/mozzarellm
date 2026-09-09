@@ -13,16 +13,13 @@ if str(_REPO_ROOT) not in sys.path:
 from mozzarellm.prompt_components import COMPONENT_REGISTRY
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.bench_routes import (
     ROUTE_REGISTRY,
-    Route,
     StepwiseTurn,
-    build_routes_from_config,
 )
 from tests.phase1_prompt_benchmarking.architecture_benchmarking_workflow.order_bench_orderings import (
     _ORDER_SPECS,
     ORDER_VARIANTS,
     OrderVariant,
     apply_order_variant,
-    build_order_benchmark_routes,
     resolve_order_variant_ids,
     validate_order_variant_names,
 )
@@ -288,39 +285,3 @@ class TestApplyOrderVariant:
         perturbed = apply_order_variant(base, "O1")
         assert set(canonical.component_order) == set(perturbed.component_order)
         assert canonical.component_order != perturbed.component_order
-
-
-# ============================================================================
-# build_order_benchmark_routes
-# ============================================================================
-
-
-class TestBuildOrderBenchmarkRoutes:
-    def test_returns_correct_count(self):
-        base_routes = build_routes_from_config(["single_call", "cot"])
-        result = build_order_benchmark_routes(base_routes, ["O", "O1"])
-        assert len(result) == 4  # 2 routes × 2 variants
-
-    def test_all_selector_string(self):
-        """'all' selector produces routes for every variant."""
-        base_routes = build_routes_from_config(["single_call"])
-        result = build_order_benchmark_routes(base_routes, "all")
-        assert all(isinstance(r, Route) for r in result)
-        assert len(result) == 5  # 1 route × 5 variants
-
-    def test_range_selector_string(self):
-        """Range selector like 'O1-O3' expands and includes canonical."""
-        base_routes = build_routes_from_config(["single_call"])
-        result = build_order_benchmark_routes(base_routes, "O1-O3")
-        assert len(result) == 4  # O + O1 + O2 + O3
-
-    def test_invalid_variants_raise(self):
-        base_routes = build_routes_from_config(["single_call"])
-        with pytest.raises(ValueError):
-            build_order_benchmark_routes(base_routes, ["O", "invalid"])
-
-    def test_all_six_base_routes(self):
-        """Build order variants for all 6 Phase 1 routes."""
-        base_routes = build_routes_from_config(list(ROUTE_REGISTRY.keys()))
-        result = build_order_benchmark_routes(base_routes, ["O", "O1"])
-        assert len(result) == 12  # 6 routes × 2 variants

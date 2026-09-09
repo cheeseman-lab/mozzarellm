@@ -367,33 +367,6 @@ def apply_order_variant(route: Route, variant_key: str) -> Route:
         order_variant=variant.name,
         order_hypothesis=variant.hypothesis or "",
     )
-
-
-def build_order_benchmark_routes(
-    base_routes: list[Route],
-    order_variants: str | list[str],
-) -> list[Route]:
-    """Build all order-variant routes from the given base routes and variant selector.
-
-    *order_variants* supports the same selector syntax as wording targets:
-    ``"all"``, ``"O1-O3"``, ``["O", "O1"]``, or a single ``"O2"``.
-    Canonical ``"O"`` is always included.
-
-    Returns a flat list of Route objects: one per (base_route, variant) pair.
-    """
-    variant_keys = resolve_order_variant_ids(order_variants)
-    routes: list[Route] = []
-    for base in base_routes:
-        for key in variant_keys:
-            routes.append(apply_order_variant(base, key))
-    return routes
-
-
-# ============================================================================
-# Stepwise turn builder for order-variant routes
-# ============================================================================
-
-
 def compose_stepwise_turns_from_route(
     route: Route,
     screen_context_path: Path,
