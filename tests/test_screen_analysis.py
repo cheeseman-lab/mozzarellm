@@ -139,3 +139,17 @@ def test_original_df_metadata_merges_into_tables(tmp_path):
         original_df=original,
     )
     assert "n_input_genes" in out["cluster_df"].columns
+
+
+def test_prepare_screen_bundles_reuses_cache(tmp_path):
+    from mozzarellm.pipeline.screen_analysis import prepare_screen_bundles
+
+    bundle_dir = tmp_path / "s1_analysis" / "s1_evidence_bundles"
+    bundle_dir.mkdir(parents=True)
+    (bundle_dir / "s1__cluster_21__bundle.json").write_text("{}")
+
+    table = pd.DataFrame({"cluster": ["21"], "gene_symbol": ["RPL3"]})
+    bundles = prepare_screen_bundles(
+        screen_name="s1", cluster_table=table, output_dir=tmp_path
+    )  # cache hit: no network
+    assert "21" in bundles

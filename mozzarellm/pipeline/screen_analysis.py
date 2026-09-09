@@ -12,13 +12,70 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from mozzarellm.pipeline.bundle_builder import (
+    build_evidence_bundles,
+    get_or_append_stable_accession,
+)
 from mozzarellm.prompt_components import CANONICAL_FEATURE_INTERP_COT_ORDER
+from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
+from mozzarellm.utils.io import load_table
 from mozzarellm.utils.llm_analysis_utils import save_cluster_analysis
 from mozzarellm.utils.prompt_factory import (
     make_cluster_analysis_system_prompt,
     make_single_cluster_analysis_user_prompt,
 )
 from mozzarellm.utils.trace import save_trace
+
+
+def prepare_screen_bundles(
+    *,
+    screen_name: str,
+    cluster_table,
+    output_dir: str | Path,
+    gene_column: str = "gene_symbol",
+    cluster_id_column: str = "cluster",
+    feature_columns: list[str] | None = None,
+    organism_id: int = 9606,
+    rebuild: bool = False,
+) -> dict:
+    """Cluster table -> stable accessions -> evidence bundles -> {cluster_id: path}.
+
+    Bundles are cached under ``<output_dir>/<screen_name>_analysis/``; an
+    existing bundle directory is reused unless ``rebuild=True``.
+
+    Args:
+        cluster_table: DataFrame or path to a CSV/TSV/XLSX with one row per
+            gene, carrying ``gene_column`` and ``cluster_id_column`` (plus any
+            ``feature_columns`` to embed in the bundles).
+    """
+    output_dir = Path(output_dir)
+    cluster_df = (
+        cluster_table if hasattr(cluster_table, "columns") else load_table(cluster_table)
+    )
+    bundle_dir = output_dir / f"{screen_name}_analysis" / f"{screen_name}_evidence_bundles"
+
+    if rebuild or not bundle_dir.exists():
+        acc_cluster_df = get_or_append_stable_accession(
+            screen_name=screen_name,
+            cluster_df=cluster_df,
+            gene_column=gene_column,
+            organism_id=organism_id,
+            warn_on_fallback=False,
+            output_dir=output_dir,
+        )
+        build_evidence_bundles(
+            screen_name=screen_name,
+            acc_cluster_df=acc_cluster_df,
+            gene_column=gene_column,
+            cluster_id_column=cluster_id_column,
+            stable_accession_col="accession",
+            feature_columns=feature_columns or None,
+            output_dir=output_dir,
+        )
+    else:
+        logging.info(f"Using cached bundles at {bundle_dir}")
+
+    return build_cluster_id_to_bundle_path(bundle_dir, screen_name=screen_name)
 
 
 def analyze_screen(
