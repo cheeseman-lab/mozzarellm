@@ -73,6 +73,5 @@ debug/
 output/
 tmp/
 examples/benchmark_results/
-interface/output/*
-!interface/output/.gitkeep
+examples/output/
 benchmarks/bundle_regen.log

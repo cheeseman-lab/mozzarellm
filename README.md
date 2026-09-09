@@ -45,7 +45,7 @@ ANTHROPIC_API_KEY=...
 
 ## Quick start
 
-Open `interface/analyze_clusters.ipynb`. It walks through setup and three
+Open `examples/analyze_clusters.ipynb`. It walks through setup and three
 worked examples — optical pooled screening clusters with phenotypic features,
 DepMap co-essentiality modules on the baseline path, and proteomics
 co-abundance clusters with PubMed literature validation — and shows how to
@@ -66,7 +66,7 @@ run = analyze_screen(
     cluster_to_bundle_map=bundles,
     client=create_client(model="claude-sonnet-5"),
     run_dir="output/my_screen_analysis/run_01",
-    screen_context_path="screen_context.json",  # from interface/screen_context_template.json
+    screen_context_path="screen_context.json",  # from examples/screen_context_template.json
     mode="cot",
     include_features=True,                      # requires feature columns
 )
@@ -96,13 +96,17 @@ Each run directory contains the complete record and the tables to read:
   from your screen enter the bundles, and feature-interpretation reasoning
   steps require the pathway call to be consistent with the observed phenotypes.
   Currently supported for `mode="cot"` without MCP.
+- **Prompt customization** (`component_overrides={key: text}`): replace the
+  wording of any prompt component per run (see the notebook's customization
+  section); the shipped components are the benchmark-selected defaults, not a
+  constraint.
 
 ## Repository layout
 
 - `mozzarellm/` — the package: LLM clients, prompt components, bundle builder,
   screen analysis.
-- `interface/` — the analysis notebook and the screen-context template.
-- `examples/` — the three example datasets (OPS, DepMap, proteomics).
+- `examples/` — the analysis notebook, the screen-context template, and the three
+  example datasets (OPS, DepMap, proteomics).
 - `benchmarks/` — the prompt/evidence benchmarking suite that produced the
   shipped prompt configuration (see `benchmarks/README.md`).
 - `tests/` — the test suite (`python -m pytest tests/`).
