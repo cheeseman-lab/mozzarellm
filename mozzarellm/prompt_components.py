@@ -418,16 +418,3 @@ CANONICAL_FEATURE_INTERP_COT_ORDER = [
     "cPC",
     "cO",
 ]
-CANONICAL_FEATURE_INTERP_COT_MCP_ORDER = [
-    "CAT",
-    "SC",
-    "cPH",
-    "cGCR",
-    "cPri",
-    "LIT",
-    "cPSC",
-    "cVer",
-    "cFC",
-    "cPC",
-    "cO",
-]

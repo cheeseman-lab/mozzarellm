@@ -16,7 +16,6 @@ from .clients.llm_api_clients import (
 from .prompt_components import (
     CANONICAL_COT_MCP_ORDER,
     CANONICAL_COT_ORDER,
-    CANONICAL_FEATURE_INTERP_COT_MCP_ORDER,
     CANONICAL_FEATURE_INTERP_COT_ORDER,
     CANONICAL_ZERO_SHOT_MCP_ORDER,
     CANONICAL_ZERO_SHOT_ORDER,
@@ -31,7 +30,6 @@ from .schemas.mcp_schemas import (
     LiteratureReclassification,
     LiteratureValidation,
     RelevantPaper,
-    ValidationMetadata,
 )
 
 # IO utils
@@ -57,14 +55,12 @@ __all__ = [
     "CANONICAL_COT_ORDER",
     "CANONICAL_COT_MCP_ORDER",
     "CANONICAL_FEATURE_INTERP_COT_ORDER",
-    "CANONICAL_FEATURE_INTERP_COT_MCP_ORDER",
     "assemble_from_component_order",
     # Literature validation schemas
     "RelevantPaper",
     "LiteratureValidation",
     "LiteratureReclassification",
     "LiteraturePathwayRevision",
-    "ValidationMetadata",
     # IO utils
     "load_table",
     "write_bundle",

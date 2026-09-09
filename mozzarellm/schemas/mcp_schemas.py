@@ -59,18 +59,3 @@ class LiteraturePathwayRevision(BaseModel):
     post_literature_pathway: str
     pathway_changed: bool
     rationale: str
-
-
-class ValidationMetadata(BaseModel):
-    """`_validation_metadata` block attached to the parsed cluster result."""
-
-    model_config = ConfigDict(extra="allow")
-    mode: str
-    model: str
-    input_tokens: int
-    output_tokens: int
-    cost_usd: float
-    time_seconds: float
-    tool_calls: int
-    error: str | None = None
-    schema_warnings: list[str] | None = None
