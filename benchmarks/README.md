@@ -1,4 +1,4 @@
-# Phase 1 Prompt Benchmarking
+# Prompt Benchmarking
 
 Benchmarks MozzareLLM's gene-cluster classification prompts against expert ground truth.
 Eight fixed clusters (103 real genes + 3 negative-control decoys + 1 low-coherence abstain
@@ -44,7 +44,7 @@ re-scores the newest archived run dirs without API calls.
   and phenotypic features), `ground_truth/annotation_{eric,liz,iain}.csv` (raw reviewer
   sheets) + `survey_key.csv` (source-blinding key), per-screen context JSONs.
 - `bundles/` — master evidence bundles (both sources' annotations; reduced to
-  one source's view at prompt assembly). Rebuilt by `build_bundles.py`.
+  one source's view at prompt assembly). Rebuilt by `workflow/build_bundles.py`.
 - `outputs/` — submodule. Runs archive under
   `<experiment>/<condition-or-stage>_<stamp>/` (never overwritten); state at
   `<experiment>/<experiment>_state.json`.

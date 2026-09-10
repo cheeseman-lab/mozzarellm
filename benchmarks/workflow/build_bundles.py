@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Batch data preprocessing for phase-1 prompt benchmarking.
+Batch data preprocessing for the prompt benchmark.
 
 Reads inputs/benchmark_input.csv (screen_name, cluster_id, role, gene_symbol,
 up_features, down_features, phenotypic_strength), matches each screen to its
@@ -11,7 +11,7 @@ per-feature views are derived at prompt-assembly time (strip_source_fields /
 strip_feature_fields in mozzarellm.utils.prompt_factory).
 
 Usage:
-    python build_bundles.py
+    python workflow/build_bundles.py
 """
 
 from pathlib import Path
@@ -31,9 +31,9 @@ load_dotenv()  # walks upward to find .env automatically
 
 
 ############### configuration ###############
-SCRIPT_DIR = Path(__file__).resolve().parent
-INPUTS_DIR = SCRIPT_DIR / "inputs"
-OUTPUT_DIR = SCRIPT_DIR / "bundles"
+BENCH_DIR = Path(__file__).resolve().parents[1]
+INPUTS_DIR = BENCH_DIR / "inputs"
+OUTPUT_DIR = BENCH_DIR / "bundles"
 BENCHMARK_CSV = INPUTS_DIR / "benchmark_input.csv"
 SCREEN_COL = "screen_name"
 CLUSTER_COL = "cluster_id"
