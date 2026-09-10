@@ -84,3 +84,15 @@ class TestPromptComponentsRegistry:
     def test_feature_interp_orders(self):
         assert "cFC" in COMPONENT_REGISTRY, "cFC (Feature Coherence) should be defined"
         assert "cPC" in COMPONENT_REGISTRY, "cPC (Pathway Consistency) should be defined"
+
+
+def test_literature_validation_forbids_prose_output():
+    """MCP responses must be pure JSON -- prose preambles broke parsing in validation runs."""
+    from mozzarellm.prompt_components import (
+        STEP_LITERATURE_GAPFILL_BLANK,
+        STEP_LITERATURE_VALIDATION,
+    )
+
+    for component in (STEP_LITERATURE_VALIDATION, STEP_LITERATURE_GAPFILL_BLANK):
+        assert "single valid JSON object" in component
+        assert "before the opening brace" in component
