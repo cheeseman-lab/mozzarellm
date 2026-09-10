@@ -236,3 +236,50 @@ def test_stepwise_truncation_labeled_not_parse_failure():
         )
     assert raw["error"] == "output truncated at max_tokens"
     assert raw["steps"][0]["stop_reason"] == "max_tokens"
+
+
+# ---------------------------------------------------------------------------
+# Provider-generic analyze (OpenAI / Gemini path)
+# ---------------------------------------------------------------------------
+
+_VALID_JSON = """{"cluster_id": "1", "dominant_process": "proteasome", "pathway_confidence": "High",
+"established_genes": ["PSMA1"], "novel_role_genes": [], "uncharacterized_genes": []}"""
+
+
+def _generic_client(response_text=_VALID_JSON, fail=False):
+    from mozzarellm.clients.llm_api_clients import OpenAIClient
+
+    class _Stub(OpenAIClient):
+        def _make_api_call(self, system_prompt, user_prompt):
+            if fail:
+                raise RuntimeError("provider down")
+            self._last_usage = {"input_tokens": 100, "output_tokens": 50}
+            return response_text
+
+    return _Stub("gpt-test", 0.2, 1000, None, None, None, "test-key")
+
+
+def test_generic_analyze_parses_and_reports_usage():
+    parsed, raw = _generic_client().analyze(system_prompt="s", user_prompt="u", mode="cot")
+    assert parsed["dominant_process"] == "proteasome"
+    assert raw["input_tokens"] == 100 and raw["output_tokens"] == 50
+    assert raw["cost_usd"] is not None and raw["pricing_warning"]  # unknown model -> warned
+    assert raw["error"] is None
+
+
+def test_generic_analyze_rejects_anthropic_only_features():
+    import pytest
+
+    client = _generic_client()
+    with pytest.raises(ValueError, match="Anthropic-only"):
+        client.analyze(system_prompt="s", user_prompt="u", mcp=True)
+    with pytest.raises(ValueError, match="stepwise is Anthropic-only"):
+        client.analyze(system_prompt="s", user_prompt="u", mode="stepwise")
+
+
+def test_generic_analyze_surfaces_provider_errors():
+    parsed, raw = _generic_client(fail=True).analyze(
+        system_prompt="s", user_prompt="u", max_retries=1
+    )
+    assert parsed is None
+    assert "provider down" in raw["error"]

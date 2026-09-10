@@ -200,6 +200,77 @@ class LLMClientBase(ABC):
         """Make the actual API call to the provider."""
         pass
 
+    def analyze(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str | None = None,
+        mode: str = "cot",
+        mcp: bool = False,
+        batch: bool = False,
+        max_retries: int = 3,
+        **_anthropic_only,
+    ) -> tuple[dict | None, dict]:
+        """Provider-generic single-call analysis -- (parsed, raw_outputs).
+
+        Covers the standard/cot single-call path for any provider via
+        _make_api_call; MCP, stepwise, and batch are Anthropic features and the
+        AnthropicClient override handles them. raw_outputs has the uniform
+        shape consumed by mozzarellm.utils.trace.save_trace().
+        """
+        from mozzarellm.utils.llm_analysis_utils import process_cluster_response
+        from mozzarellm.utils.pricing import compute_cost
+
+        if mode not in ("standard", "cot"):
+            raise ValueError(
+                f"mode {mode!r} is not supported on {type(self).__name__}; "
+                "use 'standard' or 'cot' (stepwise is Anthropic-only)"
+            )
+        if mcp or batch:
+            raise ValueError(
+                "PubMed MCP validation and batch analysis are Anthropic-only; "
+                f"{type(self).__name__} supports single-call standard/cot"
+            )
+        if user_prompt is None:
+            raise ValueError("user_prompt is required")
+
+        self._last_usage = None
+        error: str | None = None
+        text = ""
+        start = time.time()
+        for attempt in range(max_retries):
+            try:
+                text = self._make_api_call(system_prompt, user_prompt)
+                error = None
+                break
+            except Exception as e:
+                error = f"{type(e).__name__}: {e}"
+                if attempt < max_retries - 1:
+                    time.sleep(min(5 * 2**attempt, 30))
+        elapsed = time.time() - start
+
+        usage = self._last_usage or {}
+        input_tokens = usage.get("input_tokens")
+        output_tokens = usage.get("output_tokens")
+        cost_usd, pricing_warning = (None, None)
+        if input_tokens is not None and output_tokens is not None:
+            cost_usd, pricing_warning = compute_cost(self.model, input_tokens, output_tokens)
+
+        parsed = process_cluster_response(text) if text and error is None else None
+        raw_outputs = {
+            "response_text": text,
+            "tool_calls": [],
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "elapsed_s": round(elapsed, 2),
+            "cost_usd": cost_usd,
+            "pricing_warning": pricing_warning,
+            "schema_warnings": [],
+            "error": error,
+            "steps": [],
+        }
+        return parsed, raw_outputs
+
     @abstractmethod
     def _make_batch_api_call(self, system_prompt: str, user_prompt: str) -> str:
         """Make a batched API call to the provider."""
@@ -305,6 +376,10 @@ class OpenAIClient(LLMClientBase):
         if hasattr(response, "usage"):
             tokens = response.usage.total_tokens
             logger.info(f"OpenAI tokens used: {tokens}")
+            self._last_usage = {
+                "input_tokens": response.usage.prompt_tokens,
+                "output_tokens": response.usage.completion_tokens,
+            }
 
         return response.choices[0].message.content
 
@@ -1127,6 +1202,12 @@ class GeminiClient(LLMClientBase):
             model=self.model, contents=user_prompt, config=config
         )
 
+        meta = getattr(response, "usage_metadata", None)
+        if meta is not None:
+            self._last_usage = {
+                "input_tokens": meta.prompt_token_count,
+                "output_tokens": meta.candidates_token_count,
+            }
         return response.text
 
     def _make_batch_api_call(
