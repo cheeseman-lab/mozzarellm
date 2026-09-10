@@ -36,31 +36,31 @@ def client():
 
 
 # =============================================================================
-# get_annotation: success + soft-failure paths
+# get_annotation_record: success + soft-failure paths
 # =============================================================================
 
 
-def test_get_annotation_success_returns_narrative(client):
+def test_get_annotation_record_success_returns_narrative(client):
     payload = {"gene": "TP53", "mechanistic_narrative": "real narrative", "audit_flag": None}
     with patch.object(client._session, "get", return_value=_mock_response(json_data=payload)):
-        assert client.get_annotation("TP53") == "real narrative"
+        assert client.get_annotation_record("TP53")["narrative"] == "real narrative"
 
 
-def test_get_annotation_404_returns_none_and_warns(client):
+def test_get_annotation_record_404_returns_none_and_warns(client):
     with (
         patch.object(client._session, "get", return_value=_mock_response(status_code=404)),
         pytest.warns(UserWarning, match="gene not found"),
     ):
-        assert client.get_annotation("NOTAREALGENE") is None
+        assert client.get_annotation_record("NOTAREALGENE") is None
 
 
-def test_get_annotation_audit_flagged_surfaces_narrative_and_warns(client):
+def test_get_annotation_record_audit_flagged_surfaces_narrative_and_warns(client):
     payload = {"gene": "X", "mechanistic_narrative": "anything", "audit_flag": True}
     with (
         patch.object(client._session, "get", return_value=_mock_response(json_data=payload)),
         pytest.warns(UserWarning, match="audit-flagged"),
     ):
-        assert client.get_annotation("X") == "anything"
+        assert client.get_annotation_record("X")["narrative"] == "anything"
 
 
 def test_audit_note_renders_api_human_readable_fields():
@@ -101,7 +101,7 @@ def test_get_annotation_refusal_prefix_returns_none_and_warns(client):
         patch.object(client._session, "get", return_value=_mock_response(json_data=payload)),
         pytest.warns(UserWarning, match="refusal narrative"),
     ):
-        assert client.get_annotation("X") is None
+        assert client.get_annotation_record("X") is None
 
 
 def test_get_annotation_empty_narrative_returns_none_and_warns(client):
@@ -110,11 +110,11 @@ def test_get_annotation_empty_narrative_returns_none_and_warns(client):
         patch.object(client._session, "get", return_value=_mock_response(json_data=payload)),
         pytest.warns(UserWarning, match="empty narrative"),
     ):
-        assert client.get_annotation("X") is None
+        assert client.get_annotation_record("X") is None
 
 
 # =============================================================================
-# get_annotation: infra failure raises (does not silently degrade)
+# get_annotation_record: infra failure raises (does not silently degrade)
 # =============================================================================
 
 
@@ -123,7 +123,7 @@ def test_get_annotation_5xx_raises_after_retries(client):
         patch.object(client._session, "get", return_value=_mock_response(status_code=503)),
         pytest.raises(requests.HTTPError),
     ):
-        client.get_annotation("TP53")
+        client.get_annotation_record("TP53")
 
 
 def test_get_annotation_connection_error_raises_after_retries(client):
@@ -131,20 +131,20 @@ def test_get_annotation_connection_error_raises_after_retries(client):
         patch.object(client._session, "get", side_effect=requests.ConnectionError("network down")),
         pytest.raises(requests.ConnectionError),
     ):
-        client.get_annotation("TP53")
+        client.get_annotation_record("TP53")
 
 
 def test_404_does_not_retry(client):
     mock_get = Mock(return_value=_mock_response(status_code=404))
     with patch.object(client._session, "get", mock_get), pytest.warns(UserWarning):
-        client.get_annotation("NOPE")
+        client.get_annotation_record("NOPE")
     assert mock_get.call_count == 1
 
 
 def test_5xx_retries_then_raises(client):
     mock_get = Mock(return_value=_mock_response(status_code=503))
     with patch.object(client._session, "get", mock_get), pytest.raises(requests.HTTPError):
-        client.get_annotation("TP53")
+        client.get_annotation_record("TP53")
     assert mock_get.call_count == client.max_retries
 
 
@@ -157,8 +157,8 @@ def test_cache_hit_skips_request_and_warning(client):
     payload = {"gene": "TP53", "mechanistic_narrative": "narrative", "audit_flag": None}
     mock_get = Mock(return_value=_mock_response(json_data=payload))
     with patch.object(client._session, "get", mock_get):
-        assert client.get_annotation("TP53") == "narrative"
-        assert client.get_annotation("TP53") == "narrative"
+        assert client.get_annotation_record("TP53")["narrative"] == "narrative"
+        assert client.get_annotation_record("TP53")["narrative"] == "narrative"
     assert mock_get.call_count == 1
 
 

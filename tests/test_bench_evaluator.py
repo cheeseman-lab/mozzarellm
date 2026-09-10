@@ -8,7 +8,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from benchmarks.architecture_benchmarking_workflow.bench_evaluator import (  # noqa: E402
+from benchmarks.workflow.bench_evaluator import (  # noqa: E402
     _consensus_subclass,
     audit_flag_diagnostics,
     build_consensus_gt,
@@ -30,7 +30,7 @@ from benchmarks.architecture_benchmarking_workflow.bench_evaluator import (  # n
 # ---------------------------------------------------------------------------
 
 P = Path(__file__).resolve().parents[1] / "benchmarks"
-GT = P / "benchmark_inputs" / "ground_truth"
+GT = P / "inputs" / "ground_truth"
 
 
 def _reviewers() -> dict[str, Path]:

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 # Ensure repo root is on sys.path for imports
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
@@ -48,8 +48,8 @@ from .bench_dry_run import (
     generate_mock_raw_outputs,
 )
 from .bench_metricfns import compute_all_metrics
+from .bench_orderings import compose_stepwise_turns_from_route
 from .bench_routes import Route
-from .order_bench_orderings import compose_stepwise_turns_from_route
 
 # =============================================================================
 # HELPERS
@@ -667,7 +667,6 @@ def _build_config_snapshot(config: BenchmarkConfig, **phase_fields: Any) -> dict
             else [asdict(c) for c in config.clusters_include]
         ),
         "mcp": asdict(config.mcp),
-        "evaluation": asdict(config.evaluation),
         "timing": asdict(config.timing),
         "paths": {k: str(v) for k, v in asdict(config.paths).items()},
     }
@@ -751,7 +750,7 @@ def _run_benchmark_loop(
                 )
                 continue
             screen_context_path = _resolve_screen_context_path(
-                config.paths.benchmark_inputs_dir, screen_name
+                config.paths.inputs_dir, screen_name
             )
             if screen_context_path is None:
                 print(

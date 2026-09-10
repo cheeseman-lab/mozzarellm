@@ -20,8 +20,8 @@ class ModelConfig:
 
 @dataclass
 class PathsConfig:
-    benchmark_inputs_dir: Path = Path("benchmark_inputs")
-    benchmark_clusters_csv: Path = Path("benchmark_inputs/benchmark_clusters.csv")
+    inputs_dir: Path = Path("inputs")
+    benchmark_clusters_csv: Path = Path("inputs/benchmark_clusters.csv")
     evidence_bundles_dir: Path = Path("benchmark_evidence_bundles_uniprot")
     output_dir: Path = Path("1.architecture_testing_outputs")
     bundle_source: str = "uniprot"  # "uniprot" or "affinage"
@@ -45,14 +45,6 @@ class RunConfig:
 class McpConfig:
     preflight: bool = True
     fail_if_unavailable: bool = False
-
-
-@dataclass
-class EvaluationConfig:
-    structural: bool = True
-    logical_consistency: bool = True
-    efficiency: bool = True
-    robustness: bool = True
 
 
 @dataclass
@@ -83,7 +75,6 @@ class BenchmarkConfig:
     screens_include: list[str] | str = "all"
     clusters_include: list[ClusterFilter] | str = "all"
     mcp: McpConfig = field(default_factory=McpConfig)
-    evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     timing: TimingConfig = field(default_factory=TimingConfig)
 
     @property

@@ -15,14 +15,14 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from benchmarks.architecture_benchmarking_workflow.bench_orchestrator import (
+from benchmarks.workflow.bench_orchestrator import (
     construct_prompts,
 )
-from benchmarks.architecture_benchmarking_workflow.bench_routes import (
-    ROUTE_REGISTRY,
-)
-from benchmarks.architecture_benchmarking_workflow.order_bench_orderings import (
+from benchmarks.workflow.bench_orderings import (
     apply_order_variant,
+)
+from benchmarks.workflow.bench_routes import (
+    ROUTE_REGISTRY,
 )
 
 # ============================================================================
@@ -83,7 +83,7 @@ class TestPhase1BackwardCompatibility:
         assert route.order_variant == ""  # Phase 1
 
         with patch(
-            "benchmarks.architecture_benchmarking_workflow"
+            "benchmarks.workflow"
             ".bench_orchestrator.make_cluster_analysis_system_prompt"
         ) as mock_make:
             mock_make.return_value = "mock prompt"
@@ -117,7 +117,7 @@ class TestPhase2ComponentOrder:
         order_route = apply_order_variant(base, "O1")
 
         with patch(
-            "benchmarks.architecture_benchmarking_workflow"
+            "benchmarks.workflow"
             ".bench_orchestrator.make_cluster_analysis_system_prompt"
         ) as mock_make:
             mock_make.return_value = "mock prompt"
@@ -142,7 +142,7 @@ class TestPhase2ComponentOrder:
         order_route = apply_order_variant(base, "O3")
 
         with patch(
-            "benchmarks.architecture_benchmarking_workflow"
+            "benchmarks.workflow"
             ".bench_orchestrator.make_cluster_analysis_system_prompt"
         ) as mock_make:
             mock_make.return_value = "mock prompt"
@@ -168,11 +168,11 @@ class TestPhase2ComponentOrder:
 
         with (
             patch(
-                "benchmarks.architecture_benchmarking_workflow"
+                "benchmarks.workflow"
                 ".bench_orchestrator.make_cluster_analysis_system_prompt"
             ) as mock_make,
             patch(
-                "benchmarks.architecture_benchmarking_workflow"
+                "benchmarks.workflow"
                 ".bench_orchestrator.compose_stepwise_turns_from_route"
             ) as mock_turns,
         ):
@@ -206,15 +206,15 @@ class TestPhase2ComponentOrder:
 
         with (
             patch(
-                "benchmarks.architecture_benchmarking_workflow"
+                "benchmarks.workflow"
                 ".bench_orchestrator.make_cluster_analysis_system_prompt"
             ) as mock_make,
             patch(
-                "benchmarks.architecture_benchmarking_workflow"
+                "benchmarks.workflow"
                 ".bench_orchestrator.compose_stepwise_user_turns"
             ) as mock_canonical_turns,
             patch(
-                "benchmarks.architecture_benchmarking_workflow"
+                "benchmarks.workflow"
                 ".bench_orchestrator.compose_stepwise_turns_from_route"
             ) as mock_order_turns,
         ):

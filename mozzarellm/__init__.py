@@ -16,12 +16,10 @@ from .clients.llm_api_clients import (
 from .prompt_components import (
     CANONICAL_COT_MCP_ORDER,
     CANONICAL_COT_ORDER,
-    CANONICAL_FEATURE_INTERP_COT_MCP_ORDER,
     CANONICAL_FEATURE_INTERP_COT_ORDER,
     CANONICAL_ZERO_SHOT_MCP_ORDER,
     CANONICAL_ZERO_SHOT_ORDER,
     CLUSTER_ANALYSIS_TASK,
-    CLUSTER_ANALYSIS_TASK_MULTI,
     COMPONENT_REGISTRY,
     GENE_CATEGORIZATION_RULES,
     OUTPUT_FORMAT_JSON,
@@ -32,7 +30,6 @@ from .schemas.mcp_schemas import (
     LiteratureReclassification,
     LiteratureValidation,
     RelevantPaper,
-    ValidationMetadata,
 )
 
 # IO utils
@@ -49,7 +46,6 @@ __all__ = [
     "create_client",
     # Prompt components
     "CLUSTER_ANALYSIS_TASK",
-    "CLUSTER_ANALYSIS_TASK_MULTI",
     "GENE_CATEGORIZATION_RULES",
     "PATHWAY_CONFIDENCE_CRITERIA",
     "OUTPUT_FORMAT_JSON",
@@ -59,14 +55,12 @@ __all__ = [
     "CANONICAL_COT_ORDER",
     "CANONICAL_COT_MCP_ORDER",
     "CANONICAL_FEATURE_INTERP_COT_ORDER",
-    "CANONICAL_FEATURE_INTERP_COT_MCP_ORDER",
     "assemble_from_component_order",
     # Literature validation schemas
     "RelevantPaper",
     "LiteratureValidation",
     "LiteratureReclassification",
     "LiteraturePathwayRevision",
-    "ValidationMetadata",
     # IO utils
     "load_table",
     "write_bundle",

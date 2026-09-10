@@ -149,15 +149,6 @@ class AffinageClient:
         self._cache[sym] = record
         return record
 
-    def get_annotation(self, symbol: str) -> str | None:
-        """Mechanistic narrative for a gene, or None if unusable.
-
-        Audit-flagged narratives are returned; the flag is available via
-        get_annotation_record().
-        """
-        record = self.get_annotation_record(symbol)
-        return record["narrative"] if record else None
-
     def fetch_functional_annotations(self, chunk: pd.DataFrame, gene_column: str) -> pd.DataFrame:
         """Return [gene_column, affinage_functional_annotation, affinage_audit_note].
 

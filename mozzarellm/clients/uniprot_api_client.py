@@ -132,27 +132,6 @@ class UniProtClient:
             (cache_key, url, params_json, response_json, int(time.time())),
         )
 
-    def clear_cache(self) -> int:
-        """Delete all entries from the cache. Returns number of rows deleted."""
-        if self._cache_conn is None:
-            return 0
-        cursor = self._cache_conn.execute("DELETE FROM uniprot_http_cache")
-        return cursor.rowcount
-
-    def evict_expired(self) -> int:
-        """Delete entries older than the current TTL. Returns number of rows deleted.
-
-        No-op if cache_ttl_seconds was not set (entries never expire).
-        """
-        if self._cache_conn is None or self._cache_ttl_seconds is None:
-            return 0
-        cutoff = int(time.time()) - self._cache_ttl_seconds
-        cursor = self._cache_conn.execute(
-            "DELETE FROM uniprot_http_cache WHERE created_at < ?", (cutoff,)
-        )
-        return cursor.rowcount
-
-    ### HTTP METHODS ###
     def _get(self, *, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
 

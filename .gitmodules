@@ -1,6 +1,6 @@
 [submodule "interface/output"]
 	path = interface/output
 	url = https://github.com/cheeseman-lab/MLLM-Interface-Outputs.git
-[submodule "benchmarks/benchmarking_outputs"]
-	path = benchmarks/benchmarking_outputs
+[submodule "benchmarks/outputs"]
+	path = benchmarks/outputs
 	url = https://github.com/cheeseman-lab/MLLM-Analysis-Benchmarking-Outputs2.git
