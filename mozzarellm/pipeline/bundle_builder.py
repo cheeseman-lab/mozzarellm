@@ -191,17 +191,6 @@ def add_functional_annotations_to_chunk(
     return chunk_annotated
 
 
-def add_local_evidence_to_chunk(
-    chunk: pd.DataFrame,
-    knowledge_dir: str | Path | None = None,
-    cluster_id_column: str | None = None,
-    stable_accession_col: str | None = None,
-) -> pd.DataFrame:
-    """Add local evidence to a chunk of gene-level data. Calls local_knowledge_context_retriever to fetch evidence."""
-    # TODO: implement improved local knowledge context retriever and add logic here
-    pass
-
-
 def build_evidence_bundles(
     *,
     screen_name: str | None = None,
@@ -210,11 +199,6 @@ def build_evidence_bundles(
     cluster_id_column: str | None = None,
     stable_accession_col: str | None = None,
     feature_columns: list[str] | None = None,
-    use_retrieval: bool = False,  # false for now; true for future use
-    knowledge_dir: str
-    | Path
-    | None = None,  # optionally change the directory where the knowledge files are stored
-    top_k: int = 10,
     source: str = "uniprot",
     uniprot_client: UniProtClient | None = None,  # Inject dependency
     affinage_client: AffinageClient | None = None,
