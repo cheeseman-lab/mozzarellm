@@ -472,9 +472,24 @@ class AnthropicClient(LLMClientBase):
         self._resolve_params()
         return dict(self._resolved_thinking_kwarg)
 
+    # Above this output size the SDK refuses non-streaming requests ("Streaming
+    # is required for operations that may take longer than 10 minutes"), so we
+    # stream and accumulate. 16k -- the benchmark-validated ceiling -- stays on
+    # the plain path.
+    _STREAM_MIN_OUTPUT_TOKENS = 16_001
+
     def _create_message(self, client, base: dict):
-        """messages.create with the resolved sampling and thinking params."""
-        return client.messages.create(**base, **self._sampling_kwargs(), **self._thinking_kwarg())
+        """messages.create with the resolved sampling and thinking params.
+
+        Large-output requests go through messages.stream + get_final_message(),
+        which returns the same Message object the non-streaming call would.
+        https://github.com/anthropics/anthropic-sdk-python#long-requests
+        """
+        kwargs = {**base, **self._sampling_kwargs(), **self._thinking_kwarg()}
+        if kwargs.get("max_tokens", 0) >= self._STREAM_MIN_OUTPUT_TOKENS:
+            with client.messages.stream(**kwargs) as stream:
+                return stream.get_final_message()
+        return client.messages.create(**kwargs)
 
     def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
         """
