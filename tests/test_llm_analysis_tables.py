@@ -64,3 +64,10 @@ def test_alphanumeric_cluster_ids_keep_every_row():
     out = save_cluster_analysis(clusters, save_outputs=False)
     assert sorted(out["cluster_df"]["cluster_id"]) == ["C0001", "C5255", "C5415"]
     assert out["cluster_df"]["cluster_id"].is_unique
+
+
+def test_empty_results_still_return_dataframes():
+    out = save_cluster_analysis({}, save_outputs=False)
+    assert out["gene_df"] is not None and out["gene_df"].empty
+    assert "category" in out["gene_df"].columns
+    assert out["cluster_df"] is not None and out["cluster_df"].empty

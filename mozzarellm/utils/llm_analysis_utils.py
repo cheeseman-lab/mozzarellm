@@ -291,7 +291,16 @@ def save_cluster_analysis(
             - 'cluster_df': DataFrame with cluster-level analysis
     """
     # Initialize return dictionary
-    results = {"json_data": None, "gene_df": None, "cluster_df": None}
+    results = {
+        "json_data": None,
+        "gene_df": pd.DataFrame(
+            columns=[
+                "gene", "cluster_id", "category", "subclass", "rationale",
+                "evidence", "dominant_process", "pathway_confidence",
+            ]
+        ),
+        "cluster_df": pd.DataFrame(columns=["cluster_id"]),
+    }
 
     # Validate parameters
     if save_outputs and not out_file_base:
