@@ -55,3 +55,12 @@ def test_original_df_columns_merge_in(tmp_path):
     out = save_cluster_analysis({"21": _PARSED}, save_outputs=False, original_df=original)
     assert (out["gene_df"]["screen"] == "funk_2022").all()
     assert (out["cluster_df"]["screen"] == "funk_2022").all()
+
+
+def test_alphanumeric_cluster_ids_keep_every_row():
+    # pandas argsort marks NaNs as -1; the old sort duplicated the last cluster
+    # and dropped the rest whenever cluster ids were non-numeric.
+    clusters = {cid: dict(_PARSED) for cid in ("C5255", "C5415", "C0001")}
+    out = save_cluster_analysis(clusters, save_outputs=False)
+    assert sorted(out["cluster_df"]["cluster_id"]) == ["C0001", "C5255", "C5415"]
+    assert out["cluster_df"]["cluster_id"].is_unique

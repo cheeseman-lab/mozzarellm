@@ -350,7 +350,11 @@ def save_cluster_analysis(
             gene_rows.extend(_gene_rows(cluster_id, analysis))
             cluster_rows.append(_cluster_row(cluster_id, analysis))
 
-        gene_df = pd.DataFrame(gene_rows)
+        gene_columns = [
+            "gene", "cluster_id", "category", "subclass", "rationale",
+            "evidence", "dominant_process", "pathway_confidence",
+        ]
+        gene_df = pd.DataFrame(gene_rows, columns=gene_columns)
         cluster_df = pd.DataFrame(cluster_rows)
 
         # Merge caller-provided per-cluster columns (e.g. the input table's metadata).
@@ -371,8 +375,12 @@ def save_cluster_analysis(
                     original[["cluster_id"] + cluster_extra], on="cluster_id", how="left"
                 )
 
-        cluster_sort = pd.to_numeric(cluster_df["cluster_id"], errors="coerce")
-        cluster_df = cluster_df.iloc[cluster_sort.argsort(kind="stable")].reset_index(drop=True)
+        cluster_df = (
+            cluster_df.assign(_sort=pd.to_numeric(cluster_df["cluster_id"], errors="coerce"))
+            .sort_values(["_sort", "cluster_id"], na_position="last", kind="stable")
+            .drop(columns="_sort")
+            .reset_index(drop=True)
+        )
         gene_df = gene_df.sort_values(["cluster_id", "category", "gene"]).reset_index(drop=True)
 
         results["gene_df"] = gene_df

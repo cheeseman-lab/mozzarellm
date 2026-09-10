@@ -9,6 +9,7 @@ tables (``<screen>_genes.csv`` / ``<screen>_clusters.csv``).
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -76,6 +77,33 @@ def prepare_screen_bundles(
         logging.info(f"Using cached bundles at {bundle_dir}")
 
     return build_cluster_id_to_bundle_path(bundle_dir, screen_name=screen_name)
+
+
+_NO_PATHWAY = "no coherent biological pathway"
+
+
+def _add_coverage(parsed: dict, bundle_path) -> dict:
+    """Ground the cluster's coverage in the bundle's actual gene list.
+
+    The model's own totals are not trusted: total_genes_in_cluster,
+    missed_genes, and classification_completeness are computed against the
+    evidence bundle, so an incomplete response cannot report itself complete.
+    """
+    bundle = json.loads(Path(bundle_path).read_text(encoding="utf-8"))
+    genes = [
+        g.get("gene_symbol")
+        for g in bundle.get("cluster_genes") or []
+        if isinstance(g, dict) and g.get("gene_symbol")
+    ]
+    classified = set(parsed.get("established_genes") or [])
+    for key in ("novel_role_genes", "uncharacterized_genes"):
+        classified |= {g.get("gene") for g in parsed.get(key) or [] if isinstance(g, dict)}
+    parsed["total_genes_in_cluster"] = len(genes)
+    parsed["missed_genes"] = sorted(set(genes) - classified)
+    parsed["classification_completeness"] = (
+        len(classified & set(genes)) / len(genes) if genes else 1.0
+    )
+    return parsed
 
 
 def analyze_screen(
@@ -190,6 +218,16 @@ def analyze_screen(
         if raw_outputs.get("error"):
             errors[cluster_id] = raw_outputs["error"]
         if parsed is not None:
+            parsed = _add_coverage(parsed, cluster_to_bundle_map[cluster_id])
+            # An empty classification with a pathway call is a parse failure,
+            # not an abstention -- abstentions declare no coherent pathway.
+            abstained = _NO_PATHWAY in str(parsed.get("dominant_process", "")).lower()
+            if parsed["total_genes_in_cluster"] and not parsed[
+                "classification_completeness"
+            ] and not abstained:
+                errors.setdefault(
+                    cluster_id, "no genes parsed from the response (see the trace)"
+                )
             results[cluster_id] = parsed
 
     tables = save_cluster_analysis(

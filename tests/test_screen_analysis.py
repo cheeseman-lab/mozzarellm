@@ -167,3 +167,67 @@ def test_component_overrides_reach_the_system_prompt(tmp_path):
         component_overrides={"cGCR": "MY CUSTOM CATEGORIZATION RULES"},
     )
     assert "MY CUSTOM CATEGORIZATION RULES" in client.calls[0]["system"]
+
+
+def test_coverage_is_bundle_grounded_not_self_reported(tmp_path):
+    out = analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=_StubClient(),
+        run_dir=tmp_path / "run",
+        screen_context_path=_context(tmp_path),
+    )
+    row = out["cluster_df"].iloc[0]
+    # Bundle has 1 gene (RPL3); the stub classifies RPL3 + 1 hallucinated gene.
+    assert row["n_genes"] == 1
+    assert row["classification_completeness"] == 1.0
+
+
+class _EmptyClient(_StubClient):
+    def analyze(self, *, system_prompt, user_prompt, mode, mcp):
+        self.calls.append({"system": system_prompt, "user": user_prompt})
+        parsed = {
+            "dominant_process": "ribosome biogenesis",  # a pathway call, yet no genes
+            "pathway_confidence": "High",
+            "established_genes": [],
+            "novel_role_genes": [],
+            "uncharacterized_genes": [],
+        }
+        return parsed, {"response_text": "{}", "cost_usd": 0.0}
+
+
+def test_empty_classification_with_pathway_call_is_an_error(tmp_path):
+    out = analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=_EmptyClient(),
+        run_dir=tmp_path / "run",
+        screen_context_path=_context(tmp_path),
+    )
+    assert set(out["errors"]) == {"21", "37"}
+    assert out["cluster_df"]["classification_completeness"].eq(0.0).all()
+    assert (out["cluster_df"]["missed_genes"] == "RPL3").all()
+
+
+class _AbstainClient(_StubClient):
+    def analyze(self, *, system_prompt, user_prompt, mode, mcp):
+        self.calls.append({})
+        parsed = {
+            "dominant_process": "No coherent biological pathway",
+            "pathway_confidence": "Low",
+            "established_genes": [],
+            "novel_role_genes": [],
+            "uncharacterized_genes": [],
+        }
+        return parsed, {"response_text": "{}", "cost_usd": 0.0}
+
+
+def test_abstention_is_not_flagged_as_an_error(tmp_path):
+    out = analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=_AbstainClient(),
+        run_dir=tmp_path / "run",
+        screen_context_path=_context(tmp_path),
+    )
+    assert out["errors"] == {}
