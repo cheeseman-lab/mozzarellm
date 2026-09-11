@@ -187,3 +187,52 @@ def test_large_outputs_stream_and_return_the_final_message():
     assert client._create_message(fake, {"max_tokens": 32000}) == "streamed"
     assert fake.messages.created_with is None
     assert fake.messages.streamed_with["max_tokens"] == 32000
+
+
+def test_stepwise_uses_provided_turns():
+    """Prebuilt turns (with overrides applied) are what the API actually receives."""
+    c = _client("claude-sonnet-5")
+    turns = [
+        {"content": "STEP 1 - TUNED FIRST", "mcp": False},
+        {"content": "STEP 2 - TUNED SECOND", "mcp": False},
+    ]
+    seen = []
+
+    def fake_endpoint(*, system_prompt, messages, max_tokens, max_retries):
+        seen.append([m["content"] for m in messages if m["role"] == "user"])
+        return _response("end_turn", texts=('{"cluster_id": "1"}',)), 0.1
+
+    with patch.object(c, "_call_messages_endpoint", side_effect=fake_endpoint):
+        parsed, raw = c._analyze_stepwise(
+            system_prompt="sys", user_prompt="bundle", mcp=False, max_retries=1, turns=turns
+        )
+    assert "TUNED FIRST" in seen[0][0]
+    assert any("TUNED SECOND" in u for u in seen[-1])
+    assert len(raw["steps"]) == 2
+
+
+def test_analyze_rejects_turns_outside_stepwise():
+    c = _client("claude-sonnet-5")
+    with pytest.raises(ValueError, match="stepwise_turns"):
+        c.analyze(
+            system_prompt="sys",
+            user_prompt="u",
+            mode="cot",
+            stepwise_turns=[{"content": "x", "mcp": False}],
+        )
+
+
+def test_stepwise_truncation_labeled_not_parse_failure():
+    """A max_tokens stop with unparseable text is reported as truncation."""
+    c = _client("claude-sonnet-5")
+
+    def fake_endpoint(*, system_prompt, messages, max_tokens, max_retries):
+        return _response("max_tokens", texts=('{"cluster_id": ',)), 0.1
+
+    turns = [{"content": "STEP 1 - only step", "mcp": False}]
+    with patch.object(c, "_call_messages_endpoint", side_effect=fake_endpoint):
+        parsed, raw = c._analyze_stepwise(
+            system_prompt="sys", user_prompt="bundle", mcp=False, max_retries=1, turns=turns
+        )
+    assert raw["error"] == "output truncated at max_tokens"
+    assert raw["steps"][0]["stop_reason"] == "max_tokens"

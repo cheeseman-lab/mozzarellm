@@ -599,6 +599,7 @@ class AnthropicClient(LLMClientBase):
         max_retries: int = 3,
         include_features: bool = False,
         source: str = "both",
+        stepwise_turns: list[dict] | None = None,
     ) -> tuple[dict | None, dict]:
         """Single entry point for cluster analysis.
 
@@ -624,6 +625,8 @@ class AnthropicClient(LLMClientBase):
         """
         if mode not in ("standard", "cot", "stepwise"):
             raise ValueError(f"mode must be one of 'standard', 'cot', 'stepwise'; got {mode!r}")
+        if stepwise_turns is not None and mode != "stepwise":
+            raise ValueError("stepwise_turns is only valid with mode='stepwise'")
         if batch and (mcp or mode == "stepwise"):
             raise ValueError(
                 "batch=True is incompatible with mcp=True or mode='stepwise' "
@@ -651,6 +654,7 @@ class AnthropicClient(LLMClientBase):
                 user_prompt=user_prompt,
                 mcp=mcp,
                 max_retries=max_retries,
+                turns=stepwise_turns,
             )
 
         if mcp:
@@ -777,6 +781,7 @@ class AnthropicClient(LLMClientBase):
             self.model, response.usage.input_tokens, response.usage.output_tokens
         )
 
+        stop_reason = getattr(response, "stop_reason", None)
         raw_outputs = self._empty_raw_outputs()
         raw_outputs.update(
             {
@@ -787,6 +792,7 @@ class AnthropicClient(LLMClientBase):
                 "elapsed_s": elapsed,
                 "cost_usd": cost,
                 "pricing_warning": pricing_warning,
+                "stop_reason": stop_reason,
             }
         )
 
@@ -798,13 +804,20 @@ class AnthropicClient(LLMClientBase):
             "cost_usd": cost,
             "time_seconds": round(elapsed, 1),
             "tool_calls": len(tool_calls),
+            "stop_reason": stop_reason,
         }
         if pricing_warning:
             meta["pricing_warning"] = pricing_warning
 
         if not parsed:
-            meta_err = {**meta, "error": "failed to parse JSON", "raw_output": output_text[:1000]}
-            raw_outputs["error"] = "failed to parse JSON"
+            # A max_tokens stop with no (or partial) text is a truncation, not a
+            # parsing defect -- label it so failure accounting can tell them apart.
+            if stop_reason == "max_tokens":
+                error = "output truncated at max_tokens" + (" (no text)" if not output_text else "")
+            else:
+                error = "failed to parse JSON"
+            meta_err = {**meta, "error": error, "raw_output": output_text[:1000]}
+            raw_outputs["error"] = error
             return ({"_validation_metadata": meta_err}, raw_outputs)
 
         schema_warnings = _validate_literature_blocks(parsed)
@@ -857,12 +870,17 @@ class AnthropicClient(LLMClientBase):
         mcp: bool,
         max_retries: int,
         max_tokens: int = 16000,
+        turns: list[dict] | None = None,
     ) -> tuple[dict | None, dict]:
         """Run the canonical CoT chain as N sequential, multi-turn API calls.
 
         Each step is a separate API call; prior assistant responses are appended
         to `messages` so step N sees steps 1..N-1's outputs. Steps in the MCP
         index set get PubMed tools attached; others use the plain endpoint.
+
+        turns: prebuilt per-turn content ({"content", "mcp"} dicts, e.g. from
+        compose_stepwise_user_turns with component overrides applied); when
+        None, the canonical turn list is composed here.
 
         On any step failure, iteration aborts and a partial trace is returned
         with steps 1..N-1 preserved.
@@ -877,7 +895,8 @@ class AnthropicClient(LLMClientBase):
         from mozzarellm.utils.trace import extract_mcp_tool_calls
 
         # Per-turn user content + MCP routing decided by prompt_factory.
-        turns = compose_stepwise_user_turns(mcp)
+        if turns is None:
+            turns = compose_stepwise_user_turns(mcp)
 
         messages: list[dict] = []
         step_records: list[dict] = []
@@ -946,6 +965,7 @@ class AnthropicClient(LLMClientBase):
                     "output_tokens": out_tok,
                     "elapsed_s": round(elapsed, 2),
                     "cost_usd": cost,
+                    "stop_reason": getattr(response, "stop_reason", None),
                     "error": None,
                 }
             )
@@ -989,8 +1009,13 @@ class AnthropicClient(LLMClientBase):
             meta["pricing_warning"] = "; ".join(pricing_warnings)
 
         if not parsed:
-            meta_err = {**meta, "error": "failed to parse JSON", "raw_output": final_text[:1000]}
-            raw_outputs["error"] = "failed to parse JSON"
+            final_stop = step_records[-1].get("stop_reason") if step_records else None
+            if final_stop == "max_tokens":
+                error = "output truncated at max_tokens" + (" (no text)" if not final_text else "")
+            else:
+                error = "failed to parse JSON"
+            meta_err = {**meta, "error": error, "raw_output": final_text[:1000]}
+            raw_outputs["error"] = error
             return ({"_validation_metadata": meta_err}, raw_outputs)
 
         if mcp:

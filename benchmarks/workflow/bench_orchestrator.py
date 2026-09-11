@@ -391,11 +391,13 @@ def execute_single_run(
         raw_outputs = generate_mock_raw_outputs(route)
     else:
         try:
+            stepwise_turns = prompts["stepwise_turns"]
             parsed, raw_outputs = client.analyze(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 mode=route.mode,
                 mcp=route.mcp,
+                **({"stepwise_turns": stepwise_turns} if stepwise_turns is not None else {}),
             )
             error = raw_outputs.get("error")
         except Exception as e:
