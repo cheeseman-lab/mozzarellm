@@ -40,6 +40,41 @@ _SAMPLING_LOCKED_MODELS = (
 _THINKING_SUPPORT_CACHE: dict[str, bool] = {}
 
 
+def _cached_system(system_prompt: str) -> list[dict]:
+    """System prompt as a cache-marked block.
+
+    The system prompt is constant within a run, so a breakpoint here lets every
+    cluster call (and every internal MCP tool round) read it from cache.
+    """
+    return [
+        {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
+    ]
+
+
+def _cached_user_message(user_prompt: str) -> dict:
+    """User bundle as a cache-marked block.
+
+    The evidence bundle repeats across replicates and across the MCP loop's
+    internal tool rounds; marking it extends the cached prefix past the bundle.
+    """
+    return {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": user_prompt, "cache_control": {"type": "ephemeral"}}
+        ],
+    }
+
+
+def _usage_tokens(usage) -> dict:
+    """Uniform token counts from a messages usage object, cache fields included."""
+    return {
+        "input_tokens": getattr(usage, "input_tokens", 0) or 0,
+        "output_tokens": getattr(usage, "output_tokens", 0) or 0,
+        "cache_creation_input_tokens": getattr(usage, "cache_creation_input_tokens", 0) or 0,
+        "cache_read_input_tokens": getattr(usage, "cache_read_input_tokens", 0) or 0,
+    }
+
+
 def _model_accepts_sampling_params(model: str) -> bool:
     """Whether the model accepts non-default temperature/top_p/top_k.
 
@@ -584,18 +619,15 @@ class AnthropicClient(LLMClientBase):
         base = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "system": system_prompt,
-            "messages": [{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
+            "system": _cached_system(system_prompt),
+            "messages": [_cached_user_message(user_prompt)],
         }
 
         response = self._create_message(client, base)
 
         # Store usage for cost tracking by callers
         if hasattr(response, "usage"):
-            self.last_usage = {
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
-            }
+            self.last_usage = _usage_tokens(response.usage)
             logger.info(
                 f"Anthropic tokens used: {response.usage.input_tokens + response.usage.output_tokens}"
             )
@@ -788,7 +820,9 @@ class AnthropicClient(LLMClientBase):
         usage = getattr(self, "last_usage", {}) or {}
         in_tok = usage.get("input_tokens", 0)
         out_tok = usage.get("output_tokens", 0)
-        cost, pricing_warning = compute_cost(self.model, in_tok, out_tok)
+        cache_write = usage.get("cache_creation_input_tokens", 0)
+        cache_read = usage.get("cache_read_input_tokens", 0)
+        cost, pricing_warning = compute_cost(self.model, in_tok, out_tok, cache_write, cache_read)
 
         raw_outputs = self._empty_raw_outputs()
         raw_outputs.update(
@@ -796,6 +830,8 @@ class AnthropicClient(LLMClientBase):
                 "response_text": response_text or "",
                 "input_tokens": in_tok,
                 "output_tokens": out_tok,
+                "cache_creation_input_tokens": cache_write,
+                "cache_read_input_tokens": cache_read,
                 "elapsed_s": elapsed,
                 "cost_usd": cost,
                 "pricing_warning": pricing_warning,
@@ -844,7 +880,7 @@ class AnthropicClient(LLMClientBase):
 
         response, elapsed = call_mcp(
             system_prompt=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[_cached_user_message(user_prompt)],
             model=self.model,
             max_tokens=max_tokens,
             max_retries=max_retries,
@@ -856,8 +892,13 @@ class AnthropicClient(LLMClientBase):
         )
         tool_calls = extract_mcp_tool_calls(response.content)
         parsed = _parse_json_from_text(output_text)
+        tok = _usage_tokens(response.usage)
         cost, pricing_warning = compute_cost(
-            self.model, response.usage.input_tokens, response.usage.output_tokens
+            self.model,
+            tok["input_tokens"],
+            tok["output_tokens"],
+            tok["cache_creation_input_tokens"],
+            tok["cache_read_input_tokens"],
         )
 
         stop_reason = getattr(response, "stop_reason", None)
@@ -866,8 +907,7 @@ class AnthropicClient(LLMClientBase):
             {
                 "response_text": output_text,
                 "tool_calls": tool_calls,
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
+                **tok,
                 "elapsed_s": elapsed,
                 "cost_usd": cost,
                 "pricing_warning": pricing_warning,
@@ -878,8 +918,7 @@ class AnthropicClient(LLMClientBase):
         meta: dict = {
             "mode": self._mode_tag(mode, mcp=True),
             "model": self.model,
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
+            **tok,
             "cost_usd": cost,
             "time_seconds": round(elapsed, 1),
             "tool_calls": len(tool_calls),
@@ -929,7 +968,7 @@ class AnthropicClient(LLMClientBase):
                 response = client.messages.create(
                     model=self.model,
                     max_tokens=max_tokens,
-                    system=system_prompt,
+                    system=_cached_system(system_prompt),
                     messages=messages,
                     timeout=PER_CALL_TIMEOUT_S,
                 )
@@ -988,7 +1027,14 @@ class AnthropicClient(LLMClientBase):
         for i, turn in enumerate(turns):
             # Prepend the cluster bundle (per-cluster content) to the first turn only.
             user_content = f"{user_prompt}\n\n{turn['content']}" if i == 0 else turn["content"]
-            messages.append({"role": "user", "content": user_content})
+            # Cache the growing conversation prefix: keep breakpoints on turn 0
+            # (the bundle, the largest stable block) and on the newest user turn,
+            # dropping the previous newest-turn marker (4-breakpoint API limit).
+            for prior in messages:
+                if prior["role"] == "user" and prior is not messages[0]:
+                    for block in prior["content"]:
+                        block.pop("cache_control", None)
+            messages.append(_cached_user_message(user_content))
             use_mcp = turn["mcp"]
 
             try:
@@ -1028,9 +1074,14 @@ class AnthropicClient(LLMClientBase):
 
             text = "".join(b.text for b in response.content if getattr(b, "type", None) == "text")
             tool_calls = extract_mcp_tool_calls(response.content) if use_mcp else []
-            in_tok = response.usage.input_tokens
-            out_tok = response.usage.output_tokens
-            cost, warning = compute_cost(self.model, in_tok, out_tok)
+            tok = _usage_tokens(response.usage)
+            cost, warning = compute_cost(
+                self.model,
+                tok["input_tokens"],
+                tok["output_tokens"],
+                tok["cache_creation_input_tokens"],
+                tok["cache_read_input_tokens"],
+            )
             if warning:
                 pricing_warnings.append(warning)
 
@@ -1040,8 +1091,7 @@ class AnthropicClient(LLMClientBase):
                     "use_mcp": use_mcp,
                     "assistant_text": text,
                     "tool_calls": tool_calls,
-                    "input_tokens": in_tok,
-                    "output_tokens": out_tok,
+                    **tok,
                     "elapsed_s": round(elapsed, 2),
                     "cost_usd": cost,
                     "stop_reason": getattr(response, "stop_reason", None),
@@ -1049,8 +1099,8 @@ class AnthropicClient(LLMClientBase):
                 }
             )
 
-            total_in += in_tok
-            total_out += out_tok
+            total_in += tok["input_tokens"]
+            total_out += tok["output_tokens"]
             total_cost += cost
             total_elapsed += elapsed
 
