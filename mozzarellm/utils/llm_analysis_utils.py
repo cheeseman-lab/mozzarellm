@@ -7,6 +7,10 @@ import time
 
 import pandas as pd
 
+# Version of the <screen>_clusters.json structure (metadata + clusters{...});
+# bump on any breaking change to the keys downstream readers consume.
+CLUSTERS_JSON_SCHEMA_VERSION = "1"
+
 
 def extract_json_from_markdown(text):
     """
@@ -255,6 +259,7 @@ def _cluster_row(cluster_id, analysis):
         "cluster_id": cluster_id,
         "dominant_process": analysis.get("dominant_process", ""),
         "pathway_confidence": analysis.get("pathway_confidence", ""),
+        "summary": analysis.get("summary", ""),
         "n_genes": total,
         "n_classified": classified,
         "n_established": len(established),
@@ -337,6 +342,7 @@ def save_cluster_analysis(
     # Add metadata
     output_data = {
         "metadata": {
+            "schema_version": CLUSTERS_JSON_SCHEMA_VERSION,
             "timestamp": time.time(),
             "date": datetime.datetime.now().isoformat(),
             "cluster_count": len(processed_clusters),

@@ -29,15 +29,20 @@ from mozzarellm.prompt_components import (
     COMPONENT_REGISTRY,
     derive_cot_overrides,
 )
-from mozzarellm.utils.screen_context_utils import load_screen_context_json
+from mozzarellm.utils.screen_context_utils import load_screen_context_json, validate_screen_context
 
 VALID_MODES = ("standard", "cot", "stepwise")
 
 
-def _resolve_screen_context(screen_context_path: Path | None, override: bool) -> str:
-    """Load and minify the screen-context JSON for inclusion in prompts."""
+def _resolve_screen_context(
+    screen_context_path: Path | None, override: bool, screen_context: dict | None = None
+) -> str:
+    """Load (or validate the given dict) and minify the screen context for prompts."""
     try:
-        ctx_obj = load_screen_context_json(screen_context_path, override=override)
+        if screen_context is not None:
+            ctx_obj = validate_screen_context(screen_context)
+        else:
+            ctx_obj = load_screen_context_json(screen_context_path, override=override)
     except Exception as e:
         raise ValueError(f"Failed to load screen context: {e}") from e
     return json.dumps(ctx_obj, ensure_ascii=False)
@@ -122,6 +127,7 @@ def make_cluster_analysis_system_prompt(
     *,
     screen_name: str,
     screen_context_path: Path | None = None,
+    screen_context: dict | None = None,
     mode: str = "standard",
     mcp: bool = False,
     component_order: list[str] | None = None,
@@ -156,6 +162,8 @@ def make_cluster_analysis_system_prompt(
     Args:
         screen_name: Used for output directory naming.
         screen_context_path: Path to screen_context.json.
+        screen_context: In-memory screen-context dict; validated through the same
+            schema as the JSON file and used instead of screen_context_path.
         mode: One of "standard" / "cot" / "stepwise". Default "standard".
         mcp: When True, attach the literature-validation step (cot+stepwise insert it
              into the canonical list; standard appends it before OUTPUT_FORMAT_JSON).
@@ -176,7 +184,9 @@ def make_cluster_analysis_system_prompt(
     if mode not in VALID_MODES:
         raise ValueError(f"mode must be one of {VALID_MODES}, got {mode!r}")
 
-    SCREEN_CONTEXT_TEXT = _resolve_screen_context(screen_context_path, override_screen_context)
+    SCREEN_CONTEXT_TEXT = _resolve_screen_context(
+        screen_context_path, override_screen_context, screen_context
+    )
 
     # =========================================================================
     # ESCAPE HATCH: Custom template overrides everything

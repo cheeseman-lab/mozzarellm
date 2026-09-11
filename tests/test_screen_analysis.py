@@ -231,3 +231,47 @@ def test_abstention_is_not_flagged_as_an_error(tmp_path):
         screen_context_path=_context(tmp_path),
     )
     assert out["errors"] == {}
+
+
+def test_screen_context_dict_replaces_path(tmp_path):
+    """An in-memory context dict works without any JSON file on disk."""
+    ctx = json.loads(_CONTEXT.read_text())
+    out = analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=_StubClient(),
+        run_dir=tmp_path / "run",
+        screen_context=ctx,
+        mode="cot",
+    )
+    assert set(out["results"]) == {"21", "37"}
+
+
+def test_latest_pointer_and_versioned_outputs(tmp_path):
+    """A successful run writes latest.json; clusters.json carries schema_version;
+    the cluster table carries the display summary."""
+    out = analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=_StubClient(),
+        run_dir=tmp_path / "runs" / "run_01",
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+    )
+    latest = json.loads((tmp_path / "runs" / "latest.json").read_text())
+    assert latest["run_dir"] == "run_01"
+    data = json.loads((tmp_path / "runs" / "run_01" / "s1_clusters.json").read_text())
+    assert data["metadata"]["schema_version"] == "1"
+    assert "summary" in out["cluster_df"].columns
+
+
+def test_control_prefix_is_configurable():
+    from mozzarellm.pipeline.bundle_builder import _lookup_accession
+
+    assert (
+        _lookup_accession("myctrl_g1_g1", 9606, False, None, control_prefix="myctrl_")
+        == "NON_TARGETING_CONTROL"
+    )
+    assert (
+        _lookup_accession("nontargeting_g1_g1", 9606, False, None) == "NON_TARGETING_CONTROL"
+    )
