@@ -283,3 +283,10 @@ def test_generic_analyze_surfaces_provider_errors():
     )
     assert parsed is None
     assert "provider down" in raw["error"]
+
+
+def test_temperature_default_is_unset_and_silent():
+    """No temperature configured -> nothing sent, nothing dropped, no warning."""
+    c = _client("claude-sonnet-5")
+    assert c._sampling_kwargs() == {}
+    assert c.resolved_params["dropped"] == []

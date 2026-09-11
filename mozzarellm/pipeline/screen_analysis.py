@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from mozzarellm.pipeline.bundle_builder import (
@@ -38,6 +39,7 @@ def prepare_screen_bundles(
     cluster_id_column: str = "cluster",
     feature_columns: list[str] | None = None,
     organism_id: int = 9606,
+    control_prefix: str = "nontargeting_",
     rebuild: bool = False,
 ) -> dict:
     """Cluster table -> stable accessions -> evidence bundles -> {cluster_id: path}.
@@ -49,6 +51,9 @@ def prepare_screen_bundles(
         cluster_table: DataFrame or path to a CSV/TSV/XLSX with one row per
             gene, carrying ``gene_column`` and ``cluster_id_column`` (plus any
             ``feature_columns`` to embed in the bundles).
+        control_prefix: Gene symbols with this prefix are treated as
+            non-targeting controls (mapped to ``NON_TARGETING_CONTROL``
+            instead of a UniProt lookup).
     """
     output_dir = Path(output_dir)
     cluster_df = (
@@ -63,6 +68,7 @@ def prepare_screen_bundles(
             gene_column=gene_column,
             organism_id=organism_id,
             warn_on_fallback=False,
+            control_prefix=control_prefix,
             output_dir=output_dir,
         )
         build_evidence_bundles(
@@ -114,6 +120,7 @@ def analyze_screen(
     client,
     run_dir: str | Path,
     screen_context_path: str | Path | None = None,
+    screen_context: dict | None = None,
     mode: str = "cot",
     mcp: bool = False,
     include_features: bool = False,
@@ -130,6 +137,8 @@ def analyze_screen(
         run_dir: Directory the run writes into (traces/ + JSON + CSVs).
         screen_context_path: The screen's context JSON (assay, imaging,
             clustering); embedded in the system prompt.
+        screen_context: The same context as an in-memory dict (validated
+            through the same schema); use instead of writing a JSON file.
         mode: "standard" | "cot" | "stepwise" -- prompt delivery format.
         mcp: Attach PubMed literature-validation tools.
         include_features: Feed each gene's phenotypic feature columns to the
@@ -162,6 +171,7 @@ def analyze_screen(
     system_prompt = make_cluster_analysis_system_prompt(
         screen_name=screen_name,
         screen_context_path=screen_context_path,
+        screen_context=screen_context,
         mode=mode,
         mcp=mcp,
         component_order=(list(CANONICAL_FEATURE_INTERP_COT_ORDER) if include_features else None),
@@ -240,6 +250,12 @@ def analyze_screen(
         out_file_base=str(run_dir / screen_name),
         original_df=original_df,
     )
+    latest = {
+        "run_dir": run_dir.name,
+        "date": datetime.now().isoformat(timespec="seconds"),
+        "screen_name": screen_name,
+    }
+    (run_dir.parent / "latest.json").write_text(json.dumps(latest, indent=2))
     return {
         "results": results,
         "gene_df": tables["gene_df"],

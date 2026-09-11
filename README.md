@@ -80,10 +80,15 @@ Each run directory contains the complete record and the tables to read:
 
 | File | Contents |
 |---|---|
-| `<screen>_clusters.csv` | one row per cluster: pathway, confidence, per-category counts, classification coverage |
-| `<screen>_genes.csv` | one row per gene: category, evidence subclass, rationale, evidence |
-| `<screen>_clusters.json` | parsed structured output per cluster |
+| `<screen>_clusters.csv` | one row per cluster: `cluster_id`, `dominant_process`, `pathway_confidence`, `summary`, `n_genes`, `n_classified`, `n_established`, `n_novel_role`, `n_uncharacterized`, per-category gene lists (`;`-joined), `missed_genes`, `classification_completeness` |
+| `<screen>_genes.csv` | one row per gene: `gene`, `cluster_id`, `category`, `subclass`, `rationale`, `evidence`, `dominant_process`, `pathway_confidence` |
+| `<screen>_clusters.json` | parsed structured output per cluster; `metadata.schema_version` identifies the structure for downstream readers |
 | `traces/cluster_<id>.json` | full per-call record: raw response, tool calls, tokens, cost |
+
+A successful run also writes `latest.json` next to the run directory
+(`{"run_dir", "date", "screen_name"}`), so downstream code can find the newest
+run without parsing timestamps. The screen context can be passed as a file
+(`screen_context_path`) or an in-memory dict (`screen_context`).
 
 ## Analysis options
 

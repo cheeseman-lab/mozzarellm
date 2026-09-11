@@ -148,7 +148,7 @@ class LLMClientBase(ABC):
     def __init__(
         self,
         model: str,
-        temperature: float = 0.0,
+        temperature: float | None = None,
         max_tokens: int = 16000,
         top_p: float | None = None,
         top_k: int | None = None,
@@ -359,10 +359,11 @@ class OpenAIClient(LLMClientBase):
         kwargs = {
             "model": self.model,
             "messages": messages,
-            "temperature": self.temperature,
             "max_completion_tokens": self.max_tokens,
             "seed": 42,  # For reproducibility
         }
+        if self.temperature is not None:
+            kwargs["temperature"] = self.temperature
 
         # Add optional sampling parameters
         if self.top_p is not None:
@@ -495,7 +496,9 @@ class AnthropicClient(LLMClientBase):
         """
         if getattr(self, "_params_resolved", False):
             return
-        configured: dict = {"temperature": self.temperature}
+        configured: dict = {}
+        if self.temperature is not None:
+            configured["temperature"] = self.temperature
         if self.top_p is not None:
             configured["top_p"] = self.top_p
         if self.top_k is not None:
@@ -504,12 +507,13 @@ class AnthropicClient(LLMClientBase):
             sampling, dropped = configured, []
         else:
             sampling, dropped = {}, list(configured)
-            logger.warning(
-                "Model %s rejects non-default sampling params (per the migration "
-                "guide); dropping %s.",
-                self.model,
-                ", ".join(dropped),
-            )
+            if dropped:
+                logger.warning(
+                    "Model %s rejects non-default sampling params (per the migration "
+                    "guide); dropping %s.",
+                    self.model,
+                    ", ".join(dropped),
+                )
         if self.stop_sequences:  # accepted by every model
             sampling["stop_sequences"] = self.stop_sequences
 
@@ -1183,10 +1187,11 @@ class GeminiClient(LLMClientBase):
 
         # Build config with optional parameters (no hardcoded values!)
         config_kwargs = {
-            "temperature": self.temperature,
             "max_output_tokens": self.max_tokens,
             "system_instruction": system_prompt,
         }
+        if self.temperature is not None:
+            config_kwargs["temperature"] = self.temperature
 
         # Add optional sampling parameters
         if self.top_p is not None:
@@ -1224,7 +1229,7 @@ class GeminiClient(LLMClientBase):
 
 def create_client(
     model: str,
-    temperature: float = 0.0,
+    temperature: float | None = None,
     max_tokens: int = 16000,
     top_p: float | None = None,
     top_k: int | None = None,
