@@ -1,12 +1,13 @@
 # The order experiment: positional sensitivity of the tuned prompt. Holds the
 # source and component *content* fixed (carried from mode/walkup) and permutes
-# the component order -- the O-variant catalog in order_bench_orderings, each
-# with its hypothesis. Order is applied to the single_call route: the walkup
-# tunes the single_call slots, so a verbatim order transplant onto cot/stepwise
-# (different slots) is out of scope; the mode winner is context, not the base.
+# the component order -- the O-variant catalog in bench_orderings, each with
+# its hypothesis. Order runs on the mode winner (cot_litb: the cot_mcp route
+# with the LITB gap-fill in the LIT slot); the walkup-tuned base texts reach
+# the cot steps through derive_cot_overrides, so each variant permutes the
+# winner's own step order.
 
 experiment: order
-description: component-order sensitivity of the tuned single_call prompt
+description: step-order sensitivity of the tuned cot_litb configuration
 
 uses:
   source: mode.carry.source
@@ -22,7 +23,29 @@ model:
 run:
   replicates: 3
   max_workers: 12
-  route: single_call
+  route: cot_mcp
+  component_overrides:  # the mode winner's LITB gap-fill, in the LIT slot
+    LIT: |
+          LITERATURE GAP-FILL (evidence-gated MCP):
+          Some genes in the evidence bundle have NO functional annotation provided (the annotation field is empty, or absent entirely). For those genes ONLY, use the attached PubMed MCP tools to retrieve functional evidence. Genes that already have annotation text MUST NOT be looked up, regardless of how you classify them.
+
+          BEFORE ANY TOOL USE — count the GAP set: genes whose functional-annotation field is empty or absent. This count fixes your ENTIRE tool budget:
+          - GAP set EMPTY (zero blank genes) → make ZERO tool calls. Do not search anything at all. Go straight to classification. Most clusters land here.
+          - GAP set NON-EMPTY → make EXACTLY TWO tool calls, no more: (1) ONE `search_articles` with all gap genes OR'd together `(GAP1[tiab] OR GAP2[tiab] OR ...)`, max_results=30, [tiab] on every symbol; (2) ONE `get_article_metadata` on the returned PMIDs. Then STOP calling tools permanently.
+
+          ABSOLUTE tool rules (violating any of these breaks the run):
+          - The 2-call cap is HARD. Never exceed it under any circumstance.
+          - Issue the search EXACTLY ONCE. NEVER repeat, re-word, refine, or re-run a search — not even if it returns few results, zero results, or nothing useful. If the search returns nothing for a gene, record "no literature found" for that gene and move on. Re-searching for any reason is FORBIDDEN.
+          - NEVER search a gene that already has annotation text — only the blank/GAP genes.
+          - Do NOT search per-gene, and do NOT use the tools to explore or brainstorm pathways.
+
+          For each GAP gene, extract a one-line functional summary from the retrieved literature, or record "no literature found".
+
+          Classify GAP genes on equal footing with the pre-annotated genes using the retrieved evidence: a GAP gene with direct pathway literature → ESTABLISHED/NOVEL_ROLE as warranted; a GAP gene with no retrievable literature → UNCHARACTERIZED (DARK_GENE).
+
+          In the final output, add a top-level `mcp_gapfill` array — one entry per GAP gene: {"gene": "...", "evidence_found": true|false, "driving_pmids": ["..."], "retrieved_summary": "..."}. Empty array if there were no GAP genes.
+
+          CRITICAL OUTPUT CONSTRAINT: Your entire response MUST be a single valid JSON object and nothing else. Start with `{` and end with `}`. Do NOT write any preamble, plan, or commentary about your searches — no "Based on my analysis...", no "According to PubMed...", no restating of the query. Do NOT write any text before the opening brace or after the closing brace. Report every literature finding ONLY inside JSON fields (rationale, mcp_gapfill), never as prose.
 
 conditions:  # what varies is component order; source + build are carried
   - {name: O,  order_variant: O}   # canonical, dependency-respecting baseline
