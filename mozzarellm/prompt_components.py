@@ -320,10 +320,11 @@ In the final output, include:
 # =============================================================================
 
 
-COT_STEP_PATHWAY_HYPOTHESIS = """PATHWAY HYPOTHESIS (2-3 candidates):
+COT_STEP_PATHWAY_HYPOTHESIS = """PATHWAY HYPOTHESIS:
 - Review gene annotations
-- List 2-3 candidate pathways with supporting genes
-- Note which annotations support each hypothesis"""
+- Identify the candidate pathway(s) the annotations support — commit to a single dominant process where one clearly fits, or 2-3 distinct processes if the cluster genuinely spans them
+- Note which annotations support each candidate
+- If no process explains a substantial share of the genes, say so — an honest "no coherent pathway" call is a valid outcome"""
 
 def build_cot_step_gene_categorization(gcr: str = GENE_CATEGORIZATION_RULES) -> str:
     """Compose the cot GENE CATEGORIZATION step from the (possibly overridden) GCR text."""
@@ -365,7 +366,7 @@ COT_STEP_PATHWAY_SELECTION = build_cot_step_pathway_selection()
 COT_STEP_VERIFICATION = """VERIFICATION:
 - Check for contradictions
 - Verify all genes are classified (no omissions)
-- Adjust confidence if evidence is weak or contradictory
+- Check that the confidence level follows the stated confidence criteria, not general impressions
 - Note any gaps in evidence that limit conclusions"""
 
 COT_STEP_OUTPUT = f"""FINAL JSON OUTPUT:
