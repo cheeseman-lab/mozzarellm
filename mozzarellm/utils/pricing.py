@@ -8,6 +8,7 @@ from __future__ import annotations
 
 # (input_$_per_M_tokens, output_$_per_M_tokens)
 MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "claude-sonnet-5": (3.0, 15.0),
     "claude-opus-4-7": (15.0, 75.0),
     "claude-opus-4-5": (15.0, 75.0),
     "claude-sonnet-4-6": (3.0, 15.0),

@@ -22,6 +22,7 @@ from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
 from mozzarellm.utils.io import load_table
 from mozzarellm.utils.llm_analysis_utils import save_cluster_analysis
 from mozzarellm.utils.prompt_factory import (
+    compose_stepwise_user_turns,
     make_cluster_analysis_system_prompt,
     make_single_cluster_analysis_user_prompt,
 )
@@ -166,6 +167,9 @@ def analyze_screen(
         component_order=(list(CANONICAL_FEATURE_INTERP_COT_ORDER) if include_features else None),
         component_overrides=component_overrides,
     )
+    stepwise_turns = (
+        compose_stepwise_user_turns(mcp, component_overrides) if mode == "stepwise" else None
+    )
 
     results: dict = {}
     errors: dict = {}
@@ -184,6 +188,7 @@ def analyze_screen(
                 user_prompt=user_prompt,
                 mode=mode,
                 mcp=mcp,
+                **({"stepwise_turns": stepwise_turns} if stepwise_turns is not None else {}),
             )
         except Exception as e:  # noqa: BLE001 -- one bad cluster must not kill the run
             errors[cluster_id] = str(e)
