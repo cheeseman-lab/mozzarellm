@@ -325,25 +325,42 @@ COT_STEP_PATHWAY_HYPOTHESIS = """PATHWAY HYPOTHESIS (2-3 candidates):
 - List 2-3 candidate pathways with supporting genes
 - Note which annotations support each hypothesis"""
 
-COT_STEP_GENE_CATEGORIZATION = f"""GENE CATEGORIZATION (cite evidence):
+def build_cot_step_gene_categorization(gcr: str = GENE_CATEGORIZATION_RULES) -> str:
+    """Compose the cot GENE CATEGORIZATION step from the (possibly overridden) GCR text."""
+    return f"""GENE CATEGORIZATION (cite evidence):
 For each gene, assign to exactly one category: ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED
-These are defined according to the following rules: {GENE_CATEGORIZATION_RULES}
+These are defined according to the following rules: {gcr}
 """
 
-COT_STEP_SUBCLASSIFICATION = f"""SUB-CLASSIFICATION:
+
+def build_cot_step_subclassification(
+    npr: str = NOVEL_CLASSIFICATION_RULES, upr: str = UNCHARACTERIZED_CLASSIFICATION_RULES
+) -> str:
+    """Compose the cot SUB-CLASSIFICATION step from the (possibly overridden) NPR/UPR texts."""
+    return f"""SUB-CLASSIFICATION:
 For NOVEL_ROLE genes, assign one sub-class: NO_EVIDENCE / INDIRECT_EVIDENCE / PARTIAL_EVIDENCE / CONTRADICTORY_EVIDENCE
-These are defined according to the following rules: {NOVEL_CLASSIFICATION_RULES}
+These are defined according to the following rules: {npr}
 For UNCHARACTERIZED genes, assign one sub-class: DARK_GENE / NASCENT / ANNOTATED_ONLY / NON_HUMAN_CHARACTERIZED
-These are defined according to the following rules: {UNCHARACTERIZED_CLASSIFICATION_RULES}
+These are defined according to the following rules: {upr}
 Cite specific annotations that inform each classification."""
 
-COT_STEP_PATHWAY_SELECTION = f"""PATHWAY SELECTION:
+
+def build_cot_step_pathway_selection(pcc: str = PATHWAY_CONFIDENCE_CRITERIA) -> str:
+    """Compose the cot PATHWAY SELECTION step from the (possibly overridden) PCC text."""
+    return f"""PATHWAY SELECTION:
 Once you have identified candidate pathway(s), evaluate how well EACH pathway explains the cluster using
-these stringent criteria based on what percentage of genes fit the proposed pathway: {PATHWAY_CONFIDENCE_CRITERIA}
+these stringent criteria based on what percentage of genes fit the proposed pathway: {pcc}
 Now, select a dominant pathway based on:
   * Number of established genes with direct roles
   * Coherence of functional relationships
   * Quality of supporting evidence"""
+
+
+COT_STEP_GENE_CATEGORIZATION = build_cot_step_gene_categorization()
+
+COT_STEP_SUBCLASSIFICATION = build_cot_step_subclassification()
+
+COT_STEP_PATHWAY_SELECTION = build_cot_step_pathway_selection()
 
 COT_STEP_VERIFICATION = """VERIFICATION:
 - Check for contradictions
@@ -403,6 +420,28 @@ COMPONENT_REGISTRY = {
     "cPC": STEP_PATHWAY_CONSISTENCY,
     "cO": COT_STEP_OUTPUT,
 }
+
+
+def derive_cot_overrides(component_overrides: dict[str, str]) -> dict[str, str]:
+    """Propagate base-component overrides into the cot slots composed from them.
+
+    The cot steps cGCR/cPri/cPSC embed the GCR/NPR+UPR/PCC texts at composition
+    time, so an override of a base component would otherwise never reach the cot
+    and stepwise routes. Rebuilds each affected cot slot from the overridden base
+    texts using the same composition templates; an explicit override for a cot
+    slot always wins over a derived one.
+    """
+    derived: dict[str, str] = {}
+    if "GCR" in component_overrides:
+        derived["cGCR"] = build_cot_step_gene_categorization(component_overrides["GCR"])
+    if "NPR" in component_overrides or "UPR" in component_overrides:
+        derived["cPri"] = build_cot_step_subclassification(
+            component_overrides.get("NPR", NOVEL_CLASSIFICATION_RULES),
+            component_overrides.get("UPR", UNCHARACTERIZED_CLASSIFICATION_RULES),
+        )
+    if "PCC" in component_overrides:
+        derived["cPSC"] = build_cot_step_pathway_selection(component_overrides["PCC"])
+    return {**derived, **component_overrides}
 
 CANONICAL_ZERO_SHOT_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]
 CANONICAL_ZERO_SHOT_MCP_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "LIT", "O"]

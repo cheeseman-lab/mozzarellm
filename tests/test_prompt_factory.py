@@ -8,8 +8,13 @@ from mozzarellm.prompt_components import (
     COT_STEP_OUTPUT,
     COT_STEP_PATHWAY_HYPOTHESIS,
     COT_STEP_VERIFICATION,
+    derive_cot_overrides,
 )
-from mozzarellm.utils.prompt_factory import make_cluster_analysis_system_prompt
+from mozzarellm.utils.prompt_factory import (
+    assemble_from_component_order,
+    compose_stepwise_user_turns,
+    make_cluster_analysis_system_prompt,
+)
 
 
 def test_standard_mode_returns_string(tmp_path):
@@ -161,3 +166,38 @@ def test_includes_screen_context(tmp_path):
         output_dir=tmp_path,
     )
     assert "context" in result.lower()
+
+
+def test_base_overrides_propagate_to_cot_slots():
+    """GCR/NPR/UPR/PCC overrides rebuild the cot slots composed from them."""
+    overrides = {
+        "GCR": "TUNED GCR RULES",
+        "NPR": "TUNED NPR RULES",
+        "UPR": "TUNED UPR RULES",
+        "PCC": "TUNED PCC RUBRIC",
+    }
+    prompt = assemble_from_component_order(
+        CANONICAL_COT_ORDER, "{}", cot_mode=True, component_overrides=overrides
+    )
+    assert "TUNED GCR RULES" in prompt
+    assert "TUNED NPR RULES" in prompt
+    assert "TUNED UPR RULES" in prompt
+    assert "TUNED PCC RUBRIC" in prompt
+    turns = compose_stepwise_user_turns(mcp=False, component_overrides=overrides)
+    joined = "\n".join(t["content"] for t in turns)
+    assert "TUNED GCR RULES" in joined
+    assert "TUNED NPR RULES" in joined
+    assert "TUNED PCC RUBRIC" in joined
+
+
+def test_explicit_cot_slot_override_beats_derived():
+    """An explicit cot-slot override wins over one derived from a base override."""
+    derived = derive_cot_overrides({"GCR": "TUNED GCR RULES", "cGCR": "EXPLICIT COT STEP"})
+    assert derived["cGCR"] == "EXPLICIT COT STEP"
+
+
+def test_no_base_overrides_leaves_cot_slots_canonical():
+    """Without base overrides the cot slots are the canonical composed texts."""
+    assert derive_cot_overrides({}) == {}
+    prompt = assemble_from_component_order(CANONICAL_COT_ORDER, "{}", cot_mode=True)
+    assert COT_STEP_GENE_CATEGORIZATION.strip() in prompt

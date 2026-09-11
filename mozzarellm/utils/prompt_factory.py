@@ -27,6 +27,7 @@ from mozzarellm.prompt_components import (
     CANONICAL_ZERO_SHOT_MCP_ORDER,
     CANONICAL_ZERO_SHOT_ORDER,
     COMPONENT_REGISTRY,
+    derive_cot_overrides,
 )
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
@@ -61,7 +62,7 @@ def compose_stepwise_user_turns(
     """
     canonical = CANONICAL_COT_MCP_ORDER if mcp else CANONICAL_COT_ORDER
     runner_keys = canonical[2:]  # skip CAT + SC (system-prompt content)
-    overrides = component_overrides or {}
+    overrides = derive_cot_overrides(component_overrides or {})
     return [
         {
             "content": f"STEP {i + 1} - {overrides.get(key, COMPONENT_REGISTRY[key])}",
@@ -97,7 +98,7 @@ def assemble_from_component_order(
     """
     registry = dict(COMPONENT_REGISTRY)
     if component_overrides:
-        registry.update(component_overrides)
+        registry.update(derive_cot_overrides(component_overrides))
 
     parts = []
     for key in component_order:

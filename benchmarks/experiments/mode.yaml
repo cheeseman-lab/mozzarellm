@@ -3,13 +3,12 @@
 # LIT / LITB). Selection is holistic (delivery format legitimately trades
 # metrics off), with the same coverage-honest primary as the source step.
 #
-# Component-mapping caveat: the walkup tunes the single_call slots
-# (CAT/GCR/NPR/UPR/PCC); cot and stepwise assemble from their own slots
-# (cPH/cGCR/cPri/cPSC/cVer/cO), sharing only CAT and SC. Carried overrides for
-# slots a route doesn't have are inert at assembly, so single_call runs the
-# full tuned prompt while cot/stepwise carry only the tuned CAT lens and keep
-# canonical text for their own components -- a fair mode comparison, not a
-# verbatim prompt transplant.
+# Component mapping: the walkup tunes the base slots (CAT/GCR/NPR/UPR/PCC);
+# cot and stepwise assemble their own steps (cGCR/cPri/cPSC) BY COMPOSING the
+# base texts, and derive_cot_overrides rebuilds those steps from the carried
+# overrides at assembly time -- every mode runs the full tuned build, and only
+# the delivery changes. (cPH/cVer/cO are route-native scaffolding with no base
+# counterpart and stay canonical.)
 #
 # MCP settings: LIT is the canonical category-gated literature validation
 # (search NOVEL_ROLE/UNCHARACTERIZED calls); LITB is the evidence-gated
