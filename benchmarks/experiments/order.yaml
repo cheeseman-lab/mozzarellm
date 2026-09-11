@@ -16,7 +16,7 @@ model:
   provider: anthropic
   model_name: claude-sonnet-5
   # temperature omitted: claude-sonnet-5 rejects non-default sampling params
-  max_tokens: 16000
+  max_tokens: 32000
   thinking: false
 
 run:

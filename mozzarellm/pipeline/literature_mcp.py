@@ -17,6 +17,7 @@ from typing import Any
 import anthropic
 from pydantic import ValidationError
 
+from mozzarellm.clients.llm_api_clients import _cached_system
 from mozzarellm.schemas.mcp_schemas import (
     LiteraturePathwayRevision,
     LiteratureReclassification,
@@ -166,7 +167,7 @@ def call_mcp(
     system_prompt: str,
     messages: list[dict[str, Any]],
     model: str,
-    max_tokens: int = 16000,
+    max_tokens: int = 32000,
     max_retries: int = 3,
     client: anthropic.Anthropic | None = None,
 ) -> tuple[Any, float]:
@@ -190,7 +191,7 @@ def call_mcp(
             response = client.beta.messages.create(
                 model=model,
                 max_tokens=max_tokens,
-                system=system_prompt,
+                system=_cached_system(system_prompt),
                 messages=messages,
                 mcp_servers=mcp_servers,
                 tools=tools,

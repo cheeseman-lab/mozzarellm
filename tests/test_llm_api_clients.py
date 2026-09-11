@@ -198,8 +198,13 @@ def test_stepwise_uses_provided_turns():
     ]
     seen = []
 
+    def _texts(content):
+        if isinstance(content, str):
+            return content
+        return "".join(b.get("text", "") for b in content)
+
     def fake_endpoint(*, system_prompt, messages, max_tokens, max_retries):
-        seen.append([m["content"] for m in messages if m["role"] == "user"])
+        seen.append([_texts(m["content"]) for m in messages if m["role"] == "user"])
         return _response("end_turn", texts=('{"cluster_id": "1"}',)), 0.1
 
     with patch.object(c, "_call_messages_endpoint", side_effect=fake_endpoint):
@@ -290,3 +295,60 @@ def test_temperature_default_is_unset_and_silent():
     c = _client("claude-sonnet-5")
     assert c._sampling_kwargs() == {}
     assert c.resolved_params["dropped"] == []
+
+
+# ---------------------------------------------------------------------------
+# Prompt caching
+# ---------------------------------------------------------------------------
+
+
+def test_plain_call_carries_cache_breakpoints():
+    """System prompt and user bundle are cache-marked; cache usage is captured."""
+    c = _client("claude-sonnet-5")
+    seen = {}
+
+    def fake_create(client, base):
+        seen.update(base)
+        resp = _response("end_turn", texts=("ok",))
+        resp.usage.cache_creation_input_tokens = 100
+        resp.usage.cache_read_input_tokens = 900
+        return resp
+
+    with patch.object(c, "_create_message", side_effect=fake_create):
+        c._make_api_call("sys", "bundle")
+    assert seen["system"][-1]["cache_control"] == {"type": "ephemeral"}
+    assert seen["messages"][0]["content"][-1]["cache_control"] == {"type": "ephemeral"}
+    assert c.last_usage["cache_read_input_tokens"] == 900
+
+
+def test_stepwise_moves_the_turn_breakpoint():
+    """Turn 0 keeps its marker; only the newest later user turn is marked."""
+    c = _client("claude-sonnet-5")
+    turns = [{"content": f"STEP {i}", "mcp": False} for i in (1, 2, 3)]
+    snapshots = []
+
+    def fake_endpoint(*, system_prompt, messages, max_tokens, max_retries):
+        snapshots.append(
+            [
+                "cache_control" in m["content"][-1] if isinstance(m["content"], list) else None
+                for m in messages
+            ]
+        )
+        return _response("end_turn", texts=('{"cluster_id": "1"}',)), 0.1
+
+    with patch.object(c, "_call_messages_endpoint", side_effect=fake_endpoint):
+        c._analyze_stepwise(
+            system_prompt="sys", user_prompt="bundle", mcp=False, max_retries=1, turns=turns
+        )
+    # Final request: [turn0(user, marked), assistant, turn1(user, unmarked),
+    # assistant, turn2(user, marked)]
+    assert snapshots[-1] == [True, None, False, None, True]
+
+
+def test_compute_cost_prices_cache_tiers():
+    from mozzarellm.utils.pricing import compute_cost
+
+    cost, warning = compute_cost("claude-sonnet-5", 1_000_000, 0)
+    assert (cost, warning) == (2.0, None)
+    cached, _ = compute_cost("claude-sonnet-5", 0, 0, 1_000_000, 1_000_000)
+    assert cached == 2.5 + 0.2  # write at 1.25x, read at 0.1x
