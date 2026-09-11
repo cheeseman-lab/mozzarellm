@@ -126,3 +126,64 @@ def test_enabled_thinking_budget_stays_within_max_tokens():
     assert 1024 <= budget < 1500
     assert c.resolved_params["thinking"] == "enabled"
 
+
+
+# ---------------------------------------------------------------------------
+# _create_message: streaming for large outputs
+# ---------------------------------------------------------------------------
+
+
+class _FakeStream:
+    def __init__(self, message):
+        self._message = message
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def get_final_message(self):
+        return self._message
+
+
+class _FakeMessages:
+    def __init__(self):
+        self.created_with = None
+        self.streamed_with = None
+
+    def create(self, **kwargs):
+        self.created_with = kwargs
+        return "created"
+
+    def stream(self, **kwargs):
+        self.streamed_with = kwargs
+        return _FakeStream("streamed")
+
+
+class _FakeAnthropic:
+    def __init__(self):
+        self.messages = _FakeMessages()
+
+
+def _anthropic_client(max_tokens):
+    from mozzarellm.clients.llm_api_clients import AnthropicClient
+
+    return AnthropicClient(
+        "claude-sonnet-5", 0.2, max_tokens, None, None, None, "test-key", False
+    )
+
+
+def test_benchmark_ceiling_stays_non_streaming():
+    client = _anthropic_client(16000)
+    fake = _FakeAnthropic()
+    assert client._create_message(fake, {"max_tokens": 16000}) == "created"
+    assert fake.messages.streamed_with is None
+
+
+def test_large_outputs_stream_and_return_the_final_message():
+    client = _anthropic_client(32000)
+    fake = _FakeAnthropic()
+    assert client._create_message(fake, {"max_tokens": 32000}) == "streamed"
+    assert fake.messages.created_with is None
+    assert fake.messages.streamed_with["max_tokens"] == 32000
