@@ -184,7 +184,7 @@ class LLMClientBase(ABC):
         self,
         model: str,
         temperature: float | None = None,
-        max_tokens: int = 16000,
+        max_tokens: int = 32000,
         top_p: float | None = None,
         top_k: int | None = None,
         stop_sequences: list[str] | None = None,
@@ -865,7 +865,7 @@ class AnthropicClient(LLMClientBase):
         user_prompt: str,
         mode: str,
         max_retries: int,
-        max_tokens: int = 16000,
+        max_tokens: int = 32000,
     ) -> tuple[dict | None, dict]:
         """One-shot cluster analysis with PubMed MCP tools attached. Used by both
         (mode=standard, mcp=True) and (mode=cot, mcp=True) — they differ only in the
@@ -987,7 +987,7 @@ class AnthropicClient(LLMClientBase):
         user_prompt: str,
         mcp: bool,
         max_retries: int,
-        max_tokens: int = 16000,
+        max_tokens: int = 32000,
         turns: list[dict] | None = None,
     ) -> tuple[dict | None, dict]:
         """Run the canonical CoT chain as N sequential, multi-turn API calls.
@@ -1280,7 +1280,7 @@ class GeminiClient(LLMClientBase):
 def create_client(
     model: str,
     temperature: float | None = None,
-    max_tokens: int = 16000,
+    max_tokens: int = 32000,
     top_p: float | None = None,
     top_k: int | None = None,
     stop_sequences: list[str] | None = None,
