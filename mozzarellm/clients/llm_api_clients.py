@@ -453,7 +453,7 @@ class AnthropicClient(LLMClientBase):
 
         bundle_obj = json.loads(Path(path_to_evidence_bundle).read_text(encoding="utf-8"))
         if not include_features:
-            strip_feature_fields(bundle_obj)  # no feature-interp component => no feature leak
+            strip_feature_fields(bundle_obj)  # no phenotype components => no phenotype leak
         strip_source_fields(bundle_obj, source)  # master bundle -> the run's evidence source
         bundle_text = json.dumps(
             bundle_obj, ensure_ascii=False

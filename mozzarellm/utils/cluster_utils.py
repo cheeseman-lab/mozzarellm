@@ -1,6 +1,80 @@
+import re
 from pathlib import Path
 
 import pandas as pd
+
+STRENGTH_RANK_COL = "phenotype_strength_rank"
+
+
+def attach_strength_ranks(
+    df: pd.DataFrame, strength_column: str, *, higher_is_stronger: bool = True
+) -> pd.DataFrame:
+    """Replace a raw perturbation-strength column with scale-free "N/M" ranks.
+
+    Any metric works (AUC, e-distance, normalized fate distance, ...): values
+    are ranked across the table's scored genes, 1 = strongest, and each gene
+    gets ``phenotype_strength_rank = "N/M"``. A column already holding "N/M"
+    strings passes through unchanged. Genes with missing strength carry no
+    rank. The raw column is dropped — raw strength values never enter bundles.
+    """
+    if strength_column not in df.columns:
+        raise ValueError(f"strength_column {strength_column!r} not in cluster table")
+    df = df.copy()
+    col = df[strength_column]
+    nonnull = col.notna()
+    if not nonnull.any():
+        raise ValueError(f"strength_column {strength_column!r} has no values")
+    ranks = pd.Series(pd.NA, index=df.index, dtype=object)
+    strs = col[nonnull].astype(str).str.strip()
+    if strs.str.fullmatch(r"\d+/\d+").all():
+        ranks[nonnull] = strs
+    else:
+        vals = pd.to_numeric(col, errors="coerce")
+        scored = vals.notna()
+        if not scored.any():
+            raise ValueError(
+                f"strength_column {strength_column!r} is neither numeric nor 'N/M' rank strings"
+            )
+        m = int(scored.sum())
+        r = vals[scored].rank(ascending=not higher_is_stronger, method="min").astype(int)
+        ranks[scored] = r.map(lambda n: f"{n}/{m}")
+    df[STRENGTH_RANK_COL] = ranks
+    return df.drop(columns=[strength_column])
+
+
+def compute_phenotype_strength(df: pd.DataFrame, gene_column: str) -> dict:
+    """Summarize a cluster's phenotype-strength ranks as a discrete table.
+
+    Mirrors compute_feature_coherence: the aggregate the model reads is computed
+    here, so the strength step is recall over a table rather than arithmetic.
+    Ranks are the "N/M" strings in ``STRENGTH_RANK_COL``; genes without one are
+    left out of the summary.
+    """
+    ranked = []
+    screen_size = None
+    for _, row in df.iterrows():
+        value = row.get(STRENGTH_RANK_COL)
+        if not isinstance(value, str) or "/" not in value:
+            continue
+        n, m = (int(x) for x in value.split("/"))
+        screen_size = m
+        ranked.append((n, str(row[gene_column])))
+    ranked.sort()
+    if not ranked:
+        return {"n_ranked": 0, "screen_size": None, "ranked_genes": []}
+    ranks = [n for n, _ in ranked]
+    quartile = screen_size / 4
+    median = ranks[len(ranks) // 2]
+    return {
+        "n_ranked": len(ranked),
+        "screen_size": screen_size,
+        "median_rank": f"{median}/{screen_size}",
+        "strongest_quartile_frac": round(sum(1 for n in ranks if n <= quartile) / len(ranks), 3),
+        "weakest_quartile_frac": round(
+            sum(1 for n in ranks if n > 3 * quartile) / len(ranks), 3
+        ),
+        "ranked_genes": [{"gene": g, "rank": f"{n}/{screen_size}"} for n, g in ranked],
+    }
 
 
 def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
@@ -49,7 +123,7 @@ def compute_feature_coherence(
             features_str = row.get(col, "")
             if not isinstance(features_str, str) or not features_str:
                 continue
-            for f in (x.strip() for x in features_str.split(",")):
+            for f in (x.strip() for x in re.split(r"[;,]", features_str)):
                 if f:
                     out.setdefault(f, []).append(gene)
         return out

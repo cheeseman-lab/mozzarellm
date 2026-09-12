@@ -552,3 +552,29 @@ def test_order_yaml_parses_with_the_variant_catalog():
     assert [c["name"] for c in exp["conditions"]] == ["O", "O1", "O2", "O3", "O4"]
     assert all(c["order_variant"] == c["name"] for c in exp["conditions"])
     assert exp["carry"] == ["source", "order"]
+
+
+def test_condition_route_extends_cot_with_phenotype_steps():
+    from benchmarks.workflow.bench_experiment import _condition_route
+
+    r = _condition_route({"name": "fs", "features": True, "strength": True}, "cot_mcp")
+    assert r.features and r.strength
+    assert r.component_order[-4:] == ("cFC", "cPC", "cPS", "cO")
+    assert "LIT" in r.component_order
+    plain = _condition_route({"name": "b"}, "cot_mcp")
+    assert not plain.features and not plain.strength
+    import pytest
+
+    with pytest.raises(ValueError, match="cot route"):
+        _condition_route({"name": "x", "features": True}, "single_call")
+
+
+def test_feature_coherence_splits_on_either_separator():
+    import pandas as pd
+
+    from mozzarellm.utils.cluster_utils import compute_feature_coherence
+
+    df = pd.DataFrame({"g": ["a", "b"], "up_features": ["f1; f2", "f1,f3"], "down_features": ["", ""]})
+    block = compute_feature_coherence(df, ["up_features", "down_features"], gene_column="g")
+    by_name = {r["feature"]: r["up_genes"] for r in block["features"]}
+    assert by_name == {"f1": ["a", "b"], "f2": ["a"], "f3": ["b"]}

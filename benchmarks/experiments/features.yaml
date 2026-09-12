@@ -1,0 +1,62 @@
+# The features experiment: does per-gene phenotype evidence change the tuned
+# cot_litb configuration's panel? Three named arms on the mode winner --
+# baseline (no phenotype data), +features (up/down lists with the
+# feature-coherence table and the cFC/cPC cross-check steps), and
+# +features+strength (adding the "N/M" strength ranks, the phenotype_strength
+# table and the cPS informativeness step). The bundles carry the phenotype
+# blocks from build_bundles.py --augment-phenotype; each arm strips what it
+# doesn't use, so the baseline prompt is byte-identical to the mode run's.
+# Success criterion: nothing degrades -- the steps are bounded cross-checks
+# the reviewers never saw, not a lever on the graded calls.
+
+experiment: features
+description: phenotype evidence (features, strength ranks) on the tuned cot_litb build
+
+uses:
+  source: mode.carry.source
+  component_overrides: walkup.carry.final_component_texts
+
+model:
+  provider: anthropic
+  model_name: claude-sonnet-5
+  # temperature omitted: claude-sonnet-5 rejects non-default sampling params
+  max_tokens: 32000
+  thinking: false
+
+run:
+  replicates: 3
+  max_workers: 12
+  route: cot_mcp
+  component_overrides:  # the mode winner's LITB gap-fill, in the LIT slot
+    LIT: |
+          LITERATURE GAP-FILL (evidence-gated MCP):
+          Some genes in the evidence bundle have NO functional annotation provided (the annotation field is empty, or absent entirely). For those genes ONLY, use the attached PubMed MCP tools to retrieve functional evidence. Genes that already have annotation text MUST NOT be looked up, regardless of how you classify them.
+
+          BEFORE ANY TOOL USE — count the GAP set: genes whose functional-annotation field is empty or absent. This count fixes your ENTIRE tool budget:
+          - GAP set EMPTY (zero blank genes) → make ZERO tool calls. Do not search anything at all. Go straight to classification. Most clusters land here.
+          - GAP set NON-EMPTY → make EXACTLY TWO tool calls, no more: (1) ONE `search_articles` with all gap genes OR'd together `(GAP1[tiab] OR GAP2[tiab] OR ...)`, max_results=30, [tiab] on every symbol; (2) ONE `get_article_metadata` on the returned PMIDs. Then STOP calling tools permanently.
+
+          ABSOLUTE tool rules (violating any of these breaks the run):
+          - The 2-call cap is HARD. Never exceed it under any circumstance.
+          - Issue the search EXACTLY ONCE. NEVER repeat, re-word, refine, or re-run a search — not even if it returns few results, zero results, or nothing useful. If the search returns nothing for a gene, record "no literature found" for that gene and move on. Re-searching for any reason is FORBIDDEN.
+          - NEVER search a gene that already has annotation text — only the blank/GAP genes.
+          - Do NOT search per-gene, and do NOT use the tools to explore or brainstorm pathways.
+
+          For each GAP gene, extract a one-line functional summary from the retrieved literature, or record "no literature found".
+
+          Classify GAP genes on equal footing with the pre-annotated genes using the retrieved evidence: a GAP gene with direct pathway literature → ESTABLISHED/NOVEL_ROLE as warranted; a GAP gene with no retrievable literature → UNCHARACTERIZED (DARK_GENE).
+
+          In the final output, add a top-level `mcp_gapfill` array — one entry per GAP gene: {"gene": "...", "evidence_found": true|false, "driving_pmids": ["..."], "retrieved_summary": "..."}. Empty array if there were no GAP genes.
+
+          CRITICAL OUTPUT CONSTRAINT: Your entire response MUST be a single valid JSON object and nothing else. Start with `{` and end with `}`. Do NOT write any preamble, plan, or commentary about your searches — no "Based on my analysis...", no "According to PubMed...", no restating of the query. Do NOT write any text before the opening brace or after the closing brace. Report every literature finding ONLY inside JSON fields (rationale, mcp_gapfill), never as prose.
+
+conditions:  # what varies is phenotype evidence; source + build + mode are carried
+  - {name: baseline}                                   # cot_litb as selected
+  - {name: features, features: true}                   # + up/down lists, cFC/cPC
+  - {name: features_strength, features: true, strength: true}  # + strength ranks, cPS
+
+selection:
+  primary: coverage_weighted_category
+  metrics: [category, novel_subclass, unchar_subclass, coherence, coverage]
+
+carry: [source, features]  # carry.source = the resolved source; carry.features = winner
