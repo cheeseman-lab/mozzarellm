@@ -11,9 +11,11 @@ per-feature views are derived at prompt-assembly time (strip_source_fields /
 strip_feature_fields in mozzarellm.utils.prompt_factory).
 
 Usage:
-    python workflow/build_bundles.py
+    python workflow/build_bundles.py                      # full rebuild (UniProt/Affinage)
+    python workflow/build_bundles.py --augment-phenotype  # add phenotype blocks in place, no API
 """
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -23,8 +25,14 @@ from mozzarellm.pipeline.bundle_builder import (
     build_evidence_bundles,
     get_or_append_stable_accession,
 )
-from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
-from mozzarellm.utils.io import load_table
+from mozzarellm.utils.cluster_utils import (
+    STRENGTH_RANK_COL,
+    attach_strength_ranks,
+    build_cluster_id_to_bundle_path,
+    compute_feature_coherence,
+    compute_phenotype_strength,
+)
+from mozzarellm.utils.io import load_table, write_bundle
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
 load_dotenv()  # walks upward to find .env automatically
@@ -98,6 +106,49 @@ def process_screen(
     }
 
 
+def augment_phenotype(bundles_dir: Path = OUTPUT_DIR, benchmark_csv: Path = BENCHMARK_CSV) -> int:
+    """Add the phenotype evidence blocks to existing bundles, without any API call.
+
+    The master bundles were built with the per-gene up/down feature columns and
+    the raw strength passing through. This attaches what the phenotype
+    reasoning steps read: a feature_coherence table from the up/down lists, and
+    per-gene phenotype_strength_rank ("N/M", ranked per screen over the
+    benchmark's scored genes -- M is the benchmark's gene set for that screen,
+    not the full screen) plus the cluster-level phenotype_strength table. The
+    raw strength value is dropped so it never reaches the model. Annotation
+    fields are untouched, so non-phenotype prompts stay byte-identical.
+    """
+    df = load_table(benchmark_csv)
+    ranks: dict[tuple[str, str], str] = {}
+    for screen_name, screen_df in df.groupby(SCREEN_COL):
+        if screen_df["phenotypic_strength"].notna().any():
+            ranked = attach_strength_ranks(screen_df, "phenotypic_strength")
+            for _, row in ranked.iterrows():
+                if isinstance(row[STRENGTH_RANK_COL], str):
+                    ranks[(screen_name, row[GENE_COL])] = row[STRENGTH_RANK_COL]
+
+    n = 0
+    for path in sorted(bundles_dir.glob("*__bundle.json")):
+        bundle = json.loads(path.read_text(encoding="utf-8"))
+        genes = bundle["cluster_genes"]
+        for gene in genes:
+            gene.pop("phenotypic_strength", None)
+            rank = ranks.get((bundle["screen_name"], gene[GENE_COL]))
+            if rank:
+                gene[STRENGTH_RANK_COL] = rank
+        chunk = pd.DataFrame(genes)
+        feature_cols = [c for c in ("up_features", "down_features") if c in chunk.columns]
+        if feature_cols:
+            bundle["feature_coherence"] = compute_feature_coherence(
+                chunk, feature_cols, gene_column=GENE_COL
+            )
+        if STRENGTH_RANK_COL in chunk.columns:
+            bundle["phenotype_strength"] = compute_phenotype_strength(chunk, gene_column=GENE_COL)
+        write_bundle(bundle, path)
+        n += 1
+    return n
+
+
 #    main
 def main():
     print(f"Inputs:    {INPUTS_DIR}")
@@ -132,4 +183,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    if "--augment-phenotype" in sys.argv:
+        print(f"Augmented {augment_phenotype()} bundles with phenotype blocks.")
+    else:
+        main()

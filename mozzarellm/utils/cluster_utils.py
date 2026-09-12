@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -122,7 +123,7 @@ def compute_feature_coherence(
             features_str = row.get(col, "")
             if not isinstance(features_str, str) or not features_str:
                 continue
-            for f in (x.strip() for x in features_str.split(",")):
+            for f in (x.strip() for x in re.split(r"[;,]", features_str)):
                 if f:
                     out.setdefault(f, []).append(gene)
         return out

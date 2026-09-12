@@ -42,6 +42,10 @@ class Route:
     # Phase 2 order benchmarking metadata (empty for Phase 1 routes).
     base_route: str = ""
     order_variant: str = ""
+    # Phenotype evidence switches: the matching reasoning steps join the
+    # component order and the bundle fields stay in the user prompt.
+    features: bool = False
+    strength: bool = False
     order_hypothesis: str = ""
 
     @property

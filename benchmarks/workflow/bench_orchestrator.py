@@ -189,6 +189,9 @@ def construct_prompts(
     # path. Phase 1 routes (order_variant == "") use the original mode-based
     # default assembly to preserve backward compatibility exactly.
     is_order_variant = bool(route.order_variant)
+    # Order variants and phenotype-extended routes both carry an explicit
+    # component order; everything else takes the mode-based default assembly.
+    custom_order = is_order_variant or route.features or route.strength
     # Label used for the on-disk prompt filename; defaults to the route name.
     prompt_label = condition_name or route.name
 
@@ -224,7 +227,7 @@ def construct_prompts(
         prompt_filename = f"system_prompt_{prompt_label}_{route.mode}_{screen_name}"
         prompt_file = output_dir / "prompts_used" / f"{prompt_filename}.txt"
         with _IO_LOCK:
-            if prompt_file.exists() and not is_order_variant:
+            if prompt_file.exists() and not custom_order:
                 system_prompt = prompt_file.read_text(encoding="utf-8")
             else:
                 system_prompt = make_cluster_analysis_system_prompt(
@@ -232,14 +235,19 @@ def construct_prompts(
                     screen_context_path=screen_context_path,
                     mode=route.mode,
                     mcp=route.mcp,
-                    component_order=(list(route.component_order) if is_order_variant else None),
+                    component_order=(list(route.component_order) if custom_order else None),
                     component_overrides=component_overrides,
                     output_dir=output_dir / "prompts_used",
                     prompt_filename=prompt_filename,
                 )
 
     user_prompt = make_single_cluster_analysis_user_prompt(
-        cluster_id, screen_name, cluster_to_bundle_map, source=source
+        cluster_id,
+        screen_name,
+        cluster_to_bundle_map,
+        include_features=route.features,
+        include_strength=route.strength,
+        source=source,
     )
 
     stepwise_turns = None

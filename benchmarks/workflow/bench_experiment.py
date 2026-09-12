@@ -43,10 +43,13 @@ import argparse
 import csv
 import json
 import re
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
 import yaml
+
+from mozzarellm.prompt_components import build_cot_component_order
 
 from .bench_configparse import BenchmarkConfig, ModelConfig, PathsConfig, RunConfig
 from .bench_evaluator import (
@@ -109,7 +112,15 @@ ABSTAIN_COHERENCE = "Low"
 
 # Keys a condition may set; anything a condition sets overrides the shared
 # ``run:`` block for that condition only.
-_CONDITION_KEYS = {"name", "bundle_source", "route", "component_overrides", "order_variant"}
+_CONDITION_KEYS = {
+    "name",
+    "bundle_source",
+    "route",
+    "component_overrides",
+    "order_variant",
+    "features",
+    "strength",
+}
 # ``uses: <experiment>.carry.<key>`` -- a cross-experiment input, resolved from
 # that experiment's state file at invocation.
 _USES_RE = re.compile(r"^(?P<experiment>\w+)\.carry\.(?P<key>\w+)$")
@@ -425,10 +436,28 @@ def panel_json(p: MetricPanel) -> dict:
 
 
 def _condition_route(cond: dict, route_name: str) -> Route:
-    """The condition's Route: the registry route, reordered when it asks for it."""
+    """The condition's Route: the registry route, reordered or phenotype-extended
+    when it asks for it."""
     route = ROUTE_REGISTRY[route_name]
     if cond.get("order_variant"):
         route = apply_order_variant(route, cond["order_variant"])
+    features, strength = bool(cond.get("features")), bool(cond.get("strength"))
+    if features or strength:
+        if route.mode != "cot" or cond.get("order_variant"):
+            raise ValueError(
+                f"condition {cond.get('name')!r}: features/strength need a cot route "
+                "without an order variant"
+            )
+        tag = "_".join(k for k, on in (("feat", features), ("strength", strength)) if on)
+        route = replace(
+            route,
+            name=f"{route.name}_{tag}",
+            component_order=tuple(
+                build_cot_component_order(mcp=route.mcp, features=features, strength=strength)
+            ),
+            features=features,
+            strength=strength,
+        )
     return route
 
 
@@ -577,6 +606,8 @@ def run_experiment(
                     "bundle_source": bundle_source,
                     "route": route_name,
                     "order_variant": cond.get("order_variant"),
+                    "features": bool(cond.get("features")),
+                    "strength": bool(cond.get("strength")),
                     "component_overrides": overrides,
                 },
             )
