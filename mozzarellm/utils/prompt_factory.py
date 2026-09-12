@@ -29,6 +29,7 @@ from mozzarellm.prompt_components import (
     COMPONENT_REGISTRY,
     derive_cot_overrides,
 )
+from mozzarellm.utils.cluster_utils import STRENGTH_RANK_COL
 from mozzarellm.utils.screen_context_utils import load_screen_context_json, validate_screen_context
 
 VALID_MODES = ("standard", "cot", "stepwise")
@@ -301,7 +302,12 @@ def strip_source_fields(bundle_obj: dict, source: str) -> None:
 
 
 def make_single_cluster_analysis_user_prompt(
-    cluster_id, screen_name, cluster_to_bundle_path_map, include_features=False, source="both"
+    cluster_id,
+    screen_name,
+    cluster_to_bundle_path_map,
+    include_features=False,
+    include_strength=False,
+    source="both",
 ):
     BUNDLE_PATH = cluster_to_bundle_path_map[str(cluster_id)]
 
@@ -309,6 +315,10 @@ def make_single_cluster_analysis_user_prompt(
     bundle_obj = json.loads(Path(BUNDLE_PATH).read_text(encoding="utf-8"))
     if not include_features:
         strip_feature_fields(bundle_obj)  # no feature-interp component => no feature leak
+    if not include_strength:
+        for gene in bundle_obj.get("cluster_genes", []):
+            if isinstance(gene, dict):
+                gene.pop(STRENGTH_RANK_COL, None)
     strip_source_fields(bundle_obj, source)  # master bundle -> the run's evidence source
     bundle_text = json.dumps(bundle_obj, ensure_ascii=False)
 

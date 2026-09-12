@@ -45,6 +45,18 @@ class Readout(SemiFlexModel):
     primary_metric: RequiredStr
 
 
+class PhenotypeReadout(SemiFlexModel):
+    """Human-written descriptions of the optional per-gene phenotype evidence.
+
+    Free prose the model reads verbatim: what the up/down feature lists are and
+    what cutoff produced them, and what the perturbation-strength metric
+    measures. Both optional -- screens without the corresponding data omit them.
+    """
+
+    features_description: str | None = None
+    strength_description: str | None = None
+
+
 class Clustering(SemiFlexModel):
     method: RequiredStr
     parameters: RequiredDict
@@ -83,6 +95,7 @@ class ScreenContext(SemiFlexModel):
     clustering: Clustering
     controls: Controls
     provenance: Provenance
+    phenotype_readout: PhenotypeReadout | None = None
 
 
 class BundleGene(SemiFlexModel):

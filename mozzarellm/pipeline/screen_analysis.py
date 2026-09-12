@@ -18,8 +18,12 @@ from mozzarellm.pipeline.bundle_builder import (
     build_evidence_bundles,
     get_or_append_stable_accession,
 )
-from mozzarellm.prompt_components import CANONICAL_FEATURE_INTERP_COT_ORDER
-from mozzarellm.utils.cluster_utils import build_cluster_id_to_bundle_path
+from mozzarellm.prompt_components import build_cot_component_order
+from mozzarellm.utils.cluster_utils import (
+    STRENGTH_RANK_COL,
+    attach_strength_ranks,
+    build_cluster_id_to_bundle_path,
+)
 from mozzarellm.utils.io import load_table
 from mozzarellm.utils.llm_analysis_utils import save_cluster_analysis
 from mozzarellm.utils.prompt_factory import (
@@ -38,6 +42,8 @@ def prepare_screen_bundles(
     gene_column: str = "gene_symbol",
     cluster_id_column: str = "cluster",
     feature_columns: list[str] | None = None,
+    strength_column: str | None = None,
+    strength_higher_is_stronger: bool = True,
     organism_id: int = 9606,
     control_prefix: str = "nontargeting_",
     rebuild: bool = False,
@@ -51,6 +57,14 @@ def prepare_screen_bundles(
         cluster_table: DataFrame or path to a CSV/TSV/XLSX with one row per
             gene, carrying ``gene_column`` and ``cluster_id_column`` (plus any
             ``feature_columns`` to embed in the bundles).
+        strength_column: Optional per-gene perturbation-strength column — any
+            metric (AUC, e-distance, ...). The raw values never enter the
+            bundles; each gene gets a scale-free ``phenotype_strength_rank``
+            of the form ``"N/M"`` (rank among the table's M scored genes,
+            1 = strongest). A column already holding ``"N/M"`` strings passes
+            through unchanged. Genes with missing strength carry no rank.
+        strength_higher_is_stronger: Direction of the raw metric — True when
+            larger values mean a stronger phenotype (e.g. AUC, e-distance).
         control_prefix: Gene symbols with this prefix are treated as
             non-targeting controls (mapped to ``NON_TARGETING_CONTROL``
             instead of a UniProt lookup).
@@ -59,6 +73,10 @@ def prepare_screen_bundles(
     cluster_df = (
         cluster_table if hasattr(cluster_table, "columns") else load_table(cluster_table)
     )
+    if strength_column is not None:
+        cluster_df = attach_strength_ranks(
+            cluster_df, strength_column, higher_is_stronger=strength_higher_is_stronger
+        )
     bundle_dir = output_dir / f"{screen_name}_analysis" / f"{screen_name}_evidence_bundles"
 
     if rebuild or not bundle_dir.exists():
@@ -113,6 +131,37 @@ def _add_coverage(parsed: dict, bundle_path) -> dict:
     return parsed
 
 
+def _bundle_has_features(bundle: dict) -> bool:
+    return "feature_coherence" in bundle or any(
+        isinstance(g, dict) and (g.get("up_features") or g.get("down_features"))
+        for g in bundle.get("cluster_genes", [])
+    )
+
+
+def _bundle_has_strength(bundle: dict) -> bool:
+    return any(
+        isinstance(g, dict) and g.get(STRENGTH_RANK_COL)
+        for g in bundle.get("cluster_genes", [])
+    )
+
+
+def _resolve_phenotype_flag(requested, name: str, cluster_to_bundle_map: dict, probe) -> bool:
+    """Resolve an "auto"/True/False phenotype flag against the actual bundles.
+
+    The corresponding prompt steps enter the chain iff the data exists: "auto"
+    detects it, True demands it (error when absent), False strips it.
+    """
+    if requested not in ("auto", True, False):
+        raise ValueError(f"{name} must be True, False, or 'auto'; got {requested!r}")
+    present = any(
+        probe(json.loads(Path(p).read_text(encoding="utf-8")))
+        for p in cluster_to_bundle_map.values()
+    )
+    if requested is True and not present:
+        raise ValueError(f"{name}=True but no bundle carries the corresponding data")
+    return present if requested == "auto" else requested
+
+
 def analyze_screen(
     *,
     screen_name: str,
@@ -123,7 +172,8 @@ def analyze_screen(
     screen_context: dict | None = None,
     mode: str = "cot",
     mcp: bool = False,
-    include_features: bool = False,
+    include_features: bool | str = "auto",
+    include_strength: bool | str = "auto",
     component_overrides: dict[str, str] | None = None,
     original_df=None,
 ) -> dict:
@@ -141,9 +191,15 @@ def analyze_screen(
             through the same schema); use instead of writing a JSON file.
         mode: "standard" | "cot" | "stepwise" -- prompt delivery format.
         mcp: Attach PubMed literature-validation tools.
-        include_features: Feed each gene's phenotypic feature columns to the
-            model and add the feature-interpretation reasoning steps.
-            Currently supported for mode="cot" without MCP.
+        include_features: Feed each gene's up/down feature lists to the model
+            and add the feature-interpretation reasoning steps (cFC, cPC).
+            "auto" (default) includes them iff the bundles carry feature data;
+            True requires it (error when absent); False strips it. The steps
+            enter the prompt only when the data does. Supported for
+            mode="cot" (with or without MCP).
+        include_strength: Same contract for the phenotype-strength step (cPS)
+            and the per-gene ``phenotype_strength_rank`` field (bundles built
+            with ``strength_column``).
         component_overrides: {component_key: text} replacements for individual
             prompt components (see mozzarellm.prompt_components
             COMPONENT_REGISTRY) -- run your own wording for any reasoning step
@@ -156,25 +212,41 @@ def analyze_screen(
         ``cluster_df`` (the tabular view, also written as CSVs),
         ``total_cost_usd``, and ``errors`` ({cluster_id: message}).
     """
-    if include_features and (mode != "cot" or mcp):
-        raise ValueError(
-            "include_features is currently supported for mode='cot' without MCP "
-            "(the feature-interpretation reasoning steps are CoT components)"
+    if mode != "cot":
+        if include_features is True or include_strength is True:
+            raise ValueError(
+                "include_features/include_strength are supported for mode='cot' "
+                "(the phenotype reasoning steps are CoT components)"
+            )
+        features = strength = False  # "auto" resolves off where the steps don't exist
+    else:
+        features = _resolve_phenotype_flag(
+            include_features, "include_features", cluster_to_bundle_map, _bundle_has_features
+        )
+        strength = _resolve_phenotype_flag(
+            include_strength, "include_strength", cluster_to_bundle_map, _bundle_has_strength
         )
 
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
     mode_label = f"{mode}_mcp" if mcp else mode
-    if include_features:
+    if features:
         mode_label += "_feat"
+    if strength:
+        mode_label += "_strength"
 
+    component_order = (
+        build_cot_component_order(mcp=mcp, features=features, strength=strength)
+        if (features or strength)
+        else None
+    )
     system_prompt = make_cluster_analysis_system_prompt(
         screen_name=screen_name,
         screen_context_path=screen_context_path,
         screen_context=screen_context,
         mode=mode,
         mcp=mcp,
-        component_order=(list(CANONICAL_FEATURE_INTERP_COT_ORDER) if include_features else None),
+        component_order=component_order,
         component_overrides=component_overrides,
     )
     stepwise_turns = (
@@ -190,7 +262,8 @@ def analyze_screen(
             cluster_id,
             screen_name,
             cluster_to_bundle_map,
-            include_features=include_features,
+            include_features=features,
+            include_strength=strength,
         )
         try:
             parsed, raw_outputs = client.analyze(

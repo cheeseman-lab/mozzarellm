@@ -2,6 +2,44 @@ from pathlib import Path
 
 import pandas as pd
 
+STRENGTH_RANK_COL = "phenotype_strength_rank"
+
+
+def attach_strength_ranks(
+    df: pd.DataFrame, strength_column: str, *, higher_is_stronger: bool = True
+) -> pd.DataFrame:
+    """Replace a raw perturbation-strength column with scale-free "N/M" ranks.
+
+    Any metric works (AUC, e-distance, normalized fate distance, ...): values
+    are ranked across the table's scored genes, 1 = strongest, and each gene
+    gets ``phenotype_strength_rank = "N/M"``. A column already holding "N/M"
+    strings passes through unchanged. Genes with missing strength carry no
+    rank. The raw column is dropped — raw strength values never enter bundles.
+    """
+    if strength_column not in df.columns:
+        raise ValueError(f"strength_column {strength_column!r} not in cluster table")
+    df = df.copy()
+    col = df[strength_column]
+    nonnull = col.notna()
+    if not nonnull.any():
+        raise ValueError(f"strength_column {strength_column!r} has no values")
+    ranks = pd.Series(pd.NA, index=df.index, dtype=object)
+    strs = col[nonnull].astype(str).str.strip()
+    if strs.str.fullmatch(r"\d+/\d+").all():
+        ranks[nonnull] = strs
+    else:
+        vals = pd.to_numeric(col, errors="coerce")
+        scored = vals.notna()
+        if not scored.any():
+            raise ValueError(
+                f"strength_column {strength_column!r} is neither numeric nor 'N/M' rank strings"
+            )
+        m = int(scored.sum())
+        r = vals[scored].rank(ascending=not higher_is_stronger, method="min").astype(int)
+        ranks[scored] = r.map(lambda n: f"{n}/{m}")
+    df[STRENGTH_RANK_COL] = ranks
+    return df.drop(columns=[strength_column])
+
 
 def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
     """Chunk a gene-level table into smaller per-cluster DataFrames slices.

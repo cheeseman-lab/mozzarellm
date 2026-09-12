@@ -97,10 +97,18 @@ run without parsing timestamps. The screen context can be passed as a file
 - **Literature validation** (`mcp=True`): the model is given PubMed search tools
   and a validation step that checks its NOVEL_ROLE and UNCHARACTERIZED calls
   against retrieved literature.
-- **Phenotypic features** (`include_features=True`): per-gene feature columns
-  from your screen enter the bundles, and feature-interpretation reasoning
-  steps require the pathway call to be consistent with the observed phenotypes.
-  Currently supported for `mode="cot"` without MCP.
+- **Phenotypic features**: pass `feature_columns` (up/down lists per gene —
+  imaging features, DE genes, anything list-shaped) and optionally
+  `strength_column` (any perturbation-strength metric; converted to scale-free
+  `"N/M"` ranks, 1 = strongest vs non-targeting controls) to
+  `prepare_screen_bundles`. The matching reasoning steps enter the prompt
+  automatically when — and only when — the bundles carry the data
+  (`include_features` / `include_strength` default to `"auto"`): features add
+  a bounded consistency cross-check against the pathway call, strength adds a
+  cluster-level informativeness verdict (strong / mixed / weak vs controls);
+  neither overturns the call. Describe what your columns mean in
+  `screen_context.json` under `phenotype_readout` — the model reads your
+  description verbatim. Supported for `mode="cot"` (with or without MCP).
 - **Prompt customization** (`component_overrides={key: text}`): replace the
   wording of any prompt component per run (see the notebook's customization
   section); the shipped components are the benchmark-selected defaults, not a

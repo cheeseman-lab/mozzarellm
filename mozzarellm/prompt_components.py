@@ -238,6 +238,8 @@ Each evidence bundle includes a `feature_coherence` field with a per-feature bre
 across the cluster: for each feature, `n_up` / `frac_up` and `n_down` / `frac_down` of
 the cluster genes calling it differentially significant in that direction, along with
 the corresponding `up_genes` / `down_genes` lists. This is the data for this step.
+If the experimental context describes how these features were derived (what they
+measure, the ranking, the cutoff), read them in that light.
 
 You may also use the per-gene `up_features` / `down_features` lists in `cluster_genes`
 ONLY to verify that candidate "essential" features are driven by an OVERLAPPING gene
@@ -314,6 +316,43 @@ Hard guardrails:
 In the final output, include:
 - A top-level `pathway_consistency` object, per the schema:
 {PATHWAY_CONSISTENCY_OUTPUT_FORMAT}"""
+
+PHENOTYPE_STRENGTH_OUTPUT_FORMAT = """
+The top-level "phenotype_strength" field must contain:
+- "verdict": "strong" | "mixed" | "weak"
+- "median_rank": "N/M" (the cluster's median strength rank)
+- "weak_members": [gene symbols whose rank falls in the weakest quartile of the screen; empty if none]
+- "rationale": one or two sentences citing ranks; no new biology
+"""
+
+STEP_PHENOTYPE_STRENGTH = f"""PHENOTYPE STRENGTH (bounded informativeness check, anchored to the call):
+
+Each gene in `cluster_genes` may carry a `phenotype_strength_rank` field of the form
+"N/M": the rank of that gene's perturbation-phenotype strength relative to non-targeting
+controls, among the M genes in this screen; rank 1 is the strongest phenotype. If the
+experimental context describes how strength was measured, read the ranks in that light.
+
+Procedure:
+1. Summarize the rank distribution across the cluster (median rank, spread, fraction of
+   members in the strongest quartile of the screen).
+2. Verdict on the cluster's phenotypic signal:
+   - "strong": ranks concentrate toward the strong end — the clustering rests on robust
+     phenotypes.
+   - "mixed": a strong core plus weak members; name the weak members.
+   - "weak": ranks concentrate toward the weak end — the clustering may be noise-dominated.
+3. Write `rationale` (one or two sentences citing ranks).
+
+Hard guardrails:
+- Strength NEVER overturns the pathway call or any gene categorization: a coherent
+  cluster of weak phenotypes is "right call, weak signal", not a wrong call. Do not
+  modify `dominant_process` or gene categories in this step.
+- A "weak" verdict is a confidence concern and a flag for the reader, nothing more.
+- Genes without a `phenotype_strength_rank` field are omitted from the summary, not
+  treated as weak.
+
+In the final output, include:
+- A top-level `phenotype_strength` object, per the schema:
+{PHENOTYPE_STRENGTH_OUTPUT_FORMAT}"""
 
 # =============================================================================
 # CHAIN-OF-THOUGHT STEPS
@@ -419,6 +458,7 @@ COMPONENT_REGISTRY = {
     "cVer": COT_STEP_VERIFICATION,
     "cFC": STEP_FEATURE_COHERENCE,
     "cPC": STEP_PATHWAY_CONSISTENCY,
+    "cPS": STEP_PHENOTYPE_STRENGTH,
     "cO": COT_STEP_OUTPUT,
 }
 
@@ -448,15 +488,23 @@ CANONICAL_ZERO_SHOT_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]
 CANONICAL_ZERO_SHOT_MCP_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "LIT", "O"]
 CANONICAL_COT_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cO"]
 CANONICAL_COT_MCP_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "LIT", "cPSC", "cVer", "cO"]
-CANONICAL_FEATURE_INTERP_COT_ORDER = [
-    "CAT",
-    "SC",
-    "cPH",
-    "cGCR",
-    "cPri",
-    "cPSC",
-    "cVer",
-    "cFC",
-    "cPC",
-    "cO",
-]
+def build_cot_component_order(
+    mcp: bool = False, features: bool = False, strength: bool = False
+) -> list[str]:
+    """The cot component order with phenotype steps included iff their data is.
+
+    Feature-interpretation steps (cFC, cPC) and the phenotype-strength step
+    (cPS) enter the chain only when the corresponding bundle fields exist —
+    a prompt never references data the bundles don't carry. LIT keeps its
+    canonical position (after cPri); phenotype steps sit after cVer, before cO.
+    """
+    order = list(CANONICAL_COT_MCP_ORDER if mcp else CANONICAL_COT_ORDER)
+    tail = order.pop()  # cO stays last
+    if features:
+        order += ["cFC", "cPC"]
+    if strength:
+        order += ["cPS"]
+    return order + [tail]
+
+
+CANONICAL_FEATURE_INTERP_COT_ORDER = build_cot_component_order(features=True)
