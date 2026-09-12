@@ -131,32 +131,25 @@ def _add_coverage(parsed: dict, bundle_path) -> dict:
     return parsed
 
 
-def _bundle_has_features(bundle: dict) -> bool:
-    return "feature_coherence" in bundle or any(
-        isinstance(g, dict) and (g.get("up_features") or g.get("down_features"))
-        for g in bundle.get("cluster_genes", [])
-    )
-
-
-def _bundle_has_strength(bundle: dict) -> bool:
-    return any(
-        isinstance(g, dict) and g.get(STRENGTH_RANK_COL)
-        for g in bundle.get("cluster_genes", [])
-    )
-
-
-def _resolve_phenotype_flag(requested, name: str, cluster_to_bundle_map: dict, probe) -> bool:
+def _resolve_phenotype_flag(
+    requested, name: str, cluster_to_bundle_map: dict, block: str, gene_fields: tuple[str, ...]
+) -> bool:
     """Resolve an "auto"/True/False phenotype flag against the actual bundles.
 
-    The corresponding prompt steps enter the chain iff the data exists: "auto"
-    detects it, True demands it (error when absent), False strips it.
+    The matching prompt steps enter the chain iff the data exists — a bundle
+    carries the signal when it has the cluster-level ``block`` or any gene has
+    one of ``gene_fields``. "auto" detects it, True demands it (error when
+    absent), False strips it.
     """
     if requested not in ("auto", True, False):
         raise ValueError(f"{name} must be True, False, or 'auto'; got {requested!r}")
-    present = any(
-        probe(json.loads(Path(p).read_text(encoding="utf-8")))
-        for p in cluster_to_bundle_map.values()
-    )
+    present = False
+    for path in cluster_to_bundle_map.values():
+        bundle = json.loads(Path(path).read_text(encoding="utf-8"))
+        genes = [g for g in bundle.get("cluster_genes", []) if isinstance(g, dict)]
+        if block in bundle or any(g.get(f) for g in genes for f in gene_fields):
+            present = True
+            break
     if requested is True and not present:
         raise ValueError(f"{name}=True but no bundle carries the corresponding data")
     return present if requested == "auto" else requested
@@ -221,10 +214,18 @@ def analyze_screen(
         features = strength = False  # "auto" resolves off where the steps don't exist
     else:
         features = _resolve_phenotype_flag(
-            include_features, "include_features", cluster_to_bundle_map, _bundle_has_features
+            include_features,
+            "include_features",
+            cluster_to_bundle_map,
+            "feature_coherence",
+            ("up_features", "down_features"),
         )
         strength = _resolve_phenotype_flag(
-            include_strength, "include_strength", cluster_to_bundle_map, _bundle_has_strength
+            include_strength,
+            "include_strength",
+            cluster_to_bundle_map,
+            "phenotype_strength",
+            (STRENGTH_RANK_COL,),
         )
 
     run_dir = Path(run_dir)

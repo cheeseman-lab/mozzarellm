@@ -41,6 +41,41 @@ def attach_strength_ranks(
     return df.drop(columns=[strength_column])
 
 
+def compute_phenotype_strength(df: pd.DataFrame, gene_column: str) -> dict:
+    """Summarize a cluster's phenotype-strength ranks as a discrete table.
+
+    Mirrors compute_feature_coherence: the aggregate the model reads is computed
+    here, so the strength step is recall over a table rather than arithmetic.
+    Ranks are the "N/M" strings in ``STRENGTH_RANK_COL``; genes without one are
+    left out of the summary.
+    """
+    ranked = []
+    screen_size = None
+    for _, row in df.iterrows():
+        value = row.get(STRENGTH_RANK_COL)
+        if not isinstance(value, str) or "/" not in value:
+            continue
+        n, m = (int(x) for x in value.split("/"))
+        screen_size = m
+        ranked.append((n, str(row[gene_column])))
+    ranked.sort()
+    if not ranked:
+        return {"n_ranked": 0, "screen_size": None, "ranked_genes": []}
+    ranks = [n for n, _ in ranked]
+    quartile = screen_size / 4
+    median = ranks[len(ranks) // 2]
+    return {
+        "n_ranked": len(ranked),
+        "screen_size": screen_size,
+        "median_rank": f"{median}/{screen_size}",
+        "strongest_quartile_frac": round(sum(1 for n in ranks if n <= quartile) / len(ranks), 3),
+        "weakest_quartile_frac": round(
+            sum(1 for n in ranks if n > 3 * quartile) / len(ranks), 3
+        ),
+        "ranked_genes": [{"gene": g, "rank": f"{n}/{screen_size}"} for n, g in ranked],
+    }
+
+
 def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
     """Chunk a gene-level table into smaller per-cluster DataFrames slices.
 

@@ -320,35 +320,37 @@ In the final output, include:
 PHENOTYPE_STRENGTH_OUTPUT_FORMAT = """
 The top-level "phenotype_strength" field must contain:
 - "verdict": "strong" | "mixed" | "weak"
-- "median_rank": "N/M" (the cluster's median strength rank)
-- "weak_members": [gene symbols whose rank falls in the weakest quartile of the screen; empty if none]
-- "rationale": one or two sentences citing ranks; no new biology
+- "weak_members": [gene symbols from the weakest quartile of the screen; empty if none]
+- "rationale": one or two sentences citing the table's ranks and fractions; no new biology
+- "confidence_revision": null | one sentence (only set when the strength profile materially changes confidence in dominant_process)
 """
 
-STEP_PHENOTYPE_STRENGTH = f"""PHENOTYPE STRENGTH (bounded informativeness check, anchored to the call):
+STEP_PHENOTYPE_STRENGTH = f"""PHENOTYPE STRENGTH (recall over a discrete table, then a bounded verdict):
 
-Each gene in `cluster_genes` may carry a `phenotype_strength_rank` field of the form
-"N/M": the rank of that gene's perturbation-phenotype strength relative to non-targeting
-controls, among the M genes in this screen; rank 1 is the strongest phenotype. If the
-experimental context describes how strength was measured, read the ranks in that light.
+Each evidence bundle includes a `phenotype_strength` table: per-gene perturbation-phenotype
+ranks of the form "N/M" — rank among the M genes of this screen by strength relative to
+non-targeting controls, 1 = strongest — plus `median_rank`, `strongest_quartile_frac`,
+`weakest_quartile_frac`, and the `ranked_genes` list (strongest first). This is the data for
+this step. If the experimental context describes how strength was measured, read the ranks
+in that light.
 
 Procedure:
-1. Summarize the rank distribution across the cluster (median rank, spread, fraction of
-   members in the strongest quartile of the screen).
-2. Verdict on the cluster's phenotypic signal:
+1. Verdict on the cluster's phenotypic signal, from the table:
    - "strong": ranks concentrate toward the strong end — the clustering rests on robust
      phenotypes.
-   - "mixed": a strong core plus weak members; name the weak members.
+   - "mixed": a strong core plus weak members; list the weak members.
    - "weak": ranks concentrate toward the weak end — the clustering may be noise-dominated.
-3. Write `rationale` (one or two sentences citing ranks).
+2. Write `rationale` (one or two sentences citing `median_rank` and the quartile fractions).
+3. Set `confidence_revision` only when the strength profile materially changes confidence in
+   `dominant_process` — a coherent call resting on weak phenotypes deserves tempered
+   confidence, stated in one sentence. Otherwise leave it null.
 
 Hard guardrails:
-- Strength NEVER overturns the pathway call or any gene categorization: a coherent
-  cluster of weak phenotypes is "right call, weak signal", not a wrong call. Do not
-  modify `dominant_process` or gene categories in this step.
-- A "weak" verdict is a confidence concern and a flag for the reader, nothing more.
-- Genes without a `phenotype_strength_rank` field are omitted from the summary, not
-  treated as weak.
+- Strength tempers confidence; it never re-calls the pathway or re-categorizes a gene. A
+  coherent cluster of weak phenotypes is "right call, weak signal". Do not modify
+  `dominant_process` or gene categories in this step.
+- Cite only ranks present in the table; genes absent from `ranked_genes` carry no rank and
+  are not treated as weak.
 
 In the final output, include:
 - A top-level `phenotype_strength` object, per the schema:

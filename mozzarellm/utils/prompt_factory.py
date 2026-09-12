@@ -252,24 +252,37 @@ def make_cluster_analysis_system_prompt(
     return prompt
 
 
-# Screen-derived per-gene feature data plus the aggregate. Stripped from the
-# bundle before it reaches the model unless a feature-interpretation component is
-# active, so features never enter the prompt as uninterpreted noise.
+# Screen-derived per-gene phenotype data plus the aggregates. Stripped from the
+# bundle before it reaches the model unless the matching reasoning component is
+# active, so phenotype data never enters the prompt as uninterpreted noise.
 FEATURE_FIELDS = ("up_features", "down_features", "phenotypic_strength")
 
 
-def strip_feature_fields(bundle_obj: dict, fields: tuple[str, ...] = FEATURE_FIELDS) -> None:
-    """Remove screen-derived feature data from an evidence bundle in place.
+def strip_feature_fields(
+    bundle_obj: dict,
+    fields: tuple[str, ...] = FEATURE_FIELDS,
+    *,
+    features: bool = True,
+    strength: bool = True,
+) -> None:
+    """Remove screen-derived phenotype data from an evidence bundle in place.
 
     fields names the per-gene feature columns to remove; the default matches
     the standard builder output. Bundles built with custom feature_columns
     (build_evidence_bundles) must pass their own names or those columns
-    survive the strip.
+    survive the strip. features/strength select which signal to strip (each
+    with its per-gene fields and its cluster-level aggregate).
     """
-    bundle_obj.pop("feature_coherence", None)
+    per_gene: tuple[str, ...] = ()
+    if features:
+        bundle_obj.pop("feature_coherence", None)
+        per_gene += fields
+    if strength:
+        bundle_obj.pop("phenotype_strength", None)
+        per_gene += (STRENGTH_RANK_COL,)
     for gene in bundle_obj.get("cluster_genes", []):
         if isinstance(gene, dict):
-            for field in fields:
+            for field in per_gene:
                 gene.pop(field, None)
 
 
@@ -313,12 +326,8 @@ def make_single_cluster_analysis_user_prompt(
 
     # Build a user prompt from the bundle JSON
     bundle_obj = json.loads(Path(BUNDLE_PATH).read_text(encoding="utf-8"))
-    if not include_features:
-        strip_feature_fields(bundle_obj)  # no feature-interp component => no feature leak
-    if not include_strength:
-        for gene in bundle_obj.get("cluster_genes", []):
-            if isinstance(gene, dict):
-                gene.pop(STRENGTH_RANK_COL, None)
+    # no matching reasoning component => no phenotype leak
+    strip_feature_fields(bundle_obj, features=not include_features, strength=not include_strength)
     strip_source_fields(bundle_obj, source)  # master bundle -> the run's evidence source
     bundle_text = json.dumps(bundle_obj, ensure_ascii=False)
 

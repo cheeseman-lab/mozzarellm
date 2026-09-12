@@ -363,3 +363,42 @@ def test_include_strength_true_requires_data(tmp_path):
             mode="cot",
             include_strength=True,
         )
+
+
+def test_phenotype_strength_block_is_recall_table():
+    import pandas as pd
+
+    from mozzarellm.utils.cluster_utils import STRENGTH_RANK_COL, compute_phenotype_strength
+
+    df = pd.DataFrame(
+        {"gene_symbol": ["a", "b", "c", "d"], STRENGTH_RANK_COL: ["10/100", "90/100", None, "30/100"]}
+    )
+    block = compute_phenotype_strength(df, gene_column="gene_symbol")
+    assert block["n_ranked"] == 3 and block["screen_size"] == 100
+    assert block["median_rank"] == "30/100"
+    assert block["strongest_quartile_frac"] == round(1 / 3, 3)
+    assert block["weakest_quartile_frac"] == round(1 / 3, 3)
+    assert [g["gene"] for g in block["ranked_genes"]] == ["a", "d", "b"]
+    assert compute_phenotype_strength(df.iloc[[2]], gene_column="gene_symbol")["n_ranked"] == 0
+
+
+def test_strip_selects_each_phenotype_signal():
+    from mozzarellm.utils.prompt_factory import strip_feature_fields
+
+    def bundle():
+        return {
+            "feature_coherence": {},
+            "phenotype_strength": {},
+            "cluster_genes": [
+                {"gene_symbol": "x", "up_features": "f", "phenotype_strength_rank": "1/9"}
+            ],
+        }
+
+    b = bundle()
+    strip_feature_fields(b, features=False, strength=True)
+    assert "feature_coherence" in b and "phenotype_strength" not in b
+    assert b["cluster_genes"][0].keys() == {"gene_symbol", "up_features"}
+    b = bundle()
+    strip_feature_fields(b, features=True, strength=False)
+    assert "phenotype_strength" in b and "feature_coherence" not in b
+    assert b["cluster_genes"][0].keys() == {"gene_symbol", "phenotype_strength_rank"}
