@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from datetime import datetime
 from pathlib import Path
+
+import pandas as pd
 
 from mozzarellm.pipeline.bundle_builder import (
     build_evidence_bundles,
@@ -29,7 +32,8 @@ from mozzarellm.utils.cluster_utils import (
     build_cluster_id_to_bundle_path,
 )
 from mozzarellm.utils.io import load_table
-from mozzarellm.utils.llm_analysis_utils import save_cluster_analysis
+from mozzarellm.utils.llm_analysis_utils import process_cluster_response, save_cluster_analysis
+from mozzarellm.utils.pricing import compute_cost
 from mozzarellm.utils.trace import save_trace
 
 
@@ -47,6 +51,8 @@ def prepare_screen_bundles(
     control_prefix: str = "nontargeting_",
     rebuild: bool = False,
 ) -> dict:
+    # organism_id is the NCBI taxonomy id the UniProt lookups are restricted to
+    # (9606 human, 10090 mouse).
     """Cluster table -> stable accessions -> evidence bundles -> {cluster_id: path}.
 
     Bundles are cached under ``<output_dir>/<screen_name>_analysis/``; an
@@ -65,6 +71,8 @@ def prepare_screen_bundles(
             rank.
         strength_higher_is_stronger: Direction of the raw metric — True when
             larger values mean a stronger phenotype (e.g. AUC, e-distance).
+        organism_id: NCBI taxonomy id for the UniProt lookups (9606 human,
+            10090 mouse).
         control_prefix: Gene symbols with this prefix are treated as
             non-targeting controls (mapped to ``NON_TARGETING_CONTROL``
             instead of a UniProt lookup).
@@ -169,6 +177,8 @@ def analyze_screen(
     component_overrides: dict[str, str] | None = None,
     component_order: list[str] | None = None,
     original_df=None,
+    resume: bool = False,
+    dry_run: bool = False,
 ) -> dict:
     """Analyze every cluster in a screen and write the run's outputs.
 
@@ -204,11 +214,19 @@ def analyze_screen(
             (cFC/cPC, cPS), and their data must then exist in the bundles.
         original_df: Optional per-cluster metadata table (must carry
             ``cluster_id``); its columns merge into the output tables.
+        resume: Skip clusters whose ``traces/cluster_<id>.json`` in
+            ``run_dir`` already holds a response; their results are re-read
+            from the trace at no cost (``resumed`` lists them).
+        dry_run: Assemble every prompt, write them under
+            ``run_dir/prompts_used/`` and return per-cluster token and cost
+            estimates (``estimates``; input side, ~4 chars per token) without
+            calling the model.
 
     Returns:
         dict with ``results`` (per-cluster parsed JSON), ``gene_df`` /
         ``cluster_df`` (the tabular view, also written as CSVs),
-        ``total_cost_usd``, and ``errors`` ({cluster_id: message}).
+        ``total_cost_usd``, ``errors`` ({cluster_id: message}), ``resumed``,
+        and, for a dry run, ``estimates``.
     """
     if component_order is not None:
         features = _resolve_phenotype_flag(
@@ -265,58 +283,76 @@ def analyze_screen(
         else None
     )
 
+    if dry_run:
+        return _dry_run(
+            run_dir,
+            screen_name,
+            client,
+            system_prompt,
+            stepwise_turns,
+            cluster_to_bundle_map,
+            features,
+            strength,
+        )
+
     results: dict = {}
     errors: dict = {}
+    resumed: list[str] = []
     total_cost = 0.0
     for cluster_id in cluster_to_bundle_map:
         cluster_id = str(cluster_id)
-        user_prompt = make_single_cluster_analysis_user_prompt(
-            cluster_id,
-            screen_name,
-            cluster_to_bundle_map,
-            include_features=features,
-            include_strength=strength,
-        )
-        try:
-            parsed, raw_outputs = client.analyze(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                mode=mode,
-                mcp=mcp,
-                **({"stepwise_turns": stepwise_turns} if stepwise_turns is not None else {}),
+        prior = _prior_response(run_dir, cluster_id) if resume else None
+        if prior is not None:
+            parsed = process_cluster_response(prior)
+            resumed.append(cluster_id)
+        else:
+            user_prompt = make_single_cluster_analysis_user_prompt(
+                cluster_id,
+                screen_name,
+                cluster_to_bundle_map,
+                include_features=features,
+                include_strength=strength,
             )
-        except Exception as e:  # noqa: BLE001 -- one bad cluster must not kill the run
-            errors[cluster_id] = str(e)
+            try:
+                parsed, raw_outputs = client.analyze(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    mode=mode,
+                    mcp=mcp,
+                    **({"stepwise_turns": stepwise_turns} if stepwise_turns is not None else {}),
+                )
+            except Exception as e:  # noqa: BLE001 -- one bad cluster must not kill the run
+                errors[cluster_id] = str(e)
+                save_trace(
+                    run_dir,
+                    cluster_id,
+                    model=client.model,
+                    mode=mode_label,
+                    raw_response="",
+                    error=str(e),
+                )
+                logging.warning(f"Cluster {cluster_id} failed: {e}")
+                continue
+
             save_trace(
                 run_dir,
                 cluster_id,
                 model=client.model,
                 mode=mode_label,
-                raw_response="",
-                error=str(e),
+                raw_response=raw_outputs.get("response_text", ""),
+                tool_calls=raw_outputs.get("tool_calls", []),
+                elapsed_s=raw_outputs.get("elapsed_s"),
+                input_tokens=raw_outputs.get("input_tokens"),
+                output_tokens=raw_outputs.get("output_tokens"),
+                cost_usd=raw_outputs.get("cost_usd"),
+                pricing_warning=raw_outputs.get("pricing_warning"),
+                schema_warnings=raw_outputs.get("schema_warnings"),
+                error=raw_outputs.get("error"),
+                steps=raw_outputs.get("steps"),
             )
-            logging.warning(f"Cluster {cluster_id} failed: {e}")
-            continue
-
-        save_trace(
-            run_dir,
-            cluster_id,
-            model=client.model,
-            mode=mode_label,
-            raw_response=raw_outputs.get("response_text", ""),
-            tool_calls=raw_outputs.get("tool_calls", []),
-            elapsed_s=raw_outputs.get("elapsed_s"),
-            input_tokens=raw_outputs.get("input_tokens"),
-            output_tokens=raw_outputs.get("output_tokens"),
-            cost_usd=raw_outputs.get("cost_usd"),
-            pricing_warning=raw_outputs.get("pricing_warning"),
-            schema_warnings=raw_outputs.get("schema_warnings"),
-            error=raw_outputs.get("error"),
-            steps=raw_outputs.get("steps"),
-        )
-        total_cost += raw_outputs.get("cost_usd") or 0.0
-        if raw_outputs.get("error"):
-            errors[cluster_id] = raw_outputs["error"]
+            total_cost += raw_outputs.get("cost_usd") or 0.0
+            if raw_outputs.get("error"):
+                errors[cluster_id] = raw_outputs["error"]
         if parsed is not None:
             parsed = _add_coverage(parsed, cluster_to_bundle_map[cluster_id])
             # An empty classification with a pathway call is a parse failure,
@@ -334,6 +370,7 @@ def analyze_screen(
         results,
         out_file_base=str(run_dir / screen_name),
         original_df=original_df,
+        gene_extra=_strength_ranks(cluster_to_bundle_map) if strength else None,
     )
     latest = {
         "run_dir": run_dir.name,
@@ -348,4 +385,84 @@ def analyze_screen(
         "run_dir": run_dir,
         "total_cost_usd": round(total_cost, 4),
         "errors": errors,
+        "resumed": resumed,
+    }
+
+
+def _prior_response(run_dir: Path, cluster_id: str) -> str | None:
+    """The raw response recorded for this cluster in ``run_dir``, if it completed."""
+    path = run_dir / "traces" / f"cluster_{cluster_id}.json"
+    if not path.exists():
+        return None
+    trace = json.loads(path.read_text(encoding="utf-8"))
+    if trace.get("error") or not trace.get("raw_response"):
+        return None
+    return trace["raw_response"]
+
+
+def _strength_ranks(cluster_to_bundle_map: dict) -> dict:
+    """{cluster_id: {gene: {"phenotype_strength_rank": "N/M"}}} from the bundles."""
+    out: dict = {}
+    for cluster_id, path in cluster_to_bundle_map.items():
+        bundle = json.loads(Path(path).read_text(encoding="utf-8"))
+        column = (bundle.get("phenotype_strength") or {}).get("column")
+        if not column:
+            continue
+        out[str(cluster_id)] = {
+            g["gene_symbol"]: {"phenotype_strength_rank": g[column]}
+            for g in bundle.get("cluster_genes", [])
+            if isinstance(g, dict) and g.get("gene_symbol") and isinstance(g.get(column), str)
+        }
+    return out
+
+
+def _dry_run(
+    run_dir,
+    screen_name,
+    client,
+    system_prompt,
+    stepwise_turns,
+    cluster_to_bundle_map,
+    features,
+    strength,
+) -> dict:
+    """Write every prompt and estimate the input side; no model call."""
+    prompts_dir = run_dir / "prompts_used"
+    prompts_dir.mkdir(parents=True, exist_ok=True)
+    (prompts_dir / "system_prompt.txt").write_text(system_prompt, encoding="utf-8")
+    turns_chars = sum(len(t["content"]) for t in stepwise_turns or [])
+    rows = []
+    for cluster_id, path in cluster_to_bundle_map.items():
+        cluster_id = str(cluster_id)
+        user_prompt = make_single_cluster_analysis_user_prompt(
+            cluster_id,
+            screen_name,
+            cluster_to_bundle_map,
+            include_features=features,
+            include_strength=strength,
+        )
+        (prompts_dir / f"user_prompt_cluster_{cluster_id}.txt").write_text(
+            user_prompt, encoding="utf-8"
+        )
+        n_genes = len(json.loads(Path(path).read_text(encoding="utf-8")).get("cluster_genes", []))
+        tokens = math.ceil((len(system_prompt) + len(user_prompt) + turns_chars) / 4)
+        cost, _ = compute_cost(client.model, tokens, 0)
+        rows.append(
+            {
+                "cluster_id": cluster_id,
+                "n_genes": n_genes,
+                "est_input_tokens": tokens,
+                "est_input_cost_usd": cost,
+            }
+        )
+    estimates = pd.DataFrame(rows)
+    return {
+        "results": {},
+        "gene_df": pd.DataFrame(),
+        "cluster_df": pd.DataFrame(),
+        "run_dir": run_dir,
+        "total_cost_usd": 0.0,
+        "errors": {},
+        "resumed": [],
+        "estimates": estimates,
     }

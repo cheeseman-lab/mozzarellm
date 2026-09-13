@@ -463,3 +463,84 @@ def test_custom_component_order_is_used_verbatim(tmp_path):
             mode="cot",
             component_order=short[:-1] + ["cPS", "cO"],  # asks for strength the bundles lack
         )
+
+
+def test_resume_reuses_recorded_responses(tmp_path):
+    class _Recorded(_StubClient):  # a trace carries the real response text
+        def analyze(self, **kw):
+            parsed, raw = super().analyze(**kw)
+            return parsed, {**raw, "response_text": json.dumps(parsed)}
+
+    first = _Recorded()
+    run_dir = tmp_path / "run"
+    out = analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=first,
+        run_dir=run_dir,
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+    )
+    assert len(first.calls) == 2 and out["resumed"] == []
+
+    class _Never(_StubClient):
+        def analyze(self, **kw):
+            raise AssertionError("resume must not call the model")
+
+    again = analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=_Never(),
+        run_dir=run_dir,
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+        resume=True,
+    )
+    assert sorted(again["resumed"]) == ["21", "37"]
+    assert again["total_cost_usd"] == 0.0
+    assert set(again["results"]) == {"21", "37"} and len(again["gene_df"]) == 4
+
+
+def test_dry_run_writes_prompts_and_estimates_without_calls(tmp_path):
+    class _Never(_StubClient):
+        def analyze(self, **kw):
+            raise AssertionError("dry_run must not call the model")
+
+    out = analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=_Never(),
+        run_dir=tmp_path / "dry",
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+        dry_run=True,
+    )
+    est = out["estimates"]
+    assert list(est["cluster_id"]) == ["21", "37"] and (est["est_input_tokens"] > 0).all()
+    assert (tmp_path / "dry" / "prompts_used" / "system_prompt.txt").exists()
+    assert (tmp_path / "dry" / "prompts_used" / "user_prompt_cluster_21.txt").exists()
+    assert not (tmp_path / "latest.json").exists() and out["results"] == {}
+
+
+def test_gene_table_carries_the_strength_rank(tmp_path):
+    p = tmp_path / "cluster_21__bundle.json"
+    p.write_text(
+        json.dumps(
+            {
+                "phenotype_strength": {"column": "auc", "n_ranked": 1, "screen_size": 9},
+                "cluster_genes": [
+                    {"gene_symbol": "RPL3", "auc": "2/9", "UniProt_functional_annotation": "r"}
+                ],
+            }
+        )
+    )
+    out = analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map={"21": p},
+        client=_StubClient(),
+        run_dir=tmp_path / "run",
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+    )
+    row = out["gene_df"][out["gene_df"]["gene"] == "RPL3"].iloc[0]
+    assert row["phenotype_strength_rank"] == "2/9"

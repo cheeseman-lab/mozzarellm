@@ -308,7 +308,12 @@ def _cluster_row(cluster_id, analysis):
 
 
 def save_cluster_analysis(
-    clusters_dict, out_file_base=None, original_df=None, include_raw=True, save_outputs=True
+    clusters_dict,
+    out_file_base=None,
+    original_df=None,
+    include_raw=True,
+    save_outputs=True,
+    gene_extra=None,
 ):
     """
     Process and optionally save cluster analysis results to JSON and multiple CSV formats.
@@ -318,6 +323,8 @@ def save_cluster_analysis(
         clusters_dict: Dictionary with cluster analysis results in JSON format
         out_file_base: Base filename for output files (without extension), required if save_outputs=True
         original_df: Optional original DataFrame with cluster_id and other original data
+        gene_extra: Optional {cluster_id: {gene: {column: value}}} of per-gene
+            columns to add to the gene table (e.g. the phenotype-strength rank)
         include_raw: Whether to include raw text in JSON output
         save_outputs: Whether to write results to disk (default: True)
 
@@ -399,8 +406,17 @@ def save_cluster_analysis(
     # Gene-level and cluster-level tables (the user-facing view of the run).
     if combined_clusters:
         gene_rows, cluster_rows = [], []
+        extra_columns: list[str] = []
         for cluster_id, analysis in combined_clusters.items():
-            gene_rows.extend(_gene_rows(cluster_id, analysis))
+            rows = _gene_rows(cluster_id, analysis)
+            for row in rows:
+                for col, val in (
+                    ((gene_extra or {}).get(str(cluster_id)) or {}).get(row["gene"], {}).items()
+                ):
+                    row[col] = val
+                    if col not in extra_columns:
+                        extra_columns.append(col)
+            gene_rows.extend(rows)
             cluster_rows.append(_cluster_row(cluster_id, analysis))
 
         gene_columns = [
@@ -412,7 +428,7 @@ def save_cluster_analysis(
             "evidence",
             "dominant_process",
             "pathway_confidence",
-        ]
+        ] + extra_columns
         gene_df = pd.DataFrame(gene_rows, columns=gene_columns)
         cluster_df = pd.DataFrame(cluster_rows)
 

@@ -28,13 +28,18 @@ literature tool calls, tokens, cost) is written to disk for auditing.
 
 ## Installation
 
+Into an existing environment (Python 3.11+); a PyPI release is planned, until
+then install from the `cot-mcp` branch:
+
 ```bash
-git clone https://github.com/cheeseman-lab/mozzarellm.git
-cd mozzarellm
-conda env create -f environment.yml
-conda activate mozzarellm
-pip install -e .
+python -m pip install "mozzarellm @ git+https://github.com/cheeseman-lab/mozzarellm.git@cot-mcp"
 ```
+
+Claude models work out of the box; add `[openai]` or `[gemini]` to the
+requirement for those providers (`"mozzarellm[openai] @ git+..."`). Use
+`python -m pip` explicitly so the install lands in the active interpreter.
+For development, clone the repo and use `environment.yml`
+(`conda env create -f environment.yml && python -m pip install -e ".[dev]"`).
 
 Add an Anthropic API key (OpenAI and Google models are also supported) to a
 `.env` file at the repo root:
@@ -80,8 +85,8 @@ Each run directory contains the complete record and the tables to read:
 
 | File | Contents |
 |---|---|
-| `<screen>_clusters.csv` | one row per cluster: `cluster_id`, `dominant_process`, `pathway_confidence`, `summary`, `n_genes`, `n_classified`, `n_established`, `n_novel_role`, `n_uncharacterized`, per-category gene lists (`;`-joined), `missed_genes`, `classification_completeness` |
-| `<screen>_genes.csv` | one row per gene: `gene`, `cluster_id`, `category`, `subclass`, `rationale`, `evidence`, `dominant_process`, `pathway_confidence` |
+| `<screen>_clusters.csv` | one row per cluster: `cluster_id`, `dominant_process`, `pathway_confidence`, `summary`, the phenotype verdicts when the run had that data (`feature_signature`, `pathway_consistency`, `phenotype_strength`, `confidence_revision`), `n_genes`, `n_classified`, `n_established`, `n_novel_role`, `n_uncharacterized`, per-category gene lists (`;`-joined), `missed_genes`, `classification_completeness` |
+| `<screen>_genes.csv` | one row per gene: `gene`, `cluster_id`, `category`, `subclass`, `rationale`, `evidence`, `dominant_process`, `pathway_confidence`, plus `phenotype_strength_rank` (`"N/M"`) when a `strength_column` was given |
 | `<screen>_clusters.json` | parsed structured output per cluster; `metadata.schema_version` identifies the structure for downstream readers |
 | `traces/cluster_<id>.json` | full per-call record: raw response, tool calls, tokens, cost |
 
@@ -89,6 +94,11 @@ A successful run also writes `latest.json` next to the run directory
 (`{"run_dir", "date", "screen_name"}`), so downstream code can find the newest
 run without parsing timestamps. The screen context can be passed as a file
 (`screen_context_path`) or an in-memory dict (`screen_context`).
+`analyze_screen(..., resume=True)` re-reads clusters already answered in that
+`run_dir` instead of calling the model again; `dry_run=True` writes every
+prompt under `run_dir/prompts_used/` and returns per-cluster input-token and
+cost estimates with no API call. `organism_id` (default 9606; 10090 for mouse)
+restricts the UniProt lookups.
 
 ## Analysis options
 

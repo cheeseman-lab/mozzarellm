@@ -23,18 +23,21 @@ dependencies = [
     "openpyxl",
     "python-dotenv",
     "requests",
-    "ipykernel",
-    "openai>=1.70.0",
-    "google-genai>=1.50.0",
     "anthropic>=0.49.0",
     "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
+openai = ["openai>=1.70.0"]
+gemini = ["google-genai>=1.50.0"]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.8.0",
+    "ipykernel",
+    "nbconvert",
+    "openai>=1.70.0",
+    "google-genai>=1.50.0",
 ]
 
 [project.urls]
