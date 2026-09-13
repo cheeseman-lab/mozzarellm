@@ -298,24 +298,21 @@ def test_control_prefix_is_configurable():
 def test_attach_strength_ranks_numeric_and_passthrough():
     import pandas as pd
 
-    from mozzarellm.utils.cluster_utils import STRENGTH_RANK_COL, attach_strength_ranks
+    from mozzarellm.utils.cluster_utils import attach_strength_ranks
 
     df = pd.DataFrame({"gene_symbol": list("abcd"), "auc": [0.9, 0.5, None, 0.7]})
-    out = attach_strength_ranks(df, "auc")
-    assert out[STRENGTH_RANK_COL].tolist()[:2] == ["1/3", "3/3"]
-    assert pd.isna(out[STRENGTH_RANK_COL].iloc[2])  # unscored gene carries no rank
-    assert out[STRENGTH_RANK_COL].iloc[3] == "2/3"
-    assert "auc" not in out.columns  # raw values never enter bundles
+    out = attach_strength_ranks(df, "auc")  # the user's column keeps its name
+    assert out["auc"].tolist()[:2] == ["1/3", "3/3"]
+    assert pd.isna(out["auc"].iloc[2])  # unscored gene carries no rank
+    assert out["auc"].iloc[3] == "2/3"  # raw values never enter bundles
 
     lower_is_stronger = attach_strength_ranks(
         pd.DataFrame({"g": ["x", "y"], "dist": [0.1, 0.9]}), "dist", higher_is_stronger=False
     )
-    assert lower_is_stronger[STRENGTH_RANK_COL].tolist() == ["1/2", "2/2"]
+    assert lower_is_stronger["dist"].tolist() == ["1/2", "2/2"]
 
-    prerank = attach_strength_ranks(
-        pd.DataFrame({"g": ["x"], "s": ["669/5299"]}), "s"
-    )
-    assert prerank[STRENGTH_RANK_COL].tolist() == ["669/5299"]
+    prerank = attach_strength_ranks(pd.DataFrame({"g": ["x"], "s": ["669/5299"]}), "s")
+    assert prerank["s"].tolist() == ["669/5299"]
 
 
 def test_strength_step_enters_prompt_iff_ranks_present(tmp_path):
@@ -324,9 +321,11 @@ def test_strength_step_enters_prompt_iff_ranks_present(tmp_path):
     for cid, rank in (("21", "12/5299"), ("37", None)):
         p = tmp_path / f"cluster_{cid}__bundle.json"
         gene = {"gene_symbol": "RPL3", "UniProt_functional_annotation": "ribosomal protein"}
+        bundle = {"cluster_genes": [gene]}
         if rank:
-            gene["phenotype_strength_rank"] = rank
-        p.write_text(json.dumps({"cluster_genes": [gene]}))
+            gene["auc"] = rank
+            bundle["phenotype_strength"] = {"column": "auc", "n_ranked": 1, "screen_size": 5299}
+        p.write_text(json.dumps(bundle))
         bundles[cid] = p
     client = _StubClient()
     analyze_screen(
@@ -374,29 +373,30 @@ def test_include_strength_true_requires_data(tmp_path):
 def test_phenotype_strength_block_is_recall_table():
     import pandas as pd
 
-    from mozzarellm.utils.cluster_utils import STRENGTH_RANK_COL, compute_phenotype_strength
+    from mozzarellm.utils.cluster_utils import compute_phenotype_strength
 
-    df = pd.DataFrame(
-        {"gene_symbol": ["a", "b", "c", "d"], STRENGTH_RANK_COL: ["10/100", "90/100", None, "30/100"]}
-    )
-    block = compute_phenotype_strength(df, gene_column="gene_symbol")
+    df = pd.DataFrame({"gene_symbol": ["a", "b", "c", "d"], "auc": ["10/100", "90/100", None, "30/100"]})
+    block = compute_phenotype_strength(df, gene_column="gene_symbol", strength_column="auc")
+    assert block["column"] == "auc"  # the table names the user's column
     assert block["n_ranked"] == 3 and block["screen_size"] == 100
     assert block["median_rank"] == "30/100"
     assert block["strongest_quartile_frac"] == round(1 / 3, 3)
     assert block["weakest_quartile_frac"] == round(1 / 3, 3)
     assert [g["gene"] for g in block["ranked_genes"]] == ["a", "d", "b"]
-    assert compute_phenotype_strength(df.iloc[[2]], gene_column="gene_symbol")["n_ranked"] == 0
+    empty = compute_phenotype_strength(df.iloc[[2]], gene_column="gene_symbol", strength_column="auc")
+    assert empty["n_ranked"] == 0
 
 
 def test_strip_selects_each_phenotype_signal():
     from mozzarellm.utils.prompt_factory import strip_feature_fields
 
+    # The user's column names come from the aggregates themselves.
     def bundle():
         return {
-            "feature_coherence": {},
-            "phenotype_strength": {},
+            "feature_coherence": {"columns": ["de_up", "de_down"]},
+            "phenotype_strength": {"column": "edist"},
             "cluster_genes": [
-                {"gene_symbol": "x", "up_features": "f", "phenotype_strength_rank": "1/9"}
+                {"gene_symbol": "x", "de_up": "f", "de_down": "", "edist": "1/9"}
             ],
         }
 
@@ -407,4 +407,4 @@ def test_strip_selects_each_phenotype_signal():
     b = bundle()
     strip_feature_fields(b, features=True, strength=False)
     assert "phenotype_strength" in b and "feature_coherence" not in b
-    assert b["cluster_genes"][0].keys() == {"gene_symbol", "phenotype_strength_rank"}
+    assert b["cluster_genes"][0].keys() == {"gene_symbol", "edist"}

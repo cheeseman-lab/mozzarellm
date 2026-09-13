@@ -29,7 +29,6 @@ from mozzarellm.prompt_components import (
     COMPONENT_REGISTRY,
     derive_cot_overrides,
 )
-from mozzarellm.utils.cluster_utils import STRENGTH_RANK_COL
 from mozzarellm.utils.screen_context_utils import load_screen_context_json, validate_screen_context
 
 VALID_MODES = ("standard", "cot", "stepwise")
@@ -252,11 +251,12 @@ def make_cluster_analysis_system_prompt(
     return prompt
 
 
-# Screen-derived per-gene phenotype data. Never reaches the model: the feature
-# steps read the bounded cluster-level feature_coherence table (which carries the
-# supporting gene lists), and raw strength is replaced by the rank. The
-# aggregates are stripped too unless the matching reasoning component is active.
-FEATURE_FIELDS = ("up_features", "down_features", "phenotypic_strength")
+# Per-gene feature lists never reach the model: the feature steps read the
+# bounded cluster-level feature_coherence table (which carries the supporting
+# gene lists). Each aggregate records the per-gene columns it was built from,
+# so the strip knows the user's column names; this default covers bundles
+# built before that record existed.
+FEATURE_FIELDS = ("up_features", "down_features")
 
 
 def strip_feature_fields(
@@ -268,18 +268,20 @@ def strip_feature_fields(
 ) -> None:
     """Remove screen-derived phenotype data from an evidence bundle in place.
 
-    fields names the per-gene feature columns, always removed; the default
-    matches the standard builder output. Bundles built with custom
-    feature_columns (build_evidence_bundles) must pass their own names or
-    those columns survive the strip. features/strength select which
-    cluster-level aggregate to strip (strength also drops the per-gene rank).
+    Per-gene feature columns are always removed: ``fields`` plus whatever the
+    bundle's feature_coherence table records as its source columns.
+    features/strength select which cluster-level aggregate to strip; strength
+    also drops the per-gene rank column the phenotype_strength table names.
     """
-    per_gene: tuple[str, ...] = fields
+    coherence = bundle_obj.get("feature_coherence") or {}
+    strength_block = bundle_obj.get("phenotype_strength") or {}
+    per_gene = set(fields) | set(coherence.get("columns") or ())
     if features:
         bundle_obj.pop("feature_coherence", None)
     if strength:
         bundle_obj.pop("phenotype_strength", None)
-        per_gene += (STRENGTH_RANK_COL,)
+        if strength_block.get("column"):
+            per_gene.add(strength_block["column"])
     for gene in bundle_obj.get("cluster_genes", []):
         if isinstance(gene, dict):
             for field in per_gene:

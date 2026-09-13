@@ -8,7 +8,6 @@ from mozzarellm.clients.affinage_api_client import AUDIT_NOTE_COL as AFFINAGE_AU
 from mozzarellm.clients.affinage_api_client import AffinageClient
 from mozzarellm.clients.uniprot_api_client import UniProtClient
 from mozzarellm.utils.cluster_utils import (
-    STRENGTH_RANK_COL,
     cluster_chunker,
     compute_feature_coherence,
     compute_phenotype_strength,
@@ -215,6 +214,7 @@ def build_evidence_bundles(
     cluster_id_column: str | None = None,
     stable_accession_col: str | None = None,
     feature_columns: list[str] | None = None,
+    strength_column: str | None = None,
     source: str = "uniprot",
     uniprot_client: UniProtClient | None = None,  # Inject dependency
     affinage_client: AffinageClient | None = None,
@@ -290,9 +290,9 @@ def build_evidence_bundles(
             evidence_bundle["feature_coherence"] = compute_feature_coherence(
                 chunk, feature_columns, gene_column=gene_column
             )
-        if STRENGTH_RANK_COL in chunk.columns:
+        if strength_column and strength_column in chunk.columns:
             evidence_bundle["phenotype_strength"] = compute_phenotype_strength(
-                chunk, gene_column=gene_column
+                chunk, gene_column=gene_column, strength_column=strength_column
             )
 
         # save bundle as json

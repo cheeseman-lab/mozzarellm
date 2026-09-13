@@ -24,19 +24,20 @@ def test_strip_feature_fields_removes_features_keeps_annotation():
         "screen_name": "s1",
         "cluster_id": "1",
         "feature_coherence": {"features": []},
+        "phenotype_strength": {"column": "phenotypic_strength"},
         "cluster_genes": [
             {
                 "gene_symbol": "G1",
                 "up_features": "cell_x; cell_y",
                 "down_features": "nucleus_z",
-                "phenotypic_strength": "4.2",
+                "phenotypic_strength": "4/9",
                 "UniProt_functional_annotation": "does a thing",
                 "accession": "P1",
             }
         ],
     }
     strip_feature_fields(bundle)
-    assert "feature_coherence" not in bundle
+    assert "feature_coherence" not in bundle and "phenotype_strength" not in bundle
     g = bundle["cluster_genes"][0]
     assert "up_features" not in g and "down_features" not in g and "phenotypic_strength" not in g
     # non-feature evidence is preserved
@@ -67,7 +68,7 @@ def test_user_prompt_gate(tmp_path):
     on = make_single_cluster_analysis_user_prompt("1", "s1", m, include_features=True)
 
     # per-gene lists never reach the model; the bounded table does iff on
-    for field in ("up_features", "down_features", "phenotypic_strength", "nucleus_z"):
+    for field in ("up_features", "down_features", "nucleus_z"):
         assert field not in off and field not in on, field
     assert "feature_coherence" not in off and "feature_coherence" in on
     # annotation always present; default (no arg) strips
@@ -132,11 +133,12 @@ def test_batch_request_gate(tmp_path):
         "screen_name": "s1",
         "cluster_id": "1",
         "feature_coherence": {"n_genes_in_cluster": 1, "features": []},
+        "phenotype_strength": {"column": "phenotypic_strength"},
         "cluster_genes": [
             {
                 "gene_symbol": "G1",
                 "up_features": "cell_x; cell_y",
-                "phenotypic_strength": "4.2",
+                "phenotypic_strength": "4/9",
                 "UniProt_functional_annotation": "does a thing",
             }
         ],

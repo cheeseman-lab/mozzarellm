@@ -20,7 +20,6 @@ from mozzarellm.pipeline.bundle_builder import (
 )
 from mozzarellm.prompt_components import build_cot_component_order
 from mozzarellm.utils.cluster_utils import (
-    STRENGTH_RANK_COL,
     attach_strength_ranks,
     build_cluster_id_to_bundle_path,
 )
@@ -59,10 +58,11 @@ def prepare_screen_bundles(
             ``feature_columns`` to embed in the bundles).
         strength_column: Optional per-gene perturbation-strength column — any
             metric (AUC, e-distance, ...). The raw values never enter the
-            bundles; each gene gets a scale-free ``phenotype_strength_rank``
-            of the form ``"N/M"`` (rank among the table's M scored genes,
-            1 = strongest). A column already holding ``"N/M"`` strings passes
-            through unchanged. Genes with missing strength carry no rank.
+            bundles: the column keeps its name and each gene's value becomes
+            a scale-free ``"N/M"`` rank (rank among the table's M scored
+            genes, 1 = strongest). A column already holding ``"N/M"`` strings
+            passes through unchanged. Genes with missing strength carry no
+            rank.
         strength_higher_is_stronger: Direction of the raw metric — True when
             larger values mean a stronger phenotype (e.g. AUC, e-distance).
         control_prefix: Gene symbols with this prefix are treated as
@@ -70,9 +70,7 @@ def prepare_screen_bundles(
             instead of a UniProt lookup).
     """
     output_dir = Path(output_dir)
-    cluster_df = (
-        cluster_table if hasattr(cluster_table, "columns") else load_table(cluster_table)
-    )
+    cluster_df = cluster_table if hasattr(cluster_table, "columns") else load_table(cluster_table)
     if strength_column is not None:
         cluster_df = attach_strength_ranks(
             cluster_df, strength_column, higher_is_stronger=strength_higher_is_stronger
@@ -96,6 +94,7 @@ def prepare_screen_bundles(
             cluster_id_column=cluster_id_column,
             stable_accession_col="accession",
             feature_columns=feature_columns or None,
+            strength_column=strength_column,
             output_dir=output_dir,
         )
     else:
@@ -193,8 +192,7 @@ def analyze_screen(
             enter the prompt only when the data does. Supported for
             mode="cot" (with or without MCP).
         include_strength: Same contract for the phenotype-strength step (cPS)
-            and the per-gene ``phenotype_strength_rank`` field (bundles built
-            with ``strength_column``).
+            and the per-gene rank field (bundles built with ``strength_column``).
         component_overrides: {component_key: text} replacements for individual
             prompt components (see mozzarellm.prompt_components
             COMPONENT_REGISTRY) -- run your own wording for any reasoning step
@@ -219,11 +217,7 @@ def analyze_screen(
             include_features, "include_features", cluster_to_bundle_map, "feature_coherence", ()
         )
         strength = _resolve_phenotype_flag(
-            include_strength,
-            "include_strength",
-            cluster_to_bundle_map,
-            "phenotype_strength",
-            (STRENGTH_RANK_COL,),
+            include_strength, "include_strength", cluster_to_bundle_map, "phenotype_strength", ()
         )
 
     run_dir = Path(run_dir)
@@ -309,12 +303,12 @@ def analyze_screen(
             # An empty classification with a pathway call is a parse failure,
             # not an abstention -- abstentions declare no coherent pathway.
             abstained = _NO_PATHWAY in str(parsed.get("dominant_process", "")).lower()
-            if parsed["total_genes_in_cluster"] and not parsed[
-                "classification_completeness"
-            ] and not abstained:
-                errors.setdefault(
-                    cluster_id, "no genes parsed from the response (see the trace)"
-                )
+            if (
+                parsed["total_genes_in_cluster"]
+                and not parsed["classification_completeness"]
+                and not abstained
+            ):
+                errors.setdefault(cluster_id, "no genes parsed from the response (see the trace)")
             results[cluster_id] = parsed
 
     tables = save_cluster_analysis(

@@ -3,19 +3,17 @@ from pathlib import Path
 
 import pandas as pd
 
-STRENGTH_RANK_COL = "phenotype_strength_rank"
-
 
 def attach_strength_ranks(
     df: pd.DataFrame, strength_column: str, *, higher_is_stronger: bool = True
 ) -> pd.DataFrame:
-    """Replace a raw perturbation-strength column with scale-free "N/M" ranks.
+    """Replace a raw perturbation-strength column's values with "N/M" ranks, in place.
 
     Any metric works (AUC, e-distance, normalized fate distance, ...): values
-    are ranked across the table's scored genes, 1 = strongest, and each gene
-    gets ``phenotype_strength_rank = "N/M"``. A column already holding "N/M"
-    strings passes through unchanged. Genes with missing strength carry no
-    rank. The raw column is dropped — raw strength values never enter bundles.
+    are ranked across the table's scored genes, 1 = strongest, and the column
+    keeps its name with ``"N/M"`` in place of the raw value. A column already
+    holding "N/M" strings passes through unchanged. Genes with missing
+    strength carry no rank. Raw strength values never enter bundles.
     """
     if strength_column not in df.columns:
         raise ValueError(f"strength_column {strength_column!r} not in cluster table")
@@ -38,22 +36,23 @@ def attach_strength_ranks(
         m = int(scored.sum())
         r = vals[scored].rank(ascending=not higher_is_stronger, method="min").astype(int)
         ranks[scored] = r.map(lambda n: f"{n}/{m}")
-    df[STRENGTH_RANK_COL] = ranks
-    return df.drop(columns=[strength_column])
+    df[strength_column] = ranks
+    return df
 
 
-def compute_phenotype_strength(df: pd.DataFrame, gene_column: str) -> dict:
+def compute_phenotype_strength(df: pd.DataFrame, gene_column: str, strength_column: str) -> dict:
     """Summarize a cluster's phenotype-strength ranks as a discrete table.
 
     Mirrors compute_feature_coherence: the aggregate the model reads is computed
     here, so the strength step is recall over a table rather than arithmetic.
-    Ranks are the "N/M" strings in ``STRENGTH_RANK_COL``; genes without one are
-    left out of the summary.
+    Ranks are the "N/M" strings in ``strength_column`` (attach_strength_ranks);
+    genes without one are left out. The table records its source column so the
+    prompt assembly knows which per-gene field carries the ranks.
     """
     ranked = []
     screen_size = None
     for _, row in df.iterrows():
-        value = row.get(STRENGTH_RANK_COL)
+        value = row.get(strength_column)
         if not isinstance(value, str) or "/" not in value:
             continue
         n, m = (int(x) for x in value.split("/"))
@@ -61,18 +60,17 @@ def compute_phenotype_strength(df: pd.DataFrame, gene_column: str) -> dict:
         ranked.append((n, str(row[gene_column])))
     ranked.sort()
     if not ranked:
-        return {"n_ranked": 0, "screen_size": None, "ranked_genes": []}
+        return {"column": strength_column, "n_ranked": 0, "screen_size": None, "ranked_genes": []}
     ranks = [n for n, _ in ranked]
     quartile = screen_size / 4
     median = ranks[len(ranks) // 2]
     return {
+        "column": strength_column,
         "n_ranked": len(ranked),
         "screen_size": screen_size,
         "median_rank": f"{median}/{screen_size}",
         "strongest_quartile_frac": round(sum(1 for n in ranks if n <= quartile) / len(ranks), 3),
-        "weakest_quartile_frac": round(
-            sum(1 for n in ranks if n > 3 * quartile) / len(ranks), 3
-        ),
+        "weakest_quartile_frac": round(sum(1 for n in ranks if n > 3 * quartile) / len(ranks), 3),
         "ranked_genes": [{"gene": g, "rank": f"{n}/{screen_size}"} for n, g in ranked],
     }
 
@@ -115,6 +113,8 @@ def compute_feature_coherence(
     cannot grow with the screen's feature space: only features reaching `min_frac`
     of the cluster in at least one direction are kept, at most `max_features` of
     them; `n_features_total` / `n_features_shown` / `min_frac` record the cut.
+    `columns` records the per-gene source columns so the prompt assembly knows
+    which fields the table replaces.
     """
     n_genes = len(df)
     up_col = next((c for c in feature_columns if "up" in c.lower()), None)
@@ -156,6 +156,7 @@ def compute_feature_coherence(
     kept = [r for r in rows if max(r["frac_up"], r["frac_down"]) >= min_frac][:max_features]
 
     return {
+        "columns": list(feature_columns),
         "n_genes_in_cluster": n_genes,
         "n_features_total": len(rows),
         "n_features_shown": len(kept),
