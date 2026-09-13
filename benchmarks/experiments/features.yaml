@@ -1,7 +1,7 @@
 # The features experiment: does per-gene phenotype evidence change the tuned
 # cot_litb configuration's panel? Three named arms on the mode winner --
-# baseline (no phenotype data), +features (up/down lists with the
-# feature-coherence table and the cFC/cPC cross-check steps), and
+# baseline (no phenotype data), +features (the bounded feature-coherence
+# table built from the up/down lists, with the cFC/cPC cross-check steps), and
 # +features+strength (adding the "N/M" strength ranks, the phenotype_strength
 # table and the cPS informativeness step). The bundles carry the phenotype
 # blocks from build_bundles.py --augment-phenotype; each arm strips what it
@@ -52,7 +52,7 @@ run:
 
 conditions:  # what varies is phenotype evidence; source + build + mode are carried
   - {name: baseline}                                   # cot_litb as selected
-  - {name: features, features: true}                   # + up/down lists, cFC/cPC
+  - {name: features, features: true}                   # + coherence table, cFC/cPC
   - {name: features_strength, features: true, strength: true}  # + strength ranks, cPS
 
 selection:
