@@ -73,10 +73,11 @@ class TestPromptComponentsRegistry:
                 )
 
     def test_both_literature_variants_registered(self):
-        # Two selectable MCP literature prompts: category-gated ("LIT") and
-        # blank-annotation gap-fill ("LITB").
-        category = COMPONENT_REGISTRY["LIT"]
-        blank = COMPONENT_REGISTRY["LITB"]
+        # Two selectable MCP literature prompts: the blank-annotation gap-fill
+        # is the shipped default in the "LIT" slot; the category-gated
+        # validation is "LITV".
+        category = COMPONENT_REGISTRY["LITV"]
+        blank = COMPONENT_REGISTRY["LIT"]
         assert "NOVEL_ROLE and UNCHARACTERIZED" in category
         assert "GAP-FILL" in blank and "mcp_gapfill" in blank
         assert category != blank

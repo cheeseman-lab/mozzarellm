@@ -94,9 +94,11 @@ run without parsing timestamps. The screen context can be passed as a file
 
 - **Mode** (`mode`): `standard` (flat single-call prompt), `cot` (chain-of-thought
   reasoning steps, the default), `stepwise` (one API turn per reasoning step).
-- **Literature validation** (`mcp=True`): the model is given PubMed search tools
-  and a validation step that checks its NOVEL_ROLE and UNCHARACTERIZED calls
-  against retrieved literature.
+- **Literature gap-fill** (`mcp=True`): the model is given PubMed search tools
+  and an evidence-gated step that looks up only the genes whose annotation is
+  blank (two tool calls at most). The category-gated variant, which checks
+  NOVEL_ROLE and UNCHARACTERIZED calls against the literature, is available
+  as `component_overrides={"LIT": COMPONENT_REGISTRY["LITV"]}`.
 - **Phenotypic features**: pass `feature_columns` (up/down lists per gene —
   imaging features, DE genes, anything list-shaped) and optionally
   `strength_column` (any perturbation-strength metric; converted to scale-free
