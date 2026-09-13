@@ -1,10 +1,12 @@
-"""Prompt assembly: the defaults, overrides, and the byte-identity fixtures.
+"""Prompt assembly: the defaults, overrides, and byte identity with the pre-reshape code.
 
-tests/fixtures/prompts/ holds the renders captured before the prompts were
-reshaped (mozzarellm/prompt_components.py + utils/prompt_factory.py ->
-mozzarellm/prompts/). Every assembly path must still produce them.
+_PRE_RESHAPE holds SHA-256 digests of renders captured on the parent commit
+(mozzarellm/prompt_components.py + utils/prompt_factory.py, before
+mozzarellm/prompts/). Every assembly path must still produce those bytes;
+render the same cases on the parent commit to reproduce the digests.
 """
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -28,7 +30,19 @@ from mozzarellm.prompts.components import (
     STEP_LITERATURE_VALIDATION,
 )
 
-_FIXTURES = Path(__file__).parent / "fixtures" / "prompts"
+_PRE_RESHAPE = {
+    "cot": "f4feb9eaef5df840e448eaee129bc3139180ece54334bcaa60dab1da0c32363f",
+    "cot_mcp": "de645740e3b92d9a930852075dc144edc82b3b7539e1a073be80e2d2d38795b2",
+    "cot_mcp_features_strength": "31e54528057c684fe5c8a1afd5452b7da0eb20f210a63b3db9ce0bd2f65e3687",
+    "cot_overrides": "a4218dee7d8771bcd6dc653b5fd332e6ea768d9dcf9b5ab199ae54e2dbafb75c",
+    "standard": "9e9364e94f40c90e0973ed2dd70e1b6c7aa70b882d4468a8e723450e1f461034",
+    "standard_mcp": "726120372b35fb4f5689d43a09495f426ad93db1359127200e550b9c4174aaa3",
+    "standard_overrides": "354a76186d4041e43aee40dcdf9909e370a71436845c9df3e1e20124cb783201",
+    "stepwise_system": "7f993f9a7720bb116e4791b1b5a1c715ceeef13ac8efaf7269bf3a7099c0b524",
+    "stepwise_turns": "6030b204d4630bae82d09e9f72df8e2f483a418041e1f568ee2a8f41687bab96",
+    "stepwise_turns_mcp": "e766667a0cda419cfad8a1b51c4715a5064d2e65d19c1e3e3a3c6d143d721b0e",
+    "stepwise_turns_overrides": "48c241cb67676a0842799c6fa6b11fa0d7d38cd0292d04a2a6c3129b351cc8d5",
+}
 _CONTEXT = (
     Path(__file__).resolve().parents[1] / "benchmarks" / "inputs" / "whitney_screen_context.json"
 )
@@ -74,8 +88,8 @@ def test_system_prompt_matches_pre_reshape_render(name, kwargs):
     ],
 )
 def test_stepwise_turns_match_pre_reshape_render(name, kwargs):
-    expected = json.loads((_FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
-    assert compose_stepwise_user_turns(**kwargs) == expected
+    turns = json.dumps(compose_stepwise_user_turns(**kwargs), indent=1, ensure_ascii=False)
+    assert hashlib.sha256(turns.encode("utf-8")).hexdigest() == _PRE_RESHAPE[name]
 
 
 def test_registry_is_texts_and_orders_reference_it():
