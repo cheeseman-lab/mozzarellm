@@ -60,7 +60,7 @@ def compose_stepwise_user_turns(
     Args:
         component_overrides: Optional dict mapping component keys to replacement
             text, applied to turn components the same way system-prompt assembly
-            applies them (e.g. a LITB variant in the LIT slot).
+            applies them (e.g. the LITV variant in the LIT slot).
 
     Returns a list of `{"content": str, "mcp": bool}`. The client walks these
     sequentially, prepending the cluster bundle to turn 0's content.
@@ -71,7 +71,7 @@ def compose_stepwise_user_turns(
     return [
         {
             "content": f"STEP {i + 1} - {overrides.get(key, COMPONENT_REGISTRY[key])}",
-            "mcp": (mcp and key == "LIT"),
+            "mcp": (mcp and key in ("LIT", "LITV")),
         }
         for i, key in enumerate(runner_keys)
     ]
