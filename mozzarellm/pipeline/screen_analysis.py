@@ -18,18 +18,18 @@ from mozzarellm.pipeline.bundle_builder import (
     build_evidence_bundles,
     get_or_append_stable_accession,
 )
-from mozzarellm.prompt_components import build_cot_component_order
+from mozzarellm.prompts import (
+    compose_stepwise_user_turns,
+    default_order,
+    make_cluster_analysis_system_prompt,
+    make_single_cluster_analysis_user_prompt,
+)
 from mozzarellm.utils.cluster_utils import (
     attach_strength_ranks,
     build_cluster_id_to_bundle_path,
 )
 from mozzarellm.utils.io import load_table
 from mozzarellm.utils.llm_analysis_utils import save_cluster_analysis
-from mozzarellm.utils.prompt_factory import (
-    compose_stepwise_user_turns,
-    make_cluster_analysis_system_prompt,
-    make_single_cluster_analysis_user_prompt,
-)
 from mozzarellm.utils.trace import save_trace
 
 
@@ -194,8 +194,8 @@ def analyze_screen(
         include_strength: Same contract for the phenotype-strength step (cPS)
             and the per-gene rank field (bundles built with ``strength_column``).
         component_overrides: {component_key: text} replacements for individual
-            prompt components (see mozzarellm.prompt_components
-            COMPONENT_REGISTRY) -- run your own wording for any reasoning step
+            prompt components (see mozzarellm.prompts.components
+            COMPONENTS) -- run your own wording for any reasoning step
             without editing the package.
         original_df: Optional per-cluster metadata table (must carry
             ``cluster_id``); its columns merge into the output tables.
@@ -229,7 +229,7 @@ def analyze_screen(
         mode_label += "_strength"
 
     component_order = (
-        build_cot_component_order(mcp=mcp, features=features, strength=strength)
+        default_order(mode, mcp, features=features, strength=strength)
         if (features or strength)
         else None
     )

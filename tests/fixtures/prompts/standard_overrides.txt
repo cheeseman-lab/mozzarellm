@@ -1,0 +1,74 @@
+MISSION: Every downstream call depends on correctly identifying what unites this cluster, so anchor
+there first.
+1. Determine the biological pathway(s) that explain the cluster — commit to a single dominant
+   process where one clearly fits, or 2-3 distinct processes if the cluster genuinely spans them. If
+   no process explains a substantial share of the genes, declare no coherent pathway.
+2. Categorize ALL genes against that pathway (ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED).
+3. Prioritize UNCHARACTERIZED and NOVEL_ROLE genes for follow-up.
+
+
+The following experimental context is provided: {"assay_type": "Optical Pooled Screen (OPS)", "target_phenotype": "Morphological cell phenotype — cell and nuclear shape, texture, and intensity features across 4 imaging channels (DNA, mitochondria, actin/Golgi/plasma membrane, ER)", "organism": "Homo sapiens", "cell_line_or_system": "HeLa", "perturbation": {"type": "CRISPR-Cas9 knockout", "library_or_reagent": "Genome-wide sgRNA library, filtered to genes with relevant phenotypes (~3,715 genes retained)"}, "readout": {"measurement": "High-content fluorescence imaging of fixed cells", "instrument_or_platform": "Optical pooled screening (in situ sequencing + imaging)", "primary_metric": "Morphological feature vectors — genes are clustered by similarity of phenotypic profiles across imaging channels", "imaging_channels": ["Hoechst (DNA)", "COX4 (mitochondria)", "AGP (actin/Golgi/plasma membrane)", "ConA (ER)"]}, "clustering": {"method": "Leiden clustering on PHATE-embedded phenotypic profiles", "parameters": {"cell_cycle_phase": "all", "resolution": 10, "n_clusters": 320, "n_genes": 3715}}, "controls": {"negative_controls": "Non-targeting sgRNAs", "positive_controls": "N/A"}, "provenance": {"dataset_name": "whitney", "citation": "Cheeseman Lab, Whitehead Institute", "data_source": "phate_leiden_clustering.tsv", "screen_name": "whitney", "lab": "Cheeseman Lab, Whitehead Institute"}, "notes": "Cell Painting-style 4-channel screen covering DNA, mitochondria, actin/Golgi/plasma membrane, and ER. Filtered gene set (3,715 genes). All cell cycle phases included. Clusters represent sets of genes whose knockout produces similar morphological phenotypes."}
+
+GCR OVERRIDE TEXT
+
+
+PRECONDITION: This step applies ONLY to genes already categorized as NOVEL_ROLE per the gene classification rules. If no genes were categorized as NOVEL_ROLE (because no coherent pathway exists, or no genes fit the criteria), do nothing — no sub-classification is needed.
+
+SUB-CLASSIFICATION (NOVEL_ROLE genes only): assign exactly one sub-class based on how the bundle's annotation relates to the identified pathway.
+- NO_EVIDENCE: nothing in the annotation links the gene to this pathway.
+- INDIRECT_EVIDENCE: the annotation shows a logical connection (shared organelle, upstream regulator) but no direct experimental link.
+- PARTIAL_EVIDENCE: the annotation reports actual data touching this pathway — a physical interaction, proteomics/co-IP hit, co-expression, or a functional assay — without focused mechanistic study.
+- CONTRADICTORY_EVIDENCE: the annotation describes a function incompatible with this pathway.
+
+PARTIAL_EVIDENCE always requires such reported data: a connection that is merely plausible, however strong the logic, is INDIRECT_EVIDENCE at most — never PARTIAL_EVIDENCE without data in the annotation.
+
+
+PRECONDITION: This step applies ONLY to genes already categorized as UNCHARACTERIZED per the gene
+classification rules. If no genes were categorized as UNCHARACTERIZED, do nothing.
+
+SUB-CLASSIFICATION (UNCHARACTERIZED genes only): assign exactly one sub-class based on the gene's
+bundle annotation.
+- DARK_GENE: identified only by a raw identifier (e.g. an Ensembl ENSG or LOC-style ID) with no
+  annotation of any kind.
+- NASCENT: no standard name, but some preliminary functional data exists.
+- ANNOTATED_ONLY: carries an official gene symbol and/or domain/motif annotation, but no
+  functional study.
+- NON_HUMAN_CHARACTERIZED: functionally studied in a non-human organism only.
+
+Identifier test: a gene carrying an official gene symbol is NEVER DARK_GENE, even when its bundle
+contains no annotation text — an assigned symbol means the gene has been named and catalogued, and
+ANNOTATED_ONLY is the correct call. Reserve DARK_GENE for genes whose only identity is a raw
+database identifier.
+
+
+PCC OVERRIDE TEXT
+
+
+
+Provide a concise analysis in this exact JSON format. Include every gene, and place each gene in exactly one category between
+ESTABLISHED, NOVEL_ROLE, and UNCHARACTERIZED — never list the same gene in two categories. Only fill the additional fields for
+genes that are in the NOVEL_ROLE or UNCHARACTERIZED categories.
+
+{
+  "cluster_id": "[CLUSTER_ID]",  // IMPORTANT: Use the exact cluster_id provided in the prompt
+  "dominant_process": "pathway name (semicolon-separated if 2-3)",
+  "pathway_confidence": "High/Medium/Low",
+  "established_genes": ["GeneA", "GeneB"],  // known role in this cluster's dominant process
+  "uncharacterized_genes": [  // little or no functional annotation
+    {
+      "gene": "GeneC",
+      "class": "DARK_GENE | NASCENT | ANNOTATED_ONLY | NON_HUMAN_CHARACTERIZED",
+      "rationale": "explanation of categorization and subclassification",
+      "evidence": "quote(s) from annotations or citations, if available"
+    }
+  ],
+  "novel_role_genes": [  // documented function elsewhere, no known role in this process
+    {
+      "gene": "GeneD",
+      "class": "NO_EVIDENCE | INDIRECT_EVIDENCE | PARTIAL_EVIDENCE | CONTRADICTORY_EVIDENCE",
+      "rationale": "explanation of categorization and subclassification",
+      "evidence": "quote(s) from annotations or citations, if available"
+    }
+  ],
+  "summary": "key findings summary"
+}

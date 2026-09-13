@@ -388,7 +388,7 @@ def test_phenotype_strength_block_is_recall_table():
 
 
 def test_strip_selects_each_phenotype_signal():
-    from mozzarellm.utils.prompt_factory import strip_feature_fields
+    from mozzarellm.prompts import strip_feature_fields
 
     # The user's column names come from the aggregates themselves.
     def bundle():

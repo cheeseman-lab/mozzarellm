@@ -449,7 +449,7 @@ class AnthropicClient(LLMClientBase):
         include_features: bool = False,
         source: str = "both",
     ) -> Request:
-        from mozzarellm.utils.prompt_factory import strip_feature_fields, strip_source_fields
+        from mozzarellm.prompts import strip_feature_fields, strip_source_fields
 
         bundle_obj = json.loads(Path(path_to_evidence_bundle).read_text(encoding="utf-8"))
         # per-gene lists never reach the model; the aggregate only with its component
@@ -1008,11 +1008,11 @@ class AnthropicClient(LLMClientBase):
             _validate_literature_blocks,
             call_mcp,
         )
+        from mozzarellm.prompts import compose_stepwise_user_turns
         from mozzarellm.utils.pricing import compute_cost
-        from mozzarellm.utils.prompt_factory import compose_stepwise_user_turns
         from mozzarellm.utils.trace import extract_mcp_tool_calls
 
-        # Per-turn user content + MCP routing decided by prompt_factory.
+        # Per-turn user content + MCP routing decided by prompt assembly.
         if turns is None:
             turns = compose_stepwise_user_turns(mcp)
 

@@ -1,4 +1,4 @@
-"""Tests for the feature-interpretation gate on the evidence-bundle user prompt.
+"""The user prompt: what of the evidence bundle reaches the model.
 
 Per-gene feature data (up/down lists, raw phenotypic strength) never reaches
 the model; the aggregate feature_coherence table does only when a
@@ -13,7 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from mozzarellm.utils.prompt_factory import (  # noqa: E402
+from mozzarellm.prompts import (  # noqa: E402
     make_single_cluster_analysis_user_prompt,
     strip_feature_fields,
 )
@@ -81,7 +81,7 @@ def test_source_gate_reduces_master_bundle(tmp_path):
     # One master bundle carries both sources' annotations; each run's source
     # view is derived at assembly time. "both" is a passthrough; empty
     # annotations are dropped rather than serialized as empty fields.
-    from mozzarellm.utils.prompt_factory import strip_source_fields
+    from mozzarellm.prompts import strip_source_fields
 
     def master():
         return {

@@ -98,7 +98,7 @@ run without parsing timestamps. The screen context can be passed as a file
   and an evidence-gated step that looks up only the genes whose annotation is
   blank (two tool calls at most). The category-gated variant, which checks
   NOVEL_ROLE and UNCHARACTERIZED calls against the literature, is available
-  as `component_overrides={"LIT": COMPONENT_REGISTRY["LITV"]}`.
+  as `component_overrides={"LIT": COMPONENTS["LITV"]}` (from `mozzarellm.prompts`).
 - **Phenotypic features**: pass `feature_columns` (up/down lists per gene —
   imaging features, DE genes, anything list-shaped) and optionally
   `strength_column` (any perturbation-strength metric; converted to scale-free
