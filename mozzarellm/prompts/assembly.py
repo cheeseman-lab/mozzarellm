@@ -142,8 +142,8 @@ def make_cluster_analysis_system_prompt(
     context = screen_context_text(screen_context_path, screen_context, override_screen_context)
     if component_order is None:
         component_order = default_order(mode, mcp)
-        if mode == "stepwise":
-            component_order = component_order[:2]  # task + context; the turns carry the rest
+    if mode == "stepwise":
+        component_order = component_order[:2]  # task + context; the turns carry the rest
     prompt = assemble(
         component_order, context, cot=(mode == "cot"), component_overrides=component_overrides
     )
@@ -158,17 +158,19 @@ def make_cluster_analysis_system_prompt(
 
 
 def compose_stepwise_user_turns(
-    mcp: bool, component_overrides: dict[str, str] | None = None
+    mcp: bool,
+    component_overrides: dict[str, str] | None = None,
+    component_order: list[str] | None = None,
 ) -> list[dict]:
     """The per-turn user content for stepwise delivery.
 
     The task and screen context live in the system prompt; the remaining
-    steps of the cot chain become numbered turns. Each turn carries a flag for
-    whether it attaches the MCP tools. The client prepends the cluster bundle
-    to turn 0.
+    steps of the chain (the cot default, or ``component_order``) become
+    numbered turns. Each turn carries a flag for whether it attaches the MCP
+    tools. The client prepends the cluster bundle to turn 0.
     """
     texts = render(component_overrides)
-    keys = default_order("cot", mcp)[2:]
+    keys = (component_order or default_order("cot", mcp))[2:]
     return [
         {"content": f"STEP {i + 1} - {texts[key]}", "mcp": mcp and key in MCP_KEYS}
         for i, key in enumerate(keys)
