@@ -251,24 +251,40 @@ def make_cluster_analysis_system_prompt(
     return prompt
 
 
-# Screen-derived per-gene feature data plus the aggregate. Stripped from the
-# bundle before it reaches the model unless a feature-interpretation component is
-# active, so features never enter the prompt as uninterpreted noise.
-FEATURE_FIELDS = ("up_features", "down_features", "phenotypic_strength")
+# Per-gene feature lists never reach the model: the feature steps read the
+# bounded cluster-level feature_coherence table (which carries the supporting
+# gene lists). Each aggregate records the per-gene columns it was built from,
+# so the strip knows the user's column names; this default covers bundles
+# built before that record existed.
+FEATURE_FIELDS = ("up_features", "down_features")
 
 
-def strip_feature_fields(bundle_obj: dict, fields: tuple[str, ...] = FEATURE_FIELDS) -> None:
-    """Remove screen-derived feature data from an evidence bundle in place.
+def strip_feature_fields(
+    bundle_obj: dict,
+    fields: tuple[str, ...] = FEATURE_FIELDS,
+    *,
+    features: bool = True,
+    strength: bool = True,
+) -> None:
+    """Remove screen-derived phenotype data from an evidence bundle in place.
 
-    fields names the per-gene feature columns to remove; the default matches
-    the standard builder output. Bundles built with custom feature_columns
-    (build_evidence_bundles) must pass their own names or those columns
-    survive the strip.
+    Per-gene feature columns are always removed: ``fields`` plus whatever the
+    bundle's feature_coherence table records as its source columns.
+    features/strength select which cluster-level aggregate to strip; strength
+    also drops the per-gene rank column the phenotype_strength table names.
     """
-    bundle_obj.pop("feature_coherence", None)
+    coherence = bundle_obj.get("feature_coherence") or {}
+    strength_block = bundle_obj.get("phenotype_strength") or {}
+    per_gene = set(fields) | set(coherence.get("columns") or ())
+    if features:
+        bundle_obj.pop("feature_coherence", None)
+    if strength:
+        bundle_obj.pop("phenotype_strength", None)
+        if strength_block.get("column"):
+            per_gene.add(strength_block["column"])
     for gene in bundle_obj.get("cluster_genes", []):
         if isinstance(gene, dict):
-            for field in fields:
+            for field in per_gene:
                 gene.pop(field, None)
 
 
@@ -301,14 +317,19 @@ def strip_source_fields(bundle_obj: dict, source: str) -> None:
 
 
 def make_single_cluster_analysis_user_prompt(
-    cluster_id, screen_name, cluster_to_bundle_path_map, include_features=False, source="both"
+    cluster_id,
+    screen_name,
+    cluster_to_bundle_path_map,
+    include_features=False,
+    include_strength=False,
+    source="both",
 ):
     BUNDLE_PATH = cluster_to_bundle_path_map[str(cluster_id)]
 
     # Build a user prompt from the bundle JSON
     bundle_obj = json.loads(Path(BUNDLE_PATH).read_text(encoding="utf-8"))
-    if not include_features:
-        strip_feature_fields(bundle_obj)  # no feature-interp component => no feature leak
+    # no matching reasoning component => no phenotype leak
+    strip_feature_fields(bundle_obj, features=not include_features, strength=not include_strength)
     strip_source_fields(bundle_obj, source)  # master bundle -> the run's evidence source
     bundle_text = json.dumps(bundle_obj, ensure_ascii=False)
 

@@ -23,7 +23,10 @@ def _context_json_validator(data) -> bool:
 def validate_screen_context(data: dict) -> dict[str, Any]:
     """Validate an in-memory screen-context dict (size/completion + schema)."""
     _context_json_validator(data)
-    return ScreenContext.model_validate(data).model_dump()
+    dumped = ScreenContext.model_validate(data).model_dump()
+    if dumped.get("phenotype_readout") is None:
+        dumped.pop("phenotype_readout", None)  # absent, not null, in what the model reads
+    return dumped
 
 
 def load_screen_context_json(

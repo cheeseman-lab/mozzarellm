@@ -47,13 +47,17 @@ def _bundles(tmp_path):
         p.write_text(
             json.dumps(
                 {
+                    "feature_coherence": {
+                        "n_genes_in_cluster": 1,
+                        "features": [{"feature": "nucleolar area", "n_up": 1, "frac_up": 1.0}],
+                    },
                     "cluster_genes": [
                         {
                             "gene_symbol": "RPL3",
-                            "up_features": "nucleolar area up",
+                            "up_features": "nucleolar area",
                             "UniProt_functional_annotation": "ribosomal protein",
                         }
-                    ]
+                    ],
                 }
             )
         )
@@ -78,8 +82,21 @@ def test_analyze_screen_writes_traces_json_and_tables(tmp_path):
     assert len(out["gene_df"]) == 4  # 2 genes x 2 clusters
     assert out["total_cost_usd"] == 0.02
     assert out["errors"] == {}
-    # Features stay out of the prompt unless asked for.
+    # Auto mode: bundles carry the coherence table, so it reaches the prompt;
+    # an explicit False strips it. Per-gene lists never reach the model.
+    assert "feature_coherence" in client.calls[0]["user"]
     assert "up_features" not in client.calls[0]["user"]
+    off = _StubClient()
+    analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=off,
+        run_dir=tmp_path / "run_off",
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+        include_features=False,
+    )
+    assert "feature_coherence" not in off.calls[0]["user"]
 
 
 def test_analyze_screen_feature_mode_feeds_features_and_cot_steps(tmp_path):
@@ -94,8 +111,9 @@ def test_analyze_screen_feature_mode_feeds_features_and_cot_steps(tmp_path):
         include_features=True,
     )
     call = client.calls[0]
-    assert "up_features" in call["user"]  # phenotypic features reach the model
-    assert "nucleolar area up" in call["user"]
+    assert "feature_coherence" in call["user"]  # the bounded table reaches the model
+    assert "nucleolar area" in call["user"]
+    assert "up_features" not in call["user"]
 
 
 def test_feature_mode_rejected_outside_cot():
@@ -275,3 +293,118 @@ def test_control_prefix_is_configurable():
     assert (
         _lookup_accession("nontargeting_g1_g1", 9606, False, None) == "NON_TARGETING_CONTROL"
     )
+
+
+def test_attach_strength_ranks_numeric_and_passthrough():
+    import pandas as pd
+
+    from mozzarellm.utils.cluster_utils import attach_strength_ranks
+
+    df = pd.DataFrame({"gene_symbol": list("abcd"), "auc": [0.9, 0.5, None, 0.7]})
+    out = attach_strength_ranks(df, "auc")  # the user's column keeps its name
+    assert out["auc"].tolist()[:2] == ["1/3", "3/3"]
+    assert pd.isna(out["auc"].iloc[2])  # unscored gene carries no rank
+    assert out["auc"].iloc[3] == "2/3"  # raw values never enter bundles
+
+    lower_is_stronger = attach_strength_ranks(
+        pd.DataFrame({"g": ["x", "y"], "dist": [0.1, 0.9]}), "dist", higher_is_stronger=False
+    )
+    assert lower_is_stronger["dist"].tolist() == ["1/2", "2/2"]
+
+    prerank = attach_strength_ranks(pd.DataFrame({"g": ["x"], "s": ["669/5299"]}), "s")
+    assert prerank["s"].tolist() == ["669/5299"]
+
+
+def test_strength_step_enters_prompt_iff_ranks_present(tmp_path):
+    """cPS + ranks appear together (auto), and only then."""
+    bundles = {}
+    for cid, rank in (("21", "12/5299"), ("37", None)):
+        p = tmp_path / f"cluster_{cid}__bundle.json"
+        gene = {"gene_symbol": "RPL3", "UniProt_functional_annotation": "ribosomal protein"}
+        bundle = {"cluster_genes": [gene]}
+        if rank:
+            gene["auc"] = rank
+            bundle["phenotype_strength"] = {"column": "auc", "n_ranked": 1, "screen_size": 5299}
+        p.write_text(json.dumps(bundle))
+        bundles[cid] = p
+    client = _StubClient()
+    analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=bundles,
+        client=client,
+        run_dir=tmp_path / "run",
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+    )
+    assert "PHENOTYPE STRENGTH" in client.calls[0]["system"]
+    assert any("12/5299" in c["user"] for c in client.calls)
+    # No feature data anywhere -> feature steps stay out even in auto mode.
+    assert "FEATURE COHERENCE" not in client.calls[0]["system"]
+
+    # Bundles without ranks -> no strength step, no dangling reference.
+    plain = _StubClient()
+    analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=plain,
+        run_dir=tmp_path / "run2",
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+        include_features=False,
+    )
+    assert "PHENOTYPE STRENGTH" not in plain.calls[0]["system"]
+
+
+def test_include_strength_true_requires_data(tmp_path):
+    import pytest
+
+    with pytest.raises(ValueError, match="include_strength=True"):
+        analyze_screen(
+            screen_name="s1",
+            cluster_to_bundle_map=_bundles(tmp_path),
+            client=_StubClient(),
+            run_dir=tmp_path / "run",
+            screen_context_path=_context(tmp_path),
+            mode="cot",
+            include_strength=True,
+        )
+
+
+def test_phenotype_strength_block_is_recall_table():
+    import pandas as pd
+
+    from mozzarellm.utils.cluster_utils import compute_phenotype_strength
+
+    df = pd.DataFrame({"gene_symbol": ["a", "b", "c", "d"], "auc": ["10/100", "90/100", None, "30/100"]})
+    block = compute_phenotype_strength(df, gene_column="gene_symbol", strength_column="auc")
+    assert block["column"] == "auc"  # the table names the user's column
+    assert block["n_ranked"] == 3 and block["screen_size"] == 100
+    assert block["median_rank"] == "30/100"
+    assert block["strongest_quartile_frac"] == round(1 / 3, 3)
+    assert block["weakest_quartile_frac"] == round(1 / 3, 3)
+    assert [g["gene"] for g in block["ranked_genes"]] == ["a", "d", "b"]
+    empty = compute_phenotype_strength(df.iloc[[2]], gene_column="gene_symbol", strength_column="auc")
+    assert empty["n_ranked"] == 0
+
+
+def test_strip_selects_each_phenotype_signal():
+    from mozzarellm.utils.prompt_factory import strip_feature_fields
+
+    # The user's column names come from the aggregates themselves.
+    def bundle():
+        return {
+            "feature_coherence": {"columns": ["de_up", "de_down"]},
+            "phenotype_strength": {"column": "edist"},
+            "cluster_genes": [
+                {"gene_symbol": "x", "de_up": "f", "de_down": "", "edist": "1/9"}
+            ],
+        }
+
+    b = bundle()
+    strip_feature_fields(b, features=False, strength=True)
+    assert "feature_coherence" in b and "phenotype_strength" not in b
+    assert b["cluster_genes"][0].keys() == {"gene_symbol"}  # per-gene lists never survive
+    b = bundle()
+    strip_feature_fields(b, features=True, strength=False)
+    assert "phenotype_strength" in b and "feature_coherence" not in b
+    assert b["cluster_genes"][0].keys() == {"gene_symbol", "edist"}

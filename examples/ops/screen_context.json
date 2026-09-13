@@ -1,6 +1,6 @@
 {
   "assay_type": "Optical Pooled Screen (OPS)",
-  "target_phenotype": "Morphological cell phenotype — cell and nuclear shape, texture, and intensity features across multiple imaging channels",
+  "target_phenotype": "Morphological cell phenotype \u2014 cell and nuclear shape, texture, and intensity features across multiple imaging channels",
   "organism": "Homo sapiens",
   "cell_line_or_system": "A549 (human lung adenocarcinoma epithelial cells)",
   "perturbation": {
@@ -10,7 +10,7 @@
   "readout": {
     "measurement": "High-content fluorescence imaging of fixed cells",
     "instrument_or_platform": "Optical pooled screening (in situ sequencing + imaging)",
-    "primary_metric": "Morphological feature vectors — cells are clustered by similarity of phenotypic profiles across imaging channels"
+    "primary_metric": "Morphological feature vectors \u2014 cells are clustered by similarity of phenotypic profiles across imaging channels"
   },
   "clustering": {
     "method": "Phenotypic similarity clustering of per-gene morphological profiles",
@@ -26,7 +26,11 @@
   "provenance": {
     "dataset_name": "Funk 2022 OPS genome-wide screen",
     "citation": "Funk et al. (2022) Nat Methods. Optical pooled screens in human cells.",
-    "data_source": "funk_2022.csv — gene-level phenotypic cluster assignments"
+    "data_source": "funk_2022.csv \u2014 gene-level phenotypic cluster assignments"
   },
-  "notes": "Clusters represent sets of genes with similar morphological phenotypes. Genes in the same cluster likely perturb the same biological process or pathway. Cluster 99 contains non-targeting controls and should receive Low confidence."
+  "notes": "Clusters represent sets of genes with similar morphological phenotypes. Genes in the same cluster likely perturb the same biological process or pathway. Cluster 99 contains non-targeting controls and should receive Low confidence.",
+  "phenotype_readout": {
+    "features_description": "up_features/down_features: the imaging features most increased or decreased by each knockout, top and bottom by percentile rank of the gene-level median versus non-targeting controls.",
+    "strength_description": "phenotype-strength rank: rank of each gene by overall morphological deviation from non-targeting controls (1 = most deviant of the screen)."
+  }
 }

@@ -60,6 +60,18 @@ def test_load_screen_context_json_valid(valid_context, write_json):
     assert loaded["perturbation"]["type"] == "CRISPRi"
 
 
+def test_phenotype_readout_absent_not_null(valid_context, write_json):
+    # A context without phenotype descriptions must serialize exactly as it
+    # did before the field existed: no "phenotype_readout": null for the model.
+    loaded = load_screen_context_json(write_json(valid_context))
+    assert "phenotype_readout" not in loaded
+    valid_context["phenotype_readout"] = {"features_description": "imaging features"}
+    assert load_screen_context_json(write_json(valid_context))["phenotype_readout"] == {
+        "features_description": "imaging features",
+        "strength_description": None,
+    }
+
+
 def test_load_screen_context_json_allows_extra_fields(valid_context, write_json):
     valid_context["extra_top_level"] = "ok"
     valid_context["perturbation"]["extra_nested"] = "ok"

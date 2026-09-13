@@ -7,7 +7,11 @@ from mozzarellm.clients.affinage_api_client import ANNOTATION_COL as AFFINAGE_CO
 from mozzarellm.clients.affinage_api_client import AUDIT_NOTE_COL as AFFINAGE_AUDIT_COL
 from mozzarellm.clients.affinage_api_client import AffinageClient
 from mozzarellm.clients.uniprot_api_client import UniProtClient
-from mozzarellm.utils.cluster_utils import cluster_chunker, compute_feature_coherence
+from mozzarellm.utils.cluster_utils import (
+    cluster_chunker,
+    compute_feature_coherence,
+    compute_phenotype_strength,
+)
 from mozzarellm.utils.io import load_table, write_bundle
 
 DEFAULT_ACCESSION_COL = "accession"
@@ -210,6 +214,7 @@ def build_evidence_bundles(
     cluster_id_column: str | None = None,
     stable_accession_col: str | None = None,
     feature_columns: list[str] | None = None,
+    strength_column: str | None = None,
     source: str = "uniprot",
     uniprot_client: UniProtClient | None = None,  # Inject dependency
     affinage_client: AffinageClient | None = None,
@@ -284,6 +289,10 @@ def build_evidence_bundles(
         if feature_columns:
             evidence_bundle["feature_coherence"] = compute_feature_coherence(
                 chunk, feature_columns, gene_column=gene_column
+            )
+        if strength_column and strength_column in chunk.columns:
+            evidence_bundle["phenotype_strength"] = compute_phenotype_strength(
+                chunk, gene_column=gene_column, strength_column=strength_column
             )
 
         # save bundle as json

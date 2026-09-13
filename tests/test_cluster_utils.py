@@ -418,3 +418,34 @@ def test_build_cluster_id_to_bundle_path_duplicate_cluster_ids(evidence_dir):
     # Should have one entry for cluster 1
     assert "1" in result
     assert len(result) == 1
+
+
+# =============================================================================
+# Test: compute_feature_coherence
+# =============================================================================
+
+
+def test_compute_feature_coherence_is_bounded():
+    """The table cannot grow with the screen's feature space: low-coverage
+    features are cut, then a hard cap applies, and the cut is recorded."""
+    from mozzarellm.utils.cluster_utils import compute_feature_coherence
+
+    df = pd.DataFrame(
+        {
+            "gene": ["A", "B", "C", "D", "E"],
+            "up_features": ["f1; f2; f3", "f1; f2", "f1; f2", "f1; rare_1; rare_2", "f1"],
+            "down_features": ["", "f3", "", "", "f3"],
+        }
+    )
+    table = compute_feature_coherence(df, ["up_features", "down_features"], gene_column="gene")
+    shown = [r["feature"] for r in table["features"]]
+    assert shown == ["f1", "f2", "f3"]  # rare_* (1/5 < 25% of the cluster) are gone
+    assert (table["n_features_total"], table["n_features_shown"]) == (5, 3)
+    assert table["min_frac"] == 0.25
+    assert table["features"][0]["up_genes"] == ["A", "B", "C", "D", "E"]
+
+    capped = compute_feature_coherence(
+        df, ["up_features", "down_features"], gene_column="gene", max_features=2
+    )
+    assert [r["feature"] for r in capped["features"]] == ["f1", "f2"]  # most-covered first
+    assert capped["n_features_shown"] == 2
