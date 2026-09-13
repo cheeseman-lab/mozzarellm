@@ -6,8 +6,10 @@
 # table and the cPS informativeness step). The bundles carry the phenotype
 # blocks from build_bundles.py --augment-phenotype; each arm strips what it
 # doesn't use, so the baseline prompt is byte-identical to the mode run's.
-# Success criterion: nothing degrades -- the steps are bounded cross-checks
-# the reviewers never saw, not a lever on the graded calls.
+# This is a non-degradation check, not a selection stage: the reviewers never
+# saw phenotype data, so the graded calls cannot prefer it. The build is the
+# order winner; features stay a user-facing option (on iff the bundles carry
+# the data). Nothing is carried forward except the evidence source.
 
 experiment: features
 description: phenotype evidence (features, strength ranks) on the tuned cot_litb build
@@ -59,4 +61,4 @@ selection:
   primary: coverage_weighted_category
   metrics: [category, novel_subclass, unchar_subclass, coherence, coverage]
 
-carry: [source, features]  # carry.source = the resolved source; carry.features = winner
+carry: [source]  # nothing selected here; the build stays the order winner
