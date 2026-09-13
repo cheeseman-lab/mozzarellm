@@ -238,12 +238,15 @@ Each evidence bundle includes a `feature_coherence` field with a per-feature bre
 across the cluster: for each feature, `n_up` / `frac_up` and `n_down` / `frac_down` of
 the cluster genes calling it differentially significant in that direction, along with
 the corresponding `up_genes` / `down_genes` lists. This is the data for this step.
+The table is bounded: only features reaching `min_frac` of the cluster in at least one
+direction are listed (`n_features_shown` of `n_features_total`); features below that
+coverage cannot be essential and are absent by design, not by lack of signal.
 If the experimental context describes how these features were derived (what they
 measure, the ranking, the cutoff), read them in that light.
 
-You may also use the per-gene `up_features` / `down_features` lists in `cluster_genes`
-ONLY to verify that candidate "essential" features are driven by an OVERLAPPING gene
-subset (not disjoint subsets that just sum to a high fraction).
+Use the `up_genes` / `down_genes` lists to verify that candidate "essential" features
+are driven by an OVERLAPPING gene subset (not disjoint subsets that just sum to a
+high fraction).
 
 Procedure:
 

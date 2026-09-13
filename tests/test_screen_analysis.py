@@ -47,13 +47,17 @@ def _bundles(tmp_path):
         p.write_text(
             json.dumps(
                 {
+                    "feature_coherence": {
+                        "n_genes_in_cluster": 1,
+                        "features": [{"feature": "nucleolar area", "n_up": 1, "frac_up": 1.0}],
+                    },
                     "cluster_genes": [
                         {
                             "gene_symbol": "RPL3",
-                            "up_features": "nucleolar area up",
+                            "up_features": "nucleolar area",
                             "UniProt_functional_annotation": "ribosomal protein",
                         }
-                    ]
+                    ],
                 }
             )
         )
@@ -78,9 +82,10 @@ def test_analyze_screen_writes_traces_json_and_tables(tmp_path):
     assert len(out["gene_df"]) == 4  # 2 genes x 2 clusters
     assert out["total_cost_usd"] == 0.02
     assert out["errors"] == {}
-    # Auto mode: bundles carry features, so they reach the prompt; an explicit
-    # False strips them.
-    assert "up_features" in client.calls[0]["user"]
+    # Auto mode: bundles carry the coherence table, so it reaches the prompt;
+    # an explicit False strips it. Per-gene lists never reach the model.
+    assert "feature_coherence" in client.calls[0]["user"]
+    assert "up_features" not in client.calls[0]["user"]
     off = _StubClient()
     analyze_screen(
         screen_name="s1",
@@ -91,7 +96,7 @@ def test_analyze_screen_writes_traces_json_and_tables(tmp_path):
         mode="cot",
         include_features=False,
     )
-    assert "up_features" not in off.calls[0]["user"]
+    assert "feature_coherence" not in off.calls[0]["user"]
 
 
 def test_analyze_screen_feature_mode_feeds_features_and_cot_steps(tmp_path):
@@ -106,8 +111,9 @@ def test_analyze_screen_feature_mode_feeds_features_and_cot_steps(tmp_path):
         include_features=True,
     )
     call = client.calls[0]
-    assert "up_features" in call["user"]  # phenotypic features reach the model
-    assert "nucleolar area up" in call["user"]
+    assert "feature_coherence" in call["user"]  # the bounded table reaches the model
+    assert "nucleolar area" in call["user"]
+    assert "up_features" not in call["user"]
 
 
 def test_feature_mode_rejected_outside_cot():
@@ -397,7 +403,7 @@ def test_strip_selects_each_phenotype_signal():
     b = bundle()
     strip_feature_fields(b, features=False, strength=True)
     assert "feature_coherence" in b and "phenotype_strength" not in b
-    assert b["cluster_genes"][0].keys() == {"gene_symbol", "up_features"}
+    assert b["cluster_genes"][0].keys() == {"gene_symbol"}  # per-gene lists never survive
     b = bundle()
     strip_feature_fields(b, features=True, strength=False)
     assert "phenotype_strength" in b and "feature_coherence" not in b

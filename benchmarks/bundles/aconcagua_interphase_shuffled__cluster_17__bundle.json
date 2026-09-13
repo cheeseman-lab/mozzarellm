@@ -463,6 +463,9 @@
   ],
   "feature_coherence": {
     "n_genes_in_cluster": 59,
+    "n_features_total": 0,
+    "n_features_shown": 0,
+    "min_frac": 0.25,
     "features": []
   }
 }

@@ -452,8 +452,8 @@ class AnthropicClient(LLMClientBase):
         from mozzarellm.utils.prompt_factory import strip_feature_fields, strip_source_fields
 
         bundle_obj = json.loads(Path(path_to_evidence_bundle).read_text(encoding="utf-8"))
-        if not include_features:
-            strip_feature_fields(bundle_obj)  # no phenotype components => no phenotype leak
+        # per-gene lists never reach the model; the aggregate only with its component
+        strip_feature_fields(bundle_obj, features=not include_features)
         strip_source_fields(bundle_obj, source)  # master bundle -> the run's evidence source
         bundle_text = json.dumps(
             bundle_obj, ensure_ascii=False

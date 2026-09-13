@@ -184,9 +184,11 @@ def analyze_screen(
             through the same schema); use instead of writing a JSON file.
         mode: "standard" | "cot" | "stepwise" -- prompt delivery format.
         mcp: Attach PubMed literature-validation tools.
-        include_features: Feed each gene's up/down feature lists to the model
-            and add the feature-interpretation reasoning steps (cFC, cPC).
-            "auto" (default) includes them iff the bundles carry feature data;
+        include_features: Feed the cluster's feature_coherence table (built
+            from the per-gene up/down lists, bounded to features covering
+            >= 25% of the cluster) to the model and add the
+            feature-interpretation reasoning steps (cFC, cPC).
+            "auto" (default) includes them iff the bundles carry the table;
             True requires it (error when absent); False strips it. The steps
             enter the prompt only when the data does. Supported for
             mode="cot" (with or without MCP).
@@ -214,11 +216,7 @@ def analyze_screen(
         features = strength = False  # "auto" resolves off where the steps don't exist
     else:
         features = _resolve_phenotype_flag(
-            include_features,
-            "include_features",
-            cluster_to_bundle_map,
-            "feature_coherence",
-            ("up_features", "down_features"),
+            include_features, "include_features", cluster_to_bundle_map, "feature_coherence", ()
         )
         strength = _resolve_phenotype_flag(
             include_strength,

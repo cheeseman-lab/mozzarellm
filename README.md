@@ -101,9 +101,13 @@ run without parsing timestamps. The screen context can be passed as a file
   imaging features, DE genes, anything list-shaped) and optionally
   `strength_column` (any perturbation-strength metric; converted to scale-free
   `"N/M"` ranks, 1 = strongest vs non-targeting controls) to
-  `prepare_screen_bundles`. The matching reasoning steps enter the prompt
-  automatically when — and only when — the bundles carry the data
-  (`include_features` / `include_strength` default to `"auto"`): features add
+  `prepare_screen_bundles`. The model never sees the per-gene lists: each
+  bundle carries a bounded cluster-level `feature_coherence` table (features
+  covering ≥25% of the cluster, at most 100, with their supporting genes), so
+  the prompt cannot grow with the screen's feature space. The matching
+  reasoning steps enter the prompt automatically when — and only when — the
+  bundles carry the data (`include_features` / `include_strength` default to
+  `"auto"`): features add
   a bounded consistency cross-check against the pathway call, strength adds a
   cluster-level informativeness verdict (strong / mixed / weak vs controls);
   neither overturns the call. Describe what your columns mean in

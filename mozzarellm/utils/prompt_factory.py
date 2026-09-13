@@ -252,9 +252,10 @@ def make_cluster_analysis_system_prompt(
     return prompt
 
 
-# Screen-derived per-gene phenotype data plus the aggregates. Stripped from the
-# bundle before it reaches the model unless the matching reasoning component is
-# active, so phenotype data never enters the prompt as uninterpreted noise.
+# Screen-derived per-gene phenotype data. Never reaches the model: the feature
+# steps read the bounded cluster-level feature_coherence table (which carries the
+# supporting gene lists), and raw strength is replaced by the rank. The
+# aggregates are stripped too unless the matching reasoning component is active.
 FEATURE_FIELDS = ("up_features", "down_features", "phenotypic_strength")
 
 
@@ -267,16 +268,15 @@ def strip_feature_fields(
 ) -> None:
     """Remove screen-derived phenotype data from an evidence bundle in place.
 
-    fields names the per-gene feature columns to remove; the default matches
-    the standard builder output. Bundles built with custom feature_columns
-    (build_evidence_bundles) must pass their own names or those columns
-    survive the strip. features/strength select which signal to strip (each
-    with its per-gene fields and its cluster-level aggregate).
+    fields names the per-gene feature columns, always removed; the default
+    matches the standard builder output. Bundles built with custom
+    feature_columns (build_evidence_bundles) must pass their own names or
+    those columns survive the strip. features/strength select which
+    cluster-level aggregate to strip (strength also drops the per-gene rank).
     """
-    per_gene: tuple[str, ...] = ()
+    per_gene: tuple[str, ...] = fields
     if features:
         bundle_obj.pop("feature_coherence", None)
-        per_gene += fields
     if strength:
         bundle_obj.pop("phenotype_strength", None)
         per_gene += (STRENGTH_RANK_COL,)

@@ -99,6 +99,9 @@ def compute_feature_coherence(
     df: pd.DataFrame,
     feature_columns: list[str],
     gene_column: str,
+    *,
+    min_frac: float = 0.25,
+    max_features: int = 100,
 ) -> dict:
     """Compute per-feature gene-coverage across a cluster with supporting gene lists.
 
@@ -107,8 +110,11 @@ def compute_feature_coherence(
     column name — substring "up" → up, substring "down" → down.
 
     Returns a dict with `n_genes_in_cluster` and a `features` array, one row per
-    feature called by at least one gene, with `n_up`/`frac_up`/`up_genes` and
-    `n_down`/`frac_down`/`down_genes`. Sorted by aggregate signal (most-covered first).
+    feature, with `n_up`/`frac_up`/`up_genes` and `n_down`/`frac_down`/`down_genes`.
+    Sorted by aggregate signal (most-covered first). The table is bounded so it
+    cannot grow with the screen's feature space: only features reaching `min_frac`
+    of the cluster in at least one direction are kept, at most `max_features` of
+    them; `n_features_total` / `n_features_shown` / `min_frac` record the cut.
     """
     n_genes = len(df)
     up_col = next((c for c in feature_columns if "up" in c.lower()), None)
@@ -147,8 +153,15 @@ def compute_feature_coherence(
             }
         )
     rows.sort(key=lambda r: (-(r["n_up"] + r["n_down"]), r["feature"]))
+    kept = [r for r in rows if max(r["frac_up"], r["frac_down"]) >= min_frac][:max_features]
 
-    return {"n_genes_in_cluster": n_genes, "features": rows}
+    return {
+        "n_genes_in_cluster": n_genes,
+        "n_features_total": len(rows),
+        "n_features_shown": len(kept),
+        "min_frac": min_frac,
+        "features": kept,
+    }
 
 
 def build_cluster_id_to_bundle_path(
