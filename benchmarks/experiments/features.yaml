@@ -20,7 +20,7 @@ model:
   provider: anthropic
   model_name: claude-sonnet-5
   # temperature omitted: claude-sonnet-5 rejects non-default sampling params
-  max_tokens: 32000
+  max_tokens: 64000  # 167-gene jebel writes 28-35k with the phenotype blocks; model max 128k
   thinking: false
 
 run:
