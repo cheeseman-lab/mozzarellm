@@ -88,7 +88,6 @@ exclude = [
 "tests/test_*.py" = ["E402"]
 # Constant-style locals / Chain-of-Thought argument naming, kept by intent
 "mozzarellm/pipeline/bundle_builder.py" = ["N806"]
-"mozzarellm/utils/prompt_factory.py" = ["N806", "N803"]
 
 [tool.ruff.format]
 # Use double quotes for strings

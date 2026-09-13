@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from mozzarellm.prompt_components import COMPONENT_REGISTRY, STEP_LITERATURE_VALIDATION
+from mozzarellm.prompts.components import COMPONENTS, STEP_LITERATURE_VALIDATION
 from mozzarellm.utils.screen_context_utils import load_screen_context_json
 
 from .bench_routes import Route, StepwiseTurn
@@ -287,7 +287,7 @@ def compose_stepwise_turns_from_route(
     """Build stepwise user turns from a Route's ``user_turns`` field.
 
     Resolves each ``StepwiseTurn.component`` to its text via
-    ``COMPONENT_REGISTRY``, with special handling for ``SC`` (screen context)
+    ``COMPONENTS``, with special handling for ``SC`` (screen context)
     and ``LIT`` (literature validation).
 
     Returns the same ``[{"content": str, "mcp": bool}, ...]`` format as
@@ -296,7 +296,7 @@ def compose_stepwise_turns_from_route(
     ctx_obj = load_screen_context_json(screen_context_path)
     screen_context_text = json.dumps(ctx_obj, ensure_ascii=False)
 
-    registry = dict(COMPONENT_REGISTRY)
+    registry = dict(COMPONENTS)
     # LIT is now in the registry, but ensure it here for safety
     if "LIT" not in registry:
         registry["LIT"] = STEP_LITERATURE_VALIDATION

@@ -16,6 +16,7 @@ def _context(tmp_path):
     shutil.copy(_CONTEXT, ctx)
     return ctx
 
+
 _PARSED = {
     "dominant_process": "ribosome biogenesis",
     "pathway_confidence": "High",
@@ -290,9 +291,7 @@ def test_control_prefix_is_configurable():
         _lookup_accession("myctrl_g1_g1", 9606, False, None, control_prefix="myctrl_")
         == "NON_TARGETING_CONTROL"
     )
-    assert (
-        _lookup_accession("nontargeting_g1_g1", 9606, False, None) == "NON_TARGETING_CONTROL"
-    )
+    assert _lookup_accession("nontargeting_g1_g1", 9606, False, None) == "NON_TARGETING_CONTROL"
 
 
 def test_attach_strength_ranks_numeric_and_passthrough():
@@ -375,7 +374,9 @@ def test_phenotype_strength_block_is_recall_table():
 
     from mozzarellm.utils.cluster_utils import compute_phenotype_strength
 
-    df = pd.DataFrame({"gene_symbol": ["a", "b", "c", "d"], "auc": ["10/100", "90/100", None, "30/100"]})
+    df = pd.DataFrame(
+        {"gene_symbol": ["a", "b", "c", "d"], "auc": ["10/100", "90/100", None, "30/100"]}
+    )
     block = compute_phenotype_strength(df, gene_column="gene_symbol", strength_column="auc")
     assert block["column"] == "auc"  # the table names the user's column
     assert block["n_ranked"] == 3 and block["screen_size"] == 100
@@ -383,21 +384,21 @@ def test_phenotype_strength_block_is_recall_table():
     assert block["strongest_quartile_frac"] == round(1 / 3, 3)
     assert block["weakest_quartile_frac"] == round(1 / 3, 3)
     assert [g["gene"] for g in block["ranked_genes"]] == ["a", "d", "b"]
-    empty = compute_phenotype_strength(df.iloc[[2]], gene_column="gene_symbol", strength_column="auc")
+    empty = compute_phenotype_strength(
+        df.iloc[[2]], gene_column="gene_symbol", strength_column="auc"
+    )
     assert empty["n_ranked"] == 0
 
 
 def test_strip_selects_each_phenotype_signal():
-    from mozzarellm.utils.prompt_factory import strip_feature_fields
+    from mozzarellm.prompts import strip_feature_fields
 
     # The user's column names come from the aggregates themselves.
     def bundle():
         return {
             "feature_coherence": {"columns": ["de_up", "de_down"]},
             "phenotype_strength": {"column": "edist"},
-            "cluster_genes": [
-                {"gene_symbol": "x", "de_up": "f", "de_down": "", "edist": "1/9"}
-            ],
+            "cluster_genes": [{"gene_symbol": "x", "de_up": "f", "de_down": "", "edist": "1/9"}],
         }
 
     b = bundle()
@@ -408,3 +409,57 @@ def test_strip_selects_each_phenotype_signal():
     strip_feature_fields(b, features=True, strength=False)
     assert "phenotype_strength" in b and "feature_coherence" not in b
     assert b["cluster_genes"][0].keys() == {"gene_symbol", "edist"}
+
+
+def test_custom_component_order_is_used_verbatim(tmp_path):
+    """A user's own chain replaces the default; phenotype steps enter iff included."""
+    short = ["CAT", "SC", "cPH", "cGCR", "cO"]
+    client = _StubClient()
+    analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=client,
+        run_dir=tmp_path / "run",
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+        component_order=short,
+    )
+    system = client.calls[0]["system"]
+    assert "STEP 5 - FINAL JSON OUTPUT" in system and "STEP 6" not in system
+    assert "FEATURE COHERENCE" not in system  # bundles carry features, chain does not ask
+    assert "feature_coherence" not in client.calls[0]["user"]
+
+    class _TurnStub(_StubClient):
+        def analyze(self, *, stepwise_turns, **kw):
+            self.calls.append({"turns": stepwise_turns})
+            return dict(_PARSED), {"response_text": "{}", "cost_usd": 0.01, "elapsed_s": 1.0}
+
+    stepwise = _TurnStub()
+    analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=_bundles(tmp_path),
+        client=stepwise,
+        run_dir=tmp_path / "run_sw",
+        screen_context_path=_context(tmp_path),
+        mode="stepwise",
+        component_order=short,
+    )
+    turns = stepwise.calls[0]["turns"]
+    assert [t["content"].split(" - ")[1].split(":")[0] for t in turns] == [
+        "PATHWAY HYPOTHESIS",
+        "GENE CATEGORIZATION (cite evidence)",
+        "FINAL JSON OUTPUT",
+    ]
+
+    import pytest
+
+    with pytest.raises(ValueError, match="include_strength=True"):
+        analyze_screen(
+            screen_name="s1",
+            cluster_to_bundle_map=_bundles(tmp_path),
+            client=_StubClient(),
+            run_dir=tmp_path / "run_x",
+            screen_context_path=_context(tmp_path),
+            mode="cot",
+            component_order=short[:-1] + ["cPS", "cO"],  # asks for strength the bundles lack
+        )

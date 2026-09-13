@@ -18,18 +18,18 @@ from mozzarellm.pipeline.bundle_builder import (
     build_evidence_bundles,
     get_or_append_stable_accession,
 )
-from mozzarellm.prompt_components import build_cot_component_order
+from mozzarellm.prompts import (
+    compose_stepwise_user_turns,
+    default_order,
+    make_cluster_analysis_system_prompt,
+    make_single_cluster_analysis_user_prompt,
+)
 from mozzarellm.utils.cluster_utils import (
     attach_strength_ranks,
     build_cluster_id_to_bundle_path,
 )
 from mozzarellm.utils.io import load_table
 from mozzarellm.utils.llm_analysis_utils import save_cluster_analysis
-from mozzarellm.utils.prompt_factory import (
-    compose_stepwise_user_turns,
-    make_cluster_analysis_system_prompt,
-    make_single_cluster_analysis_user_prompt,
-)
 from mozzarellm.utils.trace import save_trace
 
 
@@ -167,6 +167,7 @@ def analyze_screen(
     include_features: bool | str = "auto",
     include_strength: bool | str = "auto",
     component_overrides: dict[str, str] | None = None,
+    component_order: list[str] | None = None,
     original_df=None,
 ) -> dict:
     """Analyze every cluster in a screen and write the run's outputs.
@@ -194,9 +195,13 @@ def analyze_screen(
         include_strength: Same contract for the phenotype-strength step (cPS)
             and the per-gene rank field (bundles built with ``strength_column``).
         component_overrides: {component_key: text} replacements for individual
-            prompt components (see mozzarellm.prompt_components
-            COMPONENT_REGISTRY) -- run your own wording for any reasoning step
+            prompt components (see mozzarellm.prompts.components
+            COMPONENTS) -- run your own wording for any reasoning step
             without editing the package.
+        component_order: Your own chain of component keys in place of the
+            default for the mode (see mozzarellm.prompts DEFAULT_ORDERS). Used
+            verbatim; the phenotype steps enter the prompt iff you include them
+            (cFC/cPC, cPS), and their data must then exist in the bundles.
         original_df: Optional per-cluster metadata table (must carry
             ``cluster_id``); its columns merge into the output tables.
 
@@ -205,7 +210,22 @@ def analyze_screen(
         ``cluster_df`` (the tabular view, also written as CSVs),
         ``total_cost_usd``, and ``errors`` ({cluster_id: message}).
     """
-    if mode != "cot":
+    if component_order is not None:
+        features = _resolve_phenotype_flag(
+            "cFC" in component_order,
+            "include_features",
+            cluster_to_bundle_map,
+            "feature_coherence",
+            (),
+        )
+        strength = _resolve_phenotype_flag(
+            "cPS" in component_order,
+            "include_strength",
+            cluster_to_bundle_map,
+            "phenotype_strength",
+            (),
+        )
+    elif mode != "cot":
         if include_features is True or include_strength is True:
             raise ValueError(
                 "include_features/include_strength are supported for mode='cot' "
@@ -228,11 +248,8 @@ def analyze_screen(
     if strength:
         mode_label += "_strength"
 
-    component_order = (
-        build_cot_component_order(mcp=mcp, features=features, strength=strength)
-        if (features or strength)
-        else None
-    )
+    if component_order is None and (features or strength):
+        component_order = default_order(mode, mcp, features=features, strength=strength)
     system_prompt = make_cluster_analysis_system_prompt(
         screen_name=screen_name,
         screen_context_path=screen_context_path,
@@ -243,7 +260,9 @@ def analyze_screen(
         component_overrides=component_overrides,
     )
     stepwise_turns = (
-        compose_stepwise_user_turns(mcp, component_overrides) if mode == "stepwise" else None
+        compose_stepwise_user_turns(mcp, component_overrides, component_order)
+        if mode == "stepwise"
+        else None
     )
 
     results: dict = {}

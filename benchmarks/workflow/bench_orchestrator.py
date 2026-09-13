@@ -35,7 +35,7 @@ import pandas as pd
 
 from mozzarellm.clients.llm_api_clients import create_client
 from mozzarellm.pipeline.literature_mcp import get_available_mcp_servers
-from mozzarellm.utils.prompt_factory import (
+from mozzarellm.prompts import (
     compose_stepwise_user_turns,
     make_cluster_analysis_system_prompt,
     make_single_cluster_analysis_user_prompt,

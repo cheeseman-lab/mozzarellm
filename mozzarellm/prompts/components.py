@@ -1,14 +1,13 @@
-"""
-Prompt templates and instructions for gene cluster analysis.
+"""The prompt texts.
 
-Organized in assembly order: components appear in the file in the same order
-they are concatenated by the prompt factory.
+Every piece of wording the model sees lives in this file, in the order the
+default chain-of-thought prompt presents it. Nothing here is executed: each
+component is a string, and the registry at the bottom names them. Assembly
+(ordering, numbering, overrides, the screen context) is in assembly.py.
 
-Standard mode: TASK → SCREEN_CONTEXT → GENE_CATEGORIZATION → NOVEL_RULES →
-               UNCHARACTERIZED_RULES → PATHWAY_CONFIDENCE → OUTPUT_FORMAT
-
-CoT mode:      TASK → SCREEN_CONTEXT → PATHWAY_HYPOTHESIS → GENE_CATEGORIZATION →
-               SUBCLASSIFICATION → PATHWAY_SELECTION → VERIFICATION → OUTPUT_FORMAT
+The base texts (CAT, GCR, NPR, UPR, PCC, O) are the benchmark-selected build.
+The chain-of-thought steps that embed a base text are templates with a
+``{KEY}`` slot for it, so overriding a base text also re-renders the step.
 """
 
 # =============================================================================
@@ -346,42 +345,25 @@ COT_STEP_PATHWAY_HYPOTHESIS = """PATHWAY HYPOTHESIS:
 - Note which annotations support each candidate
 - If no process explains a substantial share of the genes, say so — an honest "no coherent pathway" call is a valid outcome"""
 
-def build_cot_step_gene_categorization(gcr: str = GENE_CATEGORIZATION_RULES) -> str:
-    """Compose the cot GENE CATEGORIZATION step from the (possibly overridden) GCR text."""
-    return f"""GENE CATEGORIZATION (cite evidence):
+COT_STEP_GENE_CATEGORIZATION = """GENE CATEGORIZATION (cite evidence):
 For each gene, assign to exactly one category: ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED
-These are defined according to the following rules: {gcr}
+These are defined according to the following rules: {GCR}
 """
 
-
-def build_cot_step_subclassification(
-    npr: str = NOVEL_CLASSIFICATION_RULES, upr: str = UNCHARACTERIZED_CLASSIFICATION_RULES
-) -> str:
-    """Compose the cot SUB-CLASSIFICATION step from the (possibly overridden) NPR/UPR texts."""
-    return f"""SUB-CLASSIFICATION:
+COT_STEP_SUBCLASSIFICATION = """SUB-CLASSIFICATION:
 For NOVEL_ROLE genes, assign one sub-class: NO_EVIDENCE / INDIRECT_EVIDENCE / PARTIAL_EVIDENCE / CONTRADICTORY_EVIDENCE
-These are defined according to the following rules: {npr}
+These are defined according to the following rules: {NPR}
 For UNCHARACTERIZED genes, assign one sub-class: DARK_GENE / NASCENT / ANNOTATED_ONLY / NON_HUMAN_CHARACTERIZED
-These are defined according to the following rules: {upr}
+These are defined according to the following rules: {UPR}
 Cite specific annotations that inform each classification."""
 
-
-def build_cot_step_pathway_selection(pcc: str = PATHWAY_CONFIDENCE_CRITERIA) -> str:
-    """Compose the cot PATHWAY SELECTION step from the (possibly overridden) PCC text."""
-    return f"""PATHWAY SELECTION:
+COT_STEP_PATHWAY_SELECTION = """PATHWAY SELECTION:
 Once you have identified candidate pathway(s), evaluate how well EACH pathway explains the cluster using
-these stringent criteria based on what percentage of genes fit the proposed pathway: {pcc}
+these stringent criteria based on what percentage of genes fit the proposed pathway: {PCC}
 Now, select a dominant pathway based on:
   * Number of established genes with direct roles
   * Coherence of functional relationships
   * Quality of supporting evidence"""
-
-
-COT_STEP_GENE_CATEGORIZATION = build_cot_step_gene_categorization()
-
-COT_STEP_SUBCLASSIFICATION = build_cot_step_subclassification()
-
-COT_STEP_PATHWAY_SELECTION = build_cot_step_pathway_selection()
 
 COT_STEP_VERIFICATION = """VERIFICATION:
 - Check for contradictions
@@ -389,41 +371,22 @@ COT_STEP_VERIFICATION = """VERIFICATION:
 - Check that the confidence level follows the stated confidence criteria, not general impressions
 - Note any gaps in evidence that limit conclusions"""
 
-COT_STEP_OUTPUT = f"""FINAL JSON OUTPUT:
+COT_STEP_OUTPUT = """FINAL JSON OUTPUT:
 - Compile structured JSON with all required fields
 - Ensure cluster_id matches input exactly
 - Include concise summary highlighting key findings and evidence quality
-According to {OUTPUT_FORMAT_JSON}"""
+According to {O}"""
 
 # =============================================================================
-# COMPONENT REGISTRY & CANONICAL ORDERS
+# REGISTRY
 # =============================================================================
-# Shorthand keys for each prompt component, used by prompt_factory when
-# assembling prompts in an arbitrary order (e.g. for benchmarking).
-#
-# Baseline components:
-#   CAT  = Cluster Analysis Task  (always present)
-#   SC   = Screen Context         (always present, injected per-case — NOT in registry)
-#   GCR  = Gene Categorization Rules
-#   NPR  = Novel Classification Rules
-#   UPR  = Uncharacterized Classification Rules
-#   PCC  = Pathway Confidence Criteria
-#   O    = Output format (JSON)
-#
-# CoT-specific components:
-#   cPH  = Pathway Hypothesis step
-#   cPSC = Pathway Selection & Confidence step (references PCC)
-#   cGCR = Gene Categorization step            (references GCR)
-#   cPri = Sub-classification (references NPR & UPR)
-#   cVer = Verification step
-#   cO   = Final JSON Output step              (references O)
-#   cFC  = Feature Coherence step  (feature-interp mode; emits feature_coherence)
-#   cPC  = Pathway Consistency step (feature-interp mode; emits pathway_consistency)
-#
-# NOTE: "SC" is not in the registry because screen context is dynamic
-# (varies per case). It is handled specially during assembly.
+# Base components:  CAT task, GCR / NPR / UPR rules, PCC confidence, O output
+# Literature (MCP): LIT gap-fill (default), LITV validation -- one slot, "LIT"
+# Chain of thought: cPH hypothesis, cGCR, cPri, cPSC, cVer, cO (embed the base
+#                   texts), cFC / cPC / cPS phenotype steps (data-gated)
+# "SC", the per-screen context, is injected at assembly and is not a text.
 
-COMPONENT_REGISTRY = {
+COMPONENTS = {
     "CAT": CLUSTER_ANALYSIS_TASK,
     "GCR": GENE_CATEGORIZATION_RULES,
     "NPR": NOVEL_CLASSIFICATION_RULES,
@@ -443,49 +406,10 @@ COMPONENT_REGISTRY = {
     "cO": COT_STEP_OUTPUT,
 }
 
-
-def derive_cot_overrides(component_overrides: dict[str, str]) -> dict[str, str]:
-    """Propagate base-component overrides into the cot slots composed from them.
-
-    The cot steps cGCR/cPri/cPSC embed the GCR/NPR+UPR/PCC texts at composition
-    time, so an override of a base component would otherwise never reach the cot
-    and stepwise routes. Rebuilds each affected cot slot from the overridden base
-    texts using the same composition templates; an explicit override for a cot
-    slot always wins over a derived one.
-    """
-    derived: dict[str, str] = {}
-    if "GCR" in component_overrides:
-        derived["cGCR"] = build_cot_step_gene_categorization(component_overrides["GCR"])
-    if "NPR" in component_overrides or "UPR" in component_overrides:
-        derived["cPri"] = build_cot_step_subclassification(
-            component_overrides.get("NPR", NOVEL_CLASSIFICATION_RULES),
-            component_overrides.get("UPR", UNCHARACTERIZED_CLASSIFICATION_RULES),
-        )
-    if "PCC" in component_overrides:
-        derived["cPSC"] = build_cot_step_pathway_selection(component_overrides["PCC"])
-    return {**derived, **component_overrides}
-
-CANONICAL_ZERO_SHOT_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]
-CANONICAL_ZERO_SHOT_MCP_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "LIT", "O"]
-CANONICAL_COT_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cO"]
-CANONICAL_COT_MCP_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "LIT", "cPSC", "cVer", "cO"]
-def build_cot_component_order(
-    mcp: bool = False, features: bool = False, strength: bool = False
-) -> list[str]:
-    """The cot component order with phenotype steps included iff their data is.
-
-    Feature-interpretation steps (cFC, cPC) and the phenotype-strength step
-    (cPS) enter the chain only when the corresponding bundle fields exist —
-    a prompt never references data the bundles don't carry. LIT keeps its
-    canonical position (after cPri); phenotype steps sit after cVer, before cO.
-    """
-    order = list(CANONICAL_COT_MCP_ORDER if mcp else CANONICAL_COT_ORDER)
-    tail = order.pop()  # cO stays last
-    if features:
-        order += ["cFC", "cPC"]
-    if strength:
-        order += ["cPS"]
-    return order + [tail]
-
-
-CANONICAL_FEATURE_INTERP_COT_ORDER = build_cot_component_order(features=True)
+# Which chain-of-thought steps embed which base texts (the template slots).
+EMBEDS = {
+    "cGCR": ("GCR",),
+    "cPri": ("NPR", "UPR"),
+    "cPSC": ("PCC",),
+    "cO": ("O",),
+}

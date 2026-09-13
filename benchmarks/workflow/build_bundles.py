@@ -8,7 +8,7 @@ up_features, down_features, phenotypic_strength), matches each screen to its
 UniProt, and builds one master evidence bundle per cluster: the superset of
 evidence (UniProt + Affinage annotations + feature columns). Per-source /
 per-feature views are derived at prompt-assembly time (strip_source_fields /
-strip_feature_fields in mozzarellm.utils.prompt_factory).
+strip_feature_fields in mozzarellm.prompts).
 
 Usage:
     python workflow/build_bundles.py                      # full rebuild (UniProt/Affinage)

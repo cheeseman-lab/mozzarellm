@@ -49,7 +49,7 @@ from pathlib import Path
 
 import yaml
 
-from mozzarellm.prompt_components import build_cot_component_order
+from mozzarellm.prompts import default_order
 
 from .bench_configparse import BenchmarkConfig, ModelConfig, PathsConfig, RunConfig
 from .bench_evaluator import (
@@ -453,7 +453,7 @@ def _condition_route(cond: dict, route_name: str) -> Route:
             route,
             name=f"{route.name}_{tag}",
             component_order=tuple(
-                build_cot_component_order(mcp=route.mcp, features=features, strength=strength)
+                default_order("cot", route.mcp, features=features, strength=strength)
             ),
             features=features,
             strength=strength,

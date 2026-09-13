@@ -98,7 +98,7 @@ run without parsing timestamps. The screen context can be passed as a file
   and an evidence-gated step that looks up only the genes whose annotation is
   blank (two tool calls at most). The category-gated variant, which checks
   NOVEL_ROLE and UNCHARACTERIZED calls against the literature, is available
-  as `component_overrides={"LIT": COMPONENT_REGISTRY["LITV"]}`.
+  as `component_overrides={"LIT": COMPONENTS["LITV"]}` (from `mozzarellm.prompts`).
 - **Phenotypic features**: pass `feature_columns` (up/down lists per gene —
   imaging features, DE genes, anything list-shaped) and optionally
   `strength_column` (any perturbation-strength metric; converted to scale-free
@@ -115,15 +115,18 @@ run without parsing timestamps. The screen context can be passed as a file
   neither overturns the call. Describe what your columns mean in
   `screen_context.json` under `phenotype_readout` — the model reads your
   description verbatim. Supported for `mode="cot"` (with or without MCP).
-- **Prompt customization** (`component_overrides={key: text}`): replace the
-  wording of any prompt component per run (see the notebook's customization
-  section); the shipped components are the benchmark-selected defaults, not a
-  constraint.
+- **Prompt customization**: every text the model sees is a named component in
+  `mozzarellm/prompts/components.py`; `mozzarellm/prompts/assembly.py` joins
+  them in the default chain for each mode. Reword any component per run with
+  `component_overrides={key: text}`, or run your own chain with
+  `component_order=[...]` (see the notebook's customization section). The
+  shipped wording is the benchmark-selected build, not a constraint.
 
 ## Repository layout
 
-- `mozzarellm/` — the package: LLM clients, prompt components, bundle builder,
-  screen analysis.
+- `mozzarellm/` — the package: LLM clients, prompts (`prompts/components.py`
+  is the wording, `prompts/assembly.py` the chain), bundle builder, screen
+  analysis.
 - `examples/` — the analysis notebook, the screen-context template, and the three
   example datasets (OPS, DepMap, proteomics).
 - `benchmarks/` — the prompt/evidence benchmarking suite that produced the

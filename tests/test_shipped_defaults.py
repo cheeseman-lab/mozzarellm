@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from mozzarellm.utils.prompt_factory import make_cluster_analysis_system_prompt
+from mozzarellm.prompts import make_cluster_analysis_system_prompt
 
 _REPO = Path(__file__).resolve().parents[1]
 _RUN_OF_RECORD = _REPO / "benchmarks" / "outputs" / "order" / "O_20260911_180759" / "prompts_used"
