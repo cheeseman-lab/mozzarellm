@@ -71,3 +71,34 @@ def test_empty_results_still_return_dataframes():
     assert out["gene_df"] is not None and out["gene_df"].empty
     assert "category" in out["gene_df"].columns
     assert out["cluster_df"] is not None and out["cluster_df"].empty
+
+
+def test_cluster_table_surfaces_phenotype_verdicts():
+    parsed = {
+        **_PARSED,
+        "feature_coherence": {"concrete": True},
+        "pathway_consistency": {"verdict": "partial", "confidence_revision": "tempered: X"},
+        "phenotype_strength": {"verdict": "weak", "confidence_revision": None},
+    }
+    row = save_cluster_analysis({"21": parsed}, save_outputs=False)["cluster_df"].iloc[0]
+    assert row["feature_signature"] is True or row["feature_signature"] == True  # noqa: E712
+    assert row["pathway_consistency"] == "partial" and row["phenotype_strength"] == "weak"
+    assert row["confidence_revision"] == "tempered: X"
+    plain = save_cluster_analysis({"21": _PARSED}, save_outputs=False)["cluster_df"].iloc[0]
+    assert plain["pathway_consistency"] == "" and plain["confidence_revision"] == ""
+
+
+def test_multi_fence_response_keeps_the_cluster_object_and_merges_named_blocks():
+    # The shape that broke: the model emitted the cluster JSON, then the phenotype
+    # objects as separate fenced blocks -- and the feature block was the largest.
+    from mozzarellm.utils.llm_analysis_utils import process_cluster_response
+
+    main = json.dumps({**_PARSED, "cluster_id": "167"})
+    big = json.dumps({"concrete": True, "essential_up": [{"feature": "f" * 400}], "rationale": "r"})
+    named = json.dumps({"pathway_consistency": {"verdict": "consistent"}})
+    text = f"```json\n{main}\n```\n\n**Feature coherence:**\n```json\n{big}\n```\n\n```json\n{named}\n```"
+    assert len(big) > len(main)
+    out = process_cluster_response(text)
+    assert out["cluster_id"] == "167" and out["established_genes"] == ["RPL3", "RPS6"]
+    assert out["pathway_consistency"] == {"verdict": "consistent"}
+    assert "concrete" not in out  # an unnamed block cannot be placed; it is not a gene loss

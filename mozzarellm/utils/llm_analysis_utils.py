@@ -13,27 +13,35 @@ CLUSTERS_JSON_SCHEMA_VERSION = "1"
 
 
 def extract_json_from_markdown(text):
+    """The cluster's JSON object from a response that may wrap it in markdown fences.
+
+    The main object is the fenced block carrying "cluster_id" (the largest
+    block when none does). A model sometimes emits the phenotype objects as
+    separate fenced blocks after it; a named object in another block
+    ({"phenotype_strength": {...}}) is merged in when the main object lacks
+    it. Returns the JSON text, or the original text if no fences.
     """
-    Extracts JSON from text that might be wrapped in markdown code blocks.
-
-    Args:
-        text: Raw text that might contain JSON in markdown code blocks
-
-    Returns:
-        Extracted JSON string or the original text if no code blocks found
-    """
-    import re
-
-    # Look for JSON in code blocks (with or without language specifier)
-    code_block_pattern = r"```(?:json)?\s*([\s\S]*?)```"
-    matches = re.findall(code_block_pattern, text)
-
-    if matches:
-        # Return the largest code block (most likely to be the complete JSON)
-        return max(matches, key=len).strip()
-
-    # If no code blocks found, return the original text
-    return text
+    blocks = [m.strip() for m in re.findall(r"```(?:json)?\s*([\s\S]*?)```", text)]
+    if not blocks:
+        return text
+    main = next((b for b in blocks if '"cluster_id"' in b), max(blocks, key=len))
+    extras = [b for b in blocks if b is not main]
+    if not extras:
+        return main
+    try:
+        obj = json.loads(main)
+    except json.JSONDecodeError:
+        return main
+    for block in extras:
+        try:
+            extra = json.loads(block)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(extra, dict):
+            for key, value in extra.items():
+                if isinstance(value, dict):  # a named object ({"phenotype_strength": {...}})
+                    obj.setdefault(key, value)
+    return json.dumps(obj, ensure_ascii=False)
 
 
 def process_cluster_response(analysis_text):
@@ -260,6 +268,17 @@ def _cluster_row(cluster_id, analysis):
         "dominant_process": analysis.get("dominant_process", ""),
         "pathway_confidence": analysis.get("pathway_confidence", ""),
         "summary": analysis.get("summary", ""),
+        "feature_signature": (analysis.get("feature_coherence") or {}).get("concrete", ""),
+        "pathway_consistency": (analysis.get("pathway_consistency") or {}).get("verdict", ""),
+        "phenotype_strength": (analysis.get("phenotype_strength") or {}).get("verdict", ""),
+        "confidence_revision": "; ".join(
+            r
+            for r in (
+                (analysis.get(k) or {}).get("confidence_revision")
+                for k in ("pathway_consistency", "phenotype_strength")
+            )
+            if r
+        ),
         "n_genes": total,
         "n_classified": classified,
         "n_established": len(established),
@@ -269,9 +288,7 @@ def _cluster_row(cluster_id, analysis):
         "novel_role_genes": ";".join(novel),
         "uncharacterized_genes": ";".join(unchar),
         "missed_genes": ";".join(missed),
-        "classification_completeness": round(
-            analysis.get("classification_completeness", 1.0), 3
-        ),
+        "classification_completeness": round(analysis.get("classification_completeness", 1.0), 3),
     }
 
 
@@ -300,8 +317,14 @@ def save_cluster_analysis(
         "json_data": None,
         "gene_df": pd.DataFrame(
             columns=[
-                "gene", "cluster_id", "category", "subclass", "rationale",
-                "evidence", "dominant_process", "pathway_confidence",
+                "gene",
+                "cluster_id",
+                "category",
+                "subclass",
+                "rationale",
+                "evidence",
+                "dominant_process",
+                "pathway_confidence",
             ]
         ),
         "cluster_df": pd.DataFrame(columns=["cluster_id"]),
@@ -366,8 +389,14 @@ def save_cluster_analysis(
             cluster_rows.append(_cluster_row(cluster_id, analysis))
 
         gene_columns = [
-            "gene", "cluster_id", "category", "subclass", "rationale",
-            "evidence", "dominant_process", "pathway_confidence",
+            "gene",
+            "cluster_id",
+            "category",
+            "subclass",
+            "rationale",
+            "evidence",
+            "dominant_process",
+            "pathway_confidence",
         ]
         gene_df = pd.DataFrame(gene_rows, columns=gene_columns)
         cluster_df = pd.DataFrame(cluster_rows)
