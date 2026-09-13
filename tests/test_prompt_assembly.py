@@ -59,24 +59,21 @@ _OVERRIDES = {"GCR": "GCR OVERRIDE TEXT\n", "PCC": "PCC OVERRIDE TEXT\n"}
         ("stepwise_system", {"mode": "stepwise", "mcp": True}),
         (
             "cot_mcp_features_strength",
-            dict(
-                mode="cot",
-                mcp=True,
-                component_order=default_order("cot", True, features=True, strength=True),
-            ),
+            {
+                "mode": "cot",
+                "mcp": True,
+                "component_order": default_order("cot", True, features=True, strength=True),
+            },
         ),
         ("cot_overrides", {"mode": "cot", "component_overrides": _OVERRIDES}),
         ("standard_overrides", {"mode": "standard", "component_overrides": _OVERRIDES}),
     ],
 )
 def test_system_prompt_matches_pre_reshape_render(name, kwargs):
-    expected = (_FIXTURES / f"{name}.txt").read_text(encoding="utf-8")
-    assert (
-        make_cluster_analysis_system_prompt(
-            screen_name="whitney", screen_context_path=_CONTEXT, **kwargs
-        )
-        == expected
+    prompt = make_cluster_analysis_system_prompt(
+        screen_name="whitney", screen_context_path=_CONTEXT, **kwargs
     )
+    assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == _PRE_RESHAPE[name]
 
 
 @pytest.mark.parametrize(
