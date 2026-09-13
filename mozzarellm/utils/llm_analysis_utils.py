@@ -12,14 +12,24 @@ import pandas as pd
 CLUSTERS_JSON_SCHEMA_VERSION = "1"
 
 
+# A phenotype object emitted bare (no field name) is recognized by the key only
+# its output format carries; pathway_consistency is the remaining "verdict" shape.
+_BARE_BLOCK_SIGNATURES = (
+    ("feature_coherence", "concrete"),
+    ("phenotype_strength", "weak_members"),
+    ("pathway_consistency", "verdict"),
+)
+
+
 def extract_json_from_markdown(text):
     """The cluster's JSON object from a response that may wrap it in markdown fences.
 
     The main object is the fenced block carrying "cluster_id" (the largest
     block when none does). A model sometimes emits the phenotype objects as
     separate fenced blocks after it; a named object in another block
-    ({"phenotype_strength": {...}}) is merged in when the main object lacks
-    it. Returns the JSON text, or the original text if no fences.
+    ({"phenotype_strength": {...}}), or a bare one recognized by its
+    signature key, is merged in when the main object lacks it. Returns the
+    JSON text, or the original text if no fences.
     """
     blocks = [m.strip() for m in re.findall(r"```(?:json)?\s*([\s\S]*?)```", text)]
     if not blocks:
@@ -37,10 +47,15 @@ def extract_json_from_markdown(text):
             extra = json.loads(block)
         except json.JSONDecodeError:
             continue
-        if isinstance(extra, dict):
-            for key, value in extra.items():
-                if isinstance(value, dict):  # a named object ({"phenotype_strength": {...}})
-                    obj.setdefault(key, value)
+        if not isinstance(extra, dict):
+            continue
+        name = next((n for n, key in _BARE_BLOCK_SIGNATURES if key in extra), None)
+        if name:  # a bare phenotype object, placed by its signature key
+            obj.setdefault(name, extra)
+            continue
+        for key, value in extra.items():
+            if isinstance(value, dict):  # a named object ({"phenotype_strength": {...}})
+                obj.setdefault(key, value)
     return json.dumps(obj, ensure_ascii=False)
 
 

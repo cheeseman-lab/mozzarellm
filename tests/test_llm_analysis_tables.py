@@ -101,4 +101,5 @@ def test_multi_fence_response_keeps_the_cluster_object_and_merges_named_blocks()
     out = process_cluster_response(text)
     assert out["cluster_id"] == "167" and out["established_genes"] == ["RPL3", "RPS6"]
     assert out["pathway_consistency"] == {"verdict": "consistent"}
-    assert "concrete" not in out  # an unnamed block cannot be placed; it is not a gene loss
+    assert out["feature_coherence"]["concrete"] is True  # bare block placed by its signature
+    assert "concrete" not in out
