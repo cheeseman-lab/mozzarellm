@@ -1,4 +1,3 @@
-
 {
   "TODO": {
     "description": "Copy this template, fill in the values, add/remove fields as needed, and remove the entire TODO field.",
@@ -33,5 +32,9 @@
     "citation": "required",
     "data_source": "required"
   },
-  "notes": "optional"
+  "notes": "optional",
+  "phenotype_readout": {
+    "features_description": "TODO: what the up/down feature lists are and what cutoff produced them (omit this block if your table has no feature columns)",
+    "strength_description": "TODO: what the perturbation-strength metric measures and how it was computed vs controls (omit if no strength column)"
+  }
 }

@@ -1,121 +1,93 @@
-"""
-Prompt templates and instructions for gene cluster analysis.
+"""The prompt texts.
 
-Organized in assembly order: components appear in the file in the same order
-they are concatenated by the prompt factory.
+Every piece of wording the model sees lives in this file, in the order the
+default chain-of-thought prompt presents it. Nothing here is executed: each
+component is a string, and the registry at the bottom names them. Assembly
+(ordering, numbering, overrides, the screen context) is in assembly.py.
 
-Standard mode: TASK → SCREEN_CONTEXT → GENE_CATEGORIZATION → NOVEL_RULES →
-               UNCHARACTERIZED_RULES → PATHWAY_CONFIDENCE → OUTPUT_FORMAT
-
-CoT mode:      TASK → SCREEN_CONTEXT → PATHWAY_HYPOTHESIS → GENE_CATEGORIZATION →
-               SUBCLASSIFICATION → PATHWAY_SELECTION → VERIFICATION → OUTPUT_FORMAT
+The base texts (CAT, GCR, NPR, UPR, PCC, O) are the benchmark-selected build.
+The chain-of-thought steps that embed a base text are templates with a
+``{KEY}`` slot for it, so overriding a base text also re-renders the step.
 """
 
 # =============================================================================
 # CORE TASK
 # =============================================================================
 
-CLUSTER_ANALYSIS_TASK = """
-MISSION: Functional genomics experiments cluster genes by phenotypic similarity. Your goal is to:
-1. Identify the dominant biological pathway that explains why these genes cluster together
-2. Categorize ALL genes relative to this pathway (ESTABLISHED / UNCHARACTERIZED / NOVEL_ROLE)
-3. Prioritize understudied genes (UNCHARACTERIZED and NOVEL_ROLE) for follow-up experiments
-
-The pathway is not the end goal - it's the lens for discovering which genes merit investigation.
+CLUSTER_ANALYSIS_TASK = """MISSION: Every downstream call depends on correctly identifying what unites this cluster, so anchor
+there first.
+1. Determine the biological pathway(s) that explain the cluster — commit to a single dominant
+   process where one clearly fits, or 2-3 distinct processes if the cluster genuinely spans them. If
+   no process explains a substantial share of the genes, declare no coherent pathway.
+2. Categorize ALL genes against that pathway (ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED).
+3. Prioritize UNCHARACTERIZED and NOVEL_ROLE genes for follow-up.
 """
 
 # =============================================================================
 # GENE CATEGORIZATION & CLASSIFICATION RULES
 # =============================================================================
 
-GENE_CATEGORIZATION_RULES = """
-STEP A — CATEGORIZE each gene into exactly one of three categories:
+GENE_CATEGORIZATION_RULES = """PRECONDITION: This step applies ONLY when a coherent biological pathway has been identified for the cluster. If no coherent pathway exists, leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty and skip this step — per-gene classification relative to a nonexistent pathway is undefined.
 
-1. ESTABLISHED:
-   At least one peer-reviewed paper directly demonstrates this gene's functional role
-   in the identified pathway (e.g., knockout/knockdown phenotype, biochemical interaction,
-   or mechanistic study within this pathway). Review articles or guilt-by-association
-   do not count — there must be direct experimental evidence in this specific pathway.
+TASK: For each gene in the cluster, categorize as ESTABLISHED, NOVEL_ROLE, or UNCHARACTERIZED based on the evidence provided in the gene's bundle annotation.
+- ESTABLISHED: the annotation documents a role in THIS cluster's pathway.
+- NOVEL_ROLE: the annotation documents function, but not in this pathway — its membership here is the new evidence.
+- UNCHARACTERIZED: the annotation offers nothing to relate to any process.
 
-2. NOVEL_ROLE:
-   At least one paper has studied this gene's molecular function, but that function is
-   in a DIFFERENT pathway. The gene is characterized — just not in this context.
-
-3. UNCHARACTERIZED:
-   No paper has focused on this gene's molecular function in any pathway in human cells.
-   This includes completely unstudied genes, genes with only domain/homology annotations,
-   and genes characterized only in non-human organisms.
-
-BOUNDARY RULES (apply in order):
-- Has any paper focused on this gene's molecular function? → No → UNCHARACTERIZED (stop)
-- Does that paper show a role in THIS specific pathway? → Yes → ESTABLISHED (stop)
-- Otherwise → NOVEL_ROLE
-
-STEP B — CLASSIFY: For NOVEL_ROLE and UNCHARACTERIZED genes, assign a sub-class
-(see classification rules below).
+Gating procedure (apply in order):
+1. Does the annotation offer ANY functional signal — a described function, a domain or motif, a process, an interaction? If NO (nothing to relate): UNCHARACTERIZED. A sparse annotation whose evidence still threads to some process is NOT uncharacterized — sparse but relatable means step 2 decides.
+2. Is the documented function part of THIS cluster's pathway? Yes: ESTABLISHED. No: NOVEL_ROLE. Judge against the pathway itself, not the gene's prominence — a well-studied gene with no documented role in this pathway is NOVEL_ROLE; general fame never makes a gene ESTABLISHED.
 """
 
-NOVEL_CLASSIFICATION_RULES = """
-Sub-classes for NOVEL_ROLE genes (genes with established functions in OTHER pathways):
+NOVEL_CLASSIFICATION_RULES = """PRECONDITION: This step applies ONLY to genes already categorized as NOVEL_ROLE per the gene classification rules. If no genes were categorized as NOVEL_ROLE (because no coherent pathway exists, or no genes fit the criteria), do nothing — no sub-classification is needed.
 
-  NO_EVIDENCE: No data linking this gene to the identified pathway.
-  INDIRECT_EVIDENCE: A logical connection exists based on shared biology (e.g., same organelle, upstream regulator) but no direct experimental link.
-  PARTIAL_EVIDENCE: Preliminary data (e.g., proteomics hit, co-expression) suggests a link to this pathway, but no focused mechanistic study. If a focused study exists, recategorize as ESTABLISHED.
-  CONTRADICTORY_EVIDENCE: The gene's known function is incompatible with this pathway.
+SUB-CLASSIFICATION (NOVEL_ROLE genes only): assign exactly one sub-class based on how the bundle's annotation relates to the identified pathway.
+- NO_EVIDENCE: nothing in the annotation links the gene to this pathway.
+- INDIRECT_EVIDENCE: the annotation shows a logical connection (shared organelle, upstream regulator) but no direct experimental link.
+- PARTIAL_EVIDENCE: the annotation reports actual data touching this pathway — a physical interaction, proteomics/co-IP hit, co-expression, or a functional assay — without focused mechanistic study.
+- CONTRADICTORY_EVIDENCE: the annotation describes a function incompatible with this pathway.
 
-Assign exactly one sub-class per gene.
+PARTIAL_EVIDENCE always requires such reported data: a connection that is merely plausible, however strong the logic, is INDIRECT_EVIDENCE at most — never PARTIAL_EVIDENCE without data in the annotation.
 """
 
-UNCHARACTERIZED_CLASSIFICATION_RULES = """
-Sub-classes for UNCHARACTERIZED genes (no focused study of molecular function in human cells):
+UNCHARACTERIZED_CLASSIFICATION_RULES = """PRECONDITION: This step applies ONLY to genes already categorized as UNCHARACTERIZED per the gene
+classification rules. If no genes were categorized as UNCHARACTERIZED, do nothing.
 
-  DARK_GENE: No name, no functional characterization whatsoever.
-  NASCENT: No standard name, but some preliminary functional data exists.
-  ANNOTATED_ONLY: Has a gene name and domain/motif annotations, but no mechanistic study.
-  NON_HUMAN_CHARACTERIZED: Functionally studied in a non-human organism only.
+SUB-CLASSIFICATION (UNCHARACTERIZED genes only): assign exactly one sub-class based on the gene's
+bundle annotation.
+- DARK_GENE: identified only by a raw identifier (e.g. an Ensembl ENSG or LOC-style ID) with no
+  annotation of any kind.
+- NASCENT: no standard name, but some preliminary functional data exists.
+- ANNOTATED_ONLY: carries an official gene symbol and/or domain/motif annotation, but no
+  functional study.
+- NON_HUMAN_CHARACTERIZED: functionally studied in a non-human organism only.
 
-Assign exactly one sub-class per gene.
+Identifier test: a gene carrying an official gene symbol is NEVER DARK_GENE, even when its bundle
+contains no annotation text — an assigned symbol means the gene has been named and catalogued, and
+ANNOTATED_ONLY is the correct call. Reserve DARK_GENE for genes whose only identity is a raw
+database identifier.
 """
 
 # =============================================================================
 # PATHWAY CONFIDENCE ASSESSMENT
 # =============================================================================
 
-PATHWAY_CONFIDENCE_CRITERIA = """
-ASSESSING PATHWAY CONFIDENCE:
+PATHWAY_CONFIDENCE_CRITERIA = """PATHWAY CONFIDENCE: report how confident you are in your dominant_process call itself — an assessment of your own call, not merely of how well the genes fit it. Weigh three things:
+- how much of the cluster the pathway explains;
+- how many genes are outsiders the call cannot place — count them explicitly, INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway;
+- whether a different biological process could explain the cluster comparably well. Before assigning a level, briefly consider the strongest alternative explanation.
 
-After identifying candidate pathway(s), evaluate how well they explain the cluster using
-these stringent criteria based on what percentage of genes fit the proposed pathway(s):
+High confidence:
+- The call would survive being wrong about any single gene; outsiders are absent or a token few; no credible alternative process.
 
-HIGH CONFIDENCE:
-- >70% of genes in the cluster fit the proposed pathway(s)
-- Multiple well-established genes with strong literature support in the pathway(s)
-- Clear functional relationships between genes that explain the observed phenotypic clustering
+Medium confidence:
+- The call is the best available explanation, but it rests partly on inference (many members are not documented participants), a notable share of the cluster is outsiders it cannot place, or a plausible alternative process exists. A notable outsider share caps confidence at Medium even when every placed gene fits perfectly.
 
-MEDIUM CONFIDENCE:
-- 50-70% of genes in the cluster fit the proposed pathway(s)
-- Some established genes from the pathway(s), with additional plausible supporting genes
-- Functional relationship is plausible but has some gaps or uncertainties
+Low confidence:
+- The call is tentative: an alternative explains the cluster about as well, or the cluster is heterogeneous enough that the dominant process may be an artifact of a subset.
 
-LOW CONFIDENCE:
-- 30-50% of genes in the cluster fit the proposed pathway(s)
-- Few established pathway genes; themes may be broad or general
-- Significant heterogeneity in gene functions within the cluster
-
-NO COHERENT PATHWAY:
-- <30% of genes in the cluster fit any proposed pathway(s)
-- Genes belong to many unrelated pathways
-- Cluster contains nontargeting control genes
-- Cannot identify a dominant biological process
-
-If there is no coherent pathway, set:
-- "pathway_confidence": "Low"
-- "dominant_process": "No coherent biological pathway"
-- And explain the reasoning clearly in the "summary" field
-
-Remember: The goal is to honestly assess pathway support, not to force-fit genes into pathways.
-Low confidence clusters may still contain valuable discovery opportunities if individual genes
-are understudied.
+No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined):
+- No process explains a substantial share of the genes, or the cluster contains many unrelated functions or nontargeting controls.
 """
 
 # =============================================================================
@@ -153,9 +125,10 @@ genes that are in the NOVEL_ROLE or UNCHARACTERIZED categories.
 """
 
 # =============================================================================
-# LITERATURE VALIDATION (mode-agnostic MCP step) — two selectable variants:
-#   "LIT"  STEP_LITERATURE_VALIDATION    — category-gated (NOVEL_ROLE/UNCHARACTERIZED genes)
-#   "LITB" STEP_LITERATURE_GAPFILL_BLANK — evidence-gated (blank-annotation genes only)
+# LITERATURE (mode-agnostic MCP step) — two selectable variants, one slot ("LIT"):
+#   "LIT"  STEP_LITERATURE_GAPFILL_BLANK — evidence-gated (blank-annotation genes only);
+#          the benchmark-selected default
+#   "LITV" STEP_LITERATURE_VALIDATION    — category-gated (NOVEL_ROLE/UNCHARACTERIZED genes)
 # Both used in single_mcp / cot_mcp / stepwise_mcp — exactly 2 MCP tool calls.
 # =============================================================================
 
@@ -194,7 +167,10 @@ In the final output, include:
 - A `literature_validation` field on each NOVEL_ROLE and UNCHARACTERIZED gene in the final classification, per the schema:
 {LITERATURE_VALIDATION_OUTPUT_FORMAT}
 - A top-level `literature_informed_reclassifications` array listing every gene whose category changed from your pre-literature categorization to post-validation. Each entry: {{"gene": "...", "initial_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "final_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "driving_pmids": ["..."], "rationale": "one sentence — what literature justified the move"}}. If nothing changed, use an empty array.
-- A top-level `literature_informed_pathway_revision` object: {{"pre_literature_pathway": "your tentative pathway BEFORE literature validation", "post_literature_pathway": "your final pathway AFTER literature validation (may be the same)", "pathway_changed": true/false, "rationale": "one sentence — what literature drove the change, or why it stayed the same"}}."""
+- A top-level `literature_informed_pathway_revision` object: {{"pre_literature_pathway": "your tentative pathway BEFORE literature validation", "post_literature_pathway": "your final pathway AFTER literature validation (may be the same)", "pathway_changed": true/false, "rationale": "one sentence — what literature drove the change, or why it stayed the same"}}.
+
+CRITICAL OUTPUT CONSTRAINT: Your entire response MUST be a single valid JSON object and nothing else. Start with `{{` and end with `}}`. Do NOT write any preamble, plan, or commentary about your searches — no "Based on my analysis...", no "According to PubMed...", no restating of the query. Do NOT write any text before the opening brace or after the closing brace. Report every literature finding ONLY inside JSON fields (rationale, literature_validation), never as prose.
+"""
 
 STEP_LITERATURE_GAPFILL_BLANK = """LITERATURE GAP-FILL (evidence-gated MCP):
 Some genes in the evidence bundle have NO functional annotation provided (the annotation field is empty, or absent entirely). For those genes ONLY, use the attached PubMed MCP tools to retrieve functional evidence. Genes that already have annotation text MUST NOT be looked up, regardless of how you classify them.
@@ -215,7 +191,8 @@ Classify GAP genes on equal footing with the pre-annotated genes using the retri
 
 In the final output, add a top-level `mcp_gapfill` array — one entry per GAP gene: {"gene": "...", "evidence_found": true|false, "driving_pmids": ["..."], "retrieved_summary": "..."}. Empty array if there were no GAP genes.
 
-CRITICAL OUTPUT CONSTRAINT: Your entire response MUST be a single valid JSON object and nothing else. Start with `{` and end with `}`. Do NOT write any preamble, plan, or commentary about your searches — no "Based on my analysis...", no "According to PubMed...", no restating of the query. Do NOT write any text before the opening brace or after the closing brace. Report every literature finding ONLY inside JSON fields (rationale, mcp_gapfill), never as prose."""
+CRITICAL OUTPUT CONSTRAINT: Your entire response MUST be a single valid JSON object and nothing else. Start with `{` and end with `}`. Do NOT write any preamble, plan, or commentary about your searches — no "Based on my analysis...", no "According to PubMed...", no restating of the query. Do NOT write any text before the opening brace or after the closing brace. Report every literature finding ONLY inside JSON fields (rationale, mcp_gapfill), never as prose.
+"""
 
 # =============================================================================
 # FEATURE COHERENCE + PATHWAY CONSISTENCY (feature-interp mode)
@@ -236,10 +213,15 @@ Each evidence bundle includes a `feature_coherence` field with a per-feature bre
 across the cluster: for each feature, `n_up` / `frac_up` and `n_down` / `frac_down` of
 the cluster genes calling it differentially significant in that direction, along with
 the corresponding `up_genes` / `down_genes` lists. This is the data for this step.
+The table is bounded: only features reaching `min_frac` of the cluster in at least one
+direction are listed (`n_features_shown` of `n_features_total`); features below that
+coverage cannot be essential and are absent by design, not by lack of signal.
+If the experimental context describes how these features were derived (what they
+measure, the ranking, the cutoff), read them in that light.
 
-You may also use the per-gene `up_features` / `down_features` lists in `cluster_genes`
-ONLY to verify that candidate "essential" features are driven by an OVERLAPPING gene
-subset (not disjoint subsets that just sum to a high fraction).
+Use the `up_genes` / `down_genes` lists to verify that candidate "essential" features
+are driven by an OVERLAPPING gene subset (not disjoint subsets that just sum to a
+high fraction).
 
 Procedure:
 
@@ -313,31 +295,71 @@ In the final output, include:
 - A top-level `pathway_consistency` object, per the schema:
 {PATHWAY_CONSISTENCY_OUTPUT_FORMAT}"""
 
+PHENOTYPE_STRENGTH_OUTPUT_FORMAT = """
+The top-level "phenotype_strength" field must contain:
+- "verdict": "strong" | "mixed" | "weak"
+- "weak_members": [gene symbols from the weakest quartile of the screen; empty if none]
+- "rationale": one or two sentences citing the table's ranks and fractions; no new biology
+- "confidence_revision": null | one sentence (only set when the strength profile materially changes confidence in dominant_process)
+"""
+
+STEP_PHENOTYPE_STRENGTH = f"""PHENOTYPE STRENGTH (recall over a discrete table, then a bounded verdict):
+
+Each evidence bundle includes a `phenotype_strength` table: per-gene perturbation-phenotype
+ranks of the form "N/M" — rank among the M genes of this screen by strength relative to
+non-targeting controls, 1 = strongest — plus `median_rank`, `strongest_quartile_frac`,
+`weakest_quartile_frac`, and the `ranked_genes` list (strongest first). This is the data for
+this step. If the experimental context describes how strength was measured, read the ranks
+in that light.
+
+Procedure:
+1. Verdict on the cluster's phenotypic signal, from the table:
+   - "strong": ranks concentrate toward the strong end — the clustering rests on robust
+     phenotypes.
+   - "mixed": a strong core plus weak members; list the weak members.
+   - "weak": ranks concentrate toward the weak end — the clustering may be noise-dominated.
+2. Write `rationale` (one or two sentences citing `median_rank` and the quartile fractions).
+3. Set `confidence_revision` only when the strength profile materially changes confidence in
+   `dominant_process` — a coherent call resting on weak phenotypes deserves tempered
+   confidence, stated in one sentence. Otherwise leave it null.
+
+Hard guardrails:
+- Strength tempers confidence; it never re-calls the pathway or re-categorizes a gene. A
+  coherent cluster of weak phenotypes is "right call, weak signal". Do not modify
+  `dominant_process` or gene categories in this step.
+- Cite only ranks present in the table; genes absent from `ranked_genes` carry no rank and
+  are not treated as weak.
+
+In the final output, include:
+- A top-level `phenotype_strength` object, per the schema:
+{PHENOTYPE_STRENGTH_OUTPUT_FORMAT}"""
+
 # =============================================================================
 # CHAIN-OF-THOUGHT STEPS
 # =============================================================================
 
 
-COT_STEP_PATHWAY_HYPOTHESIS = """PATHWAY HYPOTHESIS (2-3 candidates):
+COT_STEP_PATHWAY_HYPOTHESIS = """PATHWAY HYPOTHESIS:
 - Review gene annotations
-- List 2-3 candidate pathways with supporting genes
-- Note which annotations support each hypothesis"""
+- Identify the candidate pathway(s) the annotations support — commit to a single dominant process where one clearly fits, or 2-3 distinct processes if the cluster genuinely spans them
+- Note which annotations support each candidate
+- If no process explains a substantial share of the genes, say so — an honest "no coherent pathway" call is a valid outcome"""
 
-COT_STEP_GENE_CATEGORIZATION = f"""GENE CATEGORIZATION (cite evidence):
+COT_STEP_GENE_CATEGORIZATION = """GENE CATEGORIZATION (cite evidence):
 For each gene, assign to exactly one category: ESTABLISHED / NOVEL_ROLE / UNCHARACTERIZED
-These are defined according to the following rules: {GENE_CATEGORIZATION_RULES}
+These are defined according to the following rules: {GCR}
 """
 
-COT_STEP_SUBCLASSIFICATION = f"""SUB-CLASSIFICATION:
+COT_STEP_SUBCLASSIFICATION = """SUB-CLASSIFICATION:
 For NOVEL_ROLE genes, assign one sub-class: NO_EVIDENCE / INDIRECT_EVIDENCE / PARTIAL_EVIDENCE / CONTRADICTORY_EVIDENCE
-These are defined according to the following rules: {NOVEL_CLASSIFICATION_RULES}
+These are defined according to the following rules: {NPR}
 For UNCHARACTERIZED genes, assign one sub-class: DARK_GENE / NASCENT / ANNOTATED_ONLY / NON_HUMAN_CHARACTERIZED
-These are defined according to the following rules: {UNCHARACTERIZED_CLASSIFICATION_RULES}
+These are defined according to the following rules: {UPR}
 Cite specific annotations that inform each classification."""
 
-COT_STEP_PATHWAY_SELECTION = f"""PATHWAY SELECTION:
+COT_STEP_PATHWAY_SELECTION = """PATHWAY SELECTION:
 Once you have identified candidate pathway(s), evaluate how well EACH pathway explains the cluster using
-these stringent criteria based on what percentage of genes fit the proposed pathway: {PATHWAY_CONFIDENCE_CRITERIA}
+these stringent criteria based on what percentage of genes fit the proposed pathway: {PCC}
 Now, select a dominant pathway based on:
   * Number of established genes with direct roles
   * Coherence of functional relationships
@@ -346,52 +368,33 @@ Now, select a dominant pathway based on:
 COT_STEP_VERIFICATION = """VERIFICATION:
 - Check for contradictions
 - Verify all genes are classified (no omissions)
-- Adjust confidence if evidence is weak or contradictory
+- Check that the confidence level follows the stated confidence criteria, not general impressions
 - Note any gaps in evidence that limit conclusions"""
 
-COT_STEP_OUTPUT = f"""FINAL JSON OUTPUT:
+COT_STEP_OUTPUT = """FINAL JSON OUTPUT:
 - Compile structured JSON with all required fields
 - Ensure cluster_id matches input exactly
 - Include concise summary highlighting key findings and evidence quality
-According to {OUTPUT_FORMAT_JSON}"""
+According to {O}"""
 
 # =============================================================================
-# COMPONENT REGISTRY & CANONICAL ORDERS
+# REGISTRY
 # =============================================================================
-# Shorthand keys for each prompt component, used by prompt_factory when
-# assembling prompts in an arbitrary order (e.g. for benchmarking).
-#
-# Baseline components:
-#   CAT  = Cluster Analysis Task  (always present)
-#   SC   = Screen Context         (always present, injected per-case — NOT in registry)
-#   GCR  = Gene Categorization Rules
-#   NPR  = Novel Classification Rules
-#   UPR  = Uncharacterized Classification Rules
-#   PCC  = Pathway Confidence Criteria
-#   O    = Output format (JSON)
-#
-# CoT-specific components:
-#   cPH  = Pathway Hypothesis step
-#   cPSC = Pathway Selection & Confidence step (references PCC)
-#   cGCR = Gene Categorization step            (references GCR)
-#   cPri = Sub-classification (references NPR & UPR)
-#   cVer = Verification step
-#   cO   = Final JSON Output step              (references O)
-#   cFC  = Feature Coherence step  (feature-interp mode; emits feature_coherence)
-#   cPC  = Pathway Consistency step (feature-interp mode; emits pathway_consistency)
-#
-# NOTE: "SC" is not in the registry because screen context is dynamic
-# (varies per case). It is handled specially during assembly.
+# Base components:  CAT task, GCR / NPR / UPR rules, PCC confidence, O output
+# Literature (MCP): LIT gap-fill (default), LITV validation -- one slot, "LIT"
+# Chain of thought: cPH hypothesis, cGCR, cPri, cPSC, cVer, cO (embed the base
+#                   texts), cFC / cPC / cPS phenotype steps (data-gated)
+# "SC", the per-screen context, is injected at assembly and is not a text.
 
-COMPONENT_REGISTRY = {
+COMPONENTS = {
     "CAT": CLUSTER_ANALYSIS_TASK,
     "GCR": GENE_CATEGORIZATION_RULES,
     "NPR": NOVEL_CLASSIFICATION_RULES,
     "UPR": UNCHARACTERIZED_CLASSIFICATION_RULES,
     "PCC": PATHWAY_CONFIDENCE_CRITERIA,
     "O": OUTPUT_FORMAT_JSON,
-    "LIT": STEP_LITERATURE_VALIDATION,
-    "LITB": STEP_LITERATURE_GAPFILL_BLANK,
+    "LIT": STEP_LITERATURE_GAPFILL_BLANK,
+    "LITV": STEP_LITERATURE_VALIDATION,
     "cPH": COT_STEP_PATHWAY_HYPOTHESIS,
     "cGCR": COT_STEP_GENE_CATEGORIZATION,
     "cPri": COT_STEP_SUBCLASSIFICATION,
@@ -399,22 +402,14 @@ COMPONENT_REGISTRY = {
     "cVer": COT_STEP_VERIFICATION,
     "cFC": STEP_FEATURE_COHERENCE,
     "cPC": STEP_PATHWAY_CONSISTENCY,
+    "cPS": STEP_PHENOTYPE_STRENGTH,
     "cO": COT_STEP_OUTPUT,
 }
 
-CANONICAL_ZERO_SHOT_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "O"]
-CANONICAL_ZERO_SHOT_MCP_ORDER = ["CAT", "SC", "GCR", "NPR", "UPR", "PCC", "LIT", "O"]
-CANONICAL_COT_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "cPSC", "cVer", "cO"]
-CANONICAL_COT_MCP_ORDER = ["CAT", "SC", "cPH", "cGCR", "cPri", "LIT", "cPSC", "cVer", "cO"]
-CANONICAL_FEATURE_INTERP_COT_ORDER = [
-    "CAT",
-    "SC",
-    "cPH",
-    "cGCR",
-    "cPri",
-    "cPSC",
-    "cVer",
-    "cFC",
-    "cPC",
-    "cO",
-]
+# Which chain-of-thought steps embed which base texts (the template slots).
+EMBEDS = {
+    "cGCR": ("GCR",),
+    "cPri": ("NPR", "UPR"),
+    "cPSC": ("PCC",),
+    "cO": ("O",),
+}

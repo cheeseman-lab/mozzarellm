@@ -20,7 +20,7 @@ from benchmarks.workflow.bench_routes import (
     ROUTE_REGISTRY,
     StepwiseTurn,
 )
-from mozzarellm.prompt_components import COMPONENT_REGISTRY
+from mozzarellm.prompts import COMPONENTS
 
 # ============================================================================
 # Variant registry tests
@@ -96,8 +96,8 @@ class TestOrderSpecs:
                     assert len(spec["user_turn_keys"]) > 0
 
     def test_component_keys_are_valid(self):
-        """All component keys in specs resolve to COMPONENT_REGISTRY or SC."""
-        valid_keys = set(COMPONENT_REGISTRY.keys()) | {"SC"}
+        """All component keys in specs resolve to COMPONENTS or SC."""
+        valid_keys = set(COMPONENTS) | {"SC"}
         for variant_key, mode_specs in _ORDER_SPECS.items():
             for (mode, mcp), spec in mode_specs.items():
                 for key in spec["component_order"]:

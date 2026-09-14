@@ -20,6 +20,15 @@ def _context_json_validator(data) -> bool:
     return True
 
 
+def validate_screen_context(data: dict) -> dict[str, Any]:
+    """Validate an in-memory screen-context dict (size/completion + schema)."""
+    _context_json_validator(data)
+    dumped = ScreenContext.model_validate(data).model_dump()
+    if dumped.get("phenotype_readout") is None:
+        dumped.pop("phenotype_readout", None)  # absent, not null, in what the model reads
+    return dumped
+
+
 def load_screen_context_json(
     path: str | Path | None,
     *,
@@ -39,8 +48,6 @@ def load_screen_context_json(
         with json_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
 
-        _context_json_validator(data)  # size and completion check
-        model = ScreenContext.model_validate(data)  # schema validation
-        return model.model_dump()
+        return validate_screen_context(data)
     except Exception as e:
         raise Exception(f"Error loading screen context JSON: {e}") from e

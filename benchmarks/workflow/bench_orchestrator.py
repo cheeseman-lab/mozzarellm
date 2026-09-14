@@ -35,7 +35,7 @@ import pandas as pd
 
 from mozzarellm.clients.llm_api_clients import create_client
 from mozzarellm.pipeline.literature_mcp import get_available_mcp_servers
-from mozzarellm.utils.prompt_factory import (
+from mozzarellm.prompts import (
     compose_stepwise_user_turns,
     make_cluster_analysis_system_prompt,
     make_single_cluster_analysis_user_prompt,
@@ -189,6 +189,9 @@ def construct_prompts(
     # path. Phase 1 routes (order_variant == "") use the original mode-based
     # default assembly to preserve backward compatibility exactly.
     is_order_variant = bool(route.order_variant)
+    # Order variants and phenotype-extended routes both carry an explicit
+    # component order; everything else takes the mode-based default assembly.
+    custom_order = is_order_variant or route.features or route.strength
     # Label used for the on-disk prompt filename; defaults to the route name.
     prompt_label = condition_name or route.name
 
@@ -224,7 +227,7 @@ def construct_prompts(
         prompt_filename = f"system_prompt_{prompt_label}_{route.mode}_{screen_name}"
         prompt_file = output_dir / "prompts_used" / f"{prompt_filename}.txt"
         with _IO_LOCK:
-            if prompt_file.exists() and not is_order_variant:
+            if prompt_file.exists() and not custom_order:
                 system_prompt = prompt_file.read_text(encoding="utf-8")
             else:
                 system_prompt = make_cluster_analysis_system_prompt(
@@ -232,14 +235,19 @@ def construct_prompts(
                     screen_context_path=screen_context_path,
                     mode=route.mode,
                     mcp=route.mcp,
-                    component_order=(list(route.component_order) if is_order_variant else None),
+                    component_order=(list(route.component_order) if custom_order else None),
                     component_overrides=component_overrides,
                     output_dir=output_dir / "prompts_used",
                     prompt_filename=prompt_filename,
                 )
 
     user_prompt = make_single_cluster_analysis_user_prompt(
-        cluster_id, screen_name, cluster_to_bundle_map, source=source
+        cluster_id,
+        screen_name,
+        cluster_to_bundle_map,
+        include_features=route.features,
+        include_strength=route.strength,
+        source=source,
     )
 
     stepwise_turns = None
@@ -391,11 +399,13 @@ def execute_single_run(
         raw_outputs = generate_mock_raw_outputs(route)
     else:
         try:
+            stepwise_turns = prompts["stepwise_turns"]
             parsed, raw_outputs = client.analyze(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 mode=route.mode,
                 mcp=route.mcp,
+                **({"stepwise_turns": stepwise_turns} if stepwise_turns is not None else {}),
             )
             error = raw_outputs.get("error")
         except Exception as e:
@@ -749,9 +759,7 @@ def _run_benchmark_loop(
                     " -- bundle not found"
                 )
                 continue
-            screen_context_path = _resolve_screen_context_path(
-                config.paths.inputs_dir, screen_name
-            )
+            screen_context_path = _resolve_screen_context_path(config.paths.inputs_dir, screen_name)
             if screen_context_path is None:
                 print(
                     f"  [SKIP] {spec.condition_name}/{screen_name}/cluster_{cluster_id}"

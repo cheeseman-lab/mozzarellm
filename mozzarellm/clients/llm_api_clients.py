@@ -5,16 +5,12 @@ This module provides a consistent interface via client classes for querying diff
 (OpenAI, Anthropic, Google Gemini) with automatic retry logic and error handling.
 """
 
-import json
 import logging
 import os
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime
-from pathlib import Path
 
 import anthropic
-from anthropic.types.messages.batch_create_params import Request
 
 # NOTE: client specific imports (other than anthropic) are done in the methods to avoid import-time failures for optional dependencies
 
@@ -38,6 +34,37 @@ _SAMPLING_LOCKED_MODELS = (
 # Model -> whether type=enabled extended thinking is supported, resolved once per
 # process from the Models API capability tree (offline fallback: the tuple above).
 _THINKING_SUPPORT_CACHE: dict[str, bool] = {}
+
+
+def _cached_system(system_prompt: str) -> list[dict]:
+    """System prompt as a cache-marked block.
+
+    The system prompt is constant within a run, so a breakpoint here lets every
+    cluster call (and every internal MCP tool round) read it from cache.
+    """
+    return [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
+
+
+def _cached_user_message(user_prompt: str) -> dict:
+    """User bundle as a cache-marked block.
+
+    The evidence bundle repeats across replicates and across the MCP loop's
+    internal tool rounds; marking it extends the cached prefix past the bundle.
+    """
+    return {
+        "role": "user",
+        "content": [{"type": "text", "text": user_prompt, "cache_control": {"type": "ephemeral"}}],
+    }
+
+
+def _usage_tokens(usage) -> dict:
+    """Uniform token counts from a messages usage object, cache fields included."""
+    return {
+        "input_tokens": getattr(usage, "input_tokens", 0) or 0,
+        "output_tokens": getattr(usage, "output_tokens", 0) or 0,
+        "cache_creation_input_tokens": getattr(usage, "cache_creation_input_tokens", 0) or 0,
+        "cache_read_input_tokens": getattr(usage, "cache_read_input_tokens", 0) or 0,
+    }
 
 
 def _model_accepts_sampling_params(model: str) -> bool:
@@ -148,8 +175,8 @@ class LLMClientBase(ABC):
     def __init__(
         self,
         model: str,
-        temperature: float = 0.0,
-        max_tokens: int = 16000,
+        temperature: float | None = None,
+        max_tokens: int = 32000,
         top_p: float | None = None,
         top_k: int | None = None,
         stop_sequences: list[str] | None = None,
@@ -200,21 +227,82 @@ class LLMClientBase(ABC):
         """Make the actual API call to the provider."""
         pass
 
-    @abstractmethod
-    def _make_batch_api_call(self, system_prompt: str, user_prompt: str) -> str:
-        """Make a batched API call to the provider."""
-        pass
+    def analyze(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str | None = None,
+        mode: str = "cot",
+        mcp: bool = False,
+        max_retries: int = 3,
+        **_anthropic_only,
+    ) -> tuple[dict | None, dict]:
+        """Provider-generic single-call analysis -- (parsed, raw_outputs).
+
+        Covers the standard/cot single-call path for any provider via
+        _make_api_call; MCP and stepwise are Anthropic features and the
+        AnthropicClient override handles them. raw_outputs has the uniform
+        shape consumed by mozzarellm.utils.trace.save_trace().
+        """
+        from mozzarellm.utils.llm_analysis_utils import process_cluster_response
+        from mozzarellm.utils.pricing import compute_cost
+
+        if mode not in ("standard", "cot"):
+            raise ValueError(
+                f"mode {mode!r} is not supported on {type(self).__name__}; "
+                "use 'standard' or 'cot' (stepwise is Anthropic-only)"
+            )
+        if mcp:
+            raise ValueError(
+                "PubMed MCP validation is Anthropic-only; "
+                f"{type(self).__name__} supports single-call standard/cot"
+            )
+        if user_prompt is None:
+            raise ValueError("user_prompt is required")
+
+        self._last_usage = None
+        error: str | None = None
+        text = ""
+        start = time.time()
+        for attempt in range(max_retries):
+            try:
+                text = self._make_api_call(system_prompt, user_prompt)
+                error = None
+                break
+            except Exception as e:
+                error = f"{type(e).__name__}: {e}"
+                if attempt < max_retries - 1:
+                    time.sleep(min(5 * 2**attempt, 30))
+        elapsed = time.time() - start
+
+        usage = self._last_usage or {}
+        input_tokens = usage.get("input_tokens")
+        output_tokens = usage.get("output_tokens")
+        cost_usd, pricing_warning = (None, None)
+        if input_tokens is not None and output_tokens is not None:
+            cost_usd, pricing_warning = compute_cost(self.model, input_tokens, output_tokens)
+
+        parsed = process_cluster_response(text) if text and error is None else None
+        raw_outputs = {
+            "response_text": text,
+            "tool_calls": [],
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "elapsed_s": round(elapsed, 2),
+            "cost_usd": cost_usd,
+            "pricing_warning": pricing_warning,
+            "schema_warnings": [],
+            "error": error,
+            "steps": [],
+        }
+        return parsed, raw_outputs
 
     def query(
         self,
         *,
         max_retries: int = 3,
-        batch: bool = False,
-        screen_name: str | None = None,
         system_prompt: str,
-        # use one but not both of the following parameters
-        user_prompt: str | None = None,
-        cluster_to_prompt_map: dict[str, str] | None = None,  # *****
+        user_prompt: str,
     ) -> tuple[str | None, str | None]:
         """
         Main wrapper function for querying the LLM with retry logic.
@@ -231,14 +319,7 @@ class LLMClientBase(ABC):
         """
         for attempt in range(max_retries):
             try:
-                if batch:
-                    response = self._make_batch_api_call(
-                        cluster_to_prompt_map,
-                        screen_name,
-                        system_prompt,
-                    )
-                else:
-                    response = self._make_api_call(system_prompt, user_prompt)
+                response = self._make_api_call(system_prompt, user_prompt)
                 logger.info(
                     f"{self.__class__.__name__} call successful "
                     f"(attempt {attempt + 1}/{max_retries})"
@@ -288,10 +369,11 @@ class OpenAIClient(LLMClientBase):
         kwargs = {
             "model": self.model,
             "messages": messages,
-            "temperature": self.temperature,
             "max_completion_tokens": self.max_tokens,
             "seed": 42,  # For reproducibility
         }
+        if self.temperature is not None:
+            kwargs["temperature"] = self.temperature
 
         # Add optional sampling parameters
         if self.top_p is not None:
@@ -305,19 +387,12 @@ class OpenAIClient(LLMClientBase):
         if hasattr(response, "usage"):
             tokens = response.usage.total_tokens
             logger.info(f"OpenAI tokens used: {tokens}")
+            self._last_usage = {
+                "input_tokens": response.usage.prompt_tokens,
+                "output_tokens": response.usage.completion_tokens,
+            }
 
         return response.choices[0].message.content
-
-    def _make_batch_api_call(
-        self,
-        cluster_to_prompt_map: dict[str, str],
-        screen_name: str,
-        system_prompt: str,
-    ) -> list[str]:
-        """
-        Makes a batch of requests to the OpenAI chat API.
-        """
-        pass  # TODO
 
 
 class AnthropicClient(LLMClientBase):
@@ -328,85 +403,6 @@ class AnthropicClient(LLMClientBase):
 
     def _get_api_key_from_env(self) -> str | None:
         return os.environ.get(self._get_env_var_name())
-
-    ### Helper functions for batch requests ###
-    def _make_single_cluster_message_request(
-        self,
-        cluster_id: str,
-        path_to_evidence_bundle: str,
-        system_prompt: str,
-        include_features: bool = False,
-        source: str = "both",
-    ) -> Request:
-        from mozzarellm.utils.prompt_factory import strip_feature_fields, strip_source_fields
-
-        bundle_obj = json.loads(Path(path_to_evidence_bundle).read_text(encoding="utf-8"))
-        if not include_features:
-            strip_feature_fields(bundle_obj)  # no feature-interp component => no feature leak
-        strip_source_fields(bundle_obj, source)  # master bundle -> the run's evidence source
-        bundle_text = json.dumps(
-            bundle_obj, ensure_ascii=False
-        )  # minify JSON; has no effect on readability for LLMs + saves tokens
-
-        kwargs = {
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "system": [
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {  # caching to reduce costs
-                        "type": "ephemeral",
-                        "ttl": "5m",  # can set ttl to 1h if needed
-                    },
-                },
-            ],
-            # "thinking": {"type": "enabled"},  # can eventually set a token budget here
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Here is the evidence bundle JSON for cluster "
-                            + cluster_id
-                            + ":\n\n```json\n"
-                            + bundle_text
-                            + "\n```",
-                        }
-                    ],
-                }
-            ],
-        }
-
-        # Add optional sampling + thinking params (omitted for models that reject them)
-        kwargs.update(self._sampling_kwargs())
-        kwargs.update(self._thinking_kwarg())
-
-        cluster_request = Request(
-            custom_id=f"{cluster_id}_analysis_request",
-            params=kwargs,
-        )
-        return cluster_request
-
-    def _make_list_of_cluster_request_objs(
-        self,
-        cluster_to_prompt_map: dict[str, str],
-        system_prompt: str,
-        include_features: bool = False,
-        source: str = "both",
-    ) -> list[str]:
-        """
-        Returns a list of Request objects for the Anthropic batch messages API.
-        """
-        requests = [
-            # NOTE: user_prompt is unique to the cluster
-            self._make_single_cluster_message_request(
-                cluster_id, path_to_evidence_bundle, system_prompt, include_features, source
-            )
-            for cluster_id, path_to_evidence_bundle in cluster_to_prompt_map.items()
-        ]
-        return requests
 
     ### Endpoint access functions ###
     def _resolve_params(self) -> None:
@@ -420,7 +416,9 @@ class AnthropicClient(LLMClientBase):
         """
         if getattr(self, "_params_resolved", False):
             return
-        configured: dict = {"temperature": self.temperature}
+        configured: dict = {}
+        if self.temperature is not None:
+            configured["temperature"] = self.temperature
         if self.top_p is not None:
             configured["top_p"] = self.top_p
         if self.top_k is not None:
@@ -429,12 +427,13 @@ class AnthropicClient(LLMClientBase):
             sampling, dropped = configured, []
         else:
             sampling, dropped = {}, list(configured)
-            logger.warning(
-                "Model %s rejects non-default sampling params (per the migration "
-                "guide); dropping %s.",
-                self.model,
-                ", ".join(dropped),
-            )
+            if dropped:
+                logger.warning(
+                    "Model %s rejects non-default sampling params (per the migration "
+                    "guide); dropping %s.",
+                    self.model,
+                    ", ".join(dropped),
+                )
         if self.stop_sequences:  # accepted by every model
             sampling["stop_sequences"] = self.stop_sequences
 
@@ -472,9 +471,24 @@ class AnthropicClient(LLMClientBase):
         self._resolve_params()
         return dict(self._resolved_thinking_kwarg)
 
+    # Above this output size the SDK refuses non-streaming requests ("Streaming
+    # is required for operations that may take longer than 10 minutes"), so we
+    # stream and accumulate. 16k -- the benchmark-validated ceiling -- stays on
+    # the plain path.
+    _STREAM_MIN_OUTPUT_TOKENS = 16_001
+
     def _create_message(self, client, base: dict):
-        """messages.create with the resolved sampling and thinking params."""
-        return client.messages.create(**base, **self._sampling_kwargs(), **self._thinking_kwarg())
+        """messages.create with the resolved sampling and thinking params.
+
+        Large-output requests go through messages.stream + get_final_message(),
+        which returns the same Message object the non-streaming call would.
+        https://github.com/anthropics/anthropic-sdk-python#long-requests
+        """
+        kwargs = {**base, **self._sampling_kwargs(), **self._thinking_kwarg()}
+        if kwargs.get("max_tokens", 0) >= self._STREAM_MIN_OUTPUT_TOKENS:
+            with client.messages.stream(**kwargs) as stream:
+                return stream.get_final_message()
+        return client.messages.create(**kwargs)
 
     def _make_api_call(self, system_prompt: str, user_prompt: str) -> str:
         """
@@ -490,18 +504,15 @@ class AnthropicClient(LLMClientBase):
         base = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "system": system_prompt,
-            "messages": [{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
+            "system": _cached_system(system_prompt),
+            "messages": [_cached_user_message(user_prompt)],
         }
 
         response = self._create_message(client, base)
 
         # Store usage for cost tracking by callers
         if hasattr(response, "usage"):
-            self.last_usage = {
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
-            }
+            self.last_usage = _usage_tokens(response.usage)
             logger.info(
                 f"Anthropic tokens used: {response.usage.input_tokens + response.usage.output_tokens}"
             )
@@ -510,123 +521,33 @@ class AnthropicClient(LLMClientBase):
 
         return _extract_anthropic_text(response)
 
-    def _make_batch_api_call(
-        self,
-        cluster_to_prompt_map: dict[str, str],
-        screen_name: str,
-        system_prompt: str,
-    ) -> list[str]:
-        """
-        Makes a batch of requests to the Anthropic messages API.
-        https://platform.claude.com/docs/en/build-with-claude/batch-processing
-        """
-
-        client = anthropic.Anthropic(api_key=self.api_key)
-        request_list = self._make_list_of_cluster_request_objs(cluster_to_prompt_map, system_prompt)
-        message_batch = client.messages.batches.create(requests=request_list)
-        batch_id = message_batch.id
-        # saving the batch ID with a timestamp in a text file for reference
-        Path(
-            f"output/{screen_name}_analysis/intermediates/msg_batch_ID_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        ).write_text(batch_id)
-        print(
-            f"Batch {batch_id} created. Saving as {batch_id}.txt in output/{screen_name}_analysis/intermediates/"
-        )
-        # Polling for message batch completion
-        while True:
-            message_batch = client.messages.batches.retrieve(batch_id)
-            if message_batch.processing_status == "ended":
-                break
-            print(f"Batch {batch_id} is still processing...")
-            time.sleep(60)
-        # Stream results file in memory-efficient chunks, processing one at a time
-        errored_requests = []
-        for result in client.messages.batches.results(batch_id):
-            match result.result.type:
-                case "succeeded":
-                    path = Path(
-                        f"output/{screen_name}_analysis/phase1_batch_cluster_LLM_analysis/{result.custom_id}_analysis_response.jsonl"
-                    )
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(str(result.result.message.content), encoding="utf-8")
-                    print(f"{result.custom_id} succeeded. Saving response to {path}")
-                case "errored":
-                    error_obj = result.result.error
-                    error_type = getattr(getattr(error_obj, "error", None), "type", "unknown")
-                    error_msg = getattr(getattr(error_obj, "error", None), "message", None)
-                    if error_type == "invalid_request_error":
-                        print(f"Validation error {result.custom_id}: {error_type} -- {error_msg}")
-
-                    else:
-                        print(f"Server error {result.custom_id}: {error_type} -- {error_msg}")
-                        errored_requests.append(result.custom_id)
-                    # print(str(error_obj)) # DEBUG: uncomment for full error object
-                case "expired":
-                    print(f"Request expired {result.custom_id}")
-                    errored_requests.append(result.custom_id)
-
-        if errored_requests:
-            print(f"\n{len(errored_requests)} request(s) failed: {errored_requests}")
-        # TODO: log response metadata
-
-    ### Unified analyze() — single entry point for all (mode × mcp × batch) combos ###
+    ### Unified analyze() — single entry point for all (mode × mcp) combos ###
 
     def analyze(
         self,
         *,
         system_prompt: str,
         user_prompt: str | None = None,
-        cluster_to_prompt_map: dict[str, str] | None = None,
         mode: str = "cot",
         mcp: bool = False,
-        batch: bool = False,
-        screen_name: str | None = None,
         max_retries: int = 3,
-        include_features: bool = False,
-        source: str = "both",
+        stepwise_turns: list[dict] | None = None,
     ) -> tuple[dict | None, dict]:
         """Single entry point for cluster analysis.
 
-        include_features keeps per-gene screen features (up/down features,
-        phenotypic strength) in batch evidence bundles; by default they are
-        stripped so runs without a feature-interpretation prompt component
-        never leak features into the prompt. Per-request, not client state,
-        so one client can serve both kinds of requests. source reduces each
-        batch bundle to one evidence source's view at request build
-        (strip_source_fields; "both" is the master passthrough) -- same
-        per-request contract as include_features.
-
-        Routes on (mode, mcp, batch) — always returns (parsed, raw_outputs):
+        Routes on (mode, mcp) — always returns (parsed, raw_outputs):
 
           mode in {standard, cot}, mcp=False  -> _analyze_plain
           mode in {standard, cot}, mcp=True   -> _analyze_mcp
           mode == "stepwise", mcp=any         -> _analyze_stepwise
-          batch=True                          -> _analyze_batch (mcp/stepwise rejected)
 
-        For batch, parsed is None (results write to disk during retrieval);
-        raw_outputs carries batch_id and any errored custom_ids. raw_outputs has
-        the uniform shape consumed by `mozzarellm.utils.trace.save_trace()`.
+        raw_outputs has the uniform shape consumed by
+        `mozzarellm.utils.trace.save_trace()`.
         """
         if mode not in ("standard", "cot", "stepwise"):
             raise ValueError(f"mode must be one of 'standard', 'cot', 'stepwise'; got {mode!r}")
-        if batch and (mcp or mode == "stepwise"):
-            raise ValueError(
-                "batch=True is incompatible with mcp=True or mode='stepwise' "
-                "(Anthropic batch API does not support beta MCP, and stepwise "
-                "requires multi-turn conversation)."
-            )
-
-        if batch:
-            if cluster_to_prompt_map is None or screen_name is None:
-                raise ValueError("batch=True requires cluster_to_prompt_map and screen_name")
-            return self._analyze_batch(
-                system_prompt=system_prompt,
-                cluster_to_prompt_map=cluster_to_prompt_map,
-                screen_name=screen_name,
-                include_features=include_features,
-                source=source,
-            )
-
+        if stepwise_turns is not None and mode != "stepwise":
+            raise ValueError("stepwise_turns is only valid with mode='stepwise'")
         if user_prompt is None:
             raise ValueError("user_prompt is required for single/iterative dispatch")
 
@@ -636,6 +557,7 @@ class AnthropicClient(LLMClientBase):
                 user_prompt=user_prompt,
                 mcp=mcp,
                 max_retries=max_retries,
+                turns=stepwise_turns,
             )
 
         if mcp:
@@ -690,7 +612,9 @@ class AnthropicClient(LLMClientBase):
         usage = getattr(self, "last_usage", {}) or {}
         in_tok = usage.get("input_tokens", 0)
         out_tok = usage.get("output_tokens", 0)
-        cost, pricing_warning = compute_cost(self.model, in_tok, out_tok)
+        cache_write = usage.get("cache_creation_input_tokens", 0)
+        cache_read = usage.get("cache_read_input_tokens", 0)
+        cost, pricing_warning = compute_cost(self.model, in_tok, out_tok, cache_write, cache_read)
 
         raw_outputs = self._empty_raw_outputs()
         raw_outputs.update(
@@ -698,6 +622,8 @@ class AnthropicClient(LLMClientBase):
                 "response_text": response_text or "",
                 "input_tokens": in_tok,
                 "output_tokens": out_tok,
+                "cache_creation_input_tokens": cache_write,
+                "cache_read_input_tokens": cache_read,
                 "elapsed_s": elapsed,
                 "cost_usd": cost,
                 "pricing_warning": pricing_warning,
@@ -731,7 +657,7 @@ class AnthropicClient(LLMClientBase):
         user_prompt: str,
         mode: str,
         max_retries: int,
-        max_tokens: int = 16000,
+        max_tokens: int = 32000,
     ) -> tuple[dict | None, dict]:
         """One-shot cluster analysis with PubMed MCP tools attached. Used by both
         (mode=standard, mcp=True) and (mode=cot, mcp=True) — they differ only in the
@@ -746,7 +672,7 @@ class AnthropicClient(LLMClientBase):
 
         response, elapsed = call_mcp(
             system_prompt=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[_cached_user_message(user_prompt)],
             model=self.model,
             max_tokens=max_tokens,
             max_retries=max_retries,
@@ -758,38 +684,50 @@ class AnthropicClient(LLMClientBase):
         )
         tool_calls = extract_mcp_tool_calls(response.content)
         parsed = _parse_json_from_text(output_text)
+        tok = _usage_tokens(response.usage)
         cost, pricing_warning = compute_cost(
-            self.model, response.usage.input_tokens, response.usage.output_tokens
+            self.model,
+            tok["input_tokens"],
+            tok["output_tokens"],
+            tok["cache_creation_input_tokens"],
+            tok["cache_read_input_tokens"],
         )
 
+        stop_reason = getattr(response, "stop_reason", None)
         raw_outputs = self._empty_raw_outputs()
         raw_outputs.update(
             {
                 "response_text": output_text,
                 "tool_calls": tool_calls,
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
+                **tok,
                 "elapsed_s": elapsed,
                 "cost_usd": cost,
                 "pricing_warning": pricing_warning,
+                "stop_reason": stop_reason,
             }
         )
 
         meta: dict = {
             "mode": self._mode_tag(mode, mcp=True),
             "model": self.model,
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
+            **tok,
             "cost_usd": cost,
             "time_seconds": round(elapsed, 1),
             "tool_calls": len(tool_calls),
+            "stop_reason": stop_reason,
         }
         if pricing_warning:
             meta["pricing_warning"] = pricing_warning
 
         if not parsed:
-            meta_err = {**meta, "error": "failed to parse JSON", "raw_output": output_text[:1000]}
-            raw_outputs["error"] = "failed to parse JSON"
+            # A max_tokens stop with no (or partial) text is a truncation, not a
+            # parsing defect -- label it so failure accounting can tell them apart.
+            if stop_reason == "max_tokens":
+                error = "output truncated at max_tokens" + (" (no text)" if not output_text else "")
+            else:
+                error = "failed to parse JSON"
+            meta_err = {**meta, "error": error, "raw_output": output_text[:1000]}
+            raw_outputs["error"] = error
             return ({"_validation_metadata": meta_err}, raw_outputs)
 
         schema_warnings = _validate_literature_blocks(parsed)
@@ -822,7 +760,7 @@ class AnthropicClient(LLMClientBase):
                 response = client.messages.create(
                     model=self.model,
                     max_tokens=max_tokens,
-                    system=system_prompt,
+                    system=_cached_system(system_prompt),
                     messages=messages,
                     timeout=PER_CALL_TIMEOUT_S,
                 )
@@ -841,13 +779,18 @@ class AnthropicClient(LLMClientBase):
         user_prompt: str,
         mcp: bool,
         max_retries: int,
-        max_tokens: int = 16000,
+        max_tokens: int = 32000,
+        turns: list[dict] | None = None,
     ) -> tuple[dict | None, dict]:
         """Run the canonical CoT chain as N sequential, multi-turn API calls.
 
         Each step is a separate API call; prior assistant responses are appended
         to `messages` so step N sees steps 1..N-1's outputs. Steps in the MCP
         index set get PubMed tools attached; others use the plain endpoint.
+
+        turns: prebuilt per-turn content ({"content", "mcp"} dicts, e.g. from
+        compose_stepwise_user_turns with component overrides applied); when
+        None, the canonical turn list is composed here.
 
         On any step failure, iteration aborts and a partial trace is returned
         with steps 1..N-1 preserved.
@@ -857,12 +800,13 @@ class AnthropicClient(LLMClientBase):
             _validate_literature_blocks,
             call_mcp,
         )
+        from mozzarellm.prompts import compose_stepwise_user_turns
         from mozzarellm.utils.pricing import compute_cost
-        from mozzarellm.utils.prompt_factory import compose_stepwise_user_turns
         from mozzarellm.utils.trace import extract_mcp_tool_calls
 
-        # Per-turn user content + MCP routing decided by prompt_factory.
-        turns = compose_stepwise_user_turns(mcp)
+        # Per-turn user content + MCP routing decided by prompt assembly.
+        if turns is None:
+            turns = compose_stepwise_user_turns(mcp)
 
         messages: list[dict] = []
         step_records: list[dict] = []
@@ -875,7 +819,14 @@ class AnthropicClient(LLMClientBase):
         for i, turn in enumerate(turns):
             # Prepend the cluster bundle (per-cluster content) to the first turn only.
             user_content = f"{user_prompt}\n\n{turn['content']}" if i == 0 else turn["content"]
-            messages.append({"role": "user", "content": user_content})
+            # Cache the growing conversation prefix: keep breakpoints on turn 0
+            # (the bundle, the largest stable block) and on the newest user turn,
+            # dropping the previous newest-turn marker (4-breakpoint API limit).
+            for prior in messages:
+                if prior["role"] == "user" and prior is not messages[0]:
+                    for block in prior["content"]:
+                        block.pop("cache_control", None)
+            messages.append(_cached_user_message(user_content))
             use_mcp = turn["mcp"]
 
             try:
@@ -915,9 +866,14 @@ class AnthropicClient(LLMClientBase):
 
             text = "".join(b.text for b in response.content if getattr(b, "type", None) == "text")
             tool_calls = extract_mcp_tool_calls(response.content) if use_mcp else []
-            in_tok = response.usage.input_tokens
-            out_tok = response.usage.output_tokens
-            cost, warning = compute_cost(self.model, in_tok, out_tok)
+            tok = _usage_tokens(response.usage)
+            cost, warning = compute_cost(
+                self.model,
+                tok["input_tokens"],
+                tok["output_tokens"],
+                tok["cache_creation_input_tokens"],
+                tok["cache_read_input_tokens"],
+            )
             if warning:
                 pricing_warnings.append(warning)
 
@@ -927,16 +883,16 @@ class AnthropicClient(LLMClientBase):
                     "use_mcp": use_mcp,
                     "assistant_text": text,
                     "tool_calls": tool_calls,
-                    "input_tokens": in_tok,
-                    "output_tokens": out_tok,
+                    **tok,
                     "elapsed_s": round(elapsed, 2),
                     "cost_usd": cost,
+                    "stop_reason": getattr(response, "stop_reason", None),
                     "error": None,
                 }
             )
 
-            total_in += in_tok
-            total_out += out_tok
+            total_in += tok["input_tokens"]
+            total_out += tok["output_tokens"]
             total_cost += cost
             total_elapsed += elapsed
 
@@ -974,8 +930,13 @@ class AnthropicClient(LLMClientBase):
             meta["pricing_warning"] = "; ".join(pricing_warnings)
 
         if not parsed:
-            meta_err = {**meta, "error": "failed to parse JSON", "raw_output": final_text[:1000]}
-            raw_outputs["error"] = "failed to parse JSON"
+            final_stop = step_records[-1].get("stop_reason") if step_records else None
+            if final_stop == "max_tokens":
+                error = "output truncated at max_tokens" + (" (no text)" if not final_text else "")
+            else:
+                error = "failed to parse JSON"
+            meta_err = {**meta, "error": error, "raw_output": final_text[:1000]}
+            raw_outputs["error"] = error
             return ({"_validation_metadata": meta_err}, raw_outputs)
 
         if mcp:
@@ -986,69 +947,6 @@ class AnthropicClient(LLMClientBase):
 
         parsed["_validation_metadata"] = meta
         return parsed, raw_outputs
-
-    def _analyze_batch(
-        self,
-        *,
-        system_prompt: str,
-        cluster_to_prompt_map: dict[str, str],
-        screen_name: str,
-        include_features: bool = False,
-        source: str = "both",
-    ) -> tuple[None, dict]:
-        """Submit + poll + retrieve a message batch. Per-cluster results write
-        to disk; returns (None, raw_outputs) where raw_outputs carries batch_id
-        and any errored custom_ids."""
-        client = anthropic.Anthropic(api_key=self.api_key)
-        request_list = self._make_list_of_cluster_request_objs(
-            cluster_to_prompt_map, system_prompt, include_features, source
-        )
-        message_batch = client.messages.batches.create(requests=request_list)
-        batch_id = message_batch.id
-
-        intermediates = Path(f"output/{screen_name}_analysis/intermediates")
-        intermediates.mkdir(parents=True, exist_ok=True)
-        (intermediates / f"msg_batch_ID_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt").write_text(
-            batch_id
-        )
-        print(f"Batch {batch_id} created. ID saved in {intermediates}/")
-
-        while True:
-            message_batch = client.messages.batches.retrieve(batch_id)
-            if message_batch.processing_status == "ended":
-                break
-            print(f"Batch {batch_id} is still processing...")
-            time.sleep(60)
-
-        errored_requests: list[str] = []
-        for result in client.messages.batches.results(batch_id):
-            match result.result.type:
-                case "succeeded":
-                    path = Path(
-                        f"output/{screen_name}_analysis/phase1_batch_cluster_LLM_analysis/{result.custom_id}_analysis_response.jsonl"
-                    )
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(str(result.result.message.content), encoding="utf-8")
-                case "errored":
-                    error_obj = result.result.error
-                    error_type = getattr(getattr(error_obj, "error", None), "type", "unknown")
-                    error_msg = getattr(getattr(error_obj, "error", None), "message", None)
-                    print(f"{result.custom_id}: {error_type} -- {error_msg}")
-                    errored_requests.append(result.custom_id)
-                case "expired":
-                    print(f"Request expired {result.custom_id}")
-                    errored_requests.append(result.custom_id)
-
-        if errored_requests:
-            print(f"\n{len(errored_requests)} request(s) failed: {errored_requests}")
-
-        raw_outputs = self._empty_raw_outputs()
-        raw_outputs.update({"batch_id": batch_id, "errored_requests": errored_requests})
-        return None, raw_outputs
-
-
-# Error object for reference: ErrorResponse(error=InvalidRequestError(message='max_tokens: must be greater than or equal to 1',
-# type='invalid_request_error', details={'error_visibility': 'user_facing'}), request_id=None, type='error')
 
 
 class GeminiClient(LLMClientBase):
@@ -1068,10 +966,11 @@ class GeminiClient(LLMClientBase):
 
         # Build config with optional parameters (no hardcoded values!)
         config_kwargs = {
-            "temperature": self.temperature,
             "max_output_tokens": self.max_tokens,
             "system_instruction": system_prompt,
         }
+        if self.temperature is not None:
+            config_kwargs["temperature"] = self.temperature
 
         # Add optional sampling parameters
         if self.top_p is not None:
@@ -1087,24 +986,19 @@ class GeminiClient(LLMClientBase):
             model=self.model, contents=user_prompt, config=config
         )
 
+        meta = getattr(response, "usage_metadata", None)
+        if meta is not None:
+            self._last_usage = {
+                "input_tokens": meta.prompt_token_count,
+                "output_tokens": meta.candidates_token_count,
+            }
         return response.text
-
-    def _make_batch_api_call(
-        self,
-        cluster_to_prompt_map: dict[str, str],
-        screen_name: str,
-        system_prompt: str,
-    ) -> list[str]:
-        """
-        Makes a batch of requests to the Google Gemini API.
-        """
-        pass  # TODO
 
 
 def create_client(
     model: str,
-    temperature: float = 0.0,
-    max_tokens: int = 16000,
+    temperature: float | None = None,
+    max_tokens: int = 32000,
     top_p: float | None = None,
     top_k: int | None = None,
     stop_sequences: list[str] | None = None,

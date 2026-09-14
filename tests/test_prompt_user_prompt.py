@@ -1,8 +1,8 @@
-"""Tests for the feature-interpretation gate on the evidence-bundle user prompt.
+"""The user prompt: what of the evidence bundle reaches the model.
 
-When no feature-interpretation component is active, screen-derived feature data
-(per-gene up/down features + phenotypic strength, and any aggregate
-feature_coherence) must not reach the model.
+Per-gene feature data (up/down lists, raw phenotypic strength) never reaches
+the model; the aggregate feature_coherence table does only when a
+feature-interpretation component is active.
 """
 
 import json
@@ -13,7 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from mozzarellm.utils.prompt_factory import (  # noqa: E402
+from mozzarellm.prompts import (  # noqa: E402
     make_single_cluster_analysis_user_prompt,
     strip_feature_fields,
 )
@@ -24,19 +24,20 @@ def test_strip_feature_fields_removes_features_keeps_annotation():
         "screen_name": "s1",
         "cluster_id": "1",
         "feature_coherence": {"features": []},
+        "phenotype_strength": {"column": "phenotypic_strength"},
         "cluster_genes": [
             {
                 "gene_symbol": "G1",
                 "up_features": "cell_x; cell_y",
                 "down_features": "nucleus_z",
-                "phenotypic_strength": "4.2",
+                "phenotypic_strength": "4/9",
                 "UniProt_functional_annotation": "does a thing",
                 "accession": "P1",
             }
         ],
     }
     strip_feature_fields(bundle)
-    assert "feature_coherence" not in bundle
+    assert "feature_coherence" not in bundle and "phenotype_strength" not in bundle
     g = bundle["cluster_genes"][0]
     assert "up_features" not in g and "down_features" not in g and "phenotypic_strength" not in g
     # non-feature evidence is preserved
@@ -48,6 +49,7 @@ def test_user_prompt_gate(tmp_path):
     bundle = {
         "screen_name": "s1",
         "cluster_id": "1",
+        "feature_coherence": {"n_genes_in_cluster": 1, "features": [{"feature": "cell_x"}]},
         "cluster_genes": [
             {
                 "gene_symbol": "G1",
@@ -65,20 +67,21 @@ def test_user_prompt_gate(tmp_path):
     off = make_single_cluster_analysis_user_prompt("1", "s1", m, include_features=False)
     on = make_single_cluster_analysis_user_prompt("1", "s1", m, include_features=True)
 
-    for field in ("up_features", "down_features", "phenotypic_strength"):
-        assert field not in off, field
-        assert field in on, field
+    # per-gene lists never reach the model; the bounded table does iff on
+    for field in ("up_features", "down_features", "nucleus_z"):
+        assert field not in off and field not in on, field
+    assert "feature_coherence" not in off and "feature_coherence" in on
     # annotation always present; default (no arg) strips
     assert "does a thing" in off and "does a thing" in on
     default = make_single_cluster_analysis_user_prompt("1", "s1", m)
-    assert "up_features" not in default
+    assert "feature_coherence" not in default
 
 
 def test_source_gate_reduces_master_bundle(tmp_path):
     # One master bundle carries both sources' annotations; each run's source
     # view is derived at assembly time. "both" is a passthrough; empty
     # annotations are dropped rather than serialized as empty fields.
-    from mozzarellm.utils.prompt_factory import strip_source_fields
+    from mozzarellm.prompts import strip_source_fields
 
     def master():
         return {
@@ -121,71 +124,6 @@ def test_source_gate_reduces_master_bundle(tmp_path):
     assert "uni text" in prompt and "aff text" not in prompt
 
 
-def test_batch_request_gate(tmp_path):
-    # The gate must also hold on the client's batch-request path, where it is a
-    # per-request parameter (default: strip) rather than client state.
-    from mozzarellm.clients.llm_api_clients import AnthropicClient
-
-    bundle = {
-        "screen_name": "s1",
-        "cluster_id": "1",
-        "cluster_genes": [
-            {
-                "gene_symbol": "G1",
-                "up_features": "cell_x; cell_y",
-                "phenotypic_strength": "4.2",
-                "UniProt_functional_annotation": "does a thing",
-            }
-        ],
-    }
-    bp = tmp_path / "bundle.json"
-    bp.write_text(json.dumps(bundle))
-    client = AnthropicClient(model="claude-sonnet-5", api_key="test-key")
-
-    def _bundle_text(request) -> str:
-        return request["params"]["messages"][0]["content"][0]["text"]
-
-    off = client._make_single_cluster_message_request("1", str(bp), "sys")
-    on = client._make_single_cluster_message_request("1", str(bp), "sys", include_features=True)
-    for field in ("up_features", "phenotypic_strength"):
-        assert field not in _bundle_text(off), field
-        assert field in _bundle_text(on), field
-    assert "does a thing" in _bundle_text(off)
-
-
-def test_batch_request_source_gate(tmp_path):
-    # The source gate must also hold on the client's batch-request path, where
-    # it is a per-request parameter (default: "both" passthrough), mirroring
-    # the include_features contract.
-    from mozzarellm.clients.llm_api_clients import AnthropicClient
-
-    bundle = {
-        "screen_name": "s1",
-        "cluster_id": "1",
-        "cluster_genes": [
-            {
-                "gene_symbol": "G1",
-                "UniProt_functional_annotation": "uni text",
-                "affinage_functional_annotation": "aff text",
-                "affinage_audit_note": "flagged",
-            }
-        ],
-    }
-    bp = tmp_path / "bundle.json"
-    bp.write_text(json.dumps(bundle))
-    client = AnthropicClient(model="claude-sonnet-5", api_key="test-key")
-
-    def _bundle_text(request) -> str:
-        return request["params"]["messages"][0]["content"][0]["text"]
-
-    both = client._make_single_cluster_message_request("1", str(bp), "sys")
-    uni = client._make_single_cluster_message_request("1", str(bp), "sys", source="uniprot")
-    aff = client._make_single_cluster_message_request("1", str(bp), "sys", source="affinage")
-    assert "uni text" in _bundle_text(both) and "aff text" in _bundle_text(both)
-    assert "uni text" in _bundle_text(uni) and "aff text" not in _bundle_text(uni)
-    assert "aff text" in _bundle_text(aff) and "uni text" not in _bundle_text(aff)
-    assert "flagged" in _bundle_text(aff) and "flagged" not in _bundle_text(uni)
-
 def test_strip_feature_fields_accepts_custom_field_names():
     # Bundles built with custom feature_columns carry those names per gene;
     # the strip must take the field set as a parameter or they would leak.
@@ -201,4 +139,3 @@ def test_strip_feature_fields_accepts_custom_field_names():
     bundle2 = {"cluster_genes": [{"gene_symbol": "G1", "my_morphology_score": "1.2"}]}
     strip_feature_fields(bundle2, fields=("my_morphology_score",))
     assert "my_morphology_score" not in bundle2["cluster_genes"][0]
-

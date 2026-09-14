@@ -1,15 +1,14 @@
 # The mode experiment: the full delivery x MCP matrix on the walkup's final
 # build -- 3 deliveries (single_call / cot / stepwise) x 3 MCP settings (none /
-# LIT / LITB). Selection is holistic (delivery format legitimately trades
+# LIT / LITB, each arm's text explicit). Selection is holistic (delivery format legitimately trades
 # metrics off), with the same coverage-honest primary as the source step.
 #
-# Component-mapping caveat: the walkup tunes the single_call slots
-# (CAT/GCR/NPR/UPR/PCC); cot and stepwise assemble from their own slots
-# (cPH/cGCR/cPri/cPSC/cVer/cO), sharing only CAT and SC. Carried overrides for
-# slots a route doesn't have are inert at assembly, so single_call runs the
-# full tuned prompt while cot/stepwise carry only the tuned CAT lens and keep
-# canonical text for their own components -- a fair mode comparison, not a
-# verbatim prompt transplant.
+# Component mapping: the walkup tunes the base slots (CAT/GCR/NPR/UPR/PCC);
+# cot and stepwise assemble their own steps (cGCR/cPri/cPSC) BY COMPOSING the
+# base texts, and derive_cot_overrides rebuilds those steps from the carried
+# overrides at assembly time -- every mode runs the full tuned build, and only
+# the delivery changes. (cPH/cVer/cO are route-native scaffolding with no base
+# counterpart and stay canonical.)
 #
 # MCP settings: LIT is the canonical category-gated literature validation
 # (search NOVEL_ROLE/UNCHARACTERIZED calls); LITB is the evidence-gated
@@ -30,7 +29,7 @@ model:
   provider: anthropic
   model_name: claude-sonnet-5
   # temperature omitted: claude-sonnet-5 rejects non-default sampling params
-  max_tokens: 16000
+  max_tokens: 32000
   thinking: false
 
 run:
@@ -47,10 +46,52 @@ conditions:  # the mode matrix; source + tuned build are carried
     route: stepwise
   - name: single_call_lit
     route: single_call_mcp
+    component_overrides:
+      LIT: &litv |
+          LITERATURE VALIDATION (constrained MCP):
+          Validate NOVEL_ROLE and UNCHARACTERIZED genes against PubMed using the attached PubMed MCP tools.
+
+          Procedure (follow EXACTLY):
+          1. Extract a 2-3 word PubMed keyword from the dominant pathway you identify. Strip subprocess descriptors, complex names, parenthetical qualifiers, and em-dash extensions — keep only the core process name.
+          2. ONE `search_articles` call with: `(GENE1[tiab] OR GENE2[tiab] OR ... OR GENEN[tiab]) AND <keyword>`, max_results=30. The [tiab] tag on EVERY gene symbol is mandatory.
+          3. ONE `get_article_metadata` call with all returned PMIDs.
+          4. For each paper, judge relevance against your FULL pathway annotation (not just the keyword). A paper about "ribosome biogenesis in mitochondria" is peripheral to a "40S SSU processome" cluster.
+
+          Hard constraints:
+          - EXACTLY 2 tool calls total (1 search + 1 metadata). Do not call any tool more than once.
+          - Do NOT search per-gene. Do NOT call any other tools.
+          - Use the tools to validate gene categorizations against the literature; do NOT use them to brainstorm pathways.
+
+          Update categorizations where warranted (e.g., genes with direct pathway evidence → ESTABLISHED). The updated categorizations should be reflected in your final pathway selection and confidence assessment.
+
+          Also note whether the literature changes your pathway hypothesis itself — e.g., literature reveals a more specific subprocess, a different dominant pathway, or merges/splits your candidates. Record this as a pathway revision.
+
+          In the final output, include:
+          - A `literature_validation` field on each NOVEL_ROLE and UNCHARACTERIZED gene in the final classification, per the schema:
+
+          The "literature_validation" field per gene must contain:
+          - "literature_support": "none" | "weak" | "moderate" | "strong"
+          - "relevant_papers": up to 3 entries, each {"pmid": "...", "title": "...", "year": "...", "key_finding": "..."}
+          - "pathway_connection": one sentence — how this gene is implicated in the pathway based on literature (null if none found)
+          - "suggested_reclassification": null | "ESTABLISHED" | "NOVEL_ROLE" | "UNCHARACTERIZED"
+          - "suggested_subclass": null | one of the valid subclass values for the gene's (possibly reclassified) category:
+              NOVEL_ROLE: NO_EVIDENCE | INDIRECT_EVIDENCE | PARTIAL_EVIDENCE | CONTRADICTORY_EVIDENCE
+              UNCHARACTERIZED: DARK_GENE | NASCENT | ANNOTATED_ONLY | NON_HUMAN_CHARACTERIZED
+              ESTABLISHED: null (no subclasses)
+          - "rationale": one sentence — why reclassification/subclass update is or isn't warranted
+
+          - A top-level `literature_informed_reclassifications` array listing every gene whose category changed from your pre-literature categorization to post-validation. Each entry: {"gene": "...", "initial_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "final_category": "ESTABLISHED|NOVEL_ROLE|UNCHARACTERIZED", "driving_pmids": ["..."], "rationale": "one sentence — what literature justified the move"}. If nothing changed, use an empty array.
+          - A top-level `literature_informed_pathway_revision` object: {"pre_literature_pathway": "your tentative pathway BEFORE literature validation", "post_literature_pathway": "your final pathway AFTER literature validation (may be the same)", "pathway_changed": true/false, "rationale": "one sentence — what literature drove the change, or why it stayed the same"}.
+
+          CRITICAL OUTPUT CONSTRAINT: Your entire response MUST be a single valid JSON object and nothing else. Start with `{` and end with `}`. Do NOT write any preamble, plan, or commentary about your searches — no "Based on my analysis...", no "According to PubMed...", no restating of the query. Do NOT write any text before the opening brace or after the closing brace. Report every literature finding ONLY inside JSON fields (rationale, literature_validation), never as prose.
   - name: cot_lit
     route: cot_mcp
+    component_overrides:
+      LIT: *litv
   - name: stepwise_lit
     route: stepwise_mcp
+    component_overrides:
+      LIT: *litv
   - name: single_call_litb
     route: single_call_mcp
     component_overrides:

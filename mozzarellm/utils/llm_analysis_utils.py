@@ -7,29 +7,56 @@ import time
 
 import pandas as pd
 
+# Version of the <screen>_clusters.json structure (metadata + clusters{...});
+# bump on any breaking change to the keys downstream readers consume.
+CLUSTERS_JSON_SCHEMA_VERSION = "1"
+
+
+# A phenotype object emitted bare (no field name) is recognized by the key only
+# its output format carries; pathway_consistency is the remaining "verdict" shape.
+_BARE_BLOCK_SIGNATURES = (
+    ("feature_coherence", "concrete"),
+    ("phenotype_strength", "weak_members"),
+    ("pathway_consistency", "verdict"),
+)
+
 
 def extract_json_from_markdown(text):
+    """The cluster's JSON object from a response that may wrap it in markdown fences.
+
+    The main object is the fenced block carrying "cluster_id" (the largest
+    block when none does). A model sometimes emits the phenotype objects as
+    separate fenced blocks after it; a named object in another block
+    ({"phenotype_strength": {...}}), or a bare one recognized by its
+    signature key, is merged in when the main object lacks it. Returns the
+    JSON text, or the original text if no fences.
     """
-    Extracts JSON from text that might be wrapped in markdown code blocks.
-
-    Args:
-        text: Raw text that might contain JSON in markdown code blocks
-
-    Returns:
-        Extracted JSON string or the original text if no code blocks found
-    """
-    import re
-
-    # Look for JSON in code blocks (with or without language specifier)
-    code_block_pattern = r"```(?:json)?\s*([\s\S]*?)```"
-    matches = re.findall(code_block_pattern, text)
-
-    if matches:
-        # Return the largest code block (most likely to be the complete JSON)
-        return max(matches, key=len).strip()
-
-    # If no code blocks found, return the original text
-    return text
+    blocks = [m.strip() for m in re.findall(r"```(?:json)?\s*([\s\S]*?)```", text)]
+    if not blocks:
+        return text
+    main = next((b for b in blocks if '"cluster_id"' in b), max(blocks, key=len))
+    extras = [b for b in blocks if b is not main]
+    if not extras:
+        return main
+    try:
+        obj = json.loads(main)
+    except json.JSONDecodeError:
+        return main
+    for block in extras:
+        try:
+            extra = json.loads(block)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(extra, dict):
+            continue
+        name = next((n for n, key in _BARE_BLOCK_SIGNATURES if key in extra), None)
+        if name:  # a bare phenotype object, placed by its signature key
+            obj.setdefault(name, extra)
+            continue
+        for key, value in extra.items():
+            if isinstance(value, dict):  # a named object ({"phenotype_strength": {...}})
+                obj.setdefault(key, value)
+    return json.dumps(obj, ensure_ascii=False)
 
 
 def process_cluster_response(analysis_text):
@@ -255,6 +282,18 @@ def _cluster_row(cluster_id, analysis):
         "cluster_id": cluster_id,
         "dominant_process": analysis.get("dominant_process", ""),
         "pathway_confidence": analysis.get("pathway_confidence", ""),
+        "summary": analysis.get("summary", ""),
+        "feature_signature": (analysis.get("feature_coherence") or {}).get("concrete", ""),
+        "pathway_consistency": (analysis.get("pathway_consistency") or {}).get("verdict", ""),
+        "phenotype_strength": (analysis.get("phenotype_strength") or {}).get("verdict", ""),
+        "confidence_revision": "; ".join(
+            r
+            for r in (
+                (analysis.get(k) or {}).get("confidence_revision")
+                for k in ("pathway_consistency", "phenotype_strength")
+            )
+            if r
+        ),
         "n_genes": total,
         "n_classified": classified,
         "n_established": len(established),
@@ -264,14 +303,17 @@ def _cluster_row(cluster_id, analysis):
         "novel_role_genes": ";".join(novel),
         "uncharacterized_genes": ";".join(unchar),
         "missed_genes": ";".join(missed),
-        "classification_completeness": round(
-            analysis.get("classification_completeness", 1.0), 3
-        ),
+        "classification_completeness": round(analysis.get("classification_completeness", 1.0), 3),
     }
 
 
 def save_cluster_analysis(
-    clusters_dict, out_file_base=None, original_df=None, include_raw=True, save_outputs=True
+    clusters_dict,
+    out_file_base=None,
+    original_df=None,
+    include_raw=True,
+    save_outputs=True,
+    gene_extra=None,
 ):
     """
     Process and optionally save cluster analysis results to JSON and multiple CSV formats.
@@ -281,6 +323,8 @@ def save_cluster_analysis(
         clusters_dict: Dictionary with cluster analysis results in JSON format
         out_file_base: Base filename for output files (without extension), required if save_outputs=True
         original_df: Optional original DataFrame with cluster_id and other original data
+        gene_extra: Optional {cluster_id: {gene: {column: value}}} of per-gene
+            columns to add to the gene table (e.g. the phenotype-strength rank)
         include_raw: Whether to include raw text in JSON output
         save_outputs: Whether to write results to disk (default: True)
 
@@ -295,8 +339,14 @@ def save_cluster_analysis(
         "json_data": None,
         "gene_df": pd.DataFrame(
             columns=[
-                "gene", "cluster_id", "category", "subclass", "rationale",
-                "evidence", "dominant_process", "pathway_confidence",
+                "gene",
+                "cluster_id",
+                "category",
+                "subclass",
+                "rationale",
+                "evidence",
+                "dominant_process",
+                "pathway_confidence",
             ]
         ),
         "cluster_df": pd.DataFrame(columns=["cluster_id"]),
@@ -337,6 +387,7 @@ def save_cluster_analysis(
     # Add metadata
     output_data = {
         "metadata": {
+            "schema_version": CLUSTERS_JSON_SCHEMA_VERSION,
             "timestamp": time.time(),
             "date": datetime.datetime.now().isoformat(),
             "cluster_count": len(processed_clusters),
@@ -355,14 +406,29 @@ def save_cluster_analysis(
     # Gene-level and cluster-level tables (the user-facing view of the run).
     if combined_clusters:
         gene_rows, cluster_rows = [], []
+        extra_columns: list[str] = []
         for cluster_id, analysis in combined_clusters.items():
-            gene_rows.extend(_gene_rows(cluster_id, analysis))
+            rows = _gene_rows(cluster_id, analysis)
+            for row in rows:
+                for col, val in (
+                    ((gene_extra or {}).get(str(cluster_id)) or {}).get(row["gene"], {}).items()
+                ):
+                    row[col] = val
+                    if col not in extra_columns:
+                        extra_columns.append(col)
+            gene_rows.extend(rows)
             cluster_rows.append(_cluster_row(cluster_id, analysis))
 
         gene_columns = [
-            "gene", "cluster_id", "category", "subclass", "rationale",
-            "evidence", "dominant_process", "pathway_confidence",
-        ]
+            "gene",
+            "cluster_id",
+            "category",
+            "subclass",
+            "rationale",
+            "evidence",
+            "dominant_process",
+            "pathway_confidence",
+        ] + extra_columns
         gene_df = pd.DataFrame(gene_rows, columns=gene_columns)
         cluster_df = pd.DataFrame(cluster_rows)
 

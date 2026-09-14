@@ -43,10 +43,13 @@ import argparse
 import csv
 import json
 import re
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
 import yaml
+
+from mozzarellm.prompts import default_order
 
 from .bench_configparse import BenchmarkConfig, ModelConfig, PathsConfig, RunConfig
 from .bench_evaluator import (
@@ -109,7 +112,15 @@ ABSTAIN_COHERENCE = "Low"
 
 # Keys a condition may set; anything a condition sets overrides the shared
 # ``run:`` block for that condition only.
-_CONDITION_KEYS = {"name", "bundle_source", "route", "component_overrides", "order_variant"}
+_CONDITION_KEYS = {
+    "name",
+    "bundle_source",
+    "route",
+    "component_overrides",
+    "order_variant",
+    "features",
+    "strength",
+}
 # ``uses: <experiment>.carry.<key>`` -- a cross-experiment input, resolved from
 # that experiment's state file at invocation.
 _USES_RE = re.compile(r"^(?P<experiment>\w+)\.carry\.(?P<key>\w+)$")
@@ -139,8 +150,7 @@ def load_experiment(yaml_path: Path) -> dict:
     route = raw["run"].get("route")
     if route not in ROUTE_REGISTRY:
         raise ValueError(
-            f"{yaml_path.name}: run.route {route!r} not in registry "
-            f"{sorted(ROUTE_REGISTRY)}"
+            f"{yaml_path.name}: run.route {route!r} not in registry {sorted(ROUTE_REGISTRY)}"
         )
 
     if staged:
@@ -222,9 +232,7 @@ def _validate_stages(yaml_name: str, raw: dict, route: str) -> None:
     for stage in raw["stages"]:
         for key in ("component", "goal", "candidates"):
             if key not in stage:
-                raise ValueError(
-                    f"{yaml_name}: stage {stage.get('component')!r} missing '{key}'"
-                )
+                raise ValueError(f"{yaml_name}: stage {stage.get('component')!r} missing '{key}'")
         if stage["component"] not in ROUTE_REGISTRY[route].component_order:
             raise ValueError(
                 f"{yaml_name}: stage component {stage['component']!r} is not a "
@@ -425,10 +433,28 @@ def panel_json(p: MetricPanel) -> dict:
 
 
 def _condition_route(cond: dict, route_name: str) -> Route:
-    """The condition's Route: the registry route, reordered when it asks for it."""
+    """The condition's Route: the registry route, reordered or phenotype-extended
+    when it asks for it."""
     route = ROUTE_REGISTRY[route_name]
     if cond.get("order_variant"):
         route = apply_order_variant(route, cond["order_variant"])
+    features, strength = bool(cond.get("features")), bool(cond.get("strength"))
+    if features or strength:
+        if route.mode != "cot" or cond.get("order_variant"):
+            raise ValueError(
+                f"condition {cond.get('name')!r}: features/strength need a cot route "
+                "without an order variant"
+            )
+        tag = "_".join(k for k, on in (("feat", features), ("strength", strength)) if on)
+        route = replace(
+            route,
+            name=f"{route.name}_{tag}",
+            component_order=tuple(
+                default_order("cot", route.mcp, features=features, strength=strength)
+            ),
+            features=features,
+            strength=strength,
+        )
     return route
 
 
@@ -510,8 +536,7 @@ def run_experiment(
         return _run_stage(exp, stage, dry_run=dry_run, score_only=score_only, source=source)
     if stage is not None or select is not None:
         raise ValueError(
-            f"experiment {name!r} declares no stages; stage/select apply to "
-            "staged experiments only"
+            f"experiment {name!r} declares no stages; stage/select apply to staged experiments only"
         )
     uses = exp.get("uses") or {}
     if source is not None and "source" not in uses:
@@ -577,6 +602,8 @@ def run_experiment(
                     "bundle_source": bundle_source,
                     "route": route_name,
                     "order_variant": cond.get("order_variant"),
+                    "features": bool(cond.get("features")),
+                    "strength": bool(cond.get("strength")),
                     "component_overrides": overrides,
                 },
             )
@@ -617,9 +644,7 @@ def run_experiment(
         "stamp": stamp if not score_only else None,
         "uses": uses or None,
         "resolved": (
-            {"source": resolved_source, "component_overrides": resolved_overrides}
-            if uses
-            else None
+            {"source": resolved_source, "component_overrides": resolved_overrides} if uses else None
         ),
         "runs": run_dirs,
         "winner": winner_cell,
@@ -772,8 +797,7 @@ def _run_stage(
         return f"{sum(1 for d in rows if d['passed'])}/{len(rows)}"
 
     panels = {
-        label: score_run(out, gt, cluster_coherence=coh, route_equals=label)
-        for label in conditions
+        label: score_run(out, gt, cluster_coherence=coh, route_equals=label) for label in conditions
     }
     record = {
         "stage": stage,
@@ -783,8 +807,7 @@ def _run_stage(
         "prior": panel_json(panels[f"{stage}_prior"]),
         "prior_abstain": _abstain(f"{stage}_prior"),
         "candidates": {
-            cand["id"]: panel_json(panels[f"{stage}_{cand['id']}"])
-            for cand in spec["candidates"]
+            cand["id"]: panel_json(panels[f"{stage}_{cand['id']}"]) for cand in spec["candidates"]
         },
         "candidate_abstain": {
             cand["id"]: _abstain(f"{stage}_{cand['id']}") for cand in spec["candidates"]

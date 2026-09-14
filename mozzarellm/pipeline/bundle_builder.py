@@ -7,19 +7,27 @@ from mozzarellm.clients.affinage_api_client import ANNOTATION_COL as AFFINAGE_CO
 from mozzarellm.clients.affinage_api_client import AUDIT_NOTE_COL as AFFINAGE_AUDIT_COL
 from mozzarellm.clients.affinage_api_client import AffinageClient
 from mozzarellm.clients.uniprot_api_client import UniProtClient
-from mozzarellm.utils.cluster_utils import cluster_chunker, compute_feature_coherence
+from mozzarellm.utils.cluster_utils import (
+    cluster_chunker,
+    compute_feature_coherence,
+    compute_phenotype_strength,
+)
 from mozzarellm.utils.io import load_table, write_bundle
 
 DEFAULT_ACCESSION_COL = "accession"
 
 
 def _lookup_accession(
-    gene_symbol: str, organism_id: int, warn_on_fallback: bool, uniprot_client: UniProtClient
+    gene_symbol: str,
+    organism_id: int,
+    warn_on_fallback: bool,
+    uniprot_client: UniProtClient,
+    control_prefix: str = "nontargeting_",
 ) -> str:
     gene_symbol = str(gene_symbol)
     if not gene_symbol or gene_symbol == "nan":
         return ""
-    if gene_symbol.startswith("nontargeting_"):  # TODO: make this a config option
+    if control_prefix and gene_symbol.startswith(control_prefix):
         return "NON_TARGETING_CONTROL"
     try:
         accession = uniprot_client.get_accession_from_gene_symbol(
@@ -45,6 +53,7 @@ def get_or_append_stable_accession(
     accession_table_gene_col: str | None = None,
     accession_table_sheetname: str | None = None,
     accession_table_sep: str | None = None,
+    control_prefix: str = "nontargeting_",
     output_dir: Path
     | str
     | None = None,  # override default output dir (currently just used for unit tests)
@@ -98,7 +107,11 @@ def get_or_append_stable_accession(
             mask = accession_merged_cluster_df[accession_col].isna()
             accession_merged_cluster_df.loc[mask, accession_col] = accession_merged_cluster_df.loc[
                 mask, gene_column
-            ].apply(lambda x: _lookup_accession(x, organism_id, warn_on_fallback, uniprot_client))
+            ].apply(
+                lambda x: _lookup_accession(
+                    x, organism_id, warn_on_fallback, uniprot_client, control_prefix
+                )
+            )
 
         # save as csv; output dir interface/output/
         OUTPUT_DIR.mkdir(
@@ -118,7 +131,9 @@ def get_or_append_stable_accession(
             raise ValueError(f"Expected column '{gene_column}' to assign stable accessions")
 
         df[DEFAULT_ACCESSION_COL] = df[gene_column].map(
-            lambda x: _lookup_accession(x, organism_id, warn_on_fallback, uniprot_client)
+            lambda x: _lookup_accession(
+                x, organism_id, warn_on_fallback, uniprot_client, control_prefix
+            )
         )
         OUTPUT_DIR.mkdir(
             parents=True, exist_ok=True
@@ -199,6 +214,7 @@ def build_evidence_bundles(
     cluster_id_column: str | None = None,
     stable_accession_col: str | None = None,
     feature_columns: list[str] | None = None,
+    strength_column: str | None = None,
     source: str = "uniprot",
     uniprot_client: UniProtClient | None = None,  # Inject dependency
     affinage_client: AffinageClient | None = None,
@@ -249,8 +265,10 @@ def build_evidence_bundles(
 
         # prune redundant cluster column
         annotated_chunk.drop(columns=[cluster_id_column], inplace=True)
-        # set NaNs to empty strings
-        annotated_chunk.fillna("", inplace=True)
+        # set NaNs to empty strings (object columns only; float columns like
+        # phenotypic strength keep NaN, avoiding the pandas mixed-dtype FutureWarning)
+        obj_cols = annotated_chunk.select_dtypes(include="object").columns
+        annotated_chunk[obj_cols] = annotated_chunk[obj_cols].fillna("")
         # convert to json
         cluster_as_json = annotated_chunk.to_dict(orient="records")
 
@@ -271,6 +289,10 @@ def build_evidence_bundles(
         if feature_columns:
             evidence_bundle["feature_coherence"] = compute_feature_coherence(
                 chunk, feature_columns, gene_column=gene_column
+            )
+        if strength_column and strength_column in chunk.columns:
+            evidence_bundle["phenotype_strength"] = compute_phenotype_strength(
+                chunk, gene_column=gene_column, strength_column=strength_column
             )
 
         # save bundle as json
