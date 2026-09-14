@@ -74,6 +74,7 @@ run = analyze_screen(
     screen_context_path="screen_context.json",  # from examples/screen_context_template.json
     mode="cot",
     include_features=True,                      # requires feature columns
+    max_workers=8,                              # clusters analyzed concurrently
 )
 run["cluster_df"]  # pathway call, confidence, per-category counts per cluster
 run["gene_df"]     # one row per gene: category, subclass, rationale, evidence
@@ -98,7 +99,11 @@ run without parsing timestamps. The screen context can be passed as a file
 `run_dir` instead of calling the model again; `dry_run=True` writes every
 prompt under `run_dir/prompts_used/` and returns per-cluster input-token and
 cost estimates with no API call. `organism_id` (default 9606; 10090 for mouse)
-restricts the UniProt lookups.
+restricts the UniProt lookups. `max_workers` (default 1) analyzes that many
+clusters concurrently — a genome-wide panel of ~930 clusters takes about a day
+one at a time — and `results`, `errors`, `resumed` and `total_cost_usd` stay
+ordered by `cluster_to_bundle_map`, so a run's tables do not depend on how many
+workers it used.
 
 ## Analysis options
 

@@ -2,6 +2,8 @@
 
 import json
 import shutil
+import threading
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -544,3 +546,202 @@ def test_gene_table_carries_the_strength_rank(tmp_path):
     )
     row = out["gene_df"][out["gene_df"]["gene"] == "RPL3"].iloc[0]
     assert row["phenotype_strength_rank"] == "2/9"
+
+
+_CONCURRENT_IDS = ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7"]
+
+
+class _SlowStubClient:
+    """Stub whose per-cluster latency is reversed, so completion order is not input order."""
+
+    model = "stub-model"
+
+    def __init__(self, cluster_ids, fail_on=None, delay=0.02):
+        self.cluster_ids = list(cluster_ids)
+        self.fail_on = fail_on or set()
+        self.delay = delay
+        self.calls = []
+        self.completions = []
+        self._lock = threading.Lock()
+
+    def _cluster_of(self, user_prompt):
+        return next(c for c in self.cluster_ids if f"cluster {c}" in user_prompt)
+
+    def analyze(self, *, system_prompt, user_prompt, mode, mcp):
+        cluster_id = self._cluster_of(user_prompt)
+        with self._lock:
+            self.calls.append(cluster_id)
+        time.sleep(self.delay * (len(self.cluster_ids) - self.cluster_ids.index(cluster_id)))
+        with self._lock:
+            self.completions.append(cluster_id)
+        if cluster_id in self.fail_on:
+            raise RuntimeError(f"boom {cluster_id}")
+        cost = 0.01 * (self.cluster_ids.index(cluster_id) + 1)
+        parsed = dict(_PARSED, dominant_process=f"process {cluster_id}")
+        return parsed, {"response_text": json.dumps(parsed), "cost_usd": cost, "elapsed_s": 1.0}
+
+
+def _many_bundles(tmp_path, cluster_ids):
+    bundles = {}
+    for cid in cluster_ids:
+        p = tmp_path / f"cluster_{cid}__bundle.json"
+        p.write_text(
+            json.dumps(
+                {
+                    "cluster_genes": [
+                        {
+                            "gene_symbol": "RPL3",
+                            "UniProt_functional_annotation": "ribosomal protein",
+                        },
+                        {
+                            "gene_symbol": "C1orf131",
+                            "UniProt_functional_annotation": "",
+                        },
+                    ]
+                }
+            )
+        )
+        bundles[cid] = p
+    return bundles
+
+
+def _run(tmp_path, client, name, bundles, **kw):
+    return analyze_screen(
+        screen_name="s1",
+        cluster_to_bundle_map=bundles,
+        client=client,
+        run_dir=tmp_path / name,
+        screen_context_path=_context(tmp_path),
+        mode="cot",
+        **kw,
+    )
+
+
+def test_max_workers_one_is_the_sequential_path(tmp_path):
+    bundles = _bundles(tmp_path)
+    default = _run(tmp_path, _StubClient(), "default", bundles)
+    explicit_client = _StubClient()
+    explicit = _run(tmp_path, explicit_client, "explicit", bundles, max_workers=1)
+    assert list(explicit["results"]) == list(default["results"]) == ["21", "37"]
+    assert explicit["results"] == default["results"]
+    assert explicit["errors"] == default["errors"] == {}
+    assert explicit["resumed"] == default["resumed"] == []
+    assert explicit["total_cost_usd"] == default["total_cost_usd"] == 0.02
+    # max_workers=1 still calls the model once per cluster, in input order
+    assert [c["user"].count("cluster") > 0 for c in explicit_client.calls] == [True, True]
+
+
+def test_max_workers_rejects_zero(tmp_path):
+    import pytest
+
+    with pytest.raises(ValueError, match="max_workers must be >= 1"):
+        _run(tmp_path, _StubClient(), "bad", _bundles(tmp_path), max_workers=0)
+
+
+def test_concurrent_run_matches_sequential_results_and_order(tmp_path):
+    bundles = _many_bundles(tmp_path, _CONCURRENT_IDS)
+    fail_on = {"c1", "c5"}
+    serial_client = _SlowStubClient(_CONCURRENT_IDS, fail_on=fail_on, delay=0.0)
+    serial = _run(tmp_path, serial_client, "serial", bundles, max_workers=1)
+    pooled_client = _SlowStubClient(_CONCURRENT_IDS, fail_on=fail_on)
+    pooled = _run(tmp_path, pooled_client, "pooled", bundles, max_workers=8)
+
+    # The pool really did finish out of input order; the outputs do not show it
+    assert pooled_client.completions != _CONCURRENT_IDS
+    assert sorted(pooled_client.calls) == sorted(_CONCURRENT_IDS)
+    expected = [c for c in _CONCURRENT_IDS if c not in fail_on]
+    assert list(pooled["results"]) == list(serial["results"]) == expected
+    assert pooled["results"] == serial["results"]
+    assert list(pooled["errors"]) == list(serial["errors"]) == ["c1", "c5"]
+    assert pooled["total_cost_usd"] == serial["total_cost_usd"]
+    assert pooled["resumed"] == serial["resumed"] == []
+    assert list(pooled["cluster_df"]["cluster_id"]) == list(serial["cluster_df"]["cluster_id"])
+    assert pooled["gene_df"].equals(serial["gene_df"])
+    for cid in _CONCURRENT_IDS:
+        assert (tmp_path / "pooled" / "traces" / f"cluster_{cid}.json").exists()
+
+
+def test_resume_under_concurrency(tmp_path):
+    bundles = _many_bundles(tmp_path, _CONCURRENT_IDS)
+    first = _SlowStubClient(_CONCURRENT_IDS)
+    _run(tmp_path, first, "resumed", bundles, max_workers=4)
+    assert sorted(first.calls) == sorted(_CONCURRENT_IDS)
+
+    class _Never(_SlowStubClient):
+        def analyze(self, **kw):
+            raise AssertionError("resume must not call the model")
+
+    again = _run(
+        tmp_path,
+        _Never(_CONCURRENT_IDS),
+        "resumed",
+        bundles,
+        max_workers=4,
+        resume=True,
+    )
+    assert again["resumed"] == _CONCURRENT_IDS
+    assert list(again["results"]) == _CONCURRENT_IDS
+    assert again["total_cost_usd"] == 0.0
+    assert again["errors"] == {}
+
+
+def test_rate_limited_cluster_is_retried_not_failed(tmp_path, monkeypatch):
+    import mozzarellm.pipeline.screen_analysis as sa
+
+    monkeypatch.setattr(sa, "_RATE_LIMIT_BACKOFF_S", 0.0)
+
+    class _Throttled(_StubClient):
+        def __init__(self):
+            super().__init__()
+            self.attempts = 0
+
+        def analyze(self, **kw):
+            self.attempts += 1
+            if self.attempts <= 2:
+                raise RuntimeError("Error code: 429 - rate_limit_error")
+            return super().analyze(**kw)
+
+    client = _Throttled()
+    out = _run(
+        tmp_path,
+        client,
+        "throttled",
+        {"21": _bundles(tmp_path)["21"]},
+        max_workers=1,
+    )
+    assert client.attempts == 3
+    assert out["errors"] == {} and list(out["results"]) == ["21"]
+
+
+def test_rate_limit_retry_is_bounded_and_other_errors_are_not_retried(tmp_path, monkeypatch):
+    import mozzarellm.pipeline.screen_analysis as sa
+
+    monkeypatch.setattr(sa, "_RATE_LIMIT_BACKOFF_S", 0.0)
+    bundles = {"21": _bundles(tmp_path)["21"]}
+
+    class _AlwaysThrottled(_StubClient):
+        def __init__(self):
+            super().__init__()
+            self.attempts = 0
+
+        def analyze(self, **kw):
+            self.attempts += 1
+            raise RuntimeError("overloaded_error")
+
+    throttled = _AlwaysThrottled()
+    out = _run(tmp_path, throttled, "always", bundles)
+    assert throttled.attempts == sa._RATE_LIMIT_ATTEMPTS
+    assert "overloaded_error" in out["errors"]["21"]
+
+    class _Broken(_StubClient):
+        def __init__(self):
+            super().__init__()
+            self.attempts = 0
+
+        def analyze(self, **kw):
+            self.attempts += 1
+            raise RuntimeError("bad request")
+
+    broken = _Broken()
+    out = _run(tmp_path, broken, "broken", bundles)
+    assert broken.attempts == 1 and out["errors"] == {"21": "bad request"}

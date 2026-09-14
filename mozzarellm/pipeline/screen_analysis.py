@@ -12,6 +12,9 @@ from __future__ import annotations
 import json
 import logging
 import math
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -113,6 +116,19 @@ def prepare_screen_bundles(
 
 _NO_PATHWAY = "no coherent biological pathway"
 
+# The client layer already retries 5xx/timeouts, but a 429 or an overloaded
+# response escapes its MCP and stepwise paths -- and concurrency is what makes
+# those likely. Bounded backoff here keeps one throttled cluster from failing.
+_RATE_LIMIT_ATTEMPTS = 4
+_RATE_LIMIT_BACKOFF_S = 5.0
+_RATE_LIMIT_MARKERS = ("ratelimit", "rate_limit", "rate limit", "429", "overloaded", "529")
+
+
+def _is_rate_limited(exc: Exception) -> bool:
+    """True when the provider refused for load rather than for the request itself."""
+    text = f"{type(exc).__name__} {exc}".lower()
+    return any(marker in text for marker in _RATE_LIMIT_MARKERS)
+
 
 def _add_coverage(parsed: dict, bundle_path) -> dict:
     """Ground the cluster's coverage in the bundle's actual gene list.
@@ -179,6 +195,7 @@ def analyze_screen(
     original_df=None,
     resume: bool = False,
     dry_run: bool = False,
+    max_workers: int = 1,
 ) -> dict:
     """Analyze every cluster in a screen and write the run's outputs.
 
@@ -221,6 +238,14 @@ def analyze_screen(
             ``run_dir/prompts_used/`` and return per-cluster token and cost
             estimates (``estimates``; input side, ~4 chars per token) without
             calling the model.
+        max_workers: How many clusters to analyze concurrently; the per-cluster
+            API call runs in a thread pool. 1 (the default) keeps the strictly
+            sequential path. ``results``, ``errors`` and ``resumed`` are always
+            ordered by ``cluster_to_bundle_map``, and ``total_cost_usd`` summed
+            in that same order, so the outputs do not depend on completion
+            order. Resumed clusters are read from their traces before the pool
+            starts and never occupy a worker; ``dry_run`` makes no API calls
+            and stays sequential.
 
     Returns:
         dict with ``results`` (per-cluster parsed JSON), ``gene_df`` /
@@ -295,64 +320,113 @@ def analyze_screen(
             strength,
         )
 
-    results: dict = {}
-    errors: dict = {}
-    resumed: list[str] = []
-    total_cost = 0.0
-    for cluster_id in cluster_to_bundle_map:
-        cluster_id = str(cluster_id)
-        prior = _prior_response(run_dir, cluster_id) if resume else None
-        if prior is not None:
-            parsed = process_cluster_response(prior)
-            resumed.append(cluster_id)
-        else:
-            user_prompt = make_single_cluster_analysis_user_prompt(
-                cluster_id,
-                screen_name,
-                cluster_to_bundle_map,
-                include_features=features,
-                include_strength=strength,
-            )
-            try:
-                parsed, raw_outputs = client.analyze(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    mode=mode,
-                    mcp=mcp,
-                    **({"stepwise_turns": stepwise_turns} if stepwise_turns is not None else {}),
-                )
-            except Exception as e:  # noqa: BLE001 -- one bad cluster must not kill the run
-                errors[cluster_id] = str(e)
-                save_trace(
-                    run_dir,
-                    cluster_id,
-                    model=client.model,
-                    mode=mode_label,
-                    raw_response="",
-                    error=str(e),
-                )
-                logging.warning(f"Cluster {cluster_id} failed: {e}")
-                continue
+    if max_workers < 1:
+        raise ValueError(f"max_workers must be >= 1; got {max_workers!r}")
 
+    def _call_cluster(cluster_id: str) -> dict:
+        """One cluster's API call and trace write; returns its accumulation record."""
+        user_prompt = make_single_cluster_analysis_user_prompt(
+            cluster_id,
+            screen_name,
+            cluster_to_bundle_map,
+            include_features=features,
+            include_strength=strength,
+        )
+        try:
+            parsed, raw_outputs = _analyze_with_backoff(
+                client,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                mode=mode,
+                mcp=mcp,
+                stepwise_turns=stepwise_turns,
+            )
+        except Exception as e:  # noqa: BLE001 -- one bad cluster must not kill the run
             save_trace(
                 run_dir,
                 cluster_id,
                 model=client.model,
                 mode=mode_label,
-                raw_response=raw_outputs.get("response_text", ""),
-                tool_calls=raw_outputs.get("tool_calls", []),
-                elapsed_s=raw_outputs.get("elapsed_s"),
-                input_tokens=raw_outputs.get("input_tokens"),
-                output_tokens=raw_outputs.get("output_tokens"),
-                cost_usd=raw_outputs.get("cost_usd"),
-                pricing_warning=raw_outputs.get("pricing_warning"),
-                schema_warnings=raw_outputs.get("schema_warnings"),
-                error=raw_outputs.get("error"),
-                steps=raw_outputs.get("steps"),
+                raw_response="",
+                error=str(e),
             )
-            total_cost += raw_outputs.get("cost_usd") or 0.0
-            if raw_outputs.get("error"):
-                errors[cluster_id] = raw_outputs["error"]
+            logging.warning(f"Cluster {cluster_id} failed: {e}")
+            return {"parsed": None, "error": str(e), "cost": 0.0, "resumed": False}
+
+        save_trace(
+            run_dir,
+            cluster_id,
+            model=client.model,
+            mode=mode_label,
+            raw_response=raw_outputs.get("response_text", ""),
+            tool_calls=raw_outputs.get("tool_calls", []),
+            elapsed_s=raw_outputs.get("elapsed_s"),
+            input_tokens=raw_outputs.get("input_tokens"),
+            output_tokens=raw_outputs.get("output_tokens"),
+            cost_usd=raw_outputs.get("cost_usd"),
+            pricing_warning=raw_outputs.get("pricing_warning"),
+            schema_warnings=raw_outputs.get("schema_warnings"),
+            error=raw_outputs.get("error"),
+            steps=raw_outputs.get("steps"),
+        )
+        return {
+            "parsed": parsed,
+            "error": raw_outputs.get("error"),
+            "cost": raw_outputs.get("cost_usd") or 0.0,
+            "resumed": False,
+        }
+
+    # Resumed clusters are pure trace reads, so they are settled here rather
+    # than handed to a worker; only the clusters that still need the model go
+    # to the pool.
+    cluster_ids = [str(cluster_id) for cluster_id in cluster_to_bundle_map]
+    records: dict[str, dict] = {}
+    pending: list[str] = []
+    for cluster_id in cluster_ids:
+        prior = _prior_response(run_dir, cluster_id) if resume else None
+        if prior is None:
+            pending.append(cluster_id)
+        else:
+            records[cluster_id] = {
+                "parsed": process_cluster_response(prior),
+                "error": None,
+                "cost": 0.0,
+                "resumed": True,
+            }
+
+    if max_workers > 1 and len(pending) > 1:
+        lock = threading.Lock()
+        done = 0
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(_call_cluster, cid): cid for cid in pending}
+            for future in as_completed(futures):
+                cluster_id = futures[future]
+                record = future.result()
+                # One self-contained line per completion, emitted under the
+                # lock, so interleaved workers stay readable in the log.
+                with lock:
+                    records[cluster_id] = record
+                    done += 1
+                    logging.info(f"[{done}/{len(pending)}] cluster {cluster_id} done")
+    else:
+        for cluster_id in pending:
+            records[cluster_id] = _call_cluster(cluster_id)
+
+    # Accumulate in cluster_to_bundle_map order, never completion order, so the
+    # results, the errors, the resumed list and the cost sum are identical at
+    # any max_workers.
+    results: dict = {}
+    errors: dict = {}
+    resumed: list[str] = []
+    total_cost = 0.0
+    for cluster_id in cluster_ids:
+        record = records[cluster_id]
+        if record["resumed"]:
+            resumed.append(cluster_id)
+        total_cost += record["cost"]
+        if record["error"]:
+            errors[cluster_id] = record["error"]
+        parsed = record["parsed"]
         if parsed is not None:
             parsed = _add_coverage(parsed, cluster_to_bundle_map[cluster_id])
             # An empty classification with a pathway call is a parse failure,
@@ -387,6 +461,26 @@ def analyze_screen(
         "errors": errors,
         "resumed": resumed,
     }
+
+
+def _analyze_with_backoff(client, *, system_prompt, user_prompt, mode, mcp, stepwise_turns):
+    """``client.analyze`` with bounded backoff on a rate-limit/overload refusal."""
+    extra = {"stepwise_turns": stepwise_turns} if stepwise_turns is not None else {}
+    for attempt in range(_RATE_LIMIT_ATTEMPTS):
+        try:
+            return client.analyze(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                mode=mode,
+                mcp=mcp,
+                **extra,
+            )
+        except Exception as e:
+            if attempt == _RATE_LIMIT_ATTEMPTS - 1 or not _is_rate_limited(e):
+                raise
+            wait = _RATE_LIMIT_BACKOFF_S * 2**attempt
+            logging.warning(f"Rate limited ({e}); retrying in {wait:.0f}s")
+            time.sleep(wait)
 
 
 def _prior_response(run_dir: Path, cluster_id: str) -> str | None:
