@@ -98,10 +98,20 @@ def _write_reviewer_csv(path, rows):
 def test_reviewer_label_sets_unions_across_reviewers(tmp_path):
     a = tmp_path / "annotation_a.csv"
     b = tmp_path / "annotation_b.csv"
-    _write_reviewer_csv(a, [{"annotator": "a", "gene": "G1", "classification": "NOVEL_ROLE"},
-                            {"annotator": "a", "gene": "G2", "classification": "ESTABLISHED"}])
-    _write_reviewer_csv(b, [{"annotator": "b", "gene": "G1", "classification": "ESTABLISHED"},
-                            {"annotator": "b", "gene": "G2", "classification": "ESTABLISHED"}])
+    _write_reviewer_csv(
+        a,
+        [
+            {"annotator": "a", "gene": "G1", "classification": "NOVEL_ROLE"},
+            {"annotator": "a", "gene": "G2", "classification": "ESTABLISHED"},
+        ],
+    )
+    _write_reviewer_csv(
+        b,
+        [
+            {"annotator": "b", "gene": "G1", "classification": "ESTABLISHED"},
+            {"annotator": "b", "gene": "G2", "classification": "ESTABLISHED"},
+        ],
+    )
     labels = reviewer_label_sets({"a": a, "b": b})
     assert labels[("s1", "1", "G1")] == {"NOVEL_ROLE", "ESTABLISHED"}  # reviewers disagree
     assert labels[("s1", "1", "G2")] == {"ESTABLISHED"}  # reviewers agree
@@ -109,14 +119,31 @@ def test_reviewer_label_sets_unions_across_reviewers(tmp_path):
 
 def test_source_preference_tally_overall_and_by_class():
     gt = {
-        ("s1", "1", "G1"): {"cluster_role": "real", "consensus_class": "NOVEL_ROLE",
-                            "pref_affinage": "2", "pref_uniprot": "1", "pref_both": "0", "pref_neither": "0"},
-        ("s1", "1", "G2"): {"cluster_role": "real", "consensus_class": "ESTABLISHED",
-                            "pref_affinage": "1", "pref_uniprot": "0", "pref_both": "1", "pref_neither": "1"},
+        ("s1", "1", "G1"): {
+            "cluster_role": "real",
+            "consensus_class": "NOVEL_ROLE",
+            "pref_affinage": "2",
+            "pref_uniprot": "1",
+            "pref_both": "0",
+            "pref_neither": "0",
+        },
+        ("s1", "1", "G2"): {
+            "cluster_role": "real",
+            "consensus_class": "ESTABLISHED",
+            "pref_affinage": "1",
+            "pref_uniprot": "0",
+            "pref_both": "1",
+            "pref_neither": "1",
+        },
         ("s1", "1", "D"): {"cluster_role": "decoy", "consensus_class": "", "pref_affinage": "9"},
     }
     tally = source_preference_tally(gt)
-    assert tally["overall"] == {"affinage": 3, "uniprot": 1, "both": 1, "neither": 1}  # decoy excluded
+    assert tally["overall"] == {
+        "affinage": 3,
+        "uniprot": 1,
+        "both": 1,
+        "neither": 1,
+    }  # decoy excluded
     assert tally["by_class"]["NOVEL_ROLE"]["affinage"] == 2
 
 
@@ -125,12 +152,27 @@ def test_reviewer_concordance_pairwise_and_unanimity(tmp_path):
     b = tmp_path / "annotation_b.csv"
     c = tmp_path / "annotation_c.csv"
     # G1: all agree (unanimous, ESTABLISHED). G2: a,b agree / c differs (split, NOVEL).
-    _write_reviewer_csv(a, [{"annotator": "a", "gene": "G1", "classification": "ESTABLISHED"},
-                            {"annotator": "a", "gene": "G2", "classification": "NOVEL_ROLE"}])
-    _write_reviewer_csv(b, [{"annotator": "b", "gene": "G1", "classification": "ESTABLISHED"},
-                            {"annotator": "b", "gene": "G2", "classification": "NOVEL_ROLE"}])
-    _write_reviewer_csv(c, [{"annotator": "c", "gene": "G1", "classification": "ESTABLISHED"},
-                            {"annotator": "c", "gene": "G2", "classification": "ESTABLISHED"}])
+    _write_reviewer_csv(
+        a,
+        [
+            {"annotator": "a", "gene": "G1", "classification": "ESTABLISHED"},
+            {"annotator": "a", "gene": "G2", "classification": "NOVEL_ROLE"},
+        ],
+    )
+    _write_reviewer_csv(
+        b,
+        [
+            {"annotator": "b", "gene": "G1", "classification": "ESTABLISHED"},
+            {"annotator": "b", "gene": "G2", "classification": "NOVEL_ROLE"},
+        ],
+    )
+    _write_reviewer_csv(
+        c,
+        [
+            {"annotator": "c", "gene": "G1", "classification": "ESTABLISHED"},
+            {"annotator": "c", "gene": "G2", "classification": "ESTABLISHED"},
+        ],
+    )
     gt = {
         ("s1", "1", "G1"): {"cluster_role": "real", "consensus_class": "ESTABLISHED"},
         ("s1", "1", "G2"): {"cluster_role": "real", "consensus_class": "NOVEL_ROLE"},
@@ -204,21 +246,38 @@ def test_audit_flag_diagnostics_reports_flagged_gene_handling(tmp_path):
     run = tmp_path / "run"
     run.mkdir()
     reps = [
-        {"novel_role_genes": [{"gene": "PSMA4", "class": "STRONG", "rationale": "proteasome role", "evidence": ""}]},
+        {
+            "novel_role_genes": [
+                {"gene": "PSMA4", "class": "STRONG", "rationale": "proteasome role", "evidence": ""}
+            ]
+        },
         {
             "uncharacterized_genes": [
-                {"gene": "PSMA4", "class": "DARK", "rationale": "annotation is audit-flagged", "evidence": ""}
+                {
+                    "gene": "PSMA4",
+                    "class": "DARK",
+                    "rationale": "annotation is audit-flagged",
+                    "evidence": "",
+                }
             ]
         },
         {"established_genes": ["PSMA4", "CLEAN1"]},
     ]
     with open(run / "parsed_outputs.jsonl", "w") as fh:
         for i, extra in enumerate(reps):
-            parsed = {"cluster_id": "6", "dominant_process": "proteolysis", "pathway_confidence": "High"}
+            parsed = {
+                "cluster_id": "6",
+                "dominant_process": "proteolysis",
+                "pathway_confidence": "High",
+            }
             parsed.update(extra)
             fh.write(
                 json.dumps(
-                    {"run_id": f"src__base__whitney__cluster_6__rep_{i}", "route": "base", "parsed_output": parsed}
+                    {
+                        "run_id": f"src__base__whitney__cluster_6__rep_{i}",
+                        "route": "base",
+                        "parsed_output": parsed,
+                    }
                 )
                 + "\n"
             )
@@ -232,7 +291,13 @@ def test_audit_flag_diagnostics_reports_flagged_gene_handling(tmp_path):
     assert entry["reps_engaging"] == 1  # only the audit-flagged-mentioning rationale
 
     (bundles / "whitney__cluster_6__bundle.json").write_text(
-        json.dumps({"screen_name": "whitney", "cluster_id": 6, "cluster_genes": [{"gene_symbol": "CLEAN1"}]})
+        json.dumps(
+            {
+                "screen_name": "whitney",
+                "cluster_id": 6,
+                "cluster_genes": [{"gene_symbol": "CLEAN1"}],
+            }
+        )
     )
     assert audit_flag_diagnostics(bundles, run) == {}
 
@@ -269,21 +334,25 @@ def test_consensus_subclass_ordinal_median():
     )
     # CONTRADICTORY sits at the bottom of the ladder (most skeptical), so a
     # scattered NO/PARTIAL/CONTRADICTORY vote resolves to the conservative middle.
-    assert _consensus_subclass(["NO_EVIDENCE", "PARTIAL_EVIDENCE", "CONTRADICTORY_EVIDENCE"], novel) == (
-        "NO_EVIDENCE"
-    )
-    # A CONTRADICTORY majority is respected, not dropped.
     assert _consensus_subclass(
-        ["CONTRADICTORY_EVIDENCE", "CONTRADICTORY_EVIDENCE", "NO_EVIDENCE"], novel
-    ) == "CONTRADICTORY_EVIDENCE"
+        ["NO_EVIDENCE", "PARTIAL_EVIDENCE", "CONTRADICTORY_EVIDENCE"], novel
+    ) == ("NO_EVIDENCE")
+    # A CONTRADICTORY majority is respected, not dropped.
+    assert (
+        _consensus_subclass(
+            ["CONTRADICTORY_EVIDENCE", "CONTRADICTORY_EVIDENCE", "NO_EVIDENCE"], novel
+        )
+        == "CONTRADICTORY_EVIDENCE"
+    )
     # Off-ladder votes (an UNCHARACTERIZED subclass on a NOVEL_ROLE gene) are dropped.
     assert _consensus_subclass(["NO_EVIDENCE", "INDIRECT_EVIDENCE", "ANNOTATED_ONLY"], novel) == (
         "NO_EVIDENCE"
     )
     # UNCHARACTERIZED ladder; the lone off-ladder NOVEL vote is dropped.
-    assert _consensus_subclass(
-        ["NO_EVIDENCE", "ANNOTATED_ONLY", "ANNOTATED_ONLY"], "UNCHARACTERIZED"
-    ) == "ANNOTATED_ONLY"
+    assert (
+        _consensus_subclass(["NO_EVIDENCE", "ANNOTATED_ONLY", "ANNOTATED_ONLY"], "UNCHARACTERIZED")
+        == "ANNOTATED_ONLY"
+    )
     # ESTABLISHED carries no subclass.
     assert _consensus_subclass(["NO_EVIDENCE"], "ESTABLISHED") == ""
 
@@ -419,13 +488,12 @@ def test_score_decoys_reports_completion(tmp_path):
     d = tmp_path / "run"
     d.mkdir()
     (d / "parsed_outputs.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
-    (res,) = score_decoys(
-        d, {("jebel", "0"): "functional"}, expected_counts={("jebel", "0"): 10}
-    )
+    (res,) = score_decoys(d, {("jebel", "0"): "functional"}, expected_counts={("jebel", "0"): 10})
     assert res.genes_per_rep == [8, 10, 10]
     assert res.median_genes == 10.0
     assert res.expected_genes == 10 and res.completion == 1.0
     assert res.passed is True
+
 
 def test_duplicate_parsed_lines_cannot_inflate_counts(tmp_path):
     # The 2026-07-16 audit's dedup guard: re-parsed/duplicated output rows must
@@ -455,4 +523,3 @@ def test_duplicate_parsed_lines_cannot_inflate_counts(tmp_path):
     p3 = score_run(twice, gt, route_equals="affinage__single_call")
     assert p1.n == p3.n == 2
     assert p1.category == p3.category == 1.0
-

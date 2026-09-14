@@ -83,8 +83,7 @@ class TestPhase1BackwardCompatibility:
         assert route.order_variant == ""  # Phase 1
 
         with patch(
-            "benchmarks.workflow"
-            ".bench_orchestrator.make_cluster_analysis_system_prompt"
+            "benchmarks.workflow.bench_orchestrator.make_cluster_analysis_system_prompt"
         ) as mock_make:
             mock_make.return_value = "mock prompt"
 
@@ -117,8 +116,7 @@ class TestPhase2ComponentOrder:
         order_route = apply_order_variant(base, "O1")
 
         with patch(
-            "benchmarks.workflow"
-            ".bench_orchestrator.make_cluster_analysis_system_prompt"
+            "benchmarks.workflow.bench_orchestrator.make_cluster_analysis_system_prompt"
         ) as mock_make:
             mock_make.return_value = "mock prompt"
 
@@ -142,8 +140,7 @@ class TestPhase2ComponentOrder:
         order_route = apply_order_variant(base, "O3")
 
         with patch(
-            "benchmarks.workflow"
-            ".bench_orchestrator.make_cluster_analysis_system_prompt"
+            "benchmarks.workflow.bench_orchestrator.make_cluster_analysis_system_prompt"
         ) as mock_make:
             mock_make.return_value = "mock prompt"
 
@@ -168,12 +165,10 @@ class TestPhase2ComponentOrder:
 
         with (
             patch(
-                "benchmarks.workflow"
-                ".bench_orchestrator.make_cluster_analysis_system_prompt"
+                "benchmarks.workflow.bench_orchestrator.make_cluster_analysis_system_prompt"
             ) as mock_make,
             patch(
-                "benchmarks.workflow"
-                ".bench_orchestrator.compose_stepwise_turns_from_route"
+                "benchmarks.workflow.bench_orchestrator.compose_stepwise_turns_from_route"
             ) as mock_turns,
         ):
             mock_make.return_value = "mock system prompt"
@@ -206,16 +201,13 @@ class TestPhase2ComponentOrder:
 
         with (
             patch(
-                "benchmarks.workflow"
-                ".bench_orchestrator.make_cluster_analysis_system_prompt"
+                "benchmarks.workflow.bench_orchestrator.make_cluster_analysis_system_prompt"
             ) as mock_make,
             patch(
-                "benchmarks.workflow"
-                ".bench_orchestrator.compose_stepwise_user_turns"
+                "benchmarks.workflow.bench_orchestrator.compose_stepwise_user_turns"
             ) as mock_canonical_turns,
             patch(
-                "benchmarks.workflow"
-                ".bench_orchestrator.compose_stepwise_turns_from_route"
+                "benchmarks.workflow.bench_orchestrator.compose_stepwise_turns_from_route"
             ) as mock_order_turns,
         ):
             mock_make.return_value = "mock prompt"

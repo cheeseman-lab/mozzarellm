@@ -80,10 +80,15 @@ def test_capability_lookup_falls_back_offline():
         assert llm._model_supports_enabled_thinking("claude-sonnet-4-5", None) is True
     llm._THINKING_SUPPORT_CACHE.clear()
 
+
 def test_resolved_params_records_the_full_outcome():
     c = _client(
-        "claude-sonnet-5", temperature=0.2, top_p=0.9, top_k=40,
-        stop_sequences=["END"], thinking=False,
+        "claude-sonnet-5",
+        temperature=0.2,
+        top_p=0.9,
+        top_k=40,
+        stop_sequences=["END"],
+        thinking=False,
     )
     c._resolve_params()
     assert c.resolved_params == {
@@ -127,7 +132,6 @@ def test_enabled_thinking_budget_stays_within_max_tokens():
     assert c.resolved_params["thinking"] == "enabled"
 
 
-
 # ---------------------------------------------------------------------------
 # _create_message: streaming for large outputs
 # ---------------------------------------------------------------------------
@@ -169,9 +173,7 @@ class _FakeAnthropic:
 def _anthropic_client(max_tokens):
     from mozzarellm.clients.llm_api_clients import AnthropicClient
 
-    return AnthropicClient(
-        "claude-sonnet-5", 0.2, max_tokens, None, None, None, "test-key", False
-    )
+    return AnthropicClient("claude-sonnet-5", 0.2, max_tokens, None, None, None, "test-key", False)
 
 
 def test_benchmark_ceiling_stays_non_streaming():

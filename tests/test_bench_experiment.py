@@ -25,9 +25,7 @@ from benchmarks.workflow.bench_experiment import (  # noqa: E402
     select_holistic,
 )
 
-SOURCE_YAML = (
-    Path(__file__).resolve().parents[1] / "benchmarks" / "experiments" / "source.yaml"
-)
+SOURCE_YAML = Path(__file__).resolve().parents[1] / "benchmarks" / "experiments" / "source.yaml"
 
 # ---------------------------------------------------------------------------
 # Experiment yaml loading
@@ -218,8 +216,11 @@ def test_dry_run_of_source_experiment_writes_state(tmp_path, monkeypatch):
     assert state["carry"] == {"source": state["winner_condition"]}
     for cond in ("uniprot", "affinage"):
         controls = {(d["screen"], d["cluster"]) for d in state["decoys"][cond]}
-        assert {("aconcagua_interphase_shuffled", "17"), ("whitney", "49"), ("jebel", "0")} \
-            <= controls
+        assert {
+            ("aconcagua_interphase_shuffled", "17"),
+            ("whitney", "49"),
+            ("jebel", "0"),
+        } <= controls
         assert state["diagnostics"][cond]["condition"] == f"{cond}__single_call"
         assert cond in state["audit_flags"]
         assert cond in state["pathway"]
@@ -267,7 +268,9 @@ class TestStagedSchema:
 
     def test_stage_component_must_be_a_prompt_slot(self, tmp_path):
         with pytest.raises(ValueError, match="not a prompt slot"):
-            load_experiment(_write_yaml(tmp_path, _STAGED_YAML.replace("component: GCR", "component: XXX")))
+            load_experiment(
+                _write_yaml(tmp_path, _STAGED_YAML.replace("component: GCR", "component: XXX"))
+            )
 
     def test_stage_goal_must_be_a_selection_metric(self, tmp_path):
         text = _STAGED_YAML.replace("goal: category", "goal: accuracy", 1)
@@ -439,9 +442,7 @@ class TestStagelessUses:
 
     def test_unknown_uses_slot_rejected(self, tmp_path):
         with pytest.raises(ValueError, match="unknown uses slot"):
-            load_experiment(
-                _write_yaml(tmp_path, _DOWNSTREAM_YAML.replace("source:", "src:", 1))
-            )
+            load_experiment(_write_yaml(tmp_path, _DOWNSTREAM_YAML.replace("source:", "src:", 1)))
 
     def test_bundle_source_conflicts_with_uses_source(self, tmp_path):
         text = _DOWNSTREAM_YAML.replace(
@@ -492,9 +493,15 @@ def test_mode_yaml_parses_as_the_full_delivery_x_mcp_matrix():
     }
     conds = {c["name"]: c for c in exp["conditions"]}
     assert list(conds) == [
-        "single_call", "cot", "stepwise",
-        "single_call_lit", "cot_lit", "stepwise_lit",
-        "single_call_litb", "cot_litb", "stepwise_litb",
+        "single_call",
+        "cot",
+        "stepwise",
+        "single_call_lit",
+        "cot_lit",
+        "stepwise_lit",
+        "single_call_litb",
+        "cot_litb",
+        "stepwise_litb",
     ]
     for delivery in ("single_call", "cot", "stepwise"):
         assert conds[delivery]["route"] == delivery
@@ -504,8 +511,7 @@ def test_mode_yaml_parses_as_the_full_delivery_x_mcp_matrix():
         assert litb["component_overrides"]["LIT"].startswith("LITERATURE GAP-FILL")
     # One LITB text, anchored -- identical across the three deliveries.
     texts = {
-        conds[f"{d}_litb"]["component_overrides"]["LIT"]
-        for d in ("single_call", "cot", "stepwise")
+        conds[f"{d}_litb"]["component_overrides"]["LIT"] for d in ("single_call", "cot", "stepwise")
     }
     assert len(texts) == 1
     assert exp["carry"] == ["source", "mode"]
@@ -574,7 +580,9 @@ def test_feature_coherence_splits_on_either_separator():
 
     from mozzarellm.utils.cluster_utils import compute_feature_coherence
 
-    df = pd.DataFrame({"g": ["a", "b"], "up_features": ["f1; f2", "f1,f3"], "down_features": ["", ""]})
+    df = pd.DataFrame(
+        {"g": ["a", "b"], "up_features": ["f1; f2", "f1,f3"], "down_features": ["", ""]}
+    )
     block = compute_feature_coherence(df, ["up_features", "down_features"], gene_column="g")
     by_name = {r["feature"]: r["up_genes"] for r in block["features"]}
     assert by_name == {"f1": ["a", "b"], "f2": ["a"], "f3": ["b"]}

@@ -280,6 +280,8 @@ def apply_order_variant(route: Route, variant_key: str) -> Route:
         order_variant=variant.name,
         order_hypothesis=variant.hypothesis or "",
     )
+
+
 def compose_stepwise_turns_from_route(
     route: Route,
     screen_context_path: Path,

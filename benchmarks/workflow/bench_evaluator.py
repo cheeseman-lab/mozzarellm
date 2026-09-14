@@ -86,9 +86,24 @@ NOVEL_ORDER = ("NO_EVIDENCE", "INDIRECT_EVIDENCE", "PARTIAL_EVIDENCE", "CONTRADI
 # labels share a content keyword (approximate cluster-level concordance).
 _PATHWAY_STOPWORDS = frozenset(
     (
-        "and", "the", "through", "function", "related", "cell", "cellular",
-        "process", "complex", "pathway", "regulation", "activity", "protein",
-        "genes", "gene", "role", "roles", "involved",
+        "and",
+        "the",
+        "through",
+        "function",
+        "related",
+        "cell",
+        "cellular",
+        "process",
+        "complex",
+        "pathway",
+        "regulation",
+        "activity",
+        "protein",
+        "genes",
+        "gene",
+        "role",
+        "roles",
+        "involved",
     )
 )
 
@@ -647,10 +662,13 @@ def _fleiss_kappa(rating_rows: list[Counter], categories) -> float:
     if not n_items or n_raters < 2:
         return 0.0
     p_j = {c: sum(r[c] for r in rating_rows) / (n_items * n_raters) for c in categories}
-    p_bar = sum(
-        (sum(r[c] ** 2 for c in categories) - n_raters) / (n_raters * (n_raters - 1))
-        for r in rating_rows
-    ) / n_items
+    p_bar = (
+        sum(
+            (sum(r[c] ** 2 for c in categories) - n_raters) / (n_raters * (n_raters - 1))
+            for r in rating_rows
+        )
+        / n_items
+    )
     p_e = sum(v**2 for v in p_j.values())
     return (p_bar - p_e) / (1 - p_e) if p_e < 1 else 1.0
 
@@ -673,7 +691,10 @@ def _read_annotations(reviewer_csvs, gt):
                     sub[gk][name] = x["subclass"].strip()
                 pathway[(gk[0], gk[1])][name] = x.get("pathway", "").strip()
                 web_rows.append(
-                    (gt[gk].get("consensus_class", ""), x.get("used_web", "").strip().lower() == "yes")
+                    (
+                        gt[gk].get("consensus_class", ""),
+                        x.get("used_web", "").strip().lower() == "yes",
+                    )
                 )
     return cat, sub, pathway, web_rows
 
@@ -771,10 +792,19 @@ def inter_reviewer_concordance(reviewer_csvs: dict[str, Path], gt: dict) -> dict
             med_match += v[median_r] == top
     subclass = {
         "unchar": {"agree": unchar_agree, "n": len(unchar_cond)},
-        "novel": {"exact": novel_exact, "n": len(novel_cond),
-                  "monotone": mono, "within1": within1, "within1_n": within1_n},
-        "calibration": {"order": order, "means": means, "marginals": marginals,
-                        "labels": list(NOVEL_ORDER)},
+        "novel": {
+            "exact": novel_exact,
+            "n": len(novel_cond),
+            "monotone": mono,
+            "within1": within1,
+            "within1_n": within1_n,
+        },
+        "calibration": {
+            "order": order,
+            "means": means,
+            "marginals": marginals,
+            "labels": list(NOVEL_ORDER),
+        },
         "consensus_is_median": {"match": med_match, "n": maj, "reviewer": median_r},
     }
 
@@ -788,11 +818,17 @@ def inter_reviewer_concordance(reviewer_csvs: dict[str, Path], gt: dict) -> dict
         "by_class": by_class,
         "ceiling": [min(pw), max(pw)] if pw else [0.0, 0.0],
         "levels": {
-            "pathway": {"agree": path_agree, "n": len(path_clusters),
-                        "frac": path_agree / len(path_clusters) if path_clusters else 0.0},
+            "pathway": {
+                "agree": path_agree,
+                "n": len(path_clusters),
+                "frac": path_agree / len(path_clusters) if path_clusters else 0.0,
+            },
             "category": {"agree": unanimous, "n": n, "frac": unanimous / n if n else 0.0},
-            "subcategory": {"agree": sub_unan, "n": len(sub_genes),
-                            "frac": sub_unan / len(sub_genes) if sub_genes else 0.0},
+            "subcategory": {
+                "agree": sub_unan,
+                "n": len(sub_genes),
+                "frac": sub_unan / len(sub_genes) if sub_genes else 0.0,
+            },
         },
         "web": {
             "overall": {"yes": web_yes, "n": web_n, "frac": web_yes / web_n if web_n else 0.0},
@@ -873,8 +909,12 @@ def source_diagnostics(
         rec = tp / (tp + fn) if tp + fn else 0.0
         f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
         return {
-            "tp": tp, "fp": fp, "fn": fn,
-            "precision": round(prec, 3), "recall": round(rec, 3), "f1": round(f1, 3),
+            "tp": tp,
+            "fp": fp,
+            "fn": fn,
+            "precision": round(prec, 3),
+            "recall": round(rec, 3),
+            "f1": round(f1, 3),
         }
 
     return {
@@ -1068,9 +1108,17 @@ def score_decoys(
         completion = round(median_g / expected, 3) if expected else None
         results.append(
             DecoyResult(
-                screen, cluster, expectation, n_reps, n_fail, modal, passed,
-                genes_per_rep=counts, median_genes=median_g,
-                expected_genes=expected, completion=completion,
+                screen,
+                cluster,
+                expectation,
+                n_reps,
+                n_fail,
+                modal,
+                passed,
+                genes_per_rep=counts,
+                median_genes=median_g,
+                expected_genes=expected,
+                completion=completion,
             )
         )
     return results

@@ -42,9 +42,7 @@ def _cached_system(system_prompt: str) -> list[dict]:
     The system prompt is constant within a run, so a breakpoint here lets every
     cluster call (and every internal MCP tool round) read it from cache.
     """
-    return [
-        {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
-    ]
+    return [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
 
 
 def _cached_user_message(user_prompt: str) -> dict:
@@ -55,9 +53,7 @@ def _cached_user_message(user_prompt: str) -> dict:
     """
     return {
         "role": "user",
-        "content": [
-            {"type": "text", "text": user_prompt, "cache_control": {"type": "ephemeral"}}
-        ],
+        "content": [{"type": "text", "text": user_prompt, "cache_control": {"type": "ephemeral"}}],
     }
 
 
