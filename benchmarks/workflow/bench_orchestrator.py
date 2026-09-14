@@ -759,9 +759,7 @@ def _run_benchmark_loop(
                     " -- bundle not found"
                 )
                 continue
-            screen_context_path = _resolve_screen_context_path(
-                config.paths.inputs_dir, screen_name
-            )
+            screen_context_path = _resolve_screen_context_path(config.paths.inputs_dir, screen_name)
             if screen_context_path is None:
                 print(
                     f"  [SKIP] {spec.condition_name}/{screen_name}/cluster_{cluster_id}"

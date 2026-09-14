@@ -150,8 +150,7 @@ def load_experiment(yaml_path: Path) -> dict:
     route = raw["run"].get("route")
     if route not in ROUTE_REGISTRY:
         raise ValueError(
-            f"{yaml_path.name}: run.route {route!r} not in registry "
-            f"{sorted(ROUTE_REGISTRY)}"
+            f"{yaml_path.name}: run.route {route!r} not in registry {sorted(ROUTE_REGISTRY)}"
         )
 
     if staged:
@@ -233,9 +232,7 @@ def _validate_stages(yaml_name: str, raw: dict, route: str) -> None:
     for stage in raw["stages"]:
         for key in ("component", "goal", "candidates"):
             if key not in stage:
-                raise ValueError(
-                    f"{yaml_name}: stage {stage.get('component')!r} missing '{key}'"
-                )
+                raise ValueError(f"{yaml_name}: stage {stage.get('component')!r} missing '{key}'")
         if stage["component"] not in ROUTE_REGISTRY[route].component_order:
             raise ValueError(
                 f"{yaml_name}: stage component {stage['component']!r} is not a "
@@ -539,8 +536,7 @@ def run_experiment(
         return _run_stage(exp, stage, dry_run=dry_run, score_only=score_only, source=source)
     if stage is not None or select is not None:
         raise ValueError(
-            f"experiment {name!r} declares no stages; stage/select apply to "
-            "staged experiments only"
+            f"experiment {name!r} declares no stages; stage/select apply to staged experiments only"
         )
     uses = exp.get("uses") or {}
     if source is not None and "source" not in uses:
@@ -648,9 +644,7 @@ def run_experiment(
         "stamp": stamp if not score_only else None,
         "uses": uses or None,
         "resolved": (
-            {"source": resolved_source, "component_overrides": resolved_overrides}
-            if uses
-            else None
+            {"source": resolved_source, "component_overrides": resolved_overrides} if uses else None
         ),
         "runs": run_dirs,
         "winner": winner_cell,
@@ -803,8 +797,7 @@ def _run_stage(
         return f"{sum(1 for d in rows if d['passed'])}/{len(rows)}"
 
     panels = {
-        label: score_run(out, gt, cluster_coherence=coh, route_equals=label)
-        for label in conditions
+        label: score_run(out, gt, cluster_coherence=coh, route_equals=label) for label in conditions
     }
     record = {
         "stage": stage,
@@ -814,8 +807,7 @@ def _run_stage(
         "prior": panel_json(panels[f"{stage}_prior"]),
         "prior_abstain": _abstain(f"{stage}_prior"),
         "candidates": {
-            cand["id"]: panel_json(panels[f"{stage}_{cand['id']}"])
-            for cand in spec["candidates"]
+            cand["id"]: panel_json(panels[f"{stage}_{cand['id']}"]) for cand in spec["candidates"]
         },
         "candidate_abstain": {
             cand["id"]: _abstain(f"{stage}_{cand['id']}") for cand in spec["candidates"]
