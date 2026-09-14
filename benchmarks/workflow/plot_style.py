@@ -78,7 +78,13 @@ def setup_plot_style(font_size: int = 12) -> None:
         {
             # Fonts
             "font.family": "sans-serif",
-            "font.sans-serif": ["Arial", "Helvetica", "Nimbus Sans", "Liberation Sans", "DejaVu Sans"],
+            "font.sans-serif": [
+                "Arial",
+                "Helvetica",
+                "Nimbus Sans",
+                "Liberation Sans",
+                "DejaVu Sans",
+            ],
             "font.size": font_size,
             "axes.titlesize": font_size + 2,
             "axes.titleweight": "bold",
@@ -187,7 +193,16 @@ def label_panels(
     """Add bold panel letters at the top-left of each axis (Nature style uses lowercase)."""
     fontsize = fontsize or plt.rcParams["axes.titlesize"]
     for ax, letter in zip(axes, labels, strict=False):
-        ax.text(x, y, letter, transform=ax.transAxes, fontsize=fontsize, fontweight="bold", va="bottom", ha="right")
+        ax.text(
+            x,
+            y,
+            letter,
+            transform=ax.transAxes,
+            fontsize=fontsize,
+            fontweight="bold",
+            va="bottom",
+            ha="right",
+        )
 
 
 def add_value_labels(
