@@ -5,6 +5,7 @@ Unit tests for mozzarellm.clients.uniprot_api_client
 from __future__ import annotations
 
 import os
+import sqlite3
 import time
 from unittest.mock import Mock, patch
 
@@ -14,6 +15,8 @@ import requests
 
 from mozzarellm.clients.uniprot_api_client import (
     BASE_URL,
+    CACHE_BUSY_TIMEOUT_MS,
+    CACHE_PATH_ENV,
     DEFAULT_BACKOFF_TIME,
     DEFAULT_MAX_RETRIES,
     DEFAULT_TIMEOUT,
@@ -409,3 +412,125 @@ def test_fetch_functional_annotations_combines_multiple_function_texts(
     assert "First function" in annotation
     assert "Second function" in annotation
     assert "\n" in annotation  # Should be joined with newline
+
+
+# =============================================================================
+# Test: Cache Safety Under Concurrency
+#
+# NOTE: WAL journaling needs shared memory between the processes on one host and is
+# unsafe on a network filesystem; concurrent annotation jobs on a cluster corrupted a
+# WAL cache living on NFS within minutes. These tests pin the rollback journal, the
+# busy timeout, and the rule that an unusable cache costs the cache, not the lookups.
+# =============================================================================
+
+
+class _BrokenConn:
+    """Connection stand-in whose every statement fails the way a corrupt file does."""
+
+    def execute(self, *args, **kwargs):
+        raise sqlite3.DatabaseError("database disk image is malformed")
+
+    def close(self):
+        pass
+
+
+def _journal_mode(cache_path) -> str:
+    conn = sqlite3.connect(cache_path)
+    try:
+        return str(conn.execute("PRAGMA journal_mode").fetchone()[0]).lower()
+    finally:
+        conn.close()
+
+
+def test_cache_does_not_use_wal(client, tmp_path):
+    """Test the cache journals through a rollback journal, which is safe over NFS"""
+    assert client._cache_conn is not None
+    assert _journal_mode(tmp_path / "cache.db") == "delete"
+
+
+def test_cache_converts_a_database_left_in_wal(tmp_path):
+    """Test a cache written by an older WAL-mode version is converted on open"""
+    cache_path = tmp_path / "legacy.db"
+    legacy = sqlite3.connect(cache_path)
+    legacy.execute("PRAGMA journal_mode=WAL")
+    legacy.close()
+    assert _journal_mode(cache_path) == "wal"
+
+    UniProtClient(cache_path=cache_path)
+    assert _journal_mode(cache_path) == "delete"
+
+
+def test_cache_sets_a_generous_busy_timeout(client):
+    """Test the busy timeout lets concurrent writers wait rather than fail"""
+    assert client._cache_conn.execute("PRAGMA busy_timeout").fetchone()[0] == CACHE_BUSY_TIMEOUT_MS
+
+
+def test_corrupt_cache_file_degrades_to_no_cache(tmp_path):
+    """Test a corrupt database is reported loudly and the client opens without a cache"""
+    cache_path = tmp_path / "corrupt.db"
+    cache_path.write_bytes(b"SQLite format 3\x00" + b"\x00" * 2048)
+
+    with pytest.warns(UserWarning, match="unusable"):
+        corrupt_client = UniProtClient(cache_path=cache_path)
+
+    assert corrupt_client._cache_conn is None
+
+
+def test_unwritable_cache_directory_degrades_to_no_cache(tmp_path):
+    """Test a cache directory that cannot be created costs the cache, not the run"""
+    with (
+        patch("os.makedirs", side_effect=PermissionError("read-only filesystem")),
+        pytest.warns(UserWarning, match="unusable"),
+    ):
+        unwritable_client = UniProtClient(cache_path=tmp_path / "nope" / "cache.db")
+
+    assert unwritable_client._cache_path is None
+    assert unwritable_client._cache_conn is None
+
+
+def test_cache_corrupted_mid_run_is_dropped_not_propagated(client):
+    """Test a read against a corrupted cache disables it and returns a miss"""
+    client._cache_conn = _BrokenConn()
+
+    with pytest.warns(UserWarning, match="unusable"):
+        assert client._cache_get("any-key") is None
+
+    assert client._cache_conn is None
+
+
+def test_corrupt_cache_still_yields_annotations(client, single_accession_chunk):
+    """Test a corrupt cache falls through to the API instead of returning nothing"""
+    client._cache_conn = _BrokenConn()
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "results": [_make_uniprot_entry("P04637", "Tumor suppressor")]
+    }
+    mock_response.raise_for_status.return_value = None
+
+    with (
+        patch.object(client._session, "get", return_value=mock_response),
+        pytest.warns(UserWarning, match="unusable"),
+    ):
+        result = client.fetch_functional_annotations(single_accession_chunk, ACCESSION_COL)
+
+    assert result.iloc[0]["UniProt_functional_annotation"] == "Tumor suppressor"
+
+
+def test_cache_path_comes_from_the_environment(tmp_path):
+    """Test $MOZZARELLM_UNIPROT_CACHE relocates the cache, e.g. onto node-local storage"""
+    cache_path = tmp_path / "node_local" / "uniprot.sqlite3"
+    with patch.dict(os.environ, {CACHE_PATH_ENV: str(cache_path)}):
+        env_client = UniProtClient()
+
+    assert env_client._cache_path == str(cache_path)
+    assert cache_path.exists()
+
+
+@pytest.mark.parametrize("value", ["", "none", "OFF"])
+def test_cache_can_be_switched_off_from_the_environment(value):
+    """Test an empty/none/off env value runs with no cache at all"""
+    with patch.dict(os.environ, {CACHE_PATH_ENV: value}):
+        off_client = UniProtClient()
+
+    assert off_client._cache_path is None
+    assert off_client._cache_conn is None

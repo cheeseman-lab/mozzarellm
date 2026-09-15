@@ -95,6 +95,13 @@ A successful run also writes `latest.json` next to the run directory
 (`{"run_dir", "date", "screen_name"}`), so downstream code can find the newest
 run without parsing timestamps. The screen context can be passed as a file
 (`screen_context_path`) or an in-memory dict (`screen_context`).
+The UniProt lookups are cached on disk (`~/.cache/mozzarellm/uniprot_cache.sqlite3`
+by default). Set `MOZZARELLM_UNIPROT_CACHE` to move it — point it at node-local
+storage when several jobs annotate concurrently on a cluster, since a cache on a
+shared network filesystem is what concurrent writers corrupt — or to `none` to
+run without one. A cache that is corrupt or unwritable is dropped with a loud
+warning and the lookups go to the API; it never turns into empty annotations.
+
 `analyze_screen(..., resume=True)` re-reads clusters already answered in that
 `run_dir` instead of calling the model again; `dry_run=True` writes every
 prompt under `run_dir/prompts_used/` and returns per-cluster input-token and
@@ -130,6 +137,17 @@ workers it used.
   neither overturns the call. Describe what your columns mean in
   `screen_context.json` under `phenotype_readout` — the model reads your
   description verbatim. Supported for `mode="cot"` (with or without MCP).
+- **Annotation source** (`source` on `prepare_screen_bundles`): which functional
+  annotation the evidence bundles carry. `"uniprot"` (the default) fetches
+  UniProt FUNCTION comments; `"affinage"` fetches Affinage mechanistic
+  narratives (HGNC alias-resolved, each carrying the API's audit note);
+  `"both"` fetches the two side by side as separate columns, so the model reads
+  each on its own terms. No source silently backfills another — a gene one
+  source has nothing for stays empty for that source and the model sees the
+  gap, rather than a UniProt line standing in for a missing Affinage narrative.
+  The accession step always queries UniProt whatever the source, since
+  accessions are UniProt identifiers. Pass `uniprot_client=` / `affinage_client=`
+  to supply your own configured clients (cache path, timeouts, retries).
 - **Prompt customization**: every text the model sees is a named component in
   `mozzarellm/prompts/components.py`; `mozzarellm/prompts/assembly.py` joins
   them in the default chain for each mode. Reword any component per run with

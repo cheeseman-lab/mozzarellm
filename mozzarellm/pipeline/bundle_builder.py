@@ -15,6 +15,16 @@ from mozzarellm.utils.cluster_utils import (
 from mozzarellm.utils.io import load_table, write_bundle
 
 DEFAULT_ACCESSION_COL = "accession"
+ANNOTATION_SOURCES = ("uniprot", "affinage", "both")
+
+
+def validate_source(source: str) -> str:
+    """Return `source` if it names a known annotation source, else raise."""
+    if source not in ANNOTATION_SOURCES:
+        raise ValueError(
+            f"Unknown annotation source {source!r}; expected one of {list(ANNOTATION_SOURCES)}"
+        )
+    return source
 
 
 def _lookup_accession(
@@ -54,15 +64,19 @@ def get_or_append_stable_accession(
     accession_table_sheetname: str | None = None,
     accession_table_sep: str | None = None,
     control_prefix: str = "nontargeting_",
+    uniprot_client: UniProtClient | None = None,
     output_dir: Path
     | str
     | None = None,  # override default output dir (currently just used for unit tests)
 ):
     """
     Assign stable accession numbers to gene symbols. Or append them from a provided table.
+
+    Accessions are UniProt's own identifiers, so this step always queries UniProt
+    whatever annotation source the bundles are later built from.
     """
-    # init client
-    uniprot_client = UniProtClient()
+    if uniprot_client is None:
+        uniprot_client = UniProtClient()
     OUTPUT_DIR = (
         Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
     )
@@ -221,7 +235,8 @@ def build_evidence_bundles(
     output_dir: Path | str | None = None,
     flat_output: bool = False,
 ):
-    if uniprot_client is None:
+    validate_source(source)
+    if uniprot_client is None and source in ("uniprot", "both"):
         uniprot_client = UniProtClient()  # Create once
     if affinage_client is None and source in ("affinage", "both"):
         affinage_client = AffinageClient()
