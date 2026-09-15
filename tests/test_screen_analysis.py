@@ -177,6 +177,33 @@ def test_prepare_screen_bundles_reuses_cache(tmp_path):
     assert "21" in bundles
 
 
+def test_prepare_screen_bundles_rebuilds_a_partial_directory(tmp_path, monkeypatch):
+    from mozzarellm.pipeline import screen_analysis
+
+    bundle_dir = tmp_path / "s1_analysis" / "s1_evidence_bundles"
+    bundle_dir.mkdir(parents=True)
+    (bundle_dir / "s1__cluster_21__bundle.json").write_text("{}")
+
+    built = []
+    monkeypatch.setattr(
+        screen_analysis, "get_or_append_stable_accession", lambda **kw: kw["cluster_df"]
+    )
+
+    def _build(**kw):
+        built.append(sorted(kw["acc_cluster_df"]["cluster"].astype(str)))
+        for c in built[-1]:
+            (bundle_dir / f"s1__cluster_{c}__bundle.json").write_text("{}")
+
+    monkeypatch.setattr(screen_analysis, "build_evidence_bundles", _build)
+
+    table = pd.DataFrame({"cluster": ["21", "22"], "gene_symbol": ["RPL3", "RPL4"]})
+    bundles = screen_analysis.prepare_screen_bundles(
+        screen_name="s1", cluster_table=table, output_dir=tmp_path
+    )
+    assert built == [["21", "22"]]
+    assert set(bundles) == {"21", "22"}
+
+
 def test_component_overrides_reach_the_system_prompt(tmp_path):
     client = _StubClient()
     analyze_screen(

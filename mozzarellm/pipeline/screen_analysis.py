@@ -65,7 +65,9 @@ def prepare_screen_bundles(
     """Cluster table -> stable accessions -> evidence bundles -> {cluster_id: path}.
 
     Bundles are cached under ``<output_dir>/<screen_name>_analysis/``; an
-    existing bundle directory is reused unless ``rebuild=True``.
+    existing bundle directory is reused when it holds a bundle for every cluster in
+    the table; a directory missing any (an interrupted build) is rebuilt, as is
+    everything when ``rebuild=True``.
 
     Args:
         cluster_table: DataFrame or path to a CSV/TSV/XLSX with one row per
@@ -115,7 +117,17 @@ def prepare_screen_bundles(
         )
     bundle_dir = output_dir / f"{screen_name}_analysis" / f"{screen_name}_evidence_bundles"
 
-    if rebuild or not bundle_dir.exists():
+    # a directory left by an interrupted build is partial, and a partial map silently
+    # drops the clusters it lacks from every downstream step -- rebuild on any gap
+    expected = {str(c) for c in cluster_df[cluster_id_column].unique()}
+    present = set(build_cluster_id_to_bundle_path(bundle_dir, screen_name=screen_name))
+    missing = sorted(expected - present)
+    if missing and not rebuild and present:
+        logging.info(
+            f"Rebuilding bundles at {bundle_dir}: {len(missing)} of {len(expected)} missing"
+        )
+
+    if rebuild or missing:
         acc_cluster_df = get_or_append_stable_accession(
             screen_name=screen_name,
             cluster_df=cluster_df,
