@@ -15,11 +15,19 @@ from mozzarellm.utils.cluster_utils import (
 from mozzarellm.utils.io import load_table, write_bundle
 
 DEFAULT_ACCESSION_COL = "accession"
-ANNOTATION_SOURCES = ("uniprot", "affinage", "both")
+UNIPROT_COL = "UniProt_functional_annotation"
+FALLBACK_SOURCE = "affinage_then_uniprot"
+ANNOTATION_SOURCE_COL = "annotation_source"
+ANNOTATION_SOURCES = ("uniprot", "affinage", "both", FALLBACK_SOURCE)
 
 
 def validate_source(source: str) -> str:
-    """Return `source` if it names a known annotation source, else raise."""
+    """Return `source` if it names a known annotation source, else raise.
+
+    The known sources are the three pure ones ("uniprot", "affinage", "both")
+    plus "affinage_then_uniprot", which fetches Affinage first and queries
+    UniProt only for the genes Affinage has nothing usable for.
+    """
     if source not in ANNOTATION_SOURCES:
         raise ValueError(
             f"Unknown annotation source {source!r}; expected one of {list(ANNOTATION_SOURCES)}"
@@ -175,11 +183,21 @@ def add_functional_annotations_to_chunk(
 ) -> pd.DataFrame:
     """Add annotation columns to a chunk of gene-level data.
 
-    Each source is kept pure — no silent cross-source backfill:
+    The three pure sources keep no silent cross-source backfill:
       - "uniprot": fetches UniProt only.
       - "affinage": fetches Affinage only (alias-resolved, audit-gated).
       - "both": fetches both side-by-side as separate columns.
     Genes a source fails on stay empty for that source; the LLM sees the gap.
+
+    "affinage_then_uniprot" is the one mixed source: Affinage is fetched for
+    every gene, then UniProt is queried for the fallback subset only — the
+    genes whose Affinage annotation is absent, empty, or a refusal narrative
+    (the client returns no row for all three, so they arrive here as gaps).
+    A gene Affinage answered is never sent to UniProt, so request volume and
+    prompt length stay close to pure Affinage. A gene neither source has
+    stays blank; nothing is fabricated to fill it. Every gene carries
+    ``annotation_source`` — "affinage", "uniprot", or "" for neither — so a
+    mixed chunk stays auditable per gene.
     """
     if stable_accession_col is None:
         stable_accession_col = DEFAULT_ACCESSION_COL
@@ -199,7 +217,7 @@ def add_functional_annotations_to_chunk(
         except Exception as e:
             warnings.warn(f"UniProt lookup failed for cluster '{cluster_id}': {e}", stacklevel=2)
 
-    if source in ("affinage", "both"):
+    if source in ("affinage", "both", FALLBACK_SOURCE):
         if affinage_client is None:
             affinage_client = AffinageClient()
         try:
@@ -207,6 +225,16 @@ def add_functional_annotations_to_chunk(
             chunk_annotated = chunk_annotated.merge(affinage, on=gene_column, how="left")
         except Exception as e:
             warnings.warn(f"Affinage lookup failed for cluster '{cluster_id}': {e}", stacklevel=2)
+
+    if source == FALLBACK_SOURCE:
+        if uniprot_client is None:
+            uniprot_client = UniProtClient()
+        chunk_annotated = add_uniprot_fallback(
+            chunk=chunk_annotated,
+            stable_accession_col=stable_accession_col,
+            uniprot_client=uniprot_client,
+            cluster_id=cluster_id,
+        )
     # save as csv; output dir interface/output/
     OUTPUT_DIR = (
         Path(output_dir if output_dir is not None else "output") / f"{screen_name}_analysis"
@@ -218,6 +246,55 @@ def add_functional_annotations_to_chunk(
         OUTPUT_DIR / "intermediates" / f"cluster_{cluster_id}_chunk_annotated.csv", index=False
     )
     return chunk_annotated
+
+
+def add_uniprot_fallback(
+    *,
+    chunk: pd.DataFrame,
+    stable_accession_col: str,
+    uniprot_client: UniProtClient,
+    cluster_id,
+) -> pd.DataFrame:
+    """Fill the Affinage gaps of an already-Affinage-annotated chunk from UniProt.
+
+    The gap set is the genes with no usable Affinage text — absent from the
+    API, empty, or a refusal narrative, all of which AffinageClient leaves
+    unmerged. Only those accessions are sent to UniProt, through the client's
+    cached ``fetch_functional_annotations``, so a gene Affinage answered costs
+    no request. A gene UniProt also has nothing for stays blank.
+
+    Adds ``annotation_source`` to every row: "affinage" when the Affinage
+    narrative supplied the text, "uniprot" when the fallback did, "" when
+    neither source had any. UniProt text is cleared on rows Affinage answered,
+    so the label and the text a gene carries can never disagree.
+    """
+    chunk = chunk.reset_index(drop=True)
+    has_affinage = (
+        chunk[AFFINAGE_COL].map(_has_text)
+        if AFFINAGE_COL in chunk.columns
+        else pd.Series(False, index=chunk.index)
+    )
+    gaps = chunk[~has_affinage]
+    if not gaps.empty:
+        try:
+            annotations = uniprot_client.fetch_functional_annotations(gaps, stable_accession_col)
+        except Exception as e:
+            warnings.warn(f"UniProt fallback failed for cluster '{cluster_id}': {e}", stacklevel=2)
+        else:
+            chunk = chunk.merge(annotations, on=stable_accession_col, how="left")
+            chunk.loc[has_affinage.to_numpy(), UNIPROT_COL] = None
+
+    labels = pd.Series("", index=chunk.index)
+    if UNIPROT_COL in chunk.columns:
+        labels = labels.mask(chunk[UNIPROT_COL].map(_has_text), "uniprot")
+    labels = labels.mask(has_affinage, "affinage")
+    chunk[ANNOTATION_SOURCE_COL] = labels
+    return chunk
+
+
+def _has_text(value) -> bool:
+    """True when an annotation cell carries usable text rather than a gap."""
+    return pd.notna(value) and bool(str(value).strip())
 
 
 def build_evidence_bundles(
@@ -236,9 +313,9 @@ def build_evidence_bundles(
     flat_output: bool = False,
 ):
     validate_source(source)
-    if uniprot_client is None and source in ("uniprot", "both"):
+    if uniprot_client is None and source in ("uniprot", "both", FALLBACK_SOURCE):
         uniprot_client = UniProtClient()  # Create once
-    if affinage_client is None and source in ("affinage", "both"):
+    if affinage_client is None and source in ("affinage", "both", FALLBACK_SOURCE):
         affinage_client = AffinageClient()
     # validate required columns in cluster table
     if cluster_id_column not in acc_cluster_df.columns:
@@ -287,10 +364,10 @@ def build_evidence_bundles(
         # convert to json
         cluster_as_json = annotated_chunk.to_dict(orient="records")
 
-        # for affinage/both, drop the empty backup-source key so each gene shows only its source
-        if source in ("affinage", "both"):
+        # for affinage/both/fallback, drop the empty backup-source key so each gene shows only its source
+        if source in ("affinage", "both", FALLBACK_SOURCE):
             for gene in cluster_as_json:
-                for col in ("UniProt_functional_annotation", AFFINAGE_COL, AFFINAGE_AUDIT_COL):
+                for col in (UNIPROT_COL, AFFINAGE_COL, AFFINAGE_AUDIT_COL):
                     if gene.get(col) == "":
                         gene.pop(col, None)
 

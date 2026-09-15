@@ -88,11 +88,19 @@ def prepare_screen_bundles(
         source: Which functional annotation the bundles carry —
             ``"uniprot"`` (the default; UniProt FUNCTION comments),
             ``"affinage"`` (Affinage mechanistic narratives, alias-resolved
-            and audit-noted), or ``"both"`` (each fetched side by side as its
-            own column). No source backfills another: a gene one source has
-            nothing for stays empty for that source, and the model sees the
-            gap. The accession step always queries UniProt, since accessions
-            are UniProt identifiers.
+            and audit-noted), ``"both"`` (each fetched side by side as its
+            own column), or ``"affinage_then_uniprot"``. Among the first
+            three no source backfills another: a gene one source has nothing
+            for stays empty for that source, and the model sees the gap.
+            ``"affinage_then_uniprot"`` is the one mixed source: Affinage is
+            fetched for every gene and UniProt is queried only for the genes
+            whose Affinage annotation is absent, empty, or a refusal
+            narrative, so request volume and prompt length stay close to pure
+            Affinage. Each gene then carries ``annotation_source``
+            ("affinage", "uniprot", or "" when neither source had anything),
+            so a mixed bundle stays auditable per gene; a gene neither source
+            has still arrives blank. The accession step always queries
+            UniProt, since accessions are UniProt identifiers.
         uniprot_client: Injected ``UniProtClient`` (its cache path, timeouts
             and retries are the knobs); one is built per run when omitted.
         affinage_client: Injected ``AffinageClient``, likewise; only built

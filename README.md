@@ -148,9 +148,17 @@ workers it used.
   UniProt FUNCTION comments; `"affinage"` fetches Affinage mechanistic
   narratives (HGNC alias-resolved, each carrying the API's audit note);
   `"both"` fetches the two side by side as separate columns, so the model reads
-  each on its own terms. No source silently backfills another — a gene one
-  source has nothing for stays empty for that source and the model sees the
+  each on its own terms. None of those three silently backfills another — a gene
+  one source has nothing for stays empty for that source and the model sees the
   gap, rather than a UniProt line standing in for a missing Affinage narrative.
+  `"affinage_then_uniprot"` is the one deliberate mix, for production annotation
+  rather than benchmarking: Affinage is fetched for every gene and UniProt is
+  queried only for the genes whose Affinage annotation is absent, empty, or a
+  refusal narrative, so the prompt and the request volume stay close to pure
+  Affinage while the blanks that would otherwise read as dark genes get filled.
+  Each gene then carries `annotation_source` — `"affinage"`, `"uniprot"`, or
+  `""` when neither source had anything — so a mixed bundle stays auditable per
+  gene, and a gene neither source has still arrives blank.
   The accession step always queries UniProt whatever the source, since
   accessions are UniProt identifiers. Pass `uniprot_client=` / `affinage_client=`
   to supply your own configured clients (cache path, timeouts, retries).
