@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from mozzarellm.pipeline.screen_analysis import analyze_screen
 
@@ -745,3 +746,113 @@ def test_rate_limit_retry_is_bounded_and_other_errors_are_not_retried(tmp_path, 
     broken = _Broken()
     out = _run(tmp_path, broken, "broken", bundles)
     assert broken.attempts == 1 and out["errors"] == {"21": "bad request"}
+
+
+# The benchmark-selected build annotates from Affinage, so the entry point every
+# caller uses has to be able to ask for it; "uniprot" stays the default.
+class _StubUniProt:
+    def get_accession_from_gene_symbol(self, *, gene_symbol, organism_id, warn_on_fallback):
+        return f"ACC_{gene_symbol}"
+
+    def fetch_functional_annotations(self, chunk, stable_accession_col):
+        return pd.DataFrame(
+            {
+                stable_accession_col: chunk[stable_accession_col],
+                "UniProt_functional_annotation": ["uniprot narrative"] * len(chunk),
+            }
+        )
+
+
+class _StubAffinage:
+    def fetch_functional_annotations(self, chunk, gene_column):
+        return pd.DataFrame(
+            {
+                gene_column: chunk[gene_column],
+                "affinage_functional_annotation": ["affinage narrative"] * len(chunk),
+                "affinage_audit_note": [""] * len(chunk),
+            }
+        )
+
+
+def _prepare_with_source(tmp_path, source):
+    from mozzarellm.pipeline.screen_analysis import prepare_screen_bundles
+
+    table = pd.DataFrame({"cluster": ["21"], "gene_symbol": ["RPL3"]})
+    bundles = prepare_screen_bundles(
+        screen_name="s1",
+        cluster_table=table,
+        output_dir=tmp_path,
+        source=source,
+        uniprot_client=_StubUniProt(),
+        affinage_client=_StubAffinage(),
+    )
+    bundle = json.loads(Path(bundles["21"]).read_text(encoding="utf-8"))
+    return bundle["cluster_genes"][0]
+
+
+@pytest.mark.parametrize(
+    "source,expected,absent",
+    [
+        ("uniprot", ["UniProt_functional_annotation"], ["affinage_functional_annotation"]),
+        ("affinage", ["affinage_functional_annotation"], ["UniProt_functional_annotation"]),
+        (
+            "both",
+            ["UniProt_functional_annotation", "affinage_functional_annotation"],
+            [],
+        ),
+        (None, ["UniProt_functional_annotation"], ["affinage_functional_annotation"]),
+    ],
+)
+def test_prepare_screen_bundles_selects_the_annotation_source(tmp_path, source, expected, absent):
+    gene = _prepare_with_source(tmp_path, source) if source else _prepare_default(tmp_path)
+    for key in expected:
+        assert gene[key]
+    for key in absent:
+        assert key not in gene
+
+
+def _prepare_default(tmp_path):
+    """prepare_screen_bundles with no source argument -- the backward-compatible path."""
+    from mozzarellm.pipeline.screen_analysis import prepare_screen_bundles
+
+    table = pd.DataFrame({"cluster": ["21"], "gene_symbol": ["RPL3"]})
+    bundles = prepare_screen_bundles(
+        screen_name="s1",
+        cluster_table=table,
+        output_dir=tmp_path,
+        uniprot_client=_StubUniProt(),
+    )
+    bundle = json.loads(Path(bundles["21"]).read_text(encoding="utf-8"))
+    return bundle["cluster_genes"][0]
+
+
+def test_prepare_screen_bundles_rejects_an_unknown_source(tmp_path):
+    from mozzarellm.pipeline.screen_analysis import prepare_screen_bundles
+
+    table = pd.DataFrame({"cluster": ["21"], "gene_symbol": ["RPL3"]})
+    with pytest.raises(ValueError, match="Unknown annotation source 'uniport'"):
+        prepare_screen_bundles(
+            screen_name="s1", cluster_table=table, output_dir=tmp_path, source="uniport"
+        )
+
+
+def test_prepare_screen_bundles_does_not_backfill_across_sources(tmp_path):
+    """A gene Affinage has nothing for stays empty; UniProt does not fill the gap."""
+    from mozzarellm.pipeline.screen_analysis import prepare_screen_bundles
+
+    class _EmptyAffinage:
+        def fetch_functional_annotations(self, chunk, gene_column):
+            raise ValueError("No usable Affinage narratives for 1 symbol(s).")
+
+    table = pd.DataFrame({"cluster": ["21"], "gene_symbol": ["RPL3"]})
+    bundles = prepare_screen_bundles(
+        screen_name="s1",
+        cluster_table=table,
+        output_dir=tmp_path,
+        source="affinage",
+        uniprot_client=_StubUniProt(),
+        affinage_client=_EmptyAffinage(),
+    )
+    gene = json.loads(Path(bundles["21"]).read_text(encoding="utf-8"))["cluster_genes"][0]
+    assert "affinage_functional_annotation" not in gene
+    assert "UniProt_functional_annotation" not in gene

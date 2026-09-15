@@ -20,9 +20,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from mozzarellm.clients.affinage_api_client import AffinageClient
+from mozzarellm.clients.uniprot_api_client import UniProtClient
 from mozzarellm.pipeline.bundle_builder import (
     build_evidence_bundles,
     get_or_append_stable_accession,
+    validate_source,
 )
 from mozzarellm.prompts import (
     compose_stepwise_user_turns,
@@ -52,6 +55,9 @@ def prepare_screen_bundles(
     strength_higher_is_stronger: bool = True,
     organism_id: int = 9606,
     control_prefix: str = "nontargeting_",
+    source: str = "uniprot",
+    uniprot_client: UniProtClient | None = None,
+    affinage_client: AffinageClient | None = None,
     rebuild: bool = False,
 ) -> dict:
     # organism_id is the NCBI taxonomy id the UniProt lookups are restricted to
@@ -79,7 +85,20 @@ def prepare_screen_bundles(
         control_prefix: Gene symbols with this prefix are treated as
             non-targeting controls (mapped to ``NON_TARGETING_CONTROL``
             instead of a UniProt lookup).
+        source: Which functional annotation the bundles carry —
+            ``"uniprot"`` (the default; UniProt FUNCTION comments),
+            ``"affinage"`` (Affinage mechanistic narratives, alias-resolved
+            and audit-noted), or ``"both"`` (each fetched side by side as its
+            own column). No source backfills another: a gene one source has
+            nothing for stays empty for that source, and the model sees the
+            gap. The accession step always queries UniProt, since accessions
+            are UniProt identifiers.
+        uniprot_client: Injected ``UniProtClient`` (its cache path, timeouts
+            and retries are the knobs); one is built per run when omitted.
+        affinage_client: Injected ``AffinageClient``, likewise; only built
+            when ``source`` asks for Affinage.
     """
+    validate_source(source)
     output_dir = Path(output_dir)
     cluster_df = cluster_table if hasattr(cluster_table, "columns") else load_table(cluster_table)
     if strength_column is not None:
@@ -96,6 +115,7 @@ def prepare_screen_bundles(
             organism_id=organism_id,
             warn_on_fallback=False,
             control_prefix=control_prefix,
+            uniprot_client=uniprot_client,
             output_dir=output_dir,
         )
         build_evidence_bundles(
@@ -106,6 +126,9 @@ def prepare_screen_bundles(
             stable_accession_col="accession",
             feature_columns=feature_columns or None,
             strength_column=strength_column,
+            source=source,
+            uniprot_client=uniprot_client,
+            affinage_client=affinage_client,
             output_dir=output_dir,
         )
     else:
