@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from typing import Any
 
@@ -139,9 +140,17 @@ RETRYABLE_API_EXCEPTIONS: tuple = (
     anthropic.APIConnectionError,
 )
 
-# Hard ceiling per call. Without this, the SDK falls back to a 600s default that
-# combined with retries can run an MCP-spamming model for ~25 minutes per cluster.
+# Floor for the per-call ceiling. Without one, the SDK falls back to a 600s default
+# that combined with retries can run an MCP-spamming model for ~25 minutes per
+# cluster; but a large cluster legitimately streams tens of thousands of output
+# tokens at roughly 40 tokens/s, so the ceiling grows with the token budget.
 PER_CALL_TIMEOUT_S = 300
+_OUTPUT_TOKENS_PER_S = 40
+
+
+def call_timeout_s(max_tokens: int) -> float:
+    """Per-call timeout: the floor, or the time a full max_tokens response takes."""
+    return max(PER_CALL_TIMEOUT_S, max_tokens / _OUTPUT_TOKENS_PER_S + 120)
 
 
 def _is_retryable_api_error(exc: Exception) -> bool:
@@ -196,7 +205,7 @@ def call_mcp(
                 mcp_servers=mcp_servers,
                 tools=tools,
                 betas=["mcp-client-2025-11-20"],
-                timeout=PER_CALL_TIMEOUT_S,
+                timeout=call_timeout_s(max_tokens),
             )
             return response, time.time() - start
         except RETRYABLE_API_EXCEPTIONS as e:
@@ -242,6 +251,61 @@ def _validate_literature_blocks(parsed: dict[str, Any]) -> list[str]:
     return warnings
 
 
+_MISSING_COMMA = re.compile(r'([\]\}"])(\s*\n\s*")')
+_TRAILING_COMMA = re.compile(r",(\s*[\]\}])")
+_DOUBLE_COMMA = re.compile(r",(\s*),")
+
+
+def _drop_unmatched_closers(text: str) -> str:
+    """Remove a ``]`` or ``}`` outside a string that closes nothing that is open."""
+    out: list[str] = []
+    stack: list[str] = []
+    in_string = False
+    escaped = False
+    for i, ch in enumerate(text):
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch in "[{":
+            stack.append(ch)
+        elif ch in "]}":
+            if not stack or stack[-1] != {"]": "[", "}": "{"}[ch]:
+                continue
+            # a closer that would end the document while keys still follow is stray too
+            if len(stack) == 1 and text[i + 1 :].strip():
+                continue
+            stack.pop()
+        out.append(ch)
+    return "".join(out)
+
+
+def _repair_json_syntax(text: str) -> dict[str, Any] | None:
+    """Re-parse after fixing the slips a model makes in long JSON: a stray closing
+    bracket (one that closes nothing, or one that would end the document with keys
+    still to come), a missing or doubled comma between values, and a trailing comma
+    before a closing bracket. Returns None when the text is broken in some other
+    way, so a genuinely garbled response still counts as a failure."""
+    fixed = _drop_unmatched_closers(text)
+    fixed = _MISSING_COMMA.sub(r"\1,\2", fixed)
+    fixed = _DOUBLE_COMMA.sub(r",\1", fixed)
+    fixed = _TRAILING_COMMA.sub(r"\1", fixed)
+    if fixed == text:
+        return None
+    try:
+        parsed = json.loads(fixed)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 def _parse_json_from_text(text: str) -> dict[str, Any] | None:
     """Extract JSON from LLM response text, handling markdown code blocks."""
     # Try extracting from ```json ... ``` block
@@ -259,6 +323,9 @@ def _parse_json_from_text(text: str) -> dict[str, Any] | None:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
+        repaired = _repair_json_syntax(text)
+        if repaired is not None:
+            return repaired
         # Try to find JSON object boundaries
         brace_start = text.find("{")
         if brace_start == -1:

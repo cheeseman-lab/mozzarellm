@@ -883,3 +883,19 @@ def test_prepare_screen_bundles_does_not_backfill_across_sources(tmp_path):
     gene = json.loads(Path(bundles["21"]).read_text(encoding="utf-8"))["cluster_genes"][0]
     assert "affinage_functional_annotation" not in gene
     assert "UniProt_functional_annotation" not in gene
+
+
+def test_parse_repairs_a_missing_comma_and_a_trailing_comma():
+    from mozzarellm.pipeline.literature_mcp import _parse_json_from_text
+
+    text = '```json\n{\n  "a": [\n    "x"\n  ]\n  "b": {\n    "c": 1,\n  }\n}\n```'
+    assert _parse_json_from_text(text) == {"a": ["x"], "b": {"c": 1}}
+    stray = '{\n  "summary": "a ] in text",\n  ],\n  "b": 1\n}'
+    assert _parse_json_from_text(stray) == {"summary": "a ] in text", "b": 1}
+
+
+def test_call_timeout_grows_with_the_token_budget():
+    from mozzarellm.pipeline.literature_mcp import PER_CALL_TIMEOUT_S, call_timeout_s
+
+    assert call_timeout_s(4000) == PER_CALL_TIMEOUT_S
+    assert call_timeout_s(64000) > 1500
