@@ -11,12 +11,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from mozzarellm.clients.affinage_api_client import AffinageClient
 from mozzarellm.pipeline.bundle_builder import (
     DEFAULT_ACCESSION_COL,
+    _has_text,
     _lookup_accession,
     add_functional_annotations_to_chunk,
     build_evidence_bundles,
     get_or_append_stable_accession,
+    validate_source,
 )
 
 ####################### TEST CONSTANTS #######################
@@ -593,3 +596,247 @@ def test_build_evidence_bundles_empty_dataframe(tmp_path, mock_uniprot_client):
 
     bundle_files = list(bundles_dir.glob("*.json"))
     assert len(bundle_files) == 0, "No bundle files should be created for empty dataframe"
+
+
+# =============================================================================
+# Test: source="affinage_then_uniprot"
+# =============================================================================
+
+
+FALLBACK_CHUNK = pd.DataFrame(
+    {
+        "gene_symbol": ["AATF", "BYSL", "TP53"],
+        "cluster": [1, 1, 1],
+        DEFAULT_ACCESSION_COL: ["Q9NY61", "Q13895", "P04637"],
+    }
+)
+
+
+def _affinage_mock(annotated: dict) -> Mock:
+    """AffinageClient stub returning rows only for the genes it has narratives for."""
+    client = Mock()
+    client.fetch_functional_annotations.return_value = pd.DataFrame(
+        {
+            GENE_COLUMN: list(annotated),
+            "affinage_functional_annotation": list(annotated.values()),
+        }
+    )
+    return client
+
+
+def _uniprot_mock(annotated: dict) -> Mock:
+    """UniProtClient stub returning rows only for the accessions it has FUNCTION text for."""
+    client = Mock()
+
+    def fetch(chunk, accession_col):
+        found = [a for a in chunk[accession_col].unique() if a in annotated]
+        if not found:
+            raise ValueError("No UniProt entries found")
+        return pd.DataFrame(
+            {accession_col: found, "UniProt_functional_annotation": [annotated[a] for a in found]}
+        )
+
+    client.fetch_functional_annotations.side_effect = fetch
+    return client
+
+
+def test_validate_source_accepts_fallback():
+    """The fallback source is a known source value."""
+    assert validate_source("affinage_then_uniprot") == "affinage_then_uniprot"
+
+
+def test_fallback_queries_uniprot_for_gaps_only(tmp_path):
+    """UniProt is asked only about the genes Affinage left blank."""
+    affinage_client = _affinage_mock({"AATF": "affinage narrative for AATF"})
+    uniprot_client = _uniprot_mock({"Q13895": "Bystin-like protein", "P04637": "Tumor suppressor"})
+
+    result = add_functional_annotations_to_chunk(
+        chunk=FALLBACK_CHUNK,
+        screen_name=TEST_SCREEN_NAME,
+        cluster_id_column=CLUSTER_ID_COLUMN,
+        gene_column=GENE_COLUMN,
+        stable_accession_col=DEFAULT_ACCESSION_COL,
+        source="affinage_then_uniprot",
+        uniprot_client=uniprot_client,
+        affinage_client=affinage_client,
+        output_dir=tmp_path,
+    )
+
+    assert uniprot_client.fetch_functional_annotations.call_count == 1
+    queried = uniprot_client.fetch_functional_annotations.call_args[0][0]
+    assert sorted(queried[GENE_COLUMN]) == ["BYSL", "TP53"]
+    by_gene = result.set_index(GENE_COLUMN)
+    assert by_gene.loc["AATF", "affinage_functional_annotation"] == "affinage narrative for AATF"
+    # a gene Affinage answered carries no UniProt text, so its label cannot disagree with its text
+    assert not _has_text(by_gene.loc["AATF", "UniProt_functional_annotation"])
+    assert by_gene.loc["BYSL", "UniProt_functional_annotation"] == "Bystin-like protein"
+
+
+def test_fallback_is_skipped_when_affinage_answered_every_gene(tmp_path):
+    """No Affinage gap means no UniProt request at all."""
+    affinage_client = _affinage_mock(
+        {"AATF": "narrative A", "BYSL": "narrative B", "TP53": "narrative C"}
+    )
+    uniprot_client = _uniprot_mock({"Q13895": "Bystin-like protein"})
+
+    result = add_functional_annotations_to_chunk(
+        chunk=FALLBACK_CHUNK,
+        screen_name=TEST_SCREEN_NAME,
+        cluster_id_column=CLUSTER_ID_COLUMN,
+        gene_column=GENE_COLUMN,
+        stable_accession_col=DEFAULT_ACCESSION_COL,
+        source="affinage_then_uniprot",
+        uniprot_client=uniprot_client,
+        affinage_client=affinage_client,
+        output_dir=tmp_path,
+    )
+
+    assert uniprot_client.fetch_functional_annotations.call_count == 0
+    assert "UniProt_functional_annotation" not in result.columns
+    assert list(result["annotation_source"]) == ["affinage", "affinage", "affinage"]
+
+
+def test_fallback_fires_on_empty_affinage_text(tmp_path):
+    """An Affinage row present but empty is a gap, not an annotation."""
+    affinage_client = _affinage_mock({"AATF": "affinage narrative for AATF", "BYSL": "   "})
+    uniprot_client = _uniprot_mock({"Q13895": "Bystin-like protein", "P04637": "Tumor suppressor"})
+
+    result = add_functional_annotations_to_chunk(
+        chunk=FALLBACK_CHUNK,
+        screen_name=TEST_SCREEN_NAME,
+        cluster_id_column=CLUSTER_ID_COLUMN,
+        gene_column=GENE_COLUMN,
+        stable_accession_col=DEFAULT_ACCESSION_COL,
+        source="affinage_then_uniprot",
+        uniprot_client=uniprot_client,
+        affinage_client=affinage_client,
+        output_dir=tmp_path,
+    )
+
+    queried = uniprot_client.fetch_functional_annotations.call_args[0][0]
+    assert sorted(queried[GENE_COLUMN]) == ["BYSL", "TP53"]
+    assert dict(zip(result[GENE_COLUMN], result["annotation_source"], strict=True)) == {
+        "AATF": "affinage",
+        "BYSL": "uniprot",
+        "TP53": "uniprot",
+    }
+
+
+def test_fallback_labels_the_source_of_every_gene(tmp_path):
+    """Each gene records which source supplied its text; neither source gives ''."""
+    affinage_client = _affinage_mock({"AATF": "affinage narrative for AATF"})
+    uniprot_client = _uniprot_mock({"Q13895": "Bystin-like protein"})
+
+    result = add_functional_annotations_to_chunk(
+        chunk=FALLBACK_CHUNK,
+        screen_name=TEST_SCREEN_NAME,
+        cluster_id_column=CLUSTER_ID_COLUMN,
+        gene_column=GENE_COLUMN,
+        stable_accession_col=DEFAULT_ACCESSION_COL,
+        source="affinage_then_uniprot",
+        uniprot_client=uniprot_client,
+        affinage_client=affinage_client,
+        output_dir=tmp_path,
+    )
+
+    assert dict(zip(result[GENE_COLUMN], result["annotation_source"], strict=True)) == {
+        "AATF": "affinage",
+        "BYSL": "uniprot",
+        "TP53": "",
+    }
+
+
+def test_fallback_leaves_a_gene_neither_source_has_blank(tmp_path):
+    """Nothing is fabricated for a gene both sources miss."""
+    affinage_client = _affinage_mock({"AATF": "affinage narrative for AATF"})
+    uniprot_client = _uniprot_mock({})
+
+    with pytest.warns(UserWarning, match="UniProt fallback failed for cluster '1'"):
+        result = add_functional_annotations_to_chunk(
+            chunk=FALLBACK_CHUNK,
+            screen_name=TEST_SCREEN_NAME,
+            cluster_id_column=CLUSTER_ID_COLUMN,
+            gene_column=GENE_COLUMN,
+            stable_accession_col=DEFAULT_ACCESSION_COL,
+            source="affinage_then_uniprot",
+            uniprot_client=uniprot_client,
+            affinage_client=affinage_client,
+            output_dir=tmp_path,
+        )
+
+    blank = result[result[GENE_COLUMN] == "BYSL"].iloc[0]
+    assert blank["annotation_source"] == ""
+    assert not _has_text(blank.get("affinage_functional_annotation"))
+
+
+def test_fallback_treats_an_affinage_refusal_as_a_gap(tmp_path):
+    """A refusal narrative from the real Affinage client is a gap, so UniProt is asked.
+
+    Exercises the client's own REFUSAL_PREFIXES handling over mocked HTTP rather
+    than restating it in the bundle builder.
+    """
+    affinage_client = AffinageClient(cache_path=tmp_path / "affinage_cache.sqlite3", max_retries=1)
+
+    def affinage_get(url, **kwargs):
+        symbol = url.rsplit("/", 1)[-1]
+        narrative = (
+            "Insufficient evidence to construct a mechanistic narrative."
+            if symbol == "BYSL"
+            else f"mechanistic narrative for {symbol}"
+        )
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"mechanistic_narrative": narrative}
+        return response
+
+    uniprot_client = _uniprot_mock({"Q13895": "Bystin-like protein"})
+
+    with patch.object(affinage_client._session, "get", side_effect=affinage_get):
+        result = add_functional_annotations_to_chunk(
+            chunk=FALLBACK_CHUNK,
+            screen_name=TEST_SCREEN_NAME,
+            cluster_id_column=CLUSTER_ID_COLUMN,
+            gene_column=GENE_COLUMN,
+            stable_accession_col=DEFAULT_ACCESSION_COL,
+            source="affinage_then_uniprot",
+            uniprot_client=uniprot_client,
+            affinage_client=affinage_client,
+            output_dir=tmp_path,
+        )
+
+    queried = uniprot_client.fetch_functional_annotations.call_args[0][0]
+    assert list(queried[GENE_COLUMN]) == ["BYSL"]
+    by_gene = result.set_index(GENE_COLUMN)
+    assert by_gene.loc["BYSL", "annotation_source"] == "uniprot"
+    assert by_gene.loc["AATF", "annotation_source"] == "affinage"
+
+
+def test_build_evidence_bundles_fallback_source_labels_survive_into_the_bundle(tmp_path):
+    """The per-gene source label is in the JSON the model reads."""
+    acc_cluster_df = FALLBACK_CHUNK.copy()
+    affinage_client = _affinage_mock({"AATF": "affinage narrative for AATF"})
+    uniprot_client = _uniprot_mock({"Q13895": "Bystin-like protein"})
+
+    build_evidence_bundles(
+        screen_name=TEST_SCREEN_NAME,
+        acc_cluster_df=acc_cluster_df,
+        gene_column=GENE_COLUMN,
+        cluster_id_column=CLUSTER_ID_COLUMN,
+        stable_accession_col=DEFAULT_ACCESSION_COL,
+        source="affinage_then_uniprot",
+        uniprot_client=uniprot_client,
+        affinage_client=affinage_client,
+        output_dir=tmp_path,
+    )
+
+    bundle_path = (
+        tmp_path / "test_analysis" / "test_evidence_bundles" / "test__cluster_1__bundle.json"
+    )
+    genes = {g["gene_symbol"]: g for g in json.loads(bundle_path.read_text())["cluster_genes"]}
+    assert genes["AATF"]["annotation_source"] == "affinage"
+    assert genes["AATF"]["affinage_functional_annotation"] == "affinage narrative for AATF"
+    assert "UniProt_functional_annotation" not in genes["AATF"]
+    assert genes["BYSL"]["annotation_source"] == "uniprot"
+    assert genes["BYSL"]["UniProt_functional_annotation"] == "Bystin-like protein"
+    assert "affinage_functional_annotation" not in genes["BYSL"]
+    assert genes["TP53"]["annotation_source"] == ""
