@@ -95,12 +95,18 @@ A successful run also writes `latest.json` next to the run directory
 (`{"run_dir", "date", "screen_name"}`), so downstream code can find the newest
 run without parsing timestamps. The screen context can be passed as a file
 (`screen_context_path`) or an in-memory dict (`screen_context`).
-The UniProt lookups are cached on disk (`~/.cache/mozzarellm/uniprot_cache.sqlite3`
-by default). Set `MOZZARELLM_UNIPROT_CACHE` to move it — point it at node-local
-storage when several jobs annotate concurrently on a cluster, since a cache on a
-shared network filesystem is what concurrent writers corrupt — or to `none` to
-run without one. A cache that is corrupt or unwritable is dropped with a loud
-warning and the lookups go to the API; it never turns into empty annotations.
+The annotation lookups are cached on disk — UniProt in
+`~/.cache/mozzarellm/uniprot_cache.sqlite3` and Affinage in
+`~/.cache/mozzarellm/affinage_cache.sqlite3` by default. Set
+`MOZZARELLM_UNIPROT_CACHE` / `MOZZARELLM_AFFINAGE_CACHE` to move them — point
+them at node-local storage when several jobs annotate concurrently on a cluster,
+since a cache on a shared network filesystem is what concurrent writers corrupt —
+or to `none` to run without one. A cache that is corrupt or unwritable is dropped
+with a loud warning and the lookups go to the API; it never turns into empty
+annotations. The Affinage cache keeps the whole record (narrative plus audit
+note) and keeps negative answers too — a symbol with no record, or a refusal
+narrative — under a shorter one-week TTL, so the panels of one screen, which
+share a gene set, ask the service for each gene once rather than once per panel.
 
 `analyze_screen(..., resume=True)` re-reads clusters already answered in that
 `run_dir` instead of calling the model again; `dry_run=True` writes every

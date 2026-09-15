@@ -13,9 +13,9 @@ import pandas as pd
 import pytest
 import requests
 
+from mozzarellm.clients.sqlite_cache import CACHE_BUSY_TIMEOUT_MS
 from mozzarellm.clients.uniprot_api_client import (
     BASE_URL,
-    CACHE_BUSY_TIMEOUT_MS,
     CACHE_PATH_ENV,
     DEFAULT_BACKOFF_TIME,
     DEFAULT_MAX_RETRIES,
