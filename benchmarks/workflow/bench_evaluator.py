@@ -170,8 +170,9 @@ def consensus_coherence(reviewer_csvs: dict[str, Path]) -> dict[tuple, str]:
     """Majority-vote per-cluster coherence (High/Medium/Low) across reviewers.
 
     Reads the cluster-level `coherence` free text from each reviewer's rows,
-    maps it to a level, and returns {(screen, cluster): level} for clusters with
-    a strict majority. Ties (e.g. one High, one Medium, one Low) are excluded.
+    maps it to a level, and returns {(screen, cluster): level}: the strict
+    majority, or on a tie (e.g. one High, one Medium, one Low) the ordinal
+    median of the votes -- the same rule the subclass consensus uses.
     """
     per_cluster: dict[tuple, list[str]] = defaultdict(list)
     for path in reviewer_csvs.values():
@@ -192,6 +193,9 @@ def consensus_coherence(reviewer_csvs: dict[str, Path]) -> dict[tuple, str]:
         winner, top = counts.most_common(1)[0]
         if sum(1 for c in counts.values() if c == top) == 1:
             result[cluster_key] = winner
+        else:
+            ranks = sorted(("Low", "Medium", "High").index(label) for label in labels)
+            result[cluster_key] = ("Low", "Medium", "High")[ranks[(len(ranks) - 1) // 2]]
     return result
 
 
