@@ -396,3 +396,44 @@ stages:
 
           No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined):
           - No process explains a substantial share of the genes, or the cluster contains many unrelated functions or nontargeting controls.
+
+      - id: low_is_a_call
+        rationale: >-
+          round-2 engineering from the 2026-09-15 production census (44 panels, 18.9k
+          clusters): ~60% of clusters return "No coherent biological pathway" with no gene
+          labels, and re-annotating the legacy clusterings reproduces it (jebel legacy,
+          292 clusters: 227 no-pathway, 247 Low, 0 High), so it is the prompt. The shipped
+          rubric (outsider_capped) never separates Low from no-pathway: "substantial
+          share" is unquantified, the alternative-explanation check can push a call all
+          the way to abstention, and the GCR precondition then empties the gene lists.
+          Minimal edit, the three tiers untouched: (1) Low is a full call -- name the
+          process and categorize every gene against it; (2) a credible alternative lowers
+          the level by at most one step and never produces "No coherent pathway"; (3) the
+          abstain floor is quantified at the legacy 30% line or a control-dominated
+          cluster. The legacy 70/50 tier thresholds are deliberately NOT restored (the
+          reviewers' confidence is an epistemic self-assessment, not a coverage fraction);
+          they are the round-3 escalation only if this edit leaves the production
+          confidence distribution as skewed as it is (goal: a more even High/Medium/Low
+          spread with no-pathway reserved for genuine noise, measured on the legacy jebel
+          re-annotation, not on the 8-cluster benchmark). Must hold: abstain decoys 4/4
+          (they land below 30% or control-dominated, hence Low), coherence 3/4, category
+          within the +/-0.02 band.
+        text: |
+          PATHWAY CONFIDENCE: report how confident you are in your dominant_process call itself — an assessment of your own call, not merely of how well the genes fit it. Weigh three things:
+          - how much of the cluster the pathway explains;
+          - how many genes are outsiders the call cannot place — count them explicitly, INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway;
+          - whether a different biological process could explain the cluster comparably well. Before assigning a level, briefly consider the strongest alternative explanation.
+
+          High confidence:
+          - The call would survive being wrong about any single gene; outsiders are absent or a token few; no credible alternative process.
+
+          Medium confidence:
+          - The call is the best available explanation, but it rests partly on inference (many members are not documented participants), a notable share of the cluster is outsiders it cannot place, or a plausible alternative process exists. A notable outsider share caps confidence at Medium even when every placed gene fits perfectly.
+
+          Low confidence:
+          - The call is tentative: an alternative explains the cluster about as well, or the cluster is heterogeneous enough that the dominant process may be an artifact of a subset.
+          - Low is still a call: name the dominant_process and categorize EVERY gene against it exactly as at the higher levels — the gene lists are never left empty for a Low call.
+
+          A credible alternative lowers the level by at most one step (High to Medium, Medium to Low); it never turns a call into "No coherent pathway".
+
+          No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined). Reserve this for clusters where no process places even 30% of the genes, or the cluster is dominated by nontargeting controls. Any process that places 30% or more of the genes is a Low-or-better call, however heterogeneous the remainder.
