@@ -3,7 +3,10 @@
 _PRE_RESHAPE holds SHA-256 digests of renders captured on the parent commit
 (mozzarellm/prompt_components.py + utils/prompt_factory.py, before
 mozzarellm/prompts/). Every assembly path must still produce those bytes;
-render the same cases on the parent commit to reproduce the digests.
+render the same cases on the parent commit to reproduce the digests. The
+digests of every case that embeds PCC were re-captured when the walkup's
+PCC selection (coverage_tiers, benchmarks/outputs walkup_state.json carry)
+shipped; the overrides cases and the stepwise system prompt are unchanged.
 """
 
 import hashlib
@@ -31,16 +34,16 @@ from mozzarellm.prompts.components import (
 )
 
 _PRE_RESHAPE = {
-    "cot": "f4feb9eaef5df840e448eaee129bc3139180ece54334bcaa60dab1da0c32363f",
-    "cot_mcp": "de645740e3b92d9a930852075dc144edc82b3b7539e1a073be80e2d2d38795b2",
-    "cot_mcp_features_strength": "31e54528057c684fe5c8a1afd5452b7da0eb20f210a63b3db9ce0bd2f65e3687",
+    "cot": "61baa2d83b680330c64dc92913916ac7e20b5fb41394e26ef974264c933f6050",
+    "cot_mcp": "cc2af0f10572d187eedba21162be373340020c638f532e17e2b62ce366d9428c",
+    "cot_mcp_features_strength": "5f2185de39deaa1facc93df9a35c240ae7592833abc5660fe26375eb89a52b61",
     "cot_overrides": "a4218dee7d8771bcd6dc653b5fd332e6ea768d9dcf9b5ab199ae54e2dbafb75c",
-    "standard": "9e9364e94f40c90e0973ed2dd70e1b6c7aa70b882d4468a8e723450e1f461034",
-    "standard_mcp": "726120372b35fb4f5689d43a09495f426ad93db1359127200e550b9c4174aaa3",
+    "standard": "beca485321a2a24b6d2f53178b8ed13578054d331311b10cb81c5e07be0258ef",
+    "standard_mcp": "84025919a0d0e14c602d6a1003fe9910064918ac564b901de651a85bdc38b405",
     "standard_overrides": "354a76186d4041e43aee40dcdf9909e370a71436845c9df3e1e20124cb783201",
     "stepwise_system": "7f993f9a7720bb116e4791b1b5a1c715ceeef13ac8efaf7269bf3a7099c0b524",
-    "stepwise_turns": "6030b204d4630bae82d09e9f72df8e2f483a418041e1f568ee2a8f41687bab96",
-    "stepwise_turns_mcp": "e766667a0cda419cfad8a1b51c4715a5064d2e65d19c1e3e3a3c6d143d721b0e",
+    "stepwise_turns": "a7e6ffd8aa1bf2784a74576f3f2271bc8f106b5a21119da3db4e060c2aca7813",
+    "stepwise_turns_mcp": "7ec2836434ad982bf649d5e369be00b46188e737539bfb5648134aeebaf322ea",
     "stepwise_turns_overrides": "48c241cb67676a0842799c6fa6b11fa0d7d38cd0292d04a2a6c3129b351cc8d5",
 }
 _CONTEXT = (

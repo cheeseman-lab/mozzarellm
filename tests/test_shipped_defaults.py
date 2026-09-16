@@ -14,7 +14,7 @@ import pytest
 from mozzarellm.prompts import make_cluster_analysis_system_prompt
 
 _REPO = Path(__file__).resolve().parents[1]
-_RUN_OF_RECORD = _REPO / "benchmarks" / "outputs" / "order" / "O_20260911_180759" / "prompts_used"
+_RUN_OF_RECORD = _REPO / "benchmarks" / "outputs" / "order" / "O_20260916_181546" / "prompts_used"
 _INPUTS = _REPO / "benchmarks" / "inputs"
 _SCREENS = ("whitney", "denali", "jebel", "aconcagua_interphase", "aconcagua_interphase_shuffled")
 
