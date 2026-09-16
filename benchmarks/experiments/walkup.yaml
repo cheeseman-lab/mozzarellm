@@ -330,7 +330,9 @@ stages:
       # explicit count, or the legacy 70/50/30 coverage thresholds. Side check
       # off-benchmark: the spread on aconcagua interphase r12 (227 clusters;
       # legacy High 73 / Medium 60 / Low 94, 24 no-pathway) must stay solid.
-      - id: low_is_a_call
+      # Names say the tier rule; the floor is shared. Run dir PCC_20260916_112403
+      # was renamed in place from the ids low_is_a_call / counted_floor.
+      - id: qualitative_tiers
         rationale: >-
           minimal manipulation: the prior's three tiers word for word, plus the three
           guards. Isolates whether the collapse is the missing floor alone -- if the
@@ -357,7 +359,7 @@ stages:
 
           No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined). Reserve this for clusters where no process places even 30% of the genes, or the cluster is dominated by nontargeting controls. Any process that places 30% or more of the genes is a Low-or-better call, however heterogeneous the remainder.
 
-      - id: counted_floor
+      - id: counted_tiers
         rationale: >-
           arithmetic before adjectives (the move that worked at UPR, and round-1
           counted_outsiders' mechanism): count total / placed / outsiders and draw the
