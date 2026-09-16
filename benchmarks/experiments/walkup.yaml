@@ -314,20 +314,62 @@ stages:
   - component: PCC
     goal: coherence
     candidates:
-      - id: counted_outsiders
+      # Round 2 (2026-09-16). Round 1 selected outsider_capped (now the shipped
+      # PATHWAY_CONFIDENCE_CRITERIA and this stage's prior); its slate
+      # (counted_outsiders / outsider_capped / call_confidence) is in history at
+      # 7754352. Round-2 evidence: the 2026-09-15 production run returns "No
+      # coherent biological pathway" with empty gene lists for ~60% of 18.9k
+      # clusters, and re-annotating the legacy jebel clustering reproduces it
+      # (292 clusters: 227 no-pathway, 247 Low / 45 Medium / 0 High) -- the
+      # prior never separates Low from no-pathway ("substantial share" is
+      # unquantified, the alternative check can push a call to abstention, the
+      # GCR precondition then empties the lists). All three candidates carry the
+      # same three guards -- Low is a full call; a credible alternative lowers by
+      # at most one tier; no-pathway only below 30% or control-dominated -- and
+      # differ only in how the tier itself is set: the prior's adjectives, an
+      # explicit count, or the legacy 70/50/30 coverage thresholds. Side check
+      # off-benchmark: the spread on aconcagua interphase r12 (227 clusters;
+      # legacy High 73 / Medium 60 / Low 94, 24 no-pathway) must stay solid.
+      - id: low_is_a_call
         rationale: >-
-          outsider_capped + arithmetic before adjectives (the move that worked at UPR):
-          the cap engaged at c6-class clusters only 1-of-3 reps because "notable share"
-          vs "a token few" is unquantified. Count explicitly and draw the line at more
-          than one gene in ten unplaceable -> not High. Caveat on record: any threshold
-          in 6-15% separates the benchmark's clusters identically, so the exact value is
-          a stated convention (a reviewer's rule of thumb), not a fitted number, and
-          cannot be validated at n=5.
+          minimal manipulation: the prior's three tiers word for word, plus the three
+          guards. Isolates whether the collapse is the missing floor alone -- if the
+          spread on aconcagua recovers here, nothing else in the rubric needs to move.
+          Loses if the adjectives ("token few", "notable share") keep pulling calls to Low
+          even once Low is a full call.
+        text: |
+          PATHWAY CONFIDENCE: report how confident you are in your dominant_process call itself — an assessment of your own call, not merely of how well the genes fit it. Weigh three things:
+          - how much of the cluster the pathway explains;
+          - how many genes are outsiders the call cannot place — count them explicitly, INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway;
+          - whether a different biological process could explain the cluster comparably well. Before assigning a level, briefly consider the strongest alternative explanation.
+
+          High confidence:
+          - The call would survive being wrong about any single gene; outsiders are absent or a token few; no credible alternative process.
+
+          Medium confidence:
+          - The call is the best available explanation, but it rests partly on inference (many members are not documented participants), a notable share of the cluster is outsiders it cannot place, or a plausible alternative process exists. A notable outsider share caps confidence at Medium even when every placed gene fits perfectly.
+
+          Low confidence:
+          - The call is tentative: an alternative explains the cluster about as well, or the cluster is heterogeneous enough that the dominant process may be an artifact of a subset.
+          - Low is still a call: name the dominant_process and categorize EVERY gene against it exactly as at the higher levels — the gene lists are never left empty for a Low call.
+
+          A credible alternative lowers the level by at most one step (High to Medium, Medium to Low); it never turns a call into "No coherent pathway".
+
+          No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined). Reserve this for clusters where no process places even 30% of the genes, or the cluster is dominated by nontargeting controls. Any process that places 30% or more of the genes is a Low-or-better call, however heterogeneous the remainder.
+
+      - id: counted_floor
+        rationale: >-
+          arithmetic before adjectives (the move that worked at UPR, and round-1
+          counted_outsiders' mechanism): count total / placed / outsiders and draw the
+          High line at one gene in ten unplaceable, then the same three guards. Middle
+          of the spread -- quantifies High without restoring coverage tiers for Medium and
+          Low. Loses if the one-in-ten High line is too strict for production clusters
+          (median ~20 genes on aconcagua) and High stays near zero.
         text: |
           PATHWAY CONFIDENCE: report how confident you are in your dominant_process call itself — an assessment of your own call, not merely of how well the genes fit it. First, count and state explicitly:
           - the total number of genes in the cluster;
-          - the number the call places (ESTABLISHED or NOVEL_ROLE with a stated relationship);
-          - the number of outsiders it cannot place — INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway — and the outsider fraction.
+          - the number the call places (ESTABLISHED, or NOVEL_ROLE with a stated relationship to the process);
+          - the number of outsiders it cannot place — INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway, and every nontargeting control — and the placed fraction.
           Then briefly consider the strongest alternative explanation for the cluster.
 
           High confidence:
@@ -338,100 +380,36 @@ stages:
 
           Low confidence:
           - The call is tentative: an alternative explains the cluster about as well, or the cluster is heterogeneous enough that the dominant process may be an artifact of a subset.
+          - Low is still a call: name the dominant_process and categorize EVERY gene against it exactly as at the higher levels — the gene lists are never left empty for a Low call.
 
-          No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined):
-          - No process explains a substantial share of the genes, or the cluster contains many unrelated functions or nontargeting controls.
+          A credible alternative lowers the level by at most one step (High to Medium, Medium to Low); it never turns a call into "No coherent pathway".
 
-      - id: outsider_capped
+          No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined). Reserve this for clusters where no process places even 30% of the genes, or the cluster is dominated by nontargeting controls. Any process that places 30% or more of the genes is a Low-or-better call, however heterogeneous the remainder.
+
+      - id: coverage_tiers
         rationale: >-
-          call_confidence + explicit outsider accounting, from the reviewers' second stated
-          input: genes the call cannot place -- including UNCHARACTERIZED genes whose
-          annotation offers nothing to relate -- are outsiders, and a notable share of them
-          caps confidence at Medium even when every placed gene fits. Targets the c6-class
-          residual (high placed-gene purity, high unplaceable share) without touching the
-          control (zero-outsider clusters unaffected).
+          the legacy rubric (70/50/30 placed-fraction tiers, the one that produced the
+          High 73 / Medium 60 / Low 94 spread on aconcagua) with the three guards. Far end
+          of the spread: confidence becomes a coverage fraction rather than an epistemic
+          self-assessment, which round 1 argued against (coherence goal, reviewer
+          testimony). Wins only if the two wording candidates leave the production spread
+          collapsed; loses on the benchmark if coherence drops below 3/4 because the
+          reviewers' Medium/Low calls do not track coverage.
         text: |
-          PATHWAY CONFIDENCE: report how confident you are in your dominant_process call itself — an assessment of your own call, not merely of how well the genes fit it. Weigh three things:
-          - how much of the cluster the pathway explains;
-          - how many genes are outsiders the call cannot place — count them explicitly, INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway;
-          - whether a different biological process could explain the cluster comparably well. Before assigning a level, briefly consider the strongest alternative explanation.
+          PATHWAY CONFIDENCE: report how confident you are in your dominant_process call, from how much of the cluster it explains. First, count and state explicitly:
+          - the total number of genes in the cluster;
+          - the number the best module(s) place (ESTABLISHED, or NOVEL_ROLE with a stated relationship to the process; when you name 2-3 processes, count their union);
+          - the number of outsiders it cannot place — INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway, and every nontargeting control — and the placed fraction.
+          Assign the level from the placed fraction, then briefly consider the strongest alternative explanation.
 
           High confidence:
-          - The call would survive being wrong about any single gene; outsiders are absent or a token few; no credible alternative process.
+          - At least 70% of the genes placed; multiple well-established members with direct functional evidence; clear functional relationships explain the phenotypic clustering.
 
           Medium confidence:
-          - The call is the best available explanation, but it rests partly on inference (many members are not documented participants), a notable share of the cluster is outsiders it cannot place, or a plausible alternative process exists. A notable outsider share caps confidence at Medium even when every placed gene fits perfectly.
+          - 50-70% of the genes placed; some established members alongside plausible additional candidates; the functional relationship is plausible but has gaps.
 
           Low confidence:
-          - The call is tentative: an alternative explains the cluster about as well, or the cluster is heterogeneous enough that the dominant process may be an artifact of a subset.
-
-          No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined):
-          - No process explains a substantial share of the genes, or the cluster contains many unrelated functions or nontargeting controls.
-
-      - id: call_confidence
-        rationale: >-
-          engineered from reviewer testimony (all three reviewers, via Matteo): the label is
-          "a level of confidence that comes with their call", predicated on purity and the
-          presence of outsiders -- an epistemic self-assessment, not a cluster property.
-          Round-2 evidence: composition can't be the axis (c6 refutes it at 72% EST) and
-          hedging instructions never fire (guarded inert). This candidate names the axis
-          and its three stated inputs: explained fraction, outsiders, and a credible-
-          alternative margin test. Expected ceiling ~3/4: verbal self-confidence trends
-          eric-mode regardless of wording; the consistency-based pipeline measure is the
-          deeper alternative on record.
-        text: |
-          PATHWAY CONFIDENCE: report how confident you are in your dominant_process call itself — an assessment of your own call, not merely of how well the genes fit it. Weigh three things:
-          - how much of the cluster the pathway explains;
-          - how many genes are structurally unrelated outsiders with no place in the pathway;
-          - whether a different biological process could explain the cluster comparably well. Before assigning a level, briefly consider the strongest alternative explanation.
-
-          High confidence:
-          - The call would survive being wrong about any single gene; few or no outsiders; no credible alternative process.
-
-          Medium confidence:
-          - The call is the best available explanation, but it rests partly on inference (many members are not documented participants), carries notable outsiders, or a plausible alternative process exists.
-
-          Low confidence:
-          - The call is tentative: an alternative explains the cluster about as well, or the cluster is heterogeneous enough that the dominant process may be an artifact of a subset.
-
-          No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined):
-          - No process explains a substantial share of the genes, or the cluster contains many unrelated functions or nontargeting controls.
-
-      - id: low_is_a_call
-        rationale: >-
-          round-2 engineering from the 2026-09-15 production census (44 panels, 18.9k
-          clusters): ~60% of clusters return "No coherent biological pathway" with no gene
-          labels, and re-annotating the legacy clusterings reproduces it (jebel legacy,
-          292 clusters: 227 no-pathway, 247 Low, 0 High), so it is the prompt. The shipped
-          rubric (outsider_capped) never separates Low from no-pathway: "substantial
-          share" is unquantified, the alternative-explanation check can push a call all
-          the way to abstention, and the GCR precondition then empties the gene lists.
-          Minimal edit, the three tiers untouched: (1) Low is a full call -- name the
-          process and categorize every gene against it; (2) a credible alternative lowers
-          the level by at most one step and never produces "No coherent pathway"; (3) the
-          abstain floor is quantified at the legacy 30% line or a control-dominated
-          cluster. The legacy 70/50 tier thresholds are deliberately NOT restored (the
-          reviewers' confidence is an epistemic self-assessment, not a coverage fraction);
-          they are the round-3 escalation only if this edit leaves the production
-          confidence distribution as skewed as it is (goal: a more even High/Medium/Low
-          spread with no-pathway reserved for genuine noise, measured on the legacy jebel
-          re-annotation, not on the 8-cluster benchmark). Must hold: abstain decoys 4/4
-          (they land below 30% or control-dominated, hence Low), coherence 3/4, category
-          within the +/-0.02 band.
-        text: |
-          PATHWAY CONFIDENCE: report how confident you are in your dominant_process call itself — an assessment of your own call, not merely of how well the genes fit it. Weigh three things:
-          - how much of the cluster the pathway explains;
-          - how many genes are outsiders the call cannot place — count them explicitly, INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway;
-          - whether a different biological process could explain the cluster comparably well. Before assigning a level, briefly consider the strongest alternative explanation.
-
-          High confidence:
-          - The call would survive being wrong about any single gene; outsiders are absent or a token few; no credible alternative process.
-
-          Medium confidence:
-          - The call is the best available explanation, but it rests partly on inference (many members are not documented participants), a notable share of the cluster is outsiders it cannot place, or a plausible alternative process exists. A notable outsider share caps confidence at Medium even when every placed gene fits perfectly.
-
-          Low confidence:
-          - The call is tentative: an alternative explains the cluster about as well, or the cluster is heterogeneous enough that the dominant process may be an artifact of a subset.
+          - 30-50% of the genes placed; few established members, the theme may be broad, or the dominant process may be an artifact of a subset.
           - Low is still a call: name the dominant_process and categorize EVERY gene against it exactly as at the higher levels — the gene lists are never left empty for a Low call.
 
           A credible alternative lowers the level by at most one step (High to Medium, Medium to Low); it never turns a call into "No coherent pathway".
