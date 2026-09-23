@@ -20,9 +20,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from mozzarellm.clients.affinage_api_client import AffinageClient
+from mozzarellm.clients.uniprot_api_client import UniProtClient
 from mozzarellm.pipeline.bundle_builder import (
     build_evidence_bundles,
     get_or_append_stable_accession,
+    validate_source,
 )
 from mozzarellm.prompts import (
     compose_stepwise_user_turns,
@@ -52,6 +55,9 @@ def prepare_screen_bundles(
     strength_higher_is_stronger: bool = True,
     organism_id: int = 9606,
     control_prefix: str = "nontargeting_",
+    source: str = "uniprot",
+    uniprot_client: UniProtClient | None = None,
+    affinage_client: AffinageClient | None = None,
     rebuild: bool = False,
 ) -> dict:
     # organism_id is the NCBI taxonomy id the UniProt lookups are restricted to
@@ -59,7 +65,9 @@ def prepare_screen_bundles(
     """Cluster table -> stable accessions -> evidence bundles -> {cluster_id: path}.
 
     Bundles are cached under ``<output_dir>/<screen_name>_analysis/``; an
-    existing bundle directory is reused unless ``rebuild=True``.
+    existing bundle directory is reused when it holds a bundle for every cluster in
+    the table; a directory missing any (an interrupted build) is rebuilt, as is
+    everything when ``rebuild=True``.
 
     Args:
         cluster_table: DataFrame or path to a CSV/TSV/XLSX with one row per
@@ -79,7 +87,28 @@ def prepare_screen_bundles(
         control_prefix: Gene symbols with this prefix are treated as
             non-targeting controls (mapped to ``NON_TARGETING_CONTROL``
             instead of a UniProt lookup).
+        source: Which functional annotation the bundles carry —
+            ``"uniprot"`` (the default; UniProt FUNCTION comments),
+            ``"affinage"`` (Affinage mechanistic narratives, alias-resolved
+            and audit-noted), ``"both"`` (each fetched side by side as its
+            own column), or ``"affinage_then_uniprot"``. Among the first
+            three no source backfills another: a gene one source has nothing
+            for stays empty for that source, and the model sees the gap.
+            ``"affinage_then_uniprot"`` is the one mixed source: Affinage is
+            fetched for every gene and UniProt is queried only for the genes
+            whose Affinage annotation is absent, empty, or a refusal
+            narrative, so request volume and prompt length stay close to pure
+            Affinage. Each gene then carries ``annotation_source``
+            ("affinage", "uniprot", or "" when neither source had anything),
+            so a mixed bundle stays auditable per gene; a gene neither source
+            has still arrives blank. The accession step always queries
+            UniProt, since accessions are UniProt identifiers.
+        uniprot_client: Injected ``UniProtClient`` (its cache path, timeouts
+            and retries are the knobs); one is built per run when omitted.
+        affinage_client: Injected ``AffinageClient``, likewise; only built
+            when ``source`` asks for Affinage.
     """
+    validate_source(source)
     output_dir = Path(output_dir)
     cluster_df = cluster_table if hasattr(cluster_table, "columns") else load_table(cluster_table)
     if strength_column is not None:
@@ -88,7 +117,17 @@ def prepare_screen_bundles(
         )
     bundle_dir = output_dir / f"{screen_name}_analysis" / f"{screen_name}_evidence_bundles"
 
-    if rebuild or not bundle_dir.exists():
+    # a directory left by an interrupted build is partial, and a partial map silently
+    # drops the clusters it lacks from every downstream step -- rebuild on any gap
+    expected = {str(c) for c in cluster_df[cluster_id_column].unique()}
+    present = set(build_cluster_id_to_bundle_path(bundle_dir, screen_name=screen_name))
+    missing = sorted(expected - present)
+    if missing and not rebuild and present:
+        logging.info(
+            f"Rebuilding bundles at {bundle_dir}: {len(missing)} of {len(expected)} missing"
+        )
+
+    if rebuild or missing:
         acc_cluster_df = get_or_append_stable_accession(
             screen_name=screen_name,
             cluster_df=cluster_df,
@@ -96,6 +135,7 @@ def prepare_screen_bundles(
             organism_id=organism_id,
             warn_on_fallback=False,
             control_prefix=control_prefix,
+            uniprot_client=uniprot_client,
             output_dir=output_dir,
         )
         build_evidence_bundles(
@@ -106,6 +146,9 @@ def prepare_screen_bundles(
             stable_accession_col="accession",
             feature_columns=feature_columns or None,
             strength_column=strength_column,
+            source=source,
+            uniprot_client=uniprot_client,
+            affinage_client=affinage_client,
             output_dir=output_dir,
         )
     else:

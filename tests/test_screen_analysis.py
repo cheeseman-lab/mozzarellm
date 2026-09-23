@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from mozzarellm.pipeline.screen_analysis import analyze_screen
 
@@ -174,6 +175,33 @@ def test_prepare_screen_bundles_reuses_cache(tmp_path):
         screen_name="s1", cluster_table=table, output_dir=tmp_path
     )  # cache hit: no network
     assert "21" in bundles
+
+
+def test_prepare_screen_bundles_rebuilds_a_partial_directory(tmp_path, monkeypatch):
+    from mozzarellm.pipeline import screen_analysis
+
+    bundle_dir = tmp_path / "s1_analysis" / "s1_evidence_bundles"
+    bundle_dir.mkdir(parents=True)
+    (bundle_dir / "s1__cluster_21__bundle.json").write_text("{}")
+
+    built = []
+    monkeypatch.setattr(
+        screen_analysis, "get_or_append_stable_accession", lambda **kw: kw["cluster_df"]
+    )
+
+    def _build(**kw):
+        built.append(sorted(kw["acc_cluster_df"]["cluster"].astype(str)))
+        for c in built[-1]:
+            (bundle_dir / f"s1__cluster_{c}__bundle.json").write_text("{}")
+
+    monkeypatch.setattr(screen_analysis, "build_evidence_bundles", _build)
+
+    table = pd.DataFrame({"cluster": ["21", "22"], "gene_symbol": ["RPL3", "RPL4"]})
+    bundles = screen_analysis.prepare_screen_bundles(
+        screen_name="s1", cluster_table=table, output_dir=tmp_path
+    )
+    assert built == [["21", "22"]]
+    assert set(bundles) == {"21", "22"}
 
 
 def test_component_overrides_reach_the_system_prompt(tmp_path):
@@ -745,3 +773,129 @@ def test_rate_limit_retry_is_bounded_and_other_errors_are_not_retried(tmp_path, 
     broken = _Broken()
     out = _run(tmp_path, broken, "broken", bundles)
     assert broken.attempts == 1 and out["errors"] == {"21": "bad request"}
+
+
+# The benchmark-selected build annotates from Affinage, so the entry point every
+# caller uses has to be able to ask for it; "uniprot" stays the default.
+class _StubUniProt:
+    def get_accession_from_gene_symbol(self, *, gene_symbol, organism_id, warn_on_fallback):
+        return f"ACC_{gene_symbol}"
+
+    def fetch_functional_annotations(self, chunk, stable_accession_col):
+        return pd.DataFrame(
+            {
+                stable_accession_col: chunk[stable_accession_col],
+                "UniProt_functional_annotation": ["uniprot narrative"] * len(chunk),
+            }
+        )
+
+
+class _StubAffinage:
+    def fetch_functional_annotations(self, chunk, gene_column):
+        return pd.DataFrame(
+            {
+                gene_column: chunk[gene_column],
+                "affinage_functional_annotation": ["affinage narrative"] * len(chunk),
+                "affinage_audit_note": [""] * len(chunk),
+            }
+        )
+
+
+def _prepare_with_source(tmp_path, source):
+    from mozzarellm.pipeline.screen_analysis import prepare_screen_bundles
+
+    table = pd.DataFrame({"cluster": ["21"], "gene_symbol": ["RPL3"]})
+    bundles = prepare_screen_bundles(
+        screen_name="s1",
+        cluster_table=table,
+        output_dir=tmp_path,
+        source=source,
+        uniprot_client=_StubUniProt(),
+        affinage_client=_StubAffinage(),
+    )
+    bundle = json.loads(Path(bundles["21"]).read_text(encoding="utf-8"))
+    return bundle["cluster_genes"][0]
+
+
+@pytest.mark.parametrize(
+    "source,expected,absent",
+    [
+        ("uniprot", ["UniProt_functional_annotation"], ["affinage_functional_annotation"]),
+        ("affinage", ["affinage_functional_annotation"], ["UniProt_functional_annotation"]),
+        (
+            "both",
+            ["UniProt_functional_annotation", "affinage_functional_annotation"],
+            [],
+        ),
+        (None, ["UniProt_functional_annotation"], ["affinage_functional_annotation"]),
+    ],
+)
+def test_prepare_screen_bundles_selects_the_annotation_source(tmp_path, source, expected, absent):
+    gene = _prepare_with_source(tmp_path, source) if source else _prepare_default(tmp_path)
+    for key in expected:
+        assert gene[key]
+    for key in absent:
+        assert key not in gene
+
+
+def _prepare_default(tmp_path):
+    """prepare_screen_bundles with no source argument -- the backward-compatible path."""
+    from mozzarellm.pipeline.screen_analysis import prepare_screen_bundles
+
+    table = pd.DataFrame({"cluster": ["21"], "gene_symbol": ["RPL3"]})
+    bundles = prepare_screen_bundles(
+        screen_name="s1",
+        cluster_table=table,
+        output_dir=tmp_path,
+        uniprot_client=_StubUniProt(),
+    )
+    bundle = json.loads(Path(bundles["21"]).read_text(encoding="utf-8"))
+    return bundle["cluster_genes"][0]
+
+
+def test_prepare_screen_bundles_rejects_an_unknown_source(tmp_path):
+    from mozzarellm.pipeline.screen_analysis import prepare_screen_bundles
+
+    table = pd.DataFrame({"cluster": ["21"], "gene_symbol": ["RPL3"]})
+    with pytest.raises(ValueError, match="Unknown annotation source 'uniport'"):
+        prepare_screen_bundles(
+            screen_name="s1", cluster_table=table, output_dir=tmp_path, source="uniport"
+        )
+
+
+def test_prepare_screen_bundles_does_not_backfill_across_sources(tmp_path):
+    """A gene Affinage has nothing for stays empty; UniProt does not fill the gap."""
+    from mozzarellm.pipeline.screen_analysis import prepare_screen_bundles
+
+    class _EmptyAffinage:
+        def fetch_functional_annotations(self, chunk, gene_column):
+            raise ValueError("No usable Affinage narratives for 1 symbol(s).")
+
+    table = pd.DataFrame({"cluster": ["21"], "gene_symbol": ["RPL3"]})
+    bundles = prepare_screen_bundles(
+        screen_name="s1",
+        cluster_table=table,
+        output_dir=tmp_path,
+        source="affinage",
+        uniprot_client=_StubUniProt(),
+        affinage_client=_EmptyAffinage(),
+    )
+    gene = json.loads(Path(bundles["21"]).read_text(encoding="utf-8"))["cluster_genes"][0]
+    assert "affinage_functional_annotation" not in gene
+    assert "UniProt_functional_annotation" not in gene
+
+
+def test_parse_repairs_a_missing_comma_and_a_trailing_comma():
+    from mozzarellm.pipeline.literature_mcp import _parse_json_from_text
+
+    text = '```json\n{\n  "a": [\n    "x"\n  ]\n  "b": {\n    "c": 1,\n  }\n}\n```'
+    assert _parse_json_from_text(text) == {"a": ["x"], "b": {"c": 1}}
+    stray = '{\n  "summary": "a ] in text",\n  ],\n  "b": 1\n}'
+    assert _parse_json_from_text(stray) == {"summary": "a ] in text", "b": 1}
+
+
+def test_call_timeout_grows_with_the_token_budget():
+    from mozzarellm.pipeline.literature_mcp import PER_CALL_TIMEOUT_S, call_timeout_s
+
+    assert call_timeout_s(4000) == PER_CALL_TIMEOUT_S
+    assert call_timeout_s(64000) > 1500

@@ -354,3 +354,19 @@ def test_compute_cost_prices_cache_tiers():
     assert (cost, warning) == (2.0, None)
     cached, _ = compute_cost("claude-sonnet-5", 0, 0, 1_000_000, 1_000_000)
     assert cached == 2.5 + 0.2  # write at 1.25x, read at 0.1x
+
+
+def test_mcp_and_stepwise_dispatch_forward_the_client_max_tokens(monkeypatch):
+    client = _anthropic_client(64000)
+    seen = {}
+    monkeypatch.setattr(
+        client, "_analyze_mcp", lambda **kw: seen.setdefault("mcp", kw["max_tokens"]) and (None, {})
+    )
+    monkeypatch.setattr(
+        client,
+        "_analyze_stepwise",
+        lambda **kw: seen.setdefault("stepwise", kw["max_tokens"]) and (None, {}),
+    )
+    client.analyze(system_prompt="s", user_prompt="u", mode="cot", mcp=True)
+    client.analyze(system_prompt="s", user_prompt="u", mode="stepwise", mcp=False)
+    assert seen == {"mcp": 64000, "stepwise": 64000}

@@ -72,22 +72,25 @@ database identifier.
 # PATHWAY CONFIDENCE ASSESSMENT
 # =============================================================================
 
-PATHWAY_CONFIDENCE_CRITERIA = """PATHWAY CONFIDENCE: report how confident you are in your dominant_process call itself — an assessment of your own call, not merely of how well the genes fit it. Weigh three things:
-- how much of the cluster the pathway explains;
-- how many genes are outsiders the call cannot place — count them explicitly, INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway;
-- whether a different biological process could explain the cluster comparably well. Before assigning a level, briefly consider the strongest alternative explanation.
+PATHWAY_CONFIDENCE_CRITERIA = """PATHWAY CONFIDENCE: report how confident you are in your dominant_process call, from how much of the cluster it explains. First, count and state explicitly:
+- the total number of genes in the cluster;
+- the number the best module(s) place (ESTABLISHED, or NOVEL_ROLE with a stated relationship to the process; when you name 2-3 processes, count their union);
+- the number of outsiders it cannot place — INCLUDING every UNCHARACTERIZED gene whose annotation offers nothing to relate to the pathway, and every nontargeting control — and the placed fraction.
+Assign the level from the placed fraction, then briefly consider the strongest alternative explanation.
 
 High confidence:
-- The call would survive being wrong about any single gene; outsiders are absent or a token few; no credible alternative process.
+- At least 70% of the genes placed; multiple well-established members with direct functional evidence; clear functional relationships explain the phenotypic clustering.
 
 Medium confidence:
-- The call is the best available explanation, but it rests partly on inference (many members are not documented participants), a notable share of the cluster is outsiders it cannot place, or a plausible alternative process exists. A notable outsider share caps confidence at Medium even when every placed gene fits perfectly.
+- 50-70% of the genes placed; some established members alongside plausible additional candidates; the functional relationship is plausible but has gaps.
 
 Low confidence:
-- The call is tentative: an alternative explains the cluster about as well, or the cluster is heterogeneous enough that the dominant process may be an artifact of a subset.
+- 30-50% of the genes placed; few established members, the theme may be broad, or the dominant process may be an artifact of a subset.
+- Low is still a call: name the dominant_process and categorize EVERY gene against it exactly as at the higher levels — the gene lists are never left empty for a Low call.
 
-No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined):
-- No process explains a substantial share of the genes, or the cluster contains many unrelated functions or nontargeting controls.
+A credible alternative lowers the level by at most one step (High to Medium, Medium to Low); it never turns a call into "No coherent pathway".
+
+No coherent pathway (use Low confidence, set "dominant_process": "No coherent biological pathway", and leave `established_genes`, `novel_role_genes`, and `uncharacterized_genes` empty — per-gene classification relative to a nonexistent pathway is undefined). Reserve this for clusters where no process places even 30% of the genes, or the cluster is dominated by nontargeting controls. Any process that places 30% or more of the genes is a Low-or-better call, however heterogeneous the remainder.
 """
 
 # =============================================================================

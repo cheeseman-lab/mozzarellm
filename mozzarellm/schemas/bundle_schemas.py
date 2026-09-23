@@ -107,6 +107,8 @@ class BundleGene(SemiFlexModel):
     UniProt_functional_annotation: str | None = None
     affinage_functional_annotation: str | None = None
     affinage_audit_note: str | None = None
+    # which source supplied this gene's annotation under source="affinage_then_uniprot"
+    annotation_source: str | None = None
 
 
 # Main schema model

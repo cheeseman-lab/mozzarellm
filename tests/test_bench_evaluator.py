@@ -373,12 +373,13 @@ def test_consensus_subclass_on_real_examples(tmp_path):
 def test_consensus_coherence_majority_and_ties():
     coh = consensus_coherence(_reviewers())
     # Four clusters have a High/Medium/Low majority; whitney/9 is a 3-way tie
-    # (high/low/medium) and is therefore excluded.
+    # (high/medium/low) and resolves to the ordinal median, Medium.
     assert coh == {
-        ("aconcagua_interphase", "41"): "Medium",
+        ("aconcagua_interphase", "41"): "High",
         ("denali", "24"): "Low",
         ("denali", "43"): "Medium",
-        ("whitney", "6"): "Medium",
+        ("whitney", "6"): "High",
+        ("whitney", "9"): "Medium",
     }
 
 

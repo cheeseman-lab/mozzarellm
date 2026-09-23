@@ -557,6 +557,7 @@ class AnthropicClient(LLMClientBase):
                 user_prompt=user_prompt,
                 mcp=mcp,
                 max_retries=max_retries,
+                max_tokens=self.max_tokens,
                 turns=stepwise_turns,
             )
 
@@ -566,6 +567,7 @@ class AnthropicClient(LLMClientBase):
                 user_prompt=user_prompt,
                 mode=mode,
                 max_retries=max_retries,
+                max_tokens=self.max_tokens,
             )
 
         return self._analyze_plain(

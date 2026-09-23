@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
-import platform
 import sqlite3
 import time
 import warnings
@@ -12,15 +12,44 @@ from typing import Any
 import pandas as pd
 import requests
 
+from mozzarellm.clients.sqlite_cache import (
+    default_cache_dir,
+    init_cache,
+    resolve_cache_path,
+    warn_cache_disabled,
+)
+
 ##### CONSTANTS ##### (configurable)
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_BACKOFF_TIME = 1.0
 BASE_URL = "https://rest.uniprot.org"
+CACHE_PATH_ENV = "MOZZARELLM_UNIPROT_CACHE"
+CACHE_LABEL = "UniProt"
+CACHE_FILENAME = "uniprot_cache.sqlite3"
+CACHE_TABLE_SQL = """
+    CREATE TABLE IF NOT EXISTS uniprot_http_cache (
+        cache_key TEXT PRIMARY KEY,
+        url TEXT NOT NULL,
+        params_json TEXT,
+        response_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    )
+"""
+
+
+def _warn_cache_disabled(cache_path: str | None, error: Exception) -> None:
+    warn_cache_disabled(CACHE_LABEL, cache_path, CACHE_PATH_ENV, error)
 
 
 class UniProtClient:
-    """Configurable UniProt REST client with in-memory caching and backoff."""
+    """Configurable UniProt REST client with an on-disk response cache and backoff.
+
+    The cache file is ``cache_path``, else ``$MOZZARELLM_UNIPROT_CACHE`` (empty,
+    "none" or "off" disables it), else the per-user cache directory. A cache that
+    is corrupt, unwritable, or locked past the busy timeout is dropped with a loud
+    warning and the lookups go to the API.
+    """
 
     def __init__(
         self,
@@ -38,55 +67,41 @@ class UniProtClient:
         self._session = requests.Session()
 
         self._cache_ttl_seconds = cache_ttl_seconds
-        if cache_path is None:
-            cache_dir = self._default_cache_dir("mozzarellm")
-            os.makedirs(cache_dir, exist_ok=True)
-            cache_path = os.path.join(cache_dir, "uniprot_cache.sqlite3")
-        self._cache_path = os.fspath(cache_path) if cache_path is not None else None
+        self._cache_path = self._resolve_cache_path(cache_path)
         self._cache_conn = self._init_cache(self._cache_path) if self._cache_path else None
 
     ### CACHE METHODS ###
     @staticmethod
     def _default_cache_dir(app_name: str) -> str:
-        system = platform.system()
-
-        if system == "Windows":
-            base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-            if base:
-                return os.path.join(base, app_name)
-
-        if system == "Darwin":
-            return os.path.join(os.path.expanduser("~"), "Library", "Caches", app_name)
-
-        base = os.environ.get("XDG_CACHE_HOME")  # linux
-        if base:
-            return os.path.join(base, app_name)
-        return os.path.join(os.path.expanduser("~"), ".cache", app_name)
+        return default_cache_dir(app_name)
 
     @staticmethod
-    def _init_cache(cache_path: str) -> sqlite3.Connection:
-        """Initialize SQLite cache with optimized settings.
-
-        Note: Uses Python's built-in sqlite3 module (SQLite 3.x).
-        Developed with SQLite 3.37+. Requires SQLite 3.7.0+ for WAL mode.
-        PRAGMA statements may change in future SQLite releases.
-        """
-        conn = sqlite3.connect(cache_path, timeout=30.0, isolation_level=None)
-        conn.execute("PRAGMA journal_mode=WAL")  # Requires SQLite 3.7.0+
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA busy_timeout=30000")
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS uniprot_http_cache (
-                cache_key TEXT PRIMARY KEY,
-                url TEXT NOT NULL,
-                params_json TEXT,
-                response_json TEXT NOT NULL,
-                created_at INTEGER NOT NULL
-            )
-            """
+    def _resolve_cache_path(cache_path: str | os.PathLike[str] | None) -> str | None:
+        """Resolve the cache file: explicit argument, then $MOZZARELLM_UNIPROT_CACHE, then default."""
+        return resolve_cache_path(
+            cache_path,
+            label=CACHE_LABEL,
+            env_var=CACHE_PATH_ENV,
+            default_filename=CACHE_FILENAME,
         )
-        return conn
+
+    @staticmethod
+    def _init_cache(cache_path: str) -> sqlite3.Connection | None:
+        """Open the on-disk cache, or return None when it cannot be used safely."""
+        return init_cache(
+            cache_path,
+            label=CACHE_LABEL,
+            env_var=CACHE_PATH_ENV,
+            table_sql=CACHE_TABLE_SQL,
+        )
+
+    def _disable_cache(self, error: Exception) -> None:
+        """Drop a cache that failed mid-run, so the remaining lookups still reach the API."""
+        conn, self._cache_conn = self._cache_conn, None
+        if conn is not None:
+            with contextlib.suppress(sqlite3.Error):
+                conn.close()
+            _warn_cache_disabled(self._cache_path, error)
 
     def _make_cache_key(self, url: str, params: dict[str, Any] | None) -> str:
         params_json = json.dumps(params or {}, sort_keys=True, separators=(",", ":"))
@@ -96,10 +111,14 @@ class UniProtClient:
     def _cache_get(self, cache_key: str) -> dict[str, Any] | None:
         if self._cache_conn is None:
             return None
-        row = self._cache_conn.execute(
-            "SELECT response_json, created_at FROM uniprot_http_cache WHERE cache_key = ?",
-            (cache_key,),
-        ).fetchone()
+        try:
+            row = self._cache_conn.execute(
+                "SELECT response_json, created_at FROM uniprot_http_cache WHERE cache_key = ?",
+                (cache_key,),
+            ).fetchone()
+        except sqlite3.Error as e:
+            self._disable_cache(e)
+            return None
         if not row:
             return None
 
@@ -121,16 +140,19 @@ class UniProtClient:
             return
         params_json = json.dumps(params or {}, sort_keys=True)
         response_json = json.dumps(data, sort_keys=True)
-        self._cache_conn.execute(
-            """
-            INSERT INTO uniprot_http_cache (cache_key, url, params_json, response_json, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(cache_key) DO UPDATE SET
-                response_json = excluded.response_json,
-                created_at = excluded.created_at
-            """,
-            (cache_key, url, params_json, response_json, int(time.time())),
-        )
+        try:
+            self._cache_conn.execute(
+                """
+                INSERT INTO uniprot_http_cache (cache_key, url, params_json, response_json, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(cache_key) DO UPDATE SET
+                    response_json = excluded.response_json,
+                    created_at = excluded.created_at
+                """,
+                (cache_key, url, params_json, response_json, int(time.time())),
+            )
+        except sqlite3.Error as e:
+            self._disable_cache(e)
 
     def _get(self, *, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
