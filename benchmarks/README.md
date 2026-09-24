@@ -45,6 +45,7 @@ re-scores the newest archived run dirs without API calls.
   sheets) + `survey_key.csv` (source-blinding key), per-screen context JSONs.
 - `bundles/` — master evidence bundles (both sources' annotations; reduced to
   one source's view at prompt assembly). Rebuilt by `workflow/build_bundles.py`.
-- `outputs/` — submodule. Runs archive under
+- `outputs/` — not tracked here (a separate archive repo, cloned into this path when needed;
+  the workflow creates it if absent). Runs archive under
   `<experiment>/<condition-or-stage>_<stamp>/` (never overwritten); state at
   `<experiment>/<experiment>_state.json`.
