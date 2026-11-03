@@ -223,15 +223,27 @@ def add_value_labels(
         )
 
 
-# Benchmark condition colors: one saturated key color for the carried/winning
-# condition, neutral for priors/baselines, ordered categories for deliveries.
-COLORS = {
-    "affinage": PALETTE["key"],
-    "uniprot": PALETTE["neutral_dark"],
-    "prior": PALETTE["neutral"],
-    "selected": PALETTE["key"],
-    "candidate": PALETTE["green_2"],
-    "single_call": CATEGORICAL[0],
-    "cot": CATEGORICAL[1],
-    "stepwise": CATEGORICAL[2],
+# Benchmark colors, taken from the MozzareLLM talk so slides and paper read as one system:
+# each tool has its own hue, MozzareLLM's rust marks the build kept, and each experiment
+# step, gene category and confidence level keeps one color everywhere.
+TOOL = {"affinage": "#6B4C9A", "mozzarellm": "#B5451B", "mascarpone": "#3D6B8E"}
+INK = {"ink": "#222222", "ink2": "#555555", "ink3": "#8A8A8A", "rule": "#C8C8C8"}
+STEP_COLORS = {
+    "truth": "#B8860B",
+    "source": TOOL["affinage"],
+    "walkup": TOOL["mozzarellm"],
+    "mode": TOOL["mascarpone"],
+    "order": "#6E6E6E",
+    "features": "#3F7F5F",
+}
+CATEGORY_COLORS = {
+    "ESTABLISHED": "#9E9E9E",
+    "NOVEL_ROLE": TOOL["mascarpone"],
+    "UNCHARACTERIZED": TOOL["mozzarellm"],
+}
+CONFIDENCE_COLORS = {
+    "High": TOOL["mozzarellm"],
+    "Medium": "#D58A6C",
+    "Low": "#EFC9B9",
+    "none": "#DEDEDE",
 }
