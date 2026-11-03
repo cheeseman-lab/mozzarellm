@@ -22,7 +22,6 @@ Put an `ANTHROPIC_API_KEY` in a `.env` file, then open
 examples (optical pooled screen, DepMap co-essentiality, proteomics co-abundance) and shows how
 to point the same two calls at your own screen.
 
-Full details on installation, outputs, and analysis options: **[USAGE.md](USAGE.md)**.
 The benchmark that selected the shipped prompts is in [`benchmarks/`](benchmarks/README.md).
 
 ## Citing MozzareLLM
