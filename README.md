@@ -18,6 +18,10 @@ Install into a Python 3.11+ environment:
 python -m pip install "mozzarellm @ git+https://github.com/cheeseman-lab/mozzarellm.git"
 ```
 
+Claude models work out of the box; add `[openai]` or `[gemini]` to the requirement for those
+providers (`"mozzarellm[openai] @ git+..."`). For development, clone the repo and run
+`conda env create -f environment.yml && python -m pip install -e ".[dev]"`.
+
 Put an `ANTHROPIC_API_KEY` in a `.env` file, then open
 [`examples/analyze_clusters.ipynb`](examples/analyze_clusters.ipynb). It runs three worked
 examples (optical pooled screen, DepMap co-essentiality, proteomics co-abundance) and shows how
@@ -33,10 +37,11 @@ MozzareLLM was created by [Matteo Di Bernardo](https://github.com/mat10d),
 
 ```
 @article{dibernardo2026brieflow,
-  author  = {Di Bernardo, Matteo and Kern, Roshan S. and Cepeda Diaz, Ana Karla and Mallar, Alexa and Choi, Samuel J. and Nutter-Upham, Andrew and Lourido, Sebastian and Blainey, Paul C. and Cheeseman, Iain},
+  author  = {Di Bernardo, Matteo and Kern, Roshan S. and Cepeda Diaz, Ana Karla and Mallar, Alexa and Choi, Samuel J. and Nutter-Upham, Andrew and Lourido, Sebastian and Blainey, Paul C. and Cheeseman, Iain M.},
   title   = {Brieflow: an integrated computational pipeline for high-throughput analysis of optical pooled screening data},
   journal = {Nature Communications},
   volume  = {17},
+  pages   = {6997},
   year    = {2026},
   doi     = {10.1038/s41467-026-73643-7}
 }
