@@ -1,0 +1,32 @@
+{
+  "assay_type": "Proximity labeling proteomics (BioID / TurboID)",
+  "target_phenotype": "Protein-protein interaction neighborhoods — proteins co-purified with a bait define a functional complex or proximity network",
+  "organism": "Homo sapiens",
+  "cell_line_or_system": "HEK293 or relevant cell line (Schaffer et al. 2025)",
+  "perturbation": {
+    "type": "TurboID proximity labeling",
+    "library_or_reagent": "TurboID-tagged bait proteins (Schaffer et al. 2025)"
+  },
+  "readout": {
+    "measurement": "Biotinylated proximal proteins identified by mass spectrometry",
+    "instrument_or_platform": "TurboID + streptavidin pulldown + LC-MS/MS",
+    "primary_metric": "Enrichment of proximal proteins relative to control — clusters represent groups of proteins with shared proximity profiles"
+  },
+  "clustering": {
+    "method": "Unsupervised clustering of protein proximity profiles across multiple baits",
+    "parameters": {
+      "resolution": "Density-based or hierarchical clustering",
+      "k_neighbors": "N/A"
+    }
+  },
+  "controls": {
+    "negative_controls": "Cytoplasmic TurboID control",
+    "positive_controls": "Known interacting protein pairs"
+  },
+  "provenance": {
+    "dataset_name": "Schaffer 2025 proximity proteomics",
+    "citation": "Schaffer et al. (2025) — proximity proteomics dataset",
+    "data_source": "schaffer_2025.csv — gene-level cluster assignments from proximity proteomics"
+  },
+  "notes": "Clusters represent groups of proteins with similar proximity labeling profiles. Genes in the same cluster likely co-localize or participate in the same complex or process."
+}

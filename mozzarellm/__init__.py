@@ -2,57 +2,47 @@
 mozzarellm: Gene cluster analysis using Large Language Models (LLMs)
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
-# New unified API
-from .analyzer import ClusterAnalyzer
-from .models import (
-    AnalysisResult,
-    ClusterInput,
-    ClusterResult,
-    GeneClassification,
+from .clients.llm_api_clients import (
+    AnthropicClient,
+    GeminiClient,
+    LLMClientBase,
+    OpenAIClient,
+    create_client,
 )
 
-# Prompt components (modular)
-from .prompts import (
-    CLUSTER_ANALYSIS_TASK,
-    DEFAULT_SCREEN_CONTEXT,
-    GENE_CLASSIFICATION_RULES,
-    OUTPUT_FORMAT_JSON,
-    PATHWAY_CONFIDENCE_CRITERIA,
-)
-from .providers import (
-    AnthropicProvider,
-    GeminiProvider,
-    LLMProvider,
-    OpenAIProvider,
-    create_provider,
+# Prompts: the texts and their assembly
+from .prompts import COMPONENTS, DEFAULT_ORDERS, assemble, default_order
+from .schemas.mcp_schemas import (
+    LiteraturePathwayRevision,
+    LiteratureReclassification,
+    LiteratureValidation,
+    RelevantPaper,
 )
 
-# Utility functions (preserved)
-from .utils.cluster_utils import reshape_to_clusters
+# IO utils
+from .utils.io import load_table, write_bundle
 
 # Expose package-level API
 __all__ = [
-    # Main API
-    "ClusterAnalyzer",
-    # Models
-    "ClusterResult",
-    "AnalysisResult",
-    "GeneClassification",
-    "ClusterInput",
     # Providers
-    "LLMProvider",
-    "OpenAIProvider",
-    "AnthropicProvider",
-    "GeminiProvider",
-    "create_provider",
-    # Prompt components
-    "CLUSTER_ANALYSIS_TASK",
-    "GENE_CLASSIFICATION_RULES",
-    "DEFAULT_SCREEN_CONTEXT",
-    "PATHWAY_CONFIDENCE_CRITERIA",
-    "OUTPUT_FORMAT_JSON",
-    # Utilities
-    "reshape_to_clusters",
+    "LLMClientBase",
+    "OpenAIClient",
+    "AnthropicClient",
+    "GeminiClient",
+    "create_client",
+    # Prompts
+    "COMPONENTS",
+    "DEFAULT_ORDERS",
+    "default_order",
+    "assemble",
+    # Literature validation schemas
+    "RelevantPaper",
+    "LiteratureValidation",
+    "LiteratureReclassification",
+    "LiteraturePathwayRevision",
+    # IO utils
+    "load_table",
+    "write_bundle",
 ]

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42,<75", "wheel"]
+requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -20,20 +20,24 @@ dependencies = [
     "pandas",
     "numpy",
     "tqdm",
+    "openpyxl",
     "python-dotenv",
     "requests",
-    "ipykernel",
-    "openai>=1.70.0",
-    "google-genai>=1.50.0",
     "anthropic>=0.49.0",
     "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
+openai = ["openai>=1.70.0"]
+gemini = ["google-genai>=1.50.0"]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.8.0",
+    "ipykernel",
+    "nbconvert",
+    "openai>=1.70.0",
+    "google-genai>=1.50.0",
 ]
 
 [project.urls]
@@ -42,7 +46,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["mozzarellm", "mozzarellm.*"]
+include = ["mozzarellm*"]
 
 [tool.ruff]
 # Target Python 3.11+
@@ -79,9 +83,52 @@ exclude = [
     "*.egg-info",
 ]
 
+# Intentional per-file exceptions
+[tool.ruff.lint.per-file-ignores]
+# Orchestrator puts the repo root on sys.path before importing mozzarellm.*
+"benchmarks/workflow/bench_orchestrator.py" = ["E402"]
+# Tests put the repo root on sys.path before importing the packages under test
+"tests/test_*.py" = ["E402"]
+# Constant-style locals / Chain-of-Thought argument naming, kept by intent
+"mozzarellm/pipeline/bundle_builder.py" = ["N806"]
+
 [tool.ruff.format]
 # Use double quotes for strings
 quote-style = "double"
 
 # Indent with spaces
 indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.coverage.run]
+source = ["mozzarellm"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+# NOTE: to run use: pytest --cov=mozzarellm --cov-report=html and check htmlcov/index.html

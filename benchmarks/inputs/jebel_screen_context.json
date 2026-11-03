@@ -1,0 +1,32 @@
+{
+  "assay_type": "Optical Pooled Screen (OPS)",
+  "target_phenotype": "Morphological cell phenotype — cell and nuclear shape, texture, and intensity features across 5 imaging channels (DNA, microtubules, actin, mitochondria, glycoprotein/membrane)",
+  "organism": "Homo sapiens",
+  "cell_line_or_system": "RPE1 (hTERT-immortalized retinal pigment epithelial, non-transformed)",
+  "perturbation": {
+    "type": "CRISPR-Cas9 knockout",
+    "library_or_reagent": "Essential-wide sgRNA library (~5,300 genes)"
+  },
+  "readout": {
+    "measurement": "High-content fluorescence imaging of fixed cells",
+    "instrument_or_platform": "Optical pooled screening (in situ sequencing + imaging)",
+    "imaging_channels": ["DAPI (DNA)", "alpha-Tubulin (microtubules)", "Phalloidin (F-actin)", "COX4 (mitochondria)", "WGA (wheat-germ agglutinin; glycoproteins/membranes)"],
+    "primary_metric": "Morphological feature vectors — genes are clustered by similarity of phenotypic profiles across imaging channels"
+  },
+  "clustering": {
+    "method": "Leiden clustering on PHATE-embedded phenotypic profiles",
+    "parameters": {
+      "resolution": 15
+    }
+  },
+  "controls": {
+    "negative_controls": "Non-targeting sgRNAs",
+    "positive_controls": "N/A"
+  },
+  "provenance": {
+    "screen_name": "jebel",
+    "lab": "Cheeseman Lab, Whitehead Institute",
+    "data_source": "phate_leiden_clustering.tsv"
+  },
+  "notes": "The only RPE1 (non-transformed) screen. 5-channel readout (DNA, microtubules, F-actin, mitochondria, glycoprotein/membrane). Clusters represent sets of genes whose knockout produces similar morphological phenotypes."
+}

@@ -1,243 +1,190 @@
-"""
-Utilities for reshaping and processing gene cluster data.
-
-This module provides functions to transform gene-level data into
-cluster-level format suitable for analysis.
-"""
-
-import os
+import re
+from pathlib import Path
 
 import pandas as pd
 
 
-def reshape_to_clusters(
-    input_file=None,
-    input_df=None,
-    input_sep=",",
-    gene_col="gene_symbol",
-    cluster_col="cluster",
-    gene_sep=";",
-    additional_cols=None,
-    output_file=None,
-    gene_features_output=None,
-    return_dataframes=True,
-    uniprot_col=None,
-    verbose=True,
-):
+def attach_strength_ranks(
+    df: pd.DataFrame, strength_column: str, *, higher_is_stronger: bool = True
+) -> pd.DataFrame:
+    """Replace a raw perturbation-strength column's values with "N/M" ranks, in place.
+
+    Any metric works (AUC, e-distance, normalized fate distance, ...): values
+    are ranked across the table's scored genes, 1 = strongest, and the column
+    keeps its name with ``"N/M"`` in place of the raw value. A column already
+    holding "N/M" strings passes through unchanged. Genes with missing
+    strength carry no rank. Raw strength values never enter bundles.
     """
-    Reshape a gene-level table to a cluster-level table where each row is a cluster
-    and contains all genes belonging to that cluster.
+    if strength_column not in df.columns:
+        raise ValueError(f"strength_column {strength_column!r} not in cluster table")
+    df = df.copy()
+    col = df[strength_column]
+    nonnull = col.notna()
+    if not nonnull.any():
+        raise ValueError(f"strength_column {strength_column!r} has no values")
+    ranks = pd.Series(pd.NA, index=df.index, dtype=object)
+    strs = col[nonnull].astype(str).str.strip()
+    if strs.str.fullmatch(r"\d+/\d+").all():
+        ranks[nonnull] = strs
+    else:
+        vals = pd.to_numeric(col, errors="coerce")
+        scored = vals.notna()
+        if not scored.any():
+            raise ValueError(
+                f"strength_column {strength_column!r} is neither numeric nor 'N/M' rank strings"
+            )
+        m = int(scored.sum())
+        r = vals[scored].rank(ascending=not higher_is_stronger, method="min").astype(int)
+        ranks[scored] = r.map(lambda n: f"{n}/{m}")
+    df[strength_column] = ranks
+    return df
 
-    Parameters:
-    -----------
-    # Input data options
-    input_file : str, optional
-        Path to input CSV/TSV file with gene-level data
-    input_df : pandas.DataFrame, optional
-        DataFrame containing gene-level data (alternative to input_file)
-    input_sep : str, default=","
-        Separator used in the input file
 
-    # Data structure parameters
-    gene_col : str, default="gene_symbol"
-        Column name containing gene identifiers
-    cluster_col : str, default="cluster"
-        Column name containing cluster assignments
-    gene_sep : str, default=";"
-        Separator to use between genes in the output file
-    additional_cols : list, optional
-        List of additional columns to include as cluster-level metadata
+def compute_phenotype_strength(df: pd.DataFrame, gene_column: str, strength_column: str) -> dict:
+    """Summarize a cluster's phenotype-strength ranks as a discrete table.
 
-    # Output options
-    output_file : str, optional
-        Path to save the output cluster-level file
-    gene_features_output : str, optional
-        Path to save gene features data
-    return_dataframes : bool, default=True
-        Whether to return DataFrames even when output files are specified
+    Mirrors compute_feature_coherence: the aggregate the model reads is computed
+    here, so the strength step is recall over a table rather than arithmetic.
+    Ranks are the "N/M" strings in ``strength_column`` (attach_strength_ranks);
+    genes without one are left out. The table records its source column so the
+    prompt assembly knows which per-gene field carries the ranks.
+    """
+    ranked = []
+    screen_size = None
+    for _, row in df.iterrows():
+        value = row.get(strength_column)
+        if not isinstance(value, str) or "/" not in value:
+            continue
+        n, m = (int(x) for x in value.split("/"))
+        screen_size = m
+        ranked.append((n, str(row[gene_column])))
+    ranked.sort()
+    if not ranked:
+        return {"column": strength_column, "n_ranked": 0, "screen_size": None, "ranked_genes": []}
+    ranks = [n for n, _ in ranked]
+    quartile = screen_size / 4
+    median = ranks[len(ranks) // 2]
+    return {
+        "column": strength_column,
+        "n_ranked": len(ranked),
+        "screen_size": screen_size,
+        "median_rank": f"{median}/{screen_size}",
+        "strongest_quartile_frac": round(sum(1 for n in ranks if n <= quartile) / len(ranks), 3),
+        "weakest_quartile_frac": round(sum(1 for n in ranks if n > 3 * quartile) / len(ranks), 3),
+        "ranked_genes": [{"gene": g, "rank": f"{n}/{screen_size}"} for n, g in ranked],
+    }
 
-    # Feature extraction options
-    uniprot_col : str, optional
-        Column name containing UniProt data for feature extraction
 
-    # Misc options
-    verbose : bool, default=True
-        Whether to print progress messages
+def cluster_chunker(df: pd.DataFrame, cluster_id_column: str) -> list[pd.DataFrame]:
+    """Chunk a gene-level table into smaller per-cluster DataFrames slices.
 
     Returns:
-    --------
-    If gene features are extracted and return_dataframes is True:
-        (cluster_df, gene_features_df) : tuple of DataFrames
-            - cluster_df: DataFrame with reshaped clusters
-            - gene_features_df: DataFrame with gene features
+        List of DataFrames, one for each cluster.
 
-    Otherwise if return_dataframes is True or no output_file specified:
-        cluster_df : pandas.DataFrame
-            DataFrame with reshaped clusters
+    Raises:
+        ValueError: If cluster_id_column is not found in DataFrame.
 
-    If output_file is specified and return_dataframes is False:
-        None
-
-    Notes:
-    ------
-    - Either input_file or input_df must be provided
-    - The reshaped cluster DataFrame will always have "cluster_id" and "genes" columns
-    - The "genes" column contains semicolon-separated gene lists for direct use in analyze_gene_clusters
+    Note:
+        Will handle both sorted and interleaved cluster IDs. Relative order of genes within each cluster is preserved from the original DataFrame.
     """
-    # Handle input - either from file or DataFrame
-    if input_df is not None:
-        df = input_df
-        if verbose:
-            print(f"Using provided DataFrame with {len(df)} rows")
-    elif input_file is not None:
-        if verbose:
-            print(f"Reading input file: {input_file}")
-        # Read the input file
-        if input_sep == "\\t":
-            input_sep = "\t"
-        df = pd.read_csv(input_file, sep=input_sep)
-    else:
-        raise ValueError("Either input_file or input_df must be provided")
+    if cluster_id_column not in df.columns:
+        raise ValueError(f"Cluster ID column '{cluster_id_column}' not found in DataFrame.")
+    # Single-pass split; sort=False preserves first-seen cluster order; row order within each chunk is preserved.
+    return [group for _cluster_id, group in df.groupby(cluster_id_column, sort=False)]
 
-    if verbose:
-        print(f"Found {len(df)} genes across {df[cluster_col].nunique()} clusters")
 
-    # Initialize gene_features for return value
-    gene_features = None
+def compute_feature_coherence(
+    df: pd.DataFrame,
+    feature_columns: list[str],
+    gene_column: str,
+    *,
+    min_frac: float = 0.25,
+    max_features: int = 100,
+) -> dict:
+    """Compute per-feature gene-coverage across a cluster with supporting gene lists.
 
-    # Handle gene features if UniProt column is specified
-    if uniprot_col is not None and uniprot_col in df.columns:
-        if verbose:
-            print(f"Extracting gene features from {uniprot_col} column")
+    Each column in `feature_columns` is a comma-separated per-gene list of features
+    differentially significant in a given direction. Direction is inferred from the
+    column name — substring "up" → up, substring "down" → down.
 
-        # Extract gene features (gene to UniProt mapping)
-        gene_features = df[[gene_col, uniprot_col]].drop_duplicates()
+    Returns a dict with `n_genes_in_cluster` and a `features` array, one row per
+    feature, with `n_up`/`frac_up`/`up_genes` and `n_down`/`frac_down`/`down_genes`.
+    Sorted by aggregate signal (most-covered first). The table is bounded so it
+    cannot grow with the screen's feature space: only features reaching `min_frac`
+    of the cluster in at least one direction are kept, at most `max_features` of
+    them; `n_features_total` / `n_features_shown` / `min_frac` record the cut.
+    `columns` records the per-gene source columns so the prompt assembly knows
+    which fields the table replaces.
+    """
+    n_genes = len(df)
+    up_col = next((c for c in feature_columns if "up" in c.lower()), None)
+    down_col = next((c for c in feature_columns if "down" in c.lower()), None)
 
-        # Fill NaN values with empty string
-        gene_features.fillna("", inplace=True)
+    def _gene_to_features(col: str | None) -> dict[str, list[str]]:
+        if col is None or col not in df.columns:
+            return {}
+        out: dict[str, list[str]] = {}
+        for _, row in df.iterrows():
+            gene = row[gene_column]
+            features_str = row.get(col, "")
+            if not isinstance(features_str, str) or not features_str:
+                continue
+            for f in (x.strip() for x in re.split(r"[;,]", features_str)):
+                if f:
+                    out.setdefault(f, []).append(gene)
+        return out
 
-        # Save gene features if output path is provided
-        if gene_features_output:
-            if verbose:
-                print(f"Saving gene features to {gene_features_output}")
+    up_map = _gene_to_features(up_col)
+    down_map = _gene_to_features(down_col)
 
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(gene_features_output), exist_ok=True)
+    rows = []
+    for feat in sorted(set(up_map) | set(down_map)):
+        ups = up_map.get(feat, [])
+        downs = down_map.get(feat, [])
+        rows.append(
+            {
+                "feature": feat,
+                "n_up": len(ups),
+                "frac_up": round(len(ups) / n_genes, 3) if n_genes else 0.0,
+                "up_genes": ups,
+                "n_down": len(downs),
+                "frac_down": round(len(downs) / n_genes, 3) if n_genes else 0.0,
+                "down_genes": downs,
+            }
+        )
+    rows.sort(key=lambda r: (-(r["n_up"] + r["n_down"]), r["feature"]))
+    kept = [r for r in rows if max(r["frac_up"], r["frac_down"]) >= min_frac][:max_features]
 
-            # Save gene features
-            gene_features.to_csv(gene_features_output, index=False)
+    return {
+        "columns": list(feature_columns),
+        "n_genes_in_cluster": n_genes,
+        "n_features_total": len(rows),
+        "n_features_shown": len(kept),
+        "min_frac": min_frac,
+        "features": kept,
+    }
 
-    # Create a dictionary to store cluster information
-    clusters = {}
 
-    # Group genes by cluster
-    for cluster, group in df.groupby(cluster_col):
-        # Get list of genes in this cluster
-        genes = group[gene_col].tolist()
-        genes_text = gene_sep.join(genes)
+def build_cluster_id_to_bundle_path(
+    evidence_bundle_dir: Path,
+    screen_name: str,
+) -> dict[str, Path]:
+    """Construct a cluster-to-prompt map using the cluster ID column and the evidence bundle directory.
 
-        # Start with just cluster ID and genes
-        cluster_info = {
-            "cluster_id": cluster,
-            "genes": genes_text,
-        }
+    Greps the evidence bundle directory for all files with the name pattern {screen_name}__cluster_{#}__bundle.json and creates
+    a dictionary mapping cluster ID to bundle path."""
 
-        # Add additional cluster-level metadata if specified
-        if additional_cols:
-            # Add gene count if requested
-            if "gene_count" in additional_cols:
-                cluster_info["gene_count"] = len(genes)
+    pattern = f"{screen_name}__cluster_*__bundle.json"
 
-            # Process other additional columns
-            for col in additional_cols:
-                if col != "gene_count" and col in df.columns:
-                    # Special handling for up_features and down_features: find overlapping features
-                    if col in ["up_features", "down_features"]:
-                        feature_counts = {}
-                        for feature_str in group[col].dropna():
-                            if feature_str and isinstance(feature_str, str):
-                                features = [f.strip() for f in feature_str.split(",") if f.strip()]
-                                for feature in features:
-                                    feature_counts[feature] = feature_counts.get(feature, 0) + 1
+    bundle_files = list(evidence_bundle_dir.glob(pattern))
 
-                        # Keep only features that appear in 2+ genes (overlapping)
-                        overlapping = [f for f, count in feature_counts.items() if count >= 2]
-                        # Sort by frequency (descending), then alphabetically
-                        overlapping.sort(key=lambda f: (-feature_counts[f], f))
-                        cluster_info[col] = ",".join(overlapping) if overlapping else ""
+    cluster_id_to_bundle_path: dict[str, Path] = {}
+    for f in bundle_files:
+        name = f.name
+        if "__cluster_" not in name or not name.endswith("__bundle.json"):
+            continue
+        cluster_id = name.split("__cluster_", 1)[1].split("__bundle.json", 1)[0]
+        if cluster_id:
+            cluster_id_to_bundle_path[str(cluster_id)] = f
 
-                    # Special handling for phenotypic_strength: average numerators, keep denominator
-                    elif col == "phenotypic_strength":
-                        strengths = group[col].dropna().tolist()
-                        if strengths:
-                            numerators = []
-                            denominator = None
-                            for strength in strengths:
-                                if isinstance(strength, str) and "/" in strength:
-                                    parts = strength.split("/")
-                                    try:
-                                        numerators.append(float(parts[0]))
-                                        if denominator is None:
-                                            denominator = parts[1]
-                                    except ValueError:
-                                        continue
-
-                            if numerators and denominator:
-                                avg_numerator = sum(numerators) / len(numerators)
-                                cluster_info[col] = f"{avg_numerator:.1f}/{denominator}"
-                            else:
-                                cluster_info[col] = ""
-                        else:
-                            cluster_info[col] = ""
-
-                    # Default handling for other columns
-                    else:
-                        # For columns like cluster_group that should be the same for all genes in a cluster
-                        # Take the first non-null value or the most common value
-                        values = group[col].dropna().tolist()
-                        if values:
-                            if len(set(values)) == 1:  # All values are the same
-                                cluster_info[col] = values[0]
-                            else:
-                                # Get the most common value
-                                most_common = pd.Series(values).value_counts().index[0]
-                                cluster_info[col] = most_common
-                        else:
-                            cluster_info[col] = None
-
-        clusters[cluster] = cluster_info
-
-    # Convert to DataFrame
-    cluster_df = pd.DataFrame.from_dict(clusters, orient="index").reset_index(drop=True)
-
-    # Sort by cluster_id
-    if "cluster_id" in cluster_df.columns:
-        try:
-            cluster_df["cluster_id"] = pd.to_numeric(cluster_df["cluster_id"])
-            cluster_df = cluster_df.sort_values("cluster_id")
-        except Exception as e:
-            # If conversion to numeric fails, sort as strings
-            if verbose:
-                print(f"Could not convert cluster_id to numeric: {e}. Sorting as strings.")
-            cluster_df = cluster_df.sort_values("cluster_id")
-
-    # Save to output file if provided
-    if output_file:
-        if verbose:
-            print(f"Writing {len(cluster_df)} clusters to output file: {output_file}")
-
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-
-        # Save cluster data
-        cluster_df.to_csv(output_file, index=False)
-        if verbose:
-            print(f"Saved clusters to {output_file}")
-
-    # Determine what to return based on parameters
-    if not output_file or return_dataframes:
-        if gene_features is not None:
-            return cluster_df, gene_features
-        else:
-            return cluster_df
-    return None
+    return cluster_id_to_bundle_path

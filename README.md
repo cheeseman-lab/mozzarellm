@@ -1,168 +1,185 @@
-# mozzarellm
+# MozzareLLM
 
-Analyze gene clusters using Large Language Models (LLMs) to identify biological pathways and prioritize novel genes.
+LLM-based analysis of gene clusters from functional genomics screens: pathway
+identification, evidence-grounded gene categorization, and prioritization of
+understudied genes for experimental follow-up.
 
-## Overview
+## What it does
 
-Mozzarellm is a Python package that leverages Large Language Models to analyze gene clusters for pathway identification and novel gene discovery. It provides a streamlined way to process gene cluster data, classify genes by their pathway involvement, and prioritize candidates for experimental validation.
+Given a cluster table (one row per gene, with a cluster assignment) and a short
+description of your screen, MozzareLLM builds one evidence bundle per cluster —
+functional annotations for every gene, optionally your per-gene phenotypic
+features — and asks a large language model to:
 
-## Features
+1. **Identify the pathway(s)** that best explain why the genes cluster together,
+   or state explicitly that no coherent pathway exists.
+2. **Categorize every gene relative to that pathway**: ESTABLISHED (documented
+   role in the pathway), NOVEL_ROLE (documented function elsewhere — membership
+   here is the new evidence), or UNCHARACTERIZED (annotation too sparse to
+   judge), each with an evidence-ladder subclass and a written rationale.
+3. **Prioritize the understudied genes** — the NOVEL_ROLE and UNCHARACTERIZED
+   calls are the deliverable: candidates for follow-up experiments, with the
+   evidence trail that produced each call.
 
-- 🧬 **Pathway Identification**: Automatically identify the dominant biological process or pathway in gene clusters
-- 🔍 **Gene Classification**: Categorize genes as established pathway members, uncharacterized, or having novel potential roles
-- 🏆 **Prioritization**: Assign importance scores to novel gene candidates to guide experimental follow-up
-- 🚀 **Multi-Provider Support**: Use OpenAI (GPT-4/o), Anthropic (Claude), or Google (Gemini) models
-- 📊 **Structured Output**: Generate JSON and CSV files with detailed analysis at gene and cluster levels
+The model is used as a recall engine over the assembled evidence, not as an
+oracle: every call is grounded in the bundle contents, abstention on incoherent
+clusters is a valid outcome, and the full per-cluster record (prompt, response,
+literature tool calls, tokens, cost) is written to disk for auditing.
 
 ## Installation
 
+Into an existing environment (Python 3.11+); a PyPI release is planned, until
+then install from GitHub:
+
 ```bash
-# Create conda environment with uv
-conda create -n mozzarellm -c conda-forge python=3.11 uv pip -y
-conda activate mozzarellm
-
-# Install dependencies, then package in editable mode
-uv pip install -r pyproject.toml
-uv pip install -e .
+python -m pip install "mozzarellm @ git+https://github.com/cheeseman-lab/mozzarellm.git"
 ```
 
-Create a `.env` file with your API keys:
+Claude models work out of the box; add `[openai]` or `[gemini]` to the
+requirement for those providers (`"mozzarellm[openai] @ git+..."`). Use
+`python -m pip` explicitly so the install lands in the active interpreter.
+For development, clone the repo and use `environment.yml`
+(`conda env create -f environment.yml && python -m pip install -e ".[dev]"`).
+
+Add an Anthropic API key (OpenAI and Google models are also supported) to a
+`.env` file at the repo root:
+
 ```
-OPENAI_API_KEY=your_openai_key_here
-ANTHROPIC_API_KEY=your_anthropic_key_here
-GOOGLE_API_KEY=your_google_key_here
+ANTHROPIC_API_KEY=...
 ```
 
-## Quick Start
+## Quick start
+
+Open `examples/analyze_clusters.ipynb`. It walks through setup and three
+worked examples — optical pooled screening clusters with phenotypic features,
+DepMap co-essentiality modules on the baseline path, and proteomics
+co-abundance clusters with PubMed literature validation — and shows how to
+point the same two calls at your own screen:
 
 ```python
-import pandas as pd
-from mozzarellm import ClusterAnalyzer, reshape_to_clusters
+from mozzarellm.clients.llm_api_clients import create_client
+from mozzarellm.pipeline.screen_analysis import analyze_screen, prepare_screen_bundles
 
-# Load gene-level data (e.g., from clustering output)
-gene_df = pd.read_csv("clustering_results.tsv", sep="\t")
-
-# Reshape to cluster format
-cluster_df, gene_annotations = reshape_to_clusters(
-    input_df=gene_df,
-    gene_col="gene_symbol",
-    cluster_col="cluster",
-    uniprot_col="uniprot_function",  # optional but recommended
-    verbose=True,
+bundles = prepare_screen_bundles(
+    screen_name="my_screen",
+    cluster_table="my_clusters.csv",          # gene_symbol, cluster [, feature columns]
+    output_dir="output",
+    feature_columns=["up_features", "down_features"],  # optional
 )
-
-# Initialize analyzer
-analyzer = ClusterAnalyzer(model="claude-sonnet-4-5-20250929")
-
-# Run analysis with incremental saving (recommended for production)
-results = analyzer.analyze(
-    cluster_df,
-    gene_annotations=gene_annotations,
-    screen_context="Optical pooled screen for mitotic regulators in HeLa cells",
-    output_dir="results/mozzarellm",  # enables resume + incremental saving
+run = analyze_screen(
+    screen_name="my_screen",
+    cluster_to_bundle_map=bundles,
+    client=create_client(model="claude-sonnet-5"),
+    run_dir="output/my_screen_analysis/run_01",
+    screen_context_path="screen_context.json",  # from examples/screen_context_template.json
+    mode="cot",
+    include_features=True,                      # requires feature columns
+    max_workers=8,                              # clusters analyzed concurrently
 )
-
-# Results are automatically saved to output_dir:
-#   - results/mozzarellm/clusters/          (individual cluster JSONs)
-#   - results/mozzarellm/{model}_results.json
-#   - results/mozzarellm/{model}_summaries.tsv
-#   - results/mozzarellm/{model}_flagged_genes.tsv
+run["cluster_df"]  # pathway call, confidence, per-category counts per cluster
+run["gene_df"]     # one row per gene: category, subclass, rationale, evidence
 ```
 
-### Resume Support
+## Outputs
 
-When `output_dir` is provided, the analyzer automatically:
-- **Saves each cluster immediately** after analysis (crash-safe)
-- **Skips already-completed clusters** on restart (resume support)
-- **Generates combined outputs** at the end
+Each run directory contains the complete record and the tables to read:
 
-This means you can safely interrupt and restart long-running analyses.
+| File | Contents |
+|---|---|
+| `<screen>_clusters.csv` | one row per cluster: `cluster_id`, `dominant_process`, `pathway_confidence`, `summary`, the phenotype verdicts when the run had that data (`feature_signature`, `pathway_consistency`, `phenotype_strength`, `confidence_revision`), `n_genes`, `n_classified`, `n_established`, `n_novel_role`, `n_uncharacterized`, per-category gene lists (`;`-joined), `missed_genes`, `classification_completeness` |
+| `<screen>_genes.csv` | one row per gene: `gene`, `cluster_id`, `category`, `subclass`, `rationale`, `evidence`, `dominant_process`, `pathway_confidence`, plus `phenotype_strength_rank` (`"N/M"`) when a `strength_column` was given |
+| `<screen>_clusters.json` | parsed structured output per cluster; `metadata.schema_version` identifies the structure for downstream readers |
+| `traces/cluster_<id>.json` | full per-call record: raw response, tool calls, tokens, cost |
 
-## Input Format
+A successful run also writes `latest.json` next to the run directory
+(`{"run_dir", "date", "screen_name"}`), so downstream code can find the newest
+run without parsing timestamps. The screen context can be passed as a file
+(`screen_context_path`) or an in-memory dict (`screen_context`).
+The annotation lookups are cached on disk — UniProt in
+`~/.cache/mozzarellm/uniprot_cache.sqlite3` and Affinage in
+`~/.cache/mozzarellm/affinage_cache.sqlite3` by default. Set
+`MOZZARELLM_UNIPROT_CACHE` / `MOZZARELLM_AFFINAGE_CACHE` to move them — point
+them at node-local storage when several jobs annotate concurrently on a cluster,
+since a cache on a shared network filesystem is what concurrent writers corrupt —
+or to `none` to run without one. A cache that is corrupt or unwritable is dropped
+with a loud warning and the lookups go to the API; it never turns into empty
+annotations. The Affinage cache keeps the whole record (narrative plus audit
+note) and keeps negative answers too — a symbol with no record, or a refusal
+narrative — under a shorter one-week TTL, so the panels of one screen, which
+share a gene set, ask the service for each gene once rather than once per panel.
 
-Your input should be a CSV/TSV file with gene clusters:
+`analyze_screen(..., resume=True)` re-reads clusters already answered in that
+`run_dir` instead of calling the model again; `dry_run=True` writes every
+prompt under `run_dir/prompts_used/` and returns per-cluster input-token and
+cost estimates with no API call. `organism_id` (default 9606; 10090 for mouse)
+restricts the UniProt lookups. `max_workers` (default 1) analyzes that many
+clusters concurrently — a genome-wide panel of ~930 clusters takes about a day
+one at a time — and `results`, `errors`, `resumed` and `total_cost_usd` stay
+ordered by `cluster_to_bundle_map`, so a run's tables do not depend on how many
+workers it used.
 
-| cluster_id | genes                    | uniprot_function                           |
-|------------|--------------------------|-------------------------------------------|
-| 1          | BRCA1;TP53;PTEN;MLH1     | DNA repair; tumor suppressor; metabolism   |
-| 2          | MYC;MAX;MYCN;E2F1;RB1    | transcription factors; cell cycle control  |
+## Analysis options
 
-Required columns:
-- A column with cluster identifiers (default: `cluster_id`)
-- A column with gene symbols (default: `genes`)
-- Optionally, a column with UniProt function descriptions (helps with analysis)
+- **Mode** (`mode`): `standard` (flat single-call prompt), `cot` (chain-of-thought
+  reasoning steps, the default), `stepwise` (one API turn per reasoning step).
+- **Literature gap-fill** (`mcp=True`): the model is given PubMed search tools
+  and an evidence-gated step that looks up only the genes whose annotation is
+  blank (two tool calls at most). The category-gated variant, which checks
+  NOVEL_ROLE and UNCHARACTERIZED calls against the literature, is available
+  as `component_overrides={"LIT": COMPONENTS["LITV"]}` (from `mozzarellm.prompts`).
+- **Phenotypic features**: pass `feature_columns` (up/down lists per gene —
+  imaging features, DE genes, anything list-shaped) and optionally
+  `strength_column` (any perturbation-strength metric; converted to scale-free
+  `"N/M"` ranks, 1 = strongest vs non-targeting controls) to
+  `prepare_screen_bundles`. The model never sees the per-gene lists: each
+  bundle carries a bounded cluster-level `feature_coherence` table (features
+  covering ≥25% of the cluster, at most 100, with their supporting genes), so
+  the prompt cannot grow with the screen's feature space. The matching
+  reasoning steps enter the prompt automatically when — and only when — the
+  bundles carry the data (`include_features` / `include_strength` default to
+  `"auto"`): features add
+  a bounded consistency cross-check against the pathway call, strength adds a
+  cluster-level informativeness verdict (strong / mixed / weak vs controls);
+  neither overturns the call. Describe what your columns mean in
+  `screen_context.json` under `phenotype_readout` — the model reads your
+  description verbatim. Supported for `mode="cot"` (with or without MCP).
+- **Annotation source** (`source` on `prepare_screen_bundles`): which functional
+  annotation the evidence bundles carry. `"uniprot"` (the default) fetches
+  UniProt FUNCTION comments; `"affinage"` fetches Affinage mechanistic
+  narratives (HGNC alias-resolved, each carrying the API's audit note);
+  `"both"` fetches the two side by side as separate columns, so the model reads
+  each on its own terms. None of those three silently backfills another — a gene
+  one source has nothing for stays empty for that source and the model sees the
+  gap, rather than a UniProt line standing in for a missing Affinage narrative.
+  `"affinage_then_uniprot"` is the one deliberate mix, for production annotation
+  rather than benchmarking: Affinage is fetched for every gene and UniProt is
+  queried only for the genes whose Affinage annotation is absent, empty, or a
+  refusal narrative, so the prompt and the request volume stay close to pure
+  Affinage while the blanks that would otherwise read as dark genes get filled.
+  Each gene then carries `annotation_source` — `"affinage"`, `"uniprot"`, or
+  `""` when neither source had anything — so a mixed bundle stays auditable per
+  gene, and a gene neither source has still arrives blank.
+  The accession step always queries UniProt whatever the source, since
+  accessions are UniProt identifiers. Pass `uniprot_client=` / `affinage_client=`
+  to supply your own configured clients (cache path, timeouts, retries).
+- **Prompt customization**: every text the model sees is a named component in
+  `mozzarellm/prompts/components.py`; `mozzarellm/prompts/assembly.py` joins
+  them in the default chain for each mode. Reword any component per run with
+  `component_overrides={key: text}`, or run your own chain with
+  `component_order=[...]` (see the notebook's customization section). The
+  shipped wording is the benchmark-selected build, not a constraint.
 
-## Supported Models
+## Repository layout
 
-Mozzarellm supports models from three providers, auto-detected by model name prefix:
-
-| Provider | Prefix | Examples |
-|----------|--------|----------|
-| Anthropic | `claude*` | `claude-sonnet-4-5-20250929`, `claude-3-5-haiku-latest` |
-| OpenAI | `gpt*`, `o1*`, `o3*`, `o4*` | `gpt-4o`, `o4-mini` |
-| Google | `gemini*` | `gemini-2.5-pro`, `gemini-2.5-flash` |
-
-Pass any valid model identifier from these providers to `ClusterAnalyzer(model="...")`.
-
-## Python API
-
-### ClusterAnalyzer
-
-The main interface for analyzing gene clusters:
-
-```python
-from mozzarellm import ClusterAnalyzer
-
-analyzer = ClusterAnalyzer(
-    model="claude-sonnet-4-5-20250929",  # Model identifier
-    temperature=0.0,                      # Temperature (0.0-1.0)
-    max_tokens=8000,                      # Max tokens per response
-    show_progress=True,                   # Show progress bar
-)
-
-results = analyzer.analyze(
-    cluster_df,                           # DataFrame with cluster_id and genes columns
-    gene_annotations=gene_annotations,    # Optional: DataFrame with gene annotations
-    screen_context="...",                 # Optional: Experimental context
-    output_dir="results/",                # Optional: Enable incremental saving + resume
-)
-```
-
-### reshape_to_clusters
-
-Convert gene-level data to cluster format:
-
-```python
-from mozzarellm import reshape_to_clusters
-
-cluster_df, gene_annotations = reshape_to_clusters(
-    input_df=gene_level_data,          # Gene-level input DataFrame
-    gene_col="gene_symbol",            # Gene ID column
-    cluster_col="cluster",             # Cluster assignment column
-    uniprot_col="uniprot_function",    # Column with gene annotations (optional)
-    verbose=True,                      # Show processing information
-)
-```
-
-## Output Structure
-
-When `output_dir` is provided, the analysis produces:
-
-```
-output_dir/
-  clusters/                    # Individual cluster results (for resume)
-    cluster_0.json
-    cluster_1.json
-    ...
-  {model}_results.json         # Combined analysis with all clusters
-  {model}_summaries.tsv        # One row per cluster (pathway, confidence, counts)
-  {model}_flagged_genes.tsv    # One row per flagged gene (priority, rationale)
-```
-
-The `AnalysisResult` object is also returned with:
-- `results.clusters` - Dict mapping cluster_id to ClusterResult
-- `results.metadata` - Analysis metadata (model, timestamp, output paths)
+- `mozzarellm/` — the package: LLM clients, prompts (`prompts/components.py`
+  is the wording, `prompts/assembly.py` the chain), bundle builder, screen
+  analysis.
+- `examples/` — the analysis notebook, the screen-context template, and the three
+  example datasets (OPS, DepMap, proteomics).
+- `benchmarks/` — the prompt/evidence benchmarking suite that produced the
+  shipped prompt configuration (see `benchmarks/README.md`).
+- `tests/` — the test suite (`python -m pytest tests/`).
 
 ## License
 
-MIT License - See LICENSE file for details.
+MIT — see `LICENSE`.

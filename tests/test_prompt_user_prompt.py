@@ -1,0 +1,141 @@
+"""The user prompt: what of the evidence bundle reaches the model.
+
+Per-gene feature data (up/down lists, raw phenotypic strength) never reaches
+the model; the aggregate feature_coherence table does only when a
+feature-interpretation component is active.
+"""
+
+import json
+import sys
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from mozzarellm.prompts import (  # noqa: E402
+    make_single_cluster_analysis_user_prompt,
+    strip_feature_fields,
+)
+
+
+def test_strip_feature_fields_removes_features_keeps_annotation():
+    bundle = {
+        "screen_name": "s1",
+        "cluster_id": "1",
+        "feature_coherence": {"features": []},
+        "phenotype_strength": {"column": "phenotypic_strength"},
+        "cluster_genes": [
+            {
+                "gene_symbol": "G1",
+                "up_features": "cell_x; cell_y",
+                "down_features": "nucleus_z",
+                "phenotypic_strength": "4/9",
+                "UniProt_functional_annotation": "does a thing",
+                "accession": "P1",
+            }
+        ],
+    }
+    strip_feature_fields(bundle)
+    assert "feature_coherence" not in bundle and "phenotype_strength" not in bundle
+    g = bundle["cluster_genes"][0]
+    assert "up_features" not in g and "down_features" not in g and "phenotypic_strength" not in g
+    # non-feature evidence is preserved
+    assert g["UniProt_functional_annotation"] == "does a thing"
+    assert g["gene_symbol"] == "G1" and g["accession"] == "P1"
+
+
+def test_user_prompt_gate(tmp_path):
+    bundle = {
+        "screen_name": "s1",
+        "cluster_id": "1",
+        "feature_coherence": {"n_genes_in_cluster": 1, "features": [{"feature": "cell_x"}]},
+        "cluster_genes": [
+            {
+                "gene_symbol": "G1",
+                "up_features": "cell_x; cell_y",
+                "down_features": "nucleus_z",
+                "phenotypic_strength": "4.2",
+                "UniProt_functional_annotation": "does a thing",
+            }
+        ],
+    }
+    bp = tmp_path / "bundle.json"
+    bp.write_text(json.dumps(bundle))
+    m = {"1": bp}
+
+    off = make_single_cluster_analysis_user_prompt("1", "s1", m, include_features=False)
+    on = make_single_cluster_analysis_user_prompt("1", "s1", m, include_features=True)
+
+    # per-gene lists never reach the model; the bounded table does iff on
+    for field in ("up_features", "down_features", "nucleus_z"):
+        assert field not in off and field not in on, field
+    assert "feature_coherence" not in off and "feature_coherence" in on
+    # annotation always present; default (no arg) strips
+    assert "does a thing" in off and "does a thing" in on
+    default = make_single_cluster_analysis_user_prompt("1", "s1", m)
+    assert "feature_coherence" not in default
+
+
+def test_source_gate_reduces_master_bundle(tmp_path):
+    # One master bundle carries both sources' annotations; each run's source
+    # view is derived at assembly time. "both" is a passthrough; empty
+    # annotations are dropped rather than serialized as empty fields.
+    from mozzarellm.prompts import strip_source_fields
+
+    def master():
+        return {
+            "cluster_genes": [
+                {
+                    "gene_symbol": "G1",
+                    "UniProt_functional_annotation": "uni text",
+                    "affinage_functional_annotation": "aff text",
+                    "affinage_audit_note": "flagged",
+                },
+                {
+                    "gene_symbol": "G2",
+                    "UniProt_functional_annotation": None,
+                    "affinage_functional_annotation": "aff only",
+                },
+            ]
+        }
+
+    uni = master()
+    strip_source_fields(uni, "uniprot")
+    g1, g2 = uni["cluster_genes"]
+    assert g1["UniProt_functional_annotation"] == "uni text"
+    assert "affinage_functional_annotation" not in g1 and "affinage_audit_note" not in g1
+    assert "UniProt_functional_annotation" not in g2  # empty annotation dropped
+
+    aff = master()
+    strip_source_fields(aff, "affinage")
+    assert "UniProt_functional_annotation" not in aff["cluster_genes"][0]
+    assert aff["cluster_genes"][0]["affinage_audit_note"] == "flagged"
+
+    both = master()
+    strip_source_fields(both, "both")
+    assert both == master()  # byte-stable passthrough
+
+    bundle = master()
+    bundle.update({"screen_name": "s1", "cluster_id": "1"})
+    bp = tmp_path / "b.json"
+    bp.write_text(json.dumps(bundle))
+    prompt = make_single_cluster_analysis_user_prompt("1", "s1", {"1": bp}, source="uniprot")
+    assert "uni text" in prompt and "aff text" not in prompt
+
+
+def test_strip_feature_fields_accepts_custom_field_names():
+    # Bundles built with custom feature_columns carry those names per gene;
+    # the strip must take the field set as a parameter or they would leak.
+    bundle = {
+        "cluster_genes": [
+            {"gene_symbol": "G1", "my_morphology_score": "1.2", "up_features": "cell_x"}
+        ]
+    }
+    strip_feature_fields(bundle)  # default set: custom column survives (the documented boundary)
+    assert bundle["cluster_genes"][0]["my_morphology_score"] == "1.2"
+    assert "up_features" not in bundle["cluster_genes"][0]
+
+    bundle2 = {"cluster_genes": [{"gene_symbol": "G1", "my_morphology_score": "1.2"}]}
+    strip_feature_fields(bundle2, fields=("my_morphology_score",))
+    assert "my_morphology_score" not in bundle2["cluster_genes"][0]

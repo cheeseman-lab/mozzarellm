@@ -1,0 +1,1128 @@
+"""Benchmark evaluator: consensus ground truth + per-run metric generation.
+
+Builds consensus ground truth from the raw per-reviewer annotations
+(>=2-of-3 majority classification, ordinal-median subclass, majority coherence)
+and scores a run's parsed_outputs.jsonl against it:
+
+- per-run scoring: gene-category recall by modal vote across replicates (a
+  hedged gene resolves to the less-high call), novel/uncharacterized subclass,
+  and cluster coherence -> MetricPanel;
+- decoy validation: abstain/functional expectations on the negative-control
+  clusters, with output-completeness reporting;
+- diagnostics: per-consensus-class recall, lenient any-reviewer recall,
+  inter-reviewer concordance (pairwise / Fleiss / by level), the reviewers'
+  de-blinded source-preference tally, and audit-flag engagement;
+- pathway agreement: the model's modal dominant process vs reviewers' nominated
+  pathways (substring / bidirectional substring / optional semantic cosine via
+  a sentence-transformer).
+
+Library consumed by the pipeline runners -- no CLI. State files written by the
+runners are the record; nothing is re-derived downstream.
+"""
+
+from __future__ import annotations
+
+import csv
+import json
+import re
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+_SEMANTIC_MODEL_NAME = "all-MiniLM-L6-v2"
+_semantic_model: Any = None  # lazy-loaded on first use
+
+# Coherent-cluster gene total: the 4 coherent real clusters. The Low-coherence
+# denali/24 is demoted to abstain-only, so it and its genes are excluded here.
+N_REAL_GENES = 103
+
+# Ordinal evidence ladders per category (rank ascending = more support for the
+# call). CONTRADICTORY_EVIDENCE sits at the bottom of the NOVEL_ROLE ladder --
+# most skeptical -- so a CONTRADICTORY majority is respected by the median while
+# scattered votes resolve to the conservative middle. DARK_GENE < ANNOTATED_ONLY.
+NOVEL_LADDER = {
+    "CONTRADICTORY_EVIDENCE": 0,
+    "NO_EVIDENCE": 1,
+    "INDIRECT_EVIDENCE": 2,
+    "PARTIAL_EVIDENCE": 3,
+}
+UNCHAR_LADDER = {"DARK_GENE": 0, "ANNOTATED_ONLY": 1}
+_SUBCLASS_LADDERS = {"NOVEL_ROLE": NOVEL_LADDER, "UNCHARACTERIZED": UNCHAR_LADDER}
+
+REAL_COLUMNS = [
+    "screen",
+    "cluster",
+    "cluster_role",
+    "gene",
+    "consensus_class",
+    "unanimous",
+    "n_agree",
+    "consensus_subclass",
+    "pref_affinage",
+    "pref_uniprot",
+    "pref_both",
+    "pref_neither",
+]
+
+_RUN_ID_RE = re.compile(r"^(?P<screen>.+)__cluster_(?P<cluster>[^_]+)__rep_(?P<rep>.+)$")
+
+# A gene hedged across category lists resolves to the LESS-HIGH (more conservative)
+# category -- if the model won't commit, don't reward the more-established call.
+# (The output floor enforces single-labeling; this is the fallback for residuals.)
+_HEDGE_PRIORITY = {"UNCHARACTERIZED": 0, "NOVEL_ROLE": 1, "ESTABLISHED": 2}
+
+CLASSES = ("ESTABLISHED", "NOVEL_ROLE", "UNCHARACTERIZED")
+
+# The NOVEL_ROLE evidence sub-labels form an ordinal ladder of how much evidence a
+# reviewer credits (NO < INDIRECT < PARTIAL < CONTRADICTORY at the far/off-axis
+# end); reviewers differ in calibration along it, so exact-match understates their
+# agreement. Ordering here defines the ordinal levels used for the calibration stat.
+NOVEL_ORDER = ("NO_EVIDENCE", "INDIRECT_EVIDENCE", "PARTIAL_EVIDENCE", "CONTRADICTORY_EVIDENCE")
+
+# Generic words stripped before testing whether reviewers' free-text pathway
+# labels share a content keyword (approximate cluster-level concordance).
+_PATHWAY_STOPWORDS = frozenset(
+    (
+        "and",
+        "the",
+        "through",
+        "function",
+        "related",
+        "cell",
+        "cellular",
+        "process",
+        "complex",
+        "pathway",
+        "regulation",
+        "activity",
+        "protein",
+        "genes",
+        "gene",
+        "role",
+        "roles",
+        "involved",
+    )
+)
+
+# Terms a rationale must mention to count as engaging an audit note. "flagged"
+# not "flag" (avoids flagellar); the note verdicts themselves say "concern".
+_AUDIT_ENGAGEMENT_TERMS = ("audit", "flagged", "caution", "concern")
+
+
+def _norm_str(x: Any) -> str:
+    if pd.isna(x):
+        return ""
+    return str(x).strip()
+
+
+def _norm_lower(x: Any) -> str:
+    return _norm_str(x).lower()
+
+
+def consensus_of(classifications: list[str]) -> tuple[str, bool, int]:
+    """Strict >=2-of-3 majority over classification labels: (winner, unanimous, n_agree).
+
+    Returns ("", False, top_count) when no label reaches a >=2 majority (a 1-1-1
+    three-way split) -- the gene is then unresolved and excluded from consensus
+    scoring. On the 133-gene benchmark there are no such splits.
+    """
+    present = [c for c in classifications if c]
+    if not present:
+        return "", False, 0
+    counts = Counter(present)
+    winner, n_agree = counts.most_common(1)[0]
+    if n_agree < 2:
+        return "", False, n_agree
+    return winner, len(counts) == 1, n_agree
+
+
+def _consensus_subclass(subclasses: list[str], consensus_class: str) -> str:
+    """Ordinal-median subclass over votes on the consensus category's ladder.
+
+    Only NOVEL_ROLE / UNCHARACTERIZED carry a subclass. Votes off the relevant
+    ladder (e.g. a NOVEL_ROLE subclass on an UNCHARACTERIZED-consensus gene) are
+    dropped; the median of the remaining ranks is taken with the lower median on
+    even counts (the more conservative call). Empty if no on-ladder vote exists.
+    """
+    ladder = _SUBCLASS_LADDERS.get(consensus_class)
+    if ladder is None:
+        return ""
+    ranks = sorted(ladder[s] for s in subclasses if s in ladder)
+    if not ranks:
+        return ""
+    median_rank = ranks[(len(ranks) - 1) // 2]
+    return {v: k for k, v in ladder.items()}[median_rank]
+
+
+def _coherence_label(coherence_text: str) -> str | None:
+    """Map a reviewer's free-text coherence to High/Medium/Low, or None."""
+    text = coherence_text.lower()
+    for level in ("high", "medium", "low"):
+        if level in text:
+            return level.capitalize()
+    return None
+
+
+def consensus_coherence(reviewer_csvs: dict[str, Path]) -> dict[tuple, str]:
+    """Majority-vote per-cluster coherence (High/Medium/Low) across reviewers.
+
+    Reads the cluster-level `coherence` free text from each reviewer's rows,
+    maps it to a level, and returns {(screen, cluster): level}: the strict
+    majority, or on a tie (e.g. one High, one Medium, one Low) the ordinal
+    median of the votes -- the same rule the subclass consensus uses.
+    """
+    per_cluster: dict[tuple, list[str]] = defaultdict(list)
+    for path in reviewer_csvs.values():
+        with open(path, newline="") as fh:
+            seen: set[tuple] = set()
+            for row in csv.DictReader(fh):
+                cluster_key = (row["screen"].strip(), row["cluster"].strip())
+                if cluster_key in seen:
+                    continue  # one coherence vote per reviewer per cluster
+                seen.add(cluster_key)
+                label = _coherence_label(row["coherence"])
+                if label:
+                    per_cluster[cluster_key].append(label)
+
+    result: dict[tuple, str] = {}
+    for cluster_key, labels in per_cluster.items():
+        counts = Counter(labels)
+        winner, top = counts.most_common(1)[0]
+        if sum(1 for c in counts.values() if c == top) == 1:
+            result[cluster_key] = winner
+        else:
+            ranks = sorted(("Low", "Medium", "High").index(label) for label in labels)
+            result[cluster_key] = ("Low", "Medium", "High")[ranks[(len(ranks) - 1) // 2]]
+    return result
+
+
+def _deblind(preferred_source: str, key_row: dict) -> str:
+    """Map a reviewer's blinded 'a'/'b' pick to its real source via the key row."""
+    choice = preferred_source.strip().lower()
+    if choice == "a":
+        return key_row["srcA_src"].strip().lower()
+    if choice == "b":
+        return key_row["srcB_src"].strip().lower()
+    return choice
+
+
+def pathway_substring_match(predicted: str, experts: list[str]) -> bool:
+    """Any expert pathway is a case-insensitive substring of the prediction."""
+    pred = _norm_lower(predicted)
+    if not pred:
+        return False
+    for exp in experts:
+        exp_lower = _norm_lower(exp)
+        if exp_lower and exp_lower in pred:
+            return True
+    return False
+
+
+def pathway_loose_match(predicted: str, experts: list[str]) -> bool:
+    """Bidirectional substring: prediction in expert OR expert in prediction."""
+    pred = _norm_lower(predicted)
+    if not pred:
+        return False
+    for exp in experts:
+        exp_lower = _norm_lower(exp)
+        if not exp_lower:
+            continue
+        if exp_lower in pred or pred in exp_lower:
+            return True
+    return False
+
+
+def _semantic_available() -> bool:
+    """Whether sentence-transformers is importable (checked without importing torch)."""
+    import importlib.util
+
+    return importlib.util.find_spec("sentence_transformers") is not None
+
+
+def _get_semantic_model() -> Any:
+    """Lazy-load the sentence-transformer model (~80 MB download on first use)."""
+    global _semantic_model
+    if _semantic_model is None:
+        from sentence_transformers import SentenceTransformer
+
+        _semantic_model = SentenceTransformer(_SEMANTIC_MODEL_NAME)
+    return _semantic_model
+
+
+def _max_cosine(predicted: str, experts: list[str], model) -> float | None:
+    """Max cosine similarity of the prediction to any expert pathway, or None."""
+    import numpy as np
+
+    exp = [e.strip() for e in experts if e and e.strip()]
+    pred = (predicted or "").strip()
+    if not pred or not exp:
+        return None
+    emb = model.encode([pred, *exp], convert_to_tensor=False, show_progress_bar=False)
+    emb = np.asarray(emb)
+    emb = emb / np.maximum(np.linalg.norm(emb, axis=1, keepdims=True), 1e-9)
+    sims = emb[1:] @ emb[0]
+    return round(float(sims.max()), 3)
+
+
+def _pathway_keywords(text: str) -> set[str]:
+    """5-char stems of content words (minus generic terms) from a free-text pathway.
+
+    Stemming to a 5-char prefix lets morphological variants match (mitochondria /
+    mitochondrial, splice / splicing) so cluster-level pathway concordance isn't
+    lost to wording differences.
+    """
+    toks = set(re.findall(r"[a-z]{4,}", text.lower())) - _PATHWAY_STOPWORDS
+    return {t[:5] for t in toks}
+
+
+def cluster_dominant_process(
+    run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> dict[tuple, str]:
+    """Modal `dominant_process` per (screen, cluster) across replicates for one condition.
+
+    Route filtering mirrors score_run.
+    """
+    votes: dict[tuple, Counter] = defaultdict(Counter)
+    with open(Path(run_dir) / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
+            parsed = cell.get("parsed_output")
+            if parsed is None:
+                continue
+            process = parsed.get("dominant_process")
+            if not process:
+                continue
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            votes[(screen, cluster)][process] += 1
+    return {k: v.most_common(1)[0][0] for k, v in votes.items()}
+
+
+def pathway_diagnostics(
+    run_dir: Path,
+    gt: dict,
+    reviewer_csvs: dict[str, Path],
+    condition: str,
+    threshold: float = 0.70,
+    use_semantic: bool | None = None,
+) -> dict:
+    """Per-cluster pathway agreement for one condition: substring / loose / semantic.
+
+    The model's modal dominant_process for each real cluster is compared to the
+    reviewers' nominated pathways. `use_semantic` defaults to whether
+    sentence-transformers is installed; pass False to skip the model load (tests).
+    """
+    if use_semantic is None:
+        use_semantic = _semantic_available()
+    model = _get_semantic_model() if use_semantic else None
+
+    model_pw = cluster_dominant_process(run_dir, route_equals=condition)
+    _, _, reviewer_pw, _ = _read_annotations(reviewer_csvs, gt)  # {(screen, cluster): {rev: text}}
+
+    per_cluster: dict[str, dict] = {}
+    for key, experts_map in reviewer_pw.items():
+        pred = model_pw.get(key, "")
+        experts = [v for v in experts_map.values() if v]
+        score = _max_cosine(pred, experts, model) if model else None
+        per_cluster[f"{key[0]}/{key[1]}"] = {
+            "predicted": pred,
+            "substring": pathway_substring_match(pred, experts),
+            "loose": pathway_loose_match(pred, experts),
+            "semantic_score": score,
+            "semantic_match": score is not None and score >= threshold,
+        }
+
+    n = len(per_cluster)
+    scores = [c["semantic_score"] for c in per_cluster.values() if c["semantic_score"] is not None]
+
+    def _rate(field: str) -> float:
+        return sum(1 for c in per_cluster.values() if c[field]) / n if n else 0.0
+
+    return {
+        "condition": condition,
+        "n_clusters": n,
+        "substring_rate": round(_rate("substring"), 3),
+        "loose_rate": round(_rate("loose"), 3),
+        "semantic_mean": round(sum(scores) / len(scores), 3) if scores else None,
+        "semantic_match_rate": round(_rate("semantic_match"), 3),
+        "semantic_available": bool(model),
+        "per_cluster": per_cluster,
+    }
+
+
+def _gene_symbol(item) -> str:
+    """Normalize an established_genes entry to a bare gene symbol."""
+    if isinstance(item, dict):
+        return next(iter(item))
+    return item
+
+
+def _parse_run_id(run_id: str, route: str) -> tuple[str, str]:
+    """Extract (screen, cluster) from a run_id, anchored on the cell's own route."""
+    marker = f"__{route}__"
+    idx = run_id.find(marker)
+    if idx == -1:
+        raise ValueError(f"route {route!r} not found in run_id {run_id!r}")
+    remainder = run_id[idx + len(marker) :]
+    match = _RUN_ID_RE.match(remainder)
+    if not match:
+        raise ValueError(f"could not parse screen/cluster from run_id {run_id!r}")
+    return match.group("screen"), match.group("cluster")
+
+
+def _accumulate_votes(
+    run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> tuple[dict, dict, dict, int]:
+    """Fold parsed_outputs.jsonl into per-gene / per-cluster vote tallies.
+
+    Shared by score_run and gene_modal_categories so both apply the identical
+    route filter and self-contradiction drop rule. Returns
+    (gene_votes, subclass_votes, cluster_confidence_votes, failures).
+    """
+    gene_votes: dict[tuple, Counter] = defaultdict(Counter)
+    subclass_votes: dict[tuple, dict] = defaultdict(lambda: defaultdict(Counter))
+    cluster_confidence_votes: dict[tuple, Counter] = defaultdict(Counter)
+    failures = 0
+
+    with open(Path(run_dir) / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
+
+            parsed = cell.get("parsed_output")
+            if parsed is None or parsed.get("dominant_process") is None:
+                failures += 1
+                continue
+
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            cluster_key = (screen, cluster)
+
+            # A gene in more than one category list within a reply is a hedge; it
+            # resolves to the less-high category (see _HEDGE_PRIORITY). Collect this
+            # cell's per-gene category->subclass mapping first.
+            cell_categories: dict[str, dict[str, str]] = defaultdict(dict)
+
+            for item in parsed.get("established_genes") or []:
+                gene = _gene_symbol(item)
+                cell_categories[gene]["ESTABLISHED"] = ""
+
+            for item in parsed.get("novel_role_genes") or []:
+                cell_categories[item["gene"]]["NOVEL_ROLE"] = item.get("class", "")
+
+            for item in parsed.get("uncharacterized_genes") or []:
+                cell_categories[item["gene"]]["UNCHARACTERIZED"] = item.get("class", "")
+
+            for gene, categories in cell_categories.items():
+                # hedged genes resolve to the less-high category (UNCHAR > NOVEL > EST)
+                category = min(categories, key=lambda c: _HEDGE_PRIORITY.get(c, 99))
+                subclass = categories[category]
+                gene_votes[(screen, cluster, gene)][category] += 1
+                if subclass:
+                    subclass_votes[(screen, cluster, gene)][category][subclass] += 1
+
+            confidence = parsed.get("pathway_confidence")
+            if confidence:
+                cluster_confidence_votes[cluster_key][confidence] += 1
+
+    return gene_votes, subclass_votes, cluster_confidence_votes, failures
+
+
+def gene_modal_categories(
+    run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> dict[tuple, str]:
+    """Return {(screen, cluster, gene): modal category} for one condition.
+
+    The modal (most-voted) category per gene across replicates -- the same
+    per-gene call score_run scores, exposed for source-diagnostic metrics.
+    """
+    gene_votes, _, _, _ = _accumulate_votes(run_dir, route_equals, route_excludes)
+    return {k: v.most_common(1)[0][0] for k, v in gene_votes.items()}
+
+
+def build_consensus_gt(
+    reviewer_csvs: dict[str, Path],
+    key_csv: Path,
+    decoy_specs: list[dict],
+    out_csv: Path,
+) -> None:
+    """Build the consensus ground-truth CSV from reviewer annotations + blinding key.
+
+    Args:
+        reviewer_csvs: mapping of reviewer name -> path to their annotation CSV.
+        key_csv: path to the blinding key (screen, cluster, gene, srcA_src,
+            srcB_src).
+        decoy_specs: list of {"screen", "cluster", "decoy_type", "genes"} dicts;
+            each gene becomes a blank negative-control row.
+        out_csv: destination path for the consensus ground-truth CSV.
+    """
+    key: dict[tuple, dict] = {}
+    with open(key_csv, newline="") as fh:
+        for row in csv.DictReader(fh):
+            key[(row["screen"].strip(), row["cluster"].strip(), row["gene"].strip())] = row
+
+    per_gene: dict[tuple, list[dict]] = defaultdict(list)
+    for path in reviewer_csvs.values():
+        with open(path, newline="") as fh:
+            for row in csv.DictReader(fh):
+                gene_key = (row["screen"].strip(), row["cluster"].strip(), row["gene"].strip())
+                per_gene[gene_key].append(row)
+
+    rows = []
+    for (screen, cluster, gene), revs in per_gene.items():
+        key_row = key[(screen, cluster, gene)]
+
+        consensus_class, unanimous, n_agree = consensus_of(
+            [r["classification"].strip() for r in revs]
+        )
+        consensus_subclass = _consensus_subclass(
+            [r["subclass"].strip() for r in revs], consensus_class
+        )
+
+        pref_counts = Counter(_deblind(r["preferred_source"], key_row) for r in revs)
+
+        rows.append(
+            {
+                "screen": screen,
+                "cluster": cluster,
+                "cluster_role": "real",
+                "gene": gene,
+                "consensus_class": consensus_class,
+                "unanimous": unanimous,
+                "n_agree": n_agree,
+                "consensus_subclass": consensus_subclass,
+                "pref_affinage": pref_counts.get("affinage", 0),
+                "pref_uniprot": pref_counts.get("uniprot", 0),
+                "pref_both": pref_counts.get("both", 0),
+                "pref_neither": pref_counts.get("neither", 0),
+            }
+        )
+
+    for spec in decoy_specs:
+        for gene in spec["genes"]:
+            rows.append(
+                {
+                    "screen": spec["screen"],
+                    "cluster": spec["cluster"],
+                    "cluster_role": "decoy",
+                    "gene": gene,
+                    "consensus_class": "",
+                    "unanimous": "",
+                    "n_agree": "",
+                    "consensus_subclass": "",
+                    "pref_affinage": "",
+                    "pref_uniprot": "",
+                    "pref_both": "",
+                    "pref_neither": "",
+                }
+            )
+
+    out_csv = Path(out_csv)
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_csv, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=REAL_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def load_consensus_gt(csv_path: Path) -> dict[tuple, dict]:
+    """Load a consensus ground-truth CSV into {(screen, cluster, gene): row_dict}."""
+    result = {}
+    with open(csv_path, newline="") as fh:
+        for row in csv.DictReader(fh):
+            result[(row["screen"], row["cluster"], row["gene"])] = row
+    return result
+
+
+@dataclass
+class MetricPanel:
+    category: float
+    novel_subclass: tuple
+    unchar_subclass: tuple
+    coherence: tuple
+    n: int
+    failures: int
+
+
+def score_run(
+    run_dir: Path,
+    gt: dict,
+    cluster_coherence: dict | None = None,
+    route_excludes: str = "mcp",
+    route_equals: str | None = None,
+) -> MetricPanel:
+    """Score one run directory's parsed_outputs.jsonl against consensus ground truth.
+
+    Route filtering: route_equals (if set) keeps only rows whose route matches
+    exactly -- isolates one cell when several share a prefix (e.g. single_call vs
+    single_call_mcp, or W5 vs W51); otherwise skip rows matching the
+    route_excludes substring.
+    """
+    run_dir = Path(run_dir)
+    gene_votes, subclass_votes, cluster_confidence_votes, failures = _accumulate_votes(
+        run_dir, route_equals, route_excludes
+    )
+
+    category_correct = 0
+    category_n = 0
+    novel_correct = 0
+    novel_n = 0
+    unchar_correct = 0
+    unchar_n = 0
+
+    for (screen, cluster, gene), votes in gene_votes.items():
+        row = gt.get((screen, cluster, gene))
+        if row is None or row.get("cluster_role") != "real":
+            continue
+
+        modal_category = votes.most_common(1)[0][0]
+        category_n += 1
+        consensus_class = row.get("consensus_class", "")
+        if modal_category == consensus_class:
+            category_correct += 1
+
+        consensus_subclass = row.get("consensus_subclass", "")
+
+        if (
+            consensus_class == "NOVEL_ROLE"
+            and consensus_subclass
+            and modal_category == "NOVEL_ROLE"
+        ):
+            sub_counter = subclass_votes[(screen, cluster, gene)]["NOVEL_ROLE"]
+            modal_subclass = sub_counter.most_common(1)[0][0] if sub_counter else None
+            novel_n += 1
+            if modal_subclass == consensus_subclass:
+                novel_correct += 1
+
+        if (
+            consensus_class == "UNCHARACTERIZED"
+            and consensus_subclass
+            and modal_category == "UNCHARACTERIZED"
+        ):
+            sub_counter = subclass_votes[(screen, cluster, gene)]["UNCHARACTERIZED"]
+            modal_subclass = sub_counter.most_common(1)[0][0] if sub_counter else None
+            unchar_n += 1
+            if modal_subclass == consensus_subclass:
+                unchar_correct += 1
+
+    category_score = category_correct / category_n if category_n else 0.0
+
+    coherence_correct = 0
+    coherence_n = 0
+    if cluster_coherence:
+        for cluster_key, confidence_votes in cluster_confidence_votes.items():
+            if cluster_key not in cluster_coherence:
+                continue
+            modal_confidence = confidence_votes.most_common(1)[0][0]
+            coherence_n += 1
+            if modal_confidence == cluster_coherence[cluster_key]:
+                coherence_correct += 1
+
+    return MetricPanel(
+        category=category_score,
+        novel_subclass=(novel_correct, novel_n),
+        unchar_subclass=(unchar_correct, unchar_n),
+        coherence=(coherence_correct, coherence_n),
+        n=category_n,
+        failures=failures,
+    )
+
+
+def reviewer_label_sets(reviewer_csvs: dict[str, Path]) -> dict[tuple, set[str]]:
+    """Per-gene set of individual reviewer classifications (the lenient GT)."""
+    labels: dict[tuple, set[str]] = defaultdict(set)
+    for path in reviewer_csvs.values():
+        with open(path) as fh:
+            for row in csv.DictReader(fh):
+                cls = row.get("classification", "").strip()
+                if cls:
+                    key = (row["screen"].strip(), str(row["cluster"]).strip(), row["gene"].strip())
+                    labels[key].add(cls)
+    return dict(labels)
+
+
+def _fleiss_kappa(rating_rows: list[Counter], categories) -> float:
+    """Fleiss' kappa over items rated by a fixed number of raters into `categories`."""
+    n_items = len(rating_rows)
+    n_raters = sum(rating_rows[0].values()) if rating_rows else 0
+    if not n_items or n_raters < 2:
+        return 0.0
+    p_j = {c: sum(r[c] for r in rating_rows) / (n_items * n_raters) for c in categories}
+    p_bar = (
+        sum(
+            (sum(r[c] ** 2 for c in categories) - n_raters) / (n_raters * (n_raters - 1))
+            for r in rating_rows
+        )
+        / n_items
+    )
+    p_e = sum(v**2 for v in p_j.values())
+    return (p_bar - p_e) / (1 - p_e) if p_e < 1 else 1.0
+
+
+def _read_annotations(reviewer_csvs, gt):
+    """Per real (gene / cluster) reviewer classification, subclass, pathway, web use."""
+    cat: dict[tuple, dict] = defaultdict(dict)
+    sub: dict[tuple, dict] = defaultdict(dict)
+    pathway: dict[tuple, dict] = defaultdict(dict)
+    web_rows: list[tuple[str, bool]] = []  # (consensus_class, used_web) per annotation
+    for name, path in reviewer_csvs.items():
+        with open(path) as fh:
+            for x in csv.DictReader(fh):
+                gk = (x["screen"].strip(), str(x["cluster"]).strip(), x["gene"].strip())
+                if gt.get(gk, {}).get("cluster_role") != "real":
+                    continue
+                if x.get("classification", "").strip():
+                    cat[gk][name] = x["classification"].strip()
+                if x.get("subclass", "").strip():
+                    sub[gk][name] = x["subclass"].strip()
+                pathway[(gk[0], gk[1])][name] = x.get("pathway", "").strip()
+                web_rows.append(
+                    (
+                        gt[gk].get("consensus_class", ""),
+                        x.get("used_web", "").strip().lower() == "yes",
+                    )
+                )
+    return cat, sub, pathway, web_rows
+
+
+def inter_reviewer_concordance(reviewer_csvs: dict[str, Path], gt: dict) -> dict:
+    """Characterize inter-reviewer agreement at every level (the incoming data).
+
+    Category level: pairwise agreement, all-reviewer unanimity + Fleiss' kappa, and
+    unanimity by consensus class (the pairwise range is the human ceiling). Also
+    concordance at the pathway (cluster) and sub-class levels, and reviewers' web
+    usage by class -- how self-sufficient the evidence bundles were (few web lookups
+    => inline literature / MCP is only needed for the rare dark genes).
+    """
+    names = list(reviewer_csvs.keys())
+    cat, sub, pathway, web_rows = _read_annotations(reviewer_csvs, gt)
+
+    genes = [(k, v) for k, v in cat.items() if len(v) == len(names)]
+    n = len(genes)
+    pairwise = {}
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            a, b = names[i], names[j]
+            agree = sum(1 for _, v in genes if v[a] == v[b])
+            pairwise[f"{a}-{b}"] = agree / n if n else 0.0
+    unanimous = sum(1 for _, v in genes if len(set(v.values())) == 1)
+    by_class = {}
+    for cls in CLASSES:
+        sg = [(k, v) for k, v in genes if gt[k].get("consensus_class") == cls]
+        un = sum(1 for _, v in sg if len(set(v.values())) == 1)
+        by_class[cls] = {"n": len(sg), "unanimous": un, "frac": un / len(sg) if sg else 0.0}
+    pw = list(pairwise.values())
+    kappa = _fleiss_kappa([Counter(v.values()) for _, v in genes], CLASSES)
+
+    # sub-class concordance: genes where all reviewers agree on category AND all gave a sub-class
+    sub_genes = [
+        (k, v)
+        for k, v in sub.items()
+        if len(v) == len(names) and k in cat and len(set(cat[k].values())) == 1
+    ]
+    sub_unan = sum(1 for _, v in sub_genes if len(set(v.values())) == 1)
+    # pathway concordance: clusters where all reviewers share a content keyword
+    path_clusters = [v for v in pathway.values() if len(v) == len(names)]
+    path_agree = sum(
+        1 for v in path_clusters if set.intersection(*(_pathway_keywords(t) for t in v.values()))
+    )
+
+    web_n = len(web_rows)
+    web_yes = sum(1 for _, w in web_rows if w)
+    web_by_class = {}
+    for cls in CLASSES:
+        rows = [w for c, w in web_rows if c == cls]
+        web_by_class[cls] = {"n": len(rows), "frac": (sum(rows) / len(rows)) if rows else 0.0}
+
+    # --- sub-class detail: UNCHAR (categorical, agrees) vs the ordinal NOVEL ladder ---
+    def _cond(family):
+        return [
+            (k, v)
+            for k, v in sub.items()
+            if len(v) == len(names)
+            and k in cat
+            and len(set(cat[k].values())) == 1
+            and next(iter(cat[k].values())) == family
+        ]
+
+    unchar_cond, novel_cond = _cond("UNCHARACTERIZED"), _cond("NOVEL_ROLE")
+    unchar_agree = sum(1 for _, v in unchar_cond if len(set(v.values())) == 1)
+    novel_exact = sum(1 for _, v in novel_cond if len(set(v.values())) == 1)
+    lvl = {lab: i for i, lab in enumerate(NOVEL_ORDER)}
+    means = {
+        r: (sum(lvl[v[r]] for _, v in novel_cond) / len(novel_cond)) if novel_cond else 0.0
+        for r in names
+    }
+    order = sorted(names, key=lambda r: means[r])
+    mono = (
+        sum(1 for _, v in novel_cond if lvl[v[order[0]]] <= lvl[v[order[1]]] <= lvl[v[order[2]]])
+        if len(names) == 3 and novel_cond
+        else 0
+    )
+    within1 = within1_n = 0
+    for _, v in novel_cond:
+        vals = [lvl[v[r]] for r in names]
+        if 3 in vals:  # off-axis CONTRADICTORY excluded from the within-1 check
+            continue
+        within1_n += 1
+        within1 += max(vals) - min(vals) <= 1
+    marginals = {
+        r: {lab: sum(1 for _, v in novel_cond if v[r] == lab) for lab in NOVEL_ORDER} for r in names
+    }
+    median_r = order[len(order) // 2] if order else ""
+    maj = med_match = 0
+    for _, v in novel_cond:
+        top, cnt = Counter(v.values()).most_common(1)[0]
+        if cnt >= 2:
+            maj += 1
+            med_match += v[median_r] == top
+    subclass = {
+        "unchar": {"agree": unchar_agree, "n": len(unchar_cond)},
+        "novel": {
+            "exact": novel_exact,
+            "n": len(novel_cond),
+            "monotone": mono,
+            "within1": within1,
+            "within1_n": within1_n,
+        },
+        "calibration": {
+            "order": order,
+            "means": means,
+            "marginals": marginals,
+            "labels": list(NOVEL_ORDER),
+        },
+        "consensus_is_median": {"match": med_match, "n": maj, "reviewer": median_r},
+    }
+
+    return {
+        "n_genes": n,
+        "reviewers": names,
+        "pairwise": pairwise,
+        "unanimous": unanimous,
+        "unanimous_frac": unanimous / n if n else 0.0,
+        "fleiss_kappa": kappa,
+        "by_class": by_class,
+        "ceiling": [min(pw), max(pw)] if pw else [0.0, 0.0],
+        "levels": {
+            "pathway": {
+                "agree": path_agree,
+                "n": len(path_clusters),
+                "frac": path_agree / len(path_clusters) if path_clusters else 0.0,
+            },
+            "category": {"agree": unanimous, "n": n, "frac": unanimous / n if n else 0.0},
+            "subcategory": {
+                "agree": sub_unan,
+                "n": len(sub_genes),
+                "frac": sub_unan / len(sub_genes) if sub_genes else 0.0,
+            },
+        },
+        "web": {
+            "overall": {"yes": web_yes, "n": web_n, "frac": web_yes / web_n if web_n else 0.0},
+            "by_class": web_by_class,
+        },
+        "subclass": subclass,
+    }
+
+
+def source_preference_tally(gt: dict) -> dict:
+    """Sum the reviewers' de-blinded source-preference votes over real genes."""
+    overall: Counter = Counter()
+    by_class = {c: Counter() for c in CLASSES}
+    seen: set[tuple] = set()
+    for (screen, cluster, gene), row in gt.items():
+        if row.get("cluster_role") != "real":
+            continue
+        key = (screen, cluster, gene)
+        if key in seen:
+            continue
+        seen.add(key)
+        cc = row.get("consensus_class", "")
+        for src in ("affinage", "uniprot", "both", "neither"):
+            n = int(row.get(f"pref_{src}", 0) or 0)
+            overall[src] += n
+            if cc in by_class:
+                by_class[cc][src] += n
+    return {"overall": dict(overall), "by_class": {c: dict(by_class[c]) for c in CLASSES}}
+
+
+def source_diagnostics(
+    run_dir: Path,
+    gt: dict,
+    reviewer_labels: dict[tuple, set[str]],
+    condition: str,
+    n_real: int = N_REAL_GENES,
+) -> dict:
+    """Per-class + lenient recall for one source condition (e.g. affinage__single_call)."""
+    modal = gene_modal_categories(run_dir, route_equals=condition)
+    confusion = {c: Counter() for c in CLASSES}
+    strata = {c: {"consensus": 0, "any": 0, "n": 0} for c in CLASSES}
+    per_cluster: dict[tuple, list[int]] = defaultdict(lambda: [0, 0])  # (correct, n)
+    consensus_correct = any_correct = n = forgiven = 0
+
+    for (screen, cluster, gene), modal_call in modal.items():
+        row = gt.get((screen, cluster, gene))
+        if not row or row.get("cluster_role") != "real":
+            continue
+        consensus_class = row.get("consensus_class", "")
+        if not consensus_class:
+            continue
+        labels = reviewer_labels.get((screen, cluster, gene), set())
+        n += 1
+        ok_consensus = modal_call == consensus_class
+        ok_any = modal_call in labels
+        consensus_correct += ok_consensus
+        any_correct += ok_any
+        if ok_any and not ok_consensus:
+            forgiven += 1
+        confusion[consensus_class][modal_call] += 1
+        s = strata[consensus_class]
+        s["n"] += 1
+        s["consensus"] += ok_consensus
+        s["any"] += ok_any
+        pc = per_cluster[(screen, cluster)]
+        pc[0] += ok_consensus
+        pc[1] += 1
+
+    def _recall(correct: int, total: int) -> float:
+        return correct / total if total else 0.0
+
+    def _prf(c: str) -> dict:
+        """Precision / recall / F1 for class c from the full confusion matrix."""
+        tp = confusion[c].get(c, 0)
+        fn = strata[c]["n"] - tp
+        fp = sum(confusion[o].get(c, 0) for o in CLASSES if o != c)
+        prec = tp / (tp + fp) if tp + fp else 0.0
+        rec = tp / (tp + fn) if tp + fn else 0.0
+        f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
+        return {
+            "tp": tp,
+            "fp": fp,
+            "fn": fn,
+            "precision": round(prec, 3),
+            "recall": round(rec, 3),
+            "f1": round(f1, 3),
+        }
+
+    return {
+        "condition": condition,
+        "n_scored": n,
+        "consensus_recall": _recall(consensus_correct, n),
+        "any_recall": _recall(any_correct, n),
+        "consensus_cw": consensus_correct / n_real,
+        "any_cw": any_correct / n_real,
+        "leniency_gain": _recall(any_correct, n) - _recall(consensus_correct, n),
+        "forgiven": forgiven,
+        "per_class": {
+            c: {
+                "n": strata[c]["n"],
+                "recall_consensus": _recall(strata[c]["consensus"], strata[c]["n"]),
+                "recall_any": _recall(strata[c]["any"], strata[c]["n"]),
+                "confusion": dict(confusion[c]),
+                **_prf(c),
+            }
+            for c in CLASSES
+        },
+        "per_cluster": {
+            f"{s}/{cl}": {"correct": v[0], "n": v[1], "recall": round(_recall(v[0], v[1]), 3)}
+            for (s, cl), v in sorted(per_cluster.items())
+        },
+    }
+
+
+def audit_flag_diagnostics(
+    bundles_dir: Path, run_dir: Path, route_equals: str | None = None, route_excludes: str = "mcp"
+) -> dict:
+    """Per-run handling of the audit-flagged bundle genes.
+
+    Flagged genes carry a non-empty affinage_audit_note in the master bundles.
+    For each, reports the note, the gene's category votes and modal call across
+    replicates (same route filter and hedge rule as score_run), and how many
+    replicates' rationale/evidence text engages the flag -- mentions the audit
+    concern rather than absorbing the narrative silently. ESTABLISHED calls
+    carry no rationale, so reps_with_rationale counts novel/uncharacterized
+    appearances only. Returns {} when the bundle set carries no flags.
+    """
+    flags: dict[tuple, str] = {}
+    for path in sorted(Path(bundles_dir).glob("*__bundle.json")):
+        bundle = json.loads(path.read_text())
+        for entry in bundle.get("cluster_genes") or []:
+            note = entry.get("affinage_audit_note")
+            if note:
+                key = (bundle["screen_name"], str(bundle["cluster_id"]), entry["gene_symbol"])
+                flags[key] = note
+    if not flags:
+        return {}
+
+    gene_votes, _, _, _ = _accumulate_votes(run_dir, route_equals, route_excludes)
+    seen: Counter = Counter()
+    engaged: Counter = Counter()
+    with open(Path(run_dir) / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
+            parsed = cell.get("parsed_output")
+            if parsed is None or parsed.get("dominant_process") is None:
+                continue
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            gene_items = (parsed.get("novel_role_genes") or []) + (
+                parsed.get("uncharacterized_genes") or []
+            )
+            for item in gene_items:
+                key = (screen, cluster, item["gene"])
+                if key not in flags:
+                    continue
+                seen[key] += 1
+                text = f"{item.get('rationale', '')} {item.get('evidence', '')}".lower()
+                if any(term in text for term in _AUDIT_ENGAGEMENT_TERMS):
+                    engaged[key] += 1
+
+    return {
+        key: {
+            "audit_note": note,
+            "votes": dict(gene_votes[key]) if key in gene_votes else {},
+            "modal_category": gene_votes[key].most_common(1)[0][0] if key in gene_votes else None,
+            "reps_with_rationale": seen[key],
+            "reps_engaging": engaged[key],
+        }
+        for key, note in flags.items()
+    }
+
+
+@dataclass
+class DecoyResult:
+    screen: str
+    cluster: str
+    expectation: str  # "abstain" | "functional"
+    reps: int
+    failures: int
+    modal_confidence: str | None
+    passed: bool
+    genes_per_rep: list[int]  # genes classified each rep (output completeness)
+    median_genes: float
+    expected_genes: int | None  # cluster's true gene count, when known
+    completion: float | None  # median_genes / expected_genes (1.0 = perfect; >1 = over-produced)
+
+
+def _median(xs: list[int]) -> float:
+    s = sorted(xs)
+    m = len(s)
+    if not m:
+        return 0.0
+    return float(s[m // 2] if m % 2 else (s[m // 2 - 1] + s[m // 2]) / 2)
+
+
+def score_decoys(
+    run_dir: Path,
+    decoy_specs: dict[tuple, str],
+    route_equals: str | None = None,
+    route_excludes: str = "mcp",
+    expected_counts: dict[tuple, int] | None = None,
+) -> list[DecoyResult]:
+    """Validate negative-control decoy clusters (not consensus-scored).
+
+    decoy_specs maps (screen, cluster) -> expectation. Both require valid replies
+    (no crash) across reps: "abstain" passes on modal confidence Low (recognized
+    no cluster); "functional" passes on modal High/Medium (handled the big
+    cluster without erroring out). Route filtering mirrors score_run. Also reports
+    output completeness (genes classified per rep vs the cluster's expected gene
+    count) so output fragility -- dropping or hallucinating genes on the large
+    functional decoy -- is visible even when confidence passes.
+    """
+    run_dir = Path(run_dir)
+    reps: dict[tuple, int] = defaultdict(int)
+    failures: dict[tuple, int] = defaultdict(int)
+    conf_votes: dict[tuple, Counter] = defaultdict(Counter)
+    gene_counts: dict[tuple, list[int]] = defaultdict(list)
+
+    with open(run_dir / "parsed_outputs.jsonl") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            cell = json.loads(line)
+            route = cell.get("route", "")
+            if route_equals is not None:
+                if route != route_equals:
+                    continue
+            elif route_excludes and route_excludes in route:
+                continue
+
+            screen, cluster = _parse_run_id(cell["run_id"], route)
+            key = (screen, cluster)
+            if key not in decoy_specs:
+                continue
+            reps[key] += 1
+            parsed = cell.get("parsed_output")
+            if parsed is None or parsed.get("dominant_process") is None:
+                failures[key] += 1
+                continue
+            gene_counts[key].append(
+                len(parsed.get("established_genes") or [])
+                + len(parsed.get("novel_role_genes") or [])
+                + len(parsed.get("uncharacterized_genes") or [])
+            )
+            confidence = parsed.get("pathway_confidence")
+            if confidence:
+                conf_votes[key][confidence] += 1
+
+    results = []
+    for key, expectation in decoy_specs.items():
+        screen, cluster = key
+        votes = conf_votes[key]
+        modal = votes.most_common(1)[0][0] if votes else None
+        n_reps = reps[key]
+        n_fail = failures[key]
+        if expectation == "abstain":
+            # A crash is not abstention: require valid replies (no failures)
+            # whose modal confidence is Low.
+            passed = n_reps > 0 and n_fail == 0 and modal == "Low"
+        elif expectation == "functional":
+            passed = n_reps > 0 and n_fail == 0 and modal in ("High", "Medium")
+        else:
+            raise ValueError(f"unknown decoy expectation {expectation!r} for {key}")
+        counts = gene_counts[key]
+        median_g = _median(counts)
+        expected = (expected_counts or {}).get(key)
+        completion = round(median_g / expected, 3) if expected else None
+        results.append(
+            DecoyResult(
+                screen,
+                cluster,
+                expectation,
+                n_reps,
+                n_fail,
+                modal,
+                passed,
+                genes_per_rep=counts,
+                median_genes=median_g,
+                expected_genes=expected,
+                completion=completion,
+            )
+        )
+    return results

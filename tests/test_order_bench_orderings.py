@@ -1,0 +1,232 @@
+"""Tests for bench_orderings — Phase 2 order variant generation and validation."""
+
+import sys
+from pathlib import Path
+
+import pytest
+
+# Ensure repo root is on sys.path
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from benchmarks.workflow.bench_orderings import (
+    _ORDER_SPECS,
+    ORDER_VARIANTS,
+    OrderVariant,
+    apply_order_variant,
+)
+from benchmarks.workflow.bench_routes import (
+    ROUTE_REGISTRY,
+    StepwiseTurn,
+)
+from mozzarellm.prompts import COMPONENTS
+
+# ============================================================================
+# Variant registry tests
+# ============================================================================
+
+
+class TestOrderVariantsRegistry:
+    def test_all_five_variants_exist(self):
+        expected = {"O", "O1", "O2", "O3", "O4"}
+        assert set(ORDER_VARIANTS.keys()) == expected
+
+    def test_all_variants_have_required_fields(self):
+        for variant in ORDER_VARIANTS.values():
+            assert isinstance(variant, OrderVariant)
+            assert isinstance(variant.name, str) and len(variant.name) > 0
+            assert isinstance(variant.description, str) and len(variant.description) > 0
+
+    def test_canonical_has_no_hypothesis(self):
+        assert ORDER_VARIANTS["O"].hypothesis is None
+
+    def test_perturbation_variants_have_hypotheses(self):
+        for key, variant in ORDER_VARIANTS.items():
+            if key != "O":
+                assert variant.hypothesis is not None, f"{key} should have a hypothesis"
+                assert variant.hypothesis.startswith("H"), f"{key} hypothesis should start with H"
+
+
+# ============================================================================
+# Order specs coverage
+# ============================================================================
+
+
+class TestOrderSpecs:
+    """Every variant must have specs for all 6 mode×mcp combinations."""
+
+    ALL_MODE_MCP = [
+        ("standard", False),
+        ("standard", True),
+        ("cot", False),
+        ("cot", True),
+        ("stepwise", False),
+        ("stepwise", True),
+    ]
+
+    def test_all_variants_cover_all_modes(self):
+        for variant_key in ORDER_VARIANTS:
+            assert variant_key in _ORDER_SPECS, f"Missing specs for {variant_key}"
+            for mode, mcp in self.ALL_MODE_MCP:
+                assert (mode, mcp) in _ORDER_SPECS[variant_key], (
+                    f"Missing spec: variant={variant_key}, mode={mode}, mcp={mcp}"
+                )
+
+    def test_all_specs_have_component_order(self):
+        for variant_key, mode_specs in _ORDER_SPECS.items():
+            for (mode, mcp), spec in mode_specs.items():
+                assert "component_order" in spec, (
+                    f"Missing component_order: {variant_key}/{mode}/{mcp}"
+                )
+                order = spec["component_order"]
+                assert isinstance(order, tuple) and len(order) > 0
+
+    def test_stepwise_specs_have_system_and_turns(self):
+        for variant_key, mode_specs in _ORDER_SPECS.items():
+            for (mode, mcp), spec in mode_specs.items():
+                if mode == "stepwise":
+                    assert "system_components" in spec, (
+                        f"Missing system_components: {variant_key}/{mode}/{mcp}"
+                    )
+                    assert "user_turn_keys" in spec, (
+                        f"Missing user_turn_keys: {variant_key}/{mode}/{mcp}"
+                    )
+                    assert len(spec["system_components"]) > 0
+                    assert len(spec["user_turn_keys"]) > 0
+
+    def test_component_keys_are_valid(self):
+        """All component keys in specs resolve to COMPONENTS or SC."""
+        valid_keys = set(COMPONENTS) | {"SC"}
+        for variant_key, mode_specs in _ORDER_SPECS.items():
+            for (mode, mcp), spec in mode_specs.items():
+                for key in spec["component_order"]:
+                    assert key in valid_keys, f"Invalid key {key!r} in {variant_key}/{mode}/{mcp}"
+
+    def test_mcp_specs_include_lit(self):
+        """MCP variants always include LIT in their component order."""
+        for variant_key, mode_specs in _ORDER_SPECS.items():
+            for (mode, mcp), spec in mode_specs.items():
+                if mcp:
+                    assert "LIT" in spec["component_order"], (
+                        f"LIT missing from MCP spec: {variant_key}/{mode}/{mcp}"
+                    )
+                else:
+                    assert "LIT" not in spec["component_order"], (
+                        f"LIT should not be in non-MCP spec: {variant_key}/{mode}/{mcp}"
+                    )
+
+    def test_canonical_matches_phase1_routes(self):
+        """Canonical order specs should match Phase 1 ROUTE_REGISTRY orders."""
+        for route_name, route in ROUTE_REGISTRY.items():
+            mode, mcp = route.mode, route.mcp
+            canonical_spec = _ORDER_SPECS["O"][(mode, mcp)]
+            assert canonical_spec["component_order"] == route.component_order, (
+                f"Canonical order mismatch for route {route_name}: "
+                f"spec={canonical_spec['component_order']} vs route={route.component_order}"
+            )
+
+    def test_stepwise_system_plus_turns_cover_full_order(self):
+        """For stepwise specs, system_components ∪ user_turn component keys == component_order."""
+        for variant_key, mode_specs in _ORDER_SPECS.items():
+            for (mode, mcp), spec in mode_specs.items():
+                if mode != "stepwise":
+                    continue
+                turn_component_keys = {key for key, _mcp_flag in spec["user_turn_keys"]}
+                combined = set(spec["system_components"]) | turn_component_keys
+                expected = set(spec["component_order"])
+                assert combined == expected, (
+                    f"Stepwise split mismatch: {variant_key}/{mode}/mcp={mcp} — "
+                    f"system∪turns={sorted(combined)} vs order={sorted(expected)}"
+                )
+
+    def test_all_perturbations_use_same_component_set(self):
+        """Every perturbation variant uses the same component set as canonical."""
+        for variant_key, mode_specs in _ORDER_SPECS.items():
+            if variant_key == "O":
+                continue
+            for (mode, mcp), spec in mode_specs.items():
+                canonical_order = _ORDER_SPECS["O"][(mode, mcp)]["component_order"]
+                assert set(spec["component_order"]) == set(canonical_order), (
+                    f"Component set mismatch: {variant_key}/{mode}/mcp={mcp} — "
+                    f"perturbed={sorted(spec['component_order'])} vs "
+                    f"canonical={sorted(canonical_order)}"
+                )
+
+
+# ============================================================================
+# apply_order_variant
+# ============================================================================
+
+
+class TestApplyOrderVariant:
+    def test_produces_new_route_with_correct_name(self):
+        base = ROUTE_REGISTRY["cot"]
+        result = apply_order_variant(base, "O1")
+        assert result.name == "cot_O1_late_screen_context"
+
+    def test_preserves_base_fields(self):
+        base = ROUTE_REGISTRY["single_call"]
+        result = apply_order_variant(base, "O")
+        assert result.mode == base.mode
+        assert result.mcp == base.mcp
+        assert result.delivery == base.delivery
+
+    def test_sets_order_metadata(self):
+        base = ROUTE_REGISTRY["cot"]
+        result = apply_order_variant(base, "O3")
+        assert result.base_route == "cot"
+        assert result.order_variant == "early_output_format"
+        assert result.order_hypothesis == "H4"
+
+    def test_canonical_variant_has_empty_hypothesis(self):
+        base = ROUTE_REGISTRY["single_call"]
+        result = apply_order_variant(base, "O")
+        assert result.order_hypothesis == ""
+
+    def test_component_order_is_tuple(self):
+        base = ROUTE_REGISTRY["cot"]
+        result = apply_order_variant(base, "O4")
+        assert isinstance(result.component_order, tuple)
+        assert len(result.component_order) > 0
+
+    def test_stepwise_route_has_user_turns(self):
+        base = ROUTE_REGISTRY["stepwise"]
+        result = apply_order_variant(base, "O1")
+        assert result.delivery == "multi_turn"
+        assert len(result.system_components) > 0
+        assert len(result.user_turns) > 0
+        assert all(isinstance(t, StepwiseTurn) for t in result.user_turns)
+
+    def test_stepwise_mcp_has_lit_turn(self):
+        base = ROUTE_REGISTRY["stepwise_mcp"]
+        result = apply_order_variant(base, "O")
+        lit_turns = [t for t in result.user_turns if t.mcp]
+        assert len(lit_turns) == 1
+        assert lit_turns[0].component == "LIT"
+
+    def test_route_is_frozen(self):
+        base = ROUTE_REGISTRY["single_call"]
+        result = apply_order_variant(base, "O")
+        with pytest.raises(AttributeError):
+            result.name = "modified"
+
+    def test_unknown_variant_raises(self):
+        base = ROUTE_REGISTRY["single_call"]
+        with pytest.raises(ValueError, match="Unknown order variant"):
+            apply_order_variant(base, "nonexistent")
+
+    def test_perturbation_changes_order(self):
+        """Non-canonical variant should produce different order from canonical."""
+        base = ROUTE_REGISTRY["cot"]
+        canonical = apply_order_variant(base, "O")
+        perturbed = apply_order_variant(base, "O4")
+        assert canonical.component_order != perturbed.component_order
+
+    def test_same_components_different_order(self):
+        """Perturbed variant should have same components, just reordered."""
+        base = ROUTE_REGISTRY["single_call"]
+        canonical = apply_order_variant(base, "O")
+        perturbed = apply_order_variant(base, "O1")
+        assert set(canonical.component_order) == set(perturbed.component_order)
+        assert canonical.component_order != perturbed.component_order

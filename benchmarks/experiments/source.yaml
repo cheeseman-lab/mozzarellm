@@ -1,0 +1,33 @@
+# The source experiment: uniprot vs affinage evidence on the blank W0 prompt
+# floor -- the same floor the walkup builds up from. Selection is holistic on
+# coverage-weighted recall (correct categories / 103), so a condition can't win
+# by dropping hard genes to inflate raw category. The winner is carried as
+# state.carry.source for the walkup.
+
+experiment: source
+description: evidence-source comparison on the blank W0 prompt floor
+
+model:
+  provider: anthropic
+  model_name: claude-sonnet-5
+  # temperature omitted: claude-sonnet-5 rejects non-default sampling params
+  max_tokens: 16000
+  thinking: false
+
+run:
+  replicates: 3
+  max_workers: 12
+  route: single_call
+  component_overrides: {CAT: "", GCR: "", NPR: "", UPR: "", PCC: ""}  # blank W0 floor
+
+conditions:  # what varies; everything above is shared
+  - name: uniprot
+    bundle_source: uniprot
+  - name: affinage
+    bundle_source: affinage
+
+selection:
+  primary: coverage_weighted_category
+  metrics: [category, novel_subclass, unchar_subclass, coherence, coverage]
+
+carry: [source]  # state.carry.source = winning condition name

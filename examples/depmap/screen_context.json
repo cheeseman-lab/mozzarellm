@@ -1,0 +1,32 @@
+{
+  "assay_type": "DepMap co-essentiality analysis",
+  "target_phenotype": "Gene fitness effects across cancer cell lines — genes with correlated essentiality profiles are likely to function in the same pathway",
+  "organism": "Homo sapiens",
+  "cell_line_or_system": "Cancer cell line collection (DepMap, ~900 lines)",
+  "perturbation": {
+    "type": "CRISPR-Cas9 knockout",
+    "library_or_reagent": "Genome-scale CRISPR screen (Avana library)"
+  },
+  "readout": {
+    "measurement": "Cell fitness / viability after gene knockout",
+    "instrument_or_platform": "Genome-wide CRISPR screens across the Cancer Dependency Map (DepMap)",
+    "primary_metric": "Gene effect scores (CERES) — modules are co-essential gene clusters derived from correlated fitness profiles"
+  },
+  "clustering": {
+    "method": "Co-essentiality clustering of gene fitness profiles across cell lines",
+    "parameters": {
+      "resolution": "Hierarchical clustering of Pearson correlations",
+      "k_neighbors": "N/A"
+    }
+  },
+  "controls": {
+    "negative_controls": "Non-essential genes",
+    "positive_controls": "Known essential gene complexes"
+  },
+  "provenance": {
+    "dataset_name": "Wainberg 2021 DepMap co-essentiality modules",
+    "citation": "Wainberg et al. (2021) Nat Genet. A genome-wide atlas of co-essential modules assigns function to uncharacterized genes.",
+    "data_source": "wainberg_2021.csv — gene-level co-essentiality module assignments"
+  },
+  "notes": "Each module represents genes that are co-essential across cancer cell lines. Genes in the same module likely participate in the same biological process or complex."
+}

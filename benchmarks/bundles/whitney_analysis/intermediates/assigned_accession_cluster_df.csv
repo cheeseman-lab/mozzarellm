@@ -1,0 +1,62 @@
+cluster_id,gene_symbol,up_features,down_features,phenotypic_strength,accession
+6,PSMA1,,cell_ConA_median; cytoplasm_COX4_median; cell_COX4_median,2.492433915892388,P25786
+6,PSMC2,cell_AGP_median; cell_AGP_mean; cytoplasm_AGP_mean,,2.43016884406916,P35998
+6,SNRNP27,nucleus_AGP_int,,1.542973568839961,Q8WVK2
+6,ENSG00000256206,nucleus_area; nucleus_AGP_int,nucleus_ConA_median; cytoplasm_COX4_median; nucleus_ConA_mean,2.608767955250093,
+6,ENSG00000256646,nucleus_area; cell_AGP_int; cytoplasm_AGP_int; cell_area; nucleus_AGP_int,cell_COX4_mean; nucleus_COX4_mean; cell_COX4_median; cytoplasm_COX4_mean; nucleus_Hoescht_median; nucleus_Hoescht_mean; nucleus_COX4_median,2.6442071369418043,
+6,PSMA4,nucleus_AGP_int; nucleus_area; cell_AGP_int; cytoplasm_AGP_int; cell_area; cytoplasm_ConA_int; cell_ConA_int; cytoplasm_area,nucleus_ConA_median; cytoplasm_COX4_mean; cell_COX4_mean; cytoplasm_COX4_median; nucleus_ConA_mean,2.5641127143811726,P25789
+6,FNBP4,nucleus_COX4_int; nucleus_area,,1.4148959881979588,Q8N3X1
+6,PSMB1,nucleus_AGP_int; cell_AGP_int; cytoplasm_AGP_int; nucleus_area; cell_area; cytoplasm_area; cytoplasm_Hoescht_int; cell_Hoescht_int,cell_COX4_mean,2.450042749593205,P20618
+6,PSMB7,nucleus_AGP_int; cell_AGP_int,,2.535251679770911,Q99436
+6,PSMB3,cell_AGP_int; nucleus_area; cell_area; nucleus_AGP_int; cytoplasm_AGP_int; cytoplasm_area,cell_Hoescht_mean,2.395091113388148,P49720
+6,PSMC4,cytoplasm_AGP_int; cell_AGP_int; cell_area; cytoplasm_Hoescht_int; cytoplasm_area; nucleus_AGP_int,cytoplasm_COX4_median; cell_COX4_mean; cytoplasm_COX4_mean; cell_COX4_median,2.351888594569976,P43686
+6,PSMC5,,cell_COX4_median; cytoplasm_COX4_mean,1.4073478019150074,P62195
+6,NAE1,nucleus_AGP_int; cell_AGP_int,,1.2683865628090163,Q13564
+6,AKIRIN2,nucleus_AGP_int; nucleus_area; cell_AGP_int; cytoplasm_AGP_int; cell_area; cell_AGP_median; cytoplasm_Hoescht_int; cytoplasm_AGP_median,cytoplasm_COX4_mean; cell_COX4_mean; cytoplasm_COX4_median,2.8542015935839107,Q53H80
+6,FOXN3,nucleus_Hoescht_mean; nucleus_Hoescht_median,,1.3528113047574737,O00409
+6,PSMD7,cytoplasm_AGP_mean; cell_AGP_mean; cytoplasm_AGP_median; nucleus_AGP_mean; nucleus_AGP_median; cell_AGP_median; nucleus_AGP_int,,2.049893679392794,P51665
+6,SNRPE,,cell_COX4_median,1.7588488889627978,P62304
+6,NEDD8-MDP1,nucleus_AGP_int; cell_AGP_int; cytoplasm_AGP_int; cell_ConA_int; cytoplasm_ConA_int; nucleus_area; nucleus_Hoescht_int; nucleus_COX4_int,,2.1010306103128125,E9PL57
+6,PSMC6,cytoplasm_AGP_median; cytoplasm_AGP_mean; cell_AGP_median; cell_AGP_mean,,2.07032848024274,P62333
+6,PSMC3,cytoplasm_AGP_int; cell_AGP_int,,2.4843237608712285,P17980
+6,PSMB4,cytoplasm_AGP_int; nucleus_area; cell_area; cell_AGP_int; cytoplasm_area; nucleus_AGP_int; nucleus_COX4_int,cytoplasm_COX4_mean,2.326412262282067,P28070
+6,PSMD2,cell_AGP_mean; cytoplasm_AGP_mean; cytoplasm_AGP_int; cytoplasm_AGP_median; nucleus_AGP_mean,,2.5105146653512005,Q13200
+6,PSMA7,cell_AGP_int; cytoplasm_AGP_int; nucleus_AGP_int; cell_area; cytoplasm_AGP_median; nucleus_area; cytoplasm_area,,2.3082858632653247,O14818
+6,NEDD8,nucleus_AGP_int; cell_COX4_int,,1.7008664195962195,Q15843
+6,PSMC1,cytoplasm_AGP_median; cell_AGP_median; cytoplasm_AGP_mean; cell_AGP_mean; nucleus_AGP_int,,2.127834766820285,P62191
+9,CHP2,,nucleus_Hoescht_mean; nucleus_Hoescht_median,0.3833586301660737,O43745
+9,CSNK2B,nucleus_Hoescht_median,nucleus_COX4_int; nucleus_AGP_int; nucleus_area; cell_COX4_int; nucleus_AGP_median; nucleus_ConA_int; cell_AGP_int; nucleus_AGP_mean; cytoplasm_COX4_int,0.5169133027908724,P67870
+9,CYB5B,,nucleus_COX4_median; cell_COX4_median; nucleus_COX4_int; nucleus_COX4_mean,1.2473759028705,O43169
+9,DNAJC11,,cell_COX4_median,0.4509101651818907,Q9NVH1
+9,DNM1L,,cell_COX4_mean; cytoplasm_COX4_mean; cell_COX4_median; cytoplasm_COX4_median,0.8115743299786069,O00429
+9,EEF2,,cell_COX4_mean; cell_COX4_median,1.821018652881777,P13639
+9,GPAT4,,nucleus_COX4_int; nucleus_COX4_mean; nucleus_COX4_median; cell_COX4_median; cell_COX4_mean; nucleus_ConA_int; cytoplasm_COX4_mean,0.7394643627949842,Q86UL3
+9,LSM2,,nucleus_COX4_mean; cell_COX4_median,1.5849747773106355,Q9Y333
+9,MARCHF6,,cell_COX4_mean; cytoplasm_COX4_mean; cell_COX4_median; cytoplasm_COX4_median,0.5674885246660746,O60337
+9,MFN2,,cytoplasm_COX4_median; cell_COX4_median; cytoplasm_COX4_mean,0.692753535911685,O95140
+9,PCYT1A,,nucleus_COX4_int; nucleus_COX4_mean; nucleus_COX4_median; cell_COX4_median; cell_COX4_mean,0.6014837532925801,P49585
+9,RHOT2,,cytoplasm_COX4_median,0.4401521116448462,Q8IXI1
+9,SCD,cell_ConA_int; cytoplasm_AGP_int; cytoplasm_ConA_int; cytoplasm_ConA_mean; cell_AGP_int; cell_ConA_mean; nucleus_AGP_mean; nucleus_ConA_mean; nucleus_AGP_median; cell_ConA_median; nucleus_Hoescht_median; cell_AGP_mean; nucleus_Hoescht_mean; nucleus_ConA_median; cytoplasm_ConA_median; cytoplasm_Hoescht_int,nucleus_COX4_median; cell_COX4_median,0.7941470824420276,O00767
+9,SLC25A1,,cell_COX4_mean; nucleus_COX4_int; cytoplasm_COX4_mean; nucleus_COX4_mean,0.6574347475458819,P53007
+9,SMIM12,,cell_COX4_mean; nucleus_COX4_int; cytoplasm_COX4_mean; nucleus_COX4_mean; cell_COX4_median,0.5441112856910991,Q96EX1
+9,SREBF2,nucleus_Hoescht_mean; cell_ConA_mean; cytoplasm_ConA_mean; nucleus_Hoescht_median; cytoplasm_AGP_mean; cytoplasm_Hoescht_int; cell_AGP_mean; cytoplasm_ConA_median,nucleus_COX4_median; nucleus_COX4_int,0.6438640642277805,Q12772
+9,TMEM11,,nucleus_COX4_median; cell_COX4_median; nucleus_COX4_mean; cell_COX4_mean; cytoplasm_COX4_median,0.7239121855471622,P17152
+9,TMPO,,nucleus_COX4_median,0.6030939328086742,P42166
+9,VHL,,cell_COX4_int; cell_COX4_mean; cell_COX4_median; cytoplasm_COX4_int; cytoplasm_COX4_mean; cytoplasm_COX4_median; nucleus_COX4_mean; nucleus_COX4_median; nucleus_COX4_int,1.2554440284933135,P40337
+9,VKORC1L1,,nucleus_COX4_median; cell_COX4_median; nucleus_COX4_int; nucleus_COX4_mean; cell_COX4_mean,0.767679422578414,Q8N0U8
+9,VPS13D,,nucleus_COX4_mean; nucleus_COX4_median; nucleus_COX4_int; cell_COX4_mean; cell_COX4_median; cytoplasm_COX4_mean; cytoplasm_COX4_int; cell_COX4_int,0.8612721911206555,Q5THJ4
+9,ZMYM4,cell_AGP_int; cytoplasm_AGP_int; cell_area; cytoplasm_ConA_int; cytoplasm_area; cytoplasm_Hoescht_int,cell_COX4_median; nucleus_COX4_median; cell_COX4_mean; nucleus_COX4_mean,0.9580550216277952,Q5VZL5
+49,nontargeting_intergenic_CTCGGTCAGACG,,,0.3360094064470065,NON_TARGETING_CONTROL
+49,nontargeting_intergenic_CTCCAACTCGGG,,,0.4622165401932288,NON_TARGETING_CONTROL
+49,NDUFAF4,cell_Hoescht_median; cytoplasm_Hoescht_median,,0.3332983451382968,Q9P032
+49,nontargeting_intergenic_GCAATTCTGTCG,,,0.5589734028029609,NON_TARGETING_CONTROL
+49,ETV4,cytoplasm_ConA_int,,0.3635953102131035,P43268
+49,nontargeting_intergenic_GAGGGTCGCTTC,,,0.3547696557858421,NON_TARGETING_CONTROL
+49,NEFM,,nucleus_Hoescht_mean; cell_Hoescht_int,0.403890977355431,P07197
+49,nontargeting_intergenic_GACACTCTCCTT,,,0.3916985051009795,NON_TARGETING_CONTROL
+49,nontargeting_intergenic_GATGAATCTAAC,,,0.4016636575621788,NON_TARGETING_CONTROL
+49,nontargeting_intergenic_CGTTAGGAGATA,,,0.3458427512188097,NON_TARGETING_CONTROL
+49,nontargeting_intergenic_GCACAAGGTCAT,,,1.382159386356472,NON_TARGETING_CONTROL
+49,BTG1,nucleus_ConA_median; nucleus_ConA_mean; nucleus_AGP_mean,,0.370112187596009,P62324
+49,MYO9B,cytoplasm_area,cell_Hoescht_mean,0.5930255278495083,Q13459
+49,RELT,cytoplasm_AGP_int; cell_AGP_int; cell_area; cytoplasm_area,,0.3813995615809074,Q969Z4
