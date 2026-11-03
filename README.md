@@ -3,6 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/cheeseman-lab/mozzarellm)](https://github.com/cheeseman-lab/mozzarellm/releases)
 [![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![bioRxiv](https://img.shields.io/badge/bioRxiv-10.1101%2F2025.05.26.656231-b31b1b)](https://doi.org/10.1101/2025.05.26.656231)
 
 MozzareLLM annotates gene clusters from functional genomics screens with a large language model.
 For each cluster it names the pathway that explains the cluster (or says none does), classifies
@@ -28,7 +29,16 @@ The benchmark that selected the shipped prompts is in [`benchmarks/`](benchmarks
 
 MozzareLLM was created by [Matteo Di Bernardo](https://github.com/mat10d),
 [Alexa Mallar](https://github.com/amallar428), and others in the
-[Cheeseman Lab](https://cheesemanlab.wi.mit.edu/). A manuscript is in preparation.
+[Cheeseman Lab](https://cheesemanlab.wi.mit.edu/). It is described in the Brieflow manuscript;
+if you use MozzareLLM, please cite:
+
+```
+@ARTICLE
+author={Di Bernardo, Matteo and Kern, Roshan S. and Mallar, Alexa and Nutter-Upham, Andy and Blainey, Paul C. and Cheeseman, Iain},
+title={Brieflow: An Integrated Computational Pipeline for High-Throughput Analysis of Optical Pooled Screening Data},
+year={2025},
+DOI={10.1101/2025.05.26.656231}
+```
 
 ## Contributing
 
