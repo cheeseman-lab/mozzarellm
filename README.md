@@ -29,10 +29,10 @@ literature tool calls, tokens, cost) is written to disk for auditing.
 ## Installation
 
 Into an existing environment (Python 3.11+); a PyPI release is planned, until
-then install from the `cot-mcp` branch:
+then install from GitHub:
 
 ```bash
-python -m pip install "mozzarellm @ git+https://github.com/cheeseman-lab/mozzarellm.git@cot-mcp"
+python -m pip install "mozzarellm @ git+https://github.com/cheeseman-lab/mozzarellm.git"
 ```
 
 Claude models work out of the box; add `[openai]` or `[gemini]` to the
