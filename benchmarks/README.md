@@ -40,8 +40,11 @@ re-scores the newest archived run dirs without API calls.
   `bench_evaluator` (the single metric generator: consensus GT, panels, decoys,
   diagnostics), `bench_routes` (route registry), `bench_configparse` (config dataclasses),
   `bench_orderings` (O-variant catalog), `bench_dry_run`, `bench_metricfns`.
-  `bench_figures` renders every state file into `outputs/figures/` (PNG + editable-text PDF
-  + one tidy CSV per figure; `python -m benchmarks.workflow.bench_figures`).
+  `bench_figures` flattens every state file into tidy CSVs under `outputs/figures/data/` and
+  draws the paper figures at print size, one SVG/PDF/PNG per panel plus a lettered composite:
+  `benchmark/` (the supplement) and `mozzarellm_cluster_<k>/` (the MozzareLLM panels of the
+  tool figure). The screen tables come from one aconcagua run, collected once with
+  `--collect-aconcagua RUNS_DIR LEGACY_DIR PHATE_TSV`.
 - `inputs/` — `benchmark_input.csv` (one row per screen/cluster/gene, with roles
   and phenotypic features), `ground_truth/annotation_{eric,liz,iain}.csv` (raw reviewer
   sheets) + `survey_key.csv` (source-blinding key), per-screen context JSONs.
