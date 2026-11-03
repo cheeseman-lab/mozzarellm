@@ -75,3 +75,4 @@ tmp/
 examples/benchmark_results/
 examples/output/
 benchmarks/bundle_regen.log
+benchmarks/outputs/
