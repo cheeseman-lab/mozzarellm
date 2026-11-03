@@ -44,6 +44,9 @@ MozzareLLM was created by [Matteo Di Bernardo](https://github.com/mat10d),
 
 ## Contributing
 
+We welcome contributions. If you find MozzareLLM useful, feel free to:
+
+- Give the repo a star to boost MozzareLLM's visibility!
 - File a [GitHub issue](https://github.com/cheeseman-lab/mozzarellm/issues) with comments or problems.
 - Clone the repository, create a branch, and open a
   [pull request](https://github.com/cheeseman-lab/mozzarellm/compare). Run
