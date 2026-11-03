@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/cheeseman-lab/mozzarellm)](https://github.com/cheeseman-lab/mozzarellm/releases)
 [![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![bioRxiv](https://img.shields.io/badge/bioRxiv-10.1101%2F2025.05.26.656231-b31b1b)](https://doi.org/10.1101/2025.05.26.656231)
+[![Nature Communications](https://img.shields.io/badge/Nat%20Commun-10.1038%2Fs41467--026--73643--7-b31b1b)](https://doi.org/10.1038/s41467-026-73643-7)
 
 MozzareLLM annotates gene clusters from functional genomics screens with a large language model.
 For each cluster it names the pathway that explains the cluster (or says none does), classifies
@@ -29,15 +29,17 @@ The benchmark that selected the shipped prompts is in [`benchmarks/`](benchmarks
 
 MozzareLLM was created by [Matteo Di Bernardo](https://github.com/mat10d),
 [Alexa Mallar](https://github.com/amallar428), and others in the
-[Cheeseman Lab](https://cheesemanlab.wi.mit.edu/). It is described in the Brieflow manuscript;
-if you use MozzareLLM, please cite:
+[Cheeseman Lab](https://cheesemanlab.wi.mit.edu/). It is presented in the Brieflow paper; if you use MozzareLLM, please cite:
 
 ```
-@ARTICLE
-author={Di Bernardo, Matteo and Kern, Roshan S. and Mallar, Alexa and Nutter-Upham, Andy and Blainey, Paul C. and Cheeseman, Iain},
-title={Brieflow: An Integrated Computational Pipeline for High-Throughput Analysis of Optical Pooled Screening Data},
-year={2025},
-DOI={10.1101/2025.05.26.656231}
+@article{dibernardo2026brieflow,
+  author  = {Di Bernardo, Matteo and Kern, Roshan S. and Cepeda Diaz, Ana Karla and Mallar, Alexa and Choi, Samuel J. and Nutter-Upham, Andrew and Lourido, Sebastian and Blainey, Paul C. and Cheeseman, Iain},
+  title   = {Brieflow: an integrated computational pipeline for high-throughput analysis of optical pooled screening data},
+  journal = {Nature Communications},
+  volume  = {17},
+  year    = {2026},
+  doi     = {10.1038/s41467-026-73643-7}
+}
 ```
 
 ## Contributing
